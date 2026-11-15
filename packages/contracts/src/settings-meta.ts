@@ -107,6 +107,8 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = {
   'letters.family': { group: 'people', label: 'Letter to families about the app', kind: 'textarea', help: 'Printed for each family from Students → On the app, with a code that opens the app. Use {school}, {student}, {class}, {guardian}, {phoneEnd} and {link}.' },
   'letters.student': { group: 'people', label: 'Letter to students about the app', kind: 'textarea', help: 'Printed for each student when the school uses the app for students. Use {school}, {student}, {class} and {link}.' },
   'students.required': { group: 'people', label: 'Fields the office must fill for a student', kind: 'multi', options: [['gender', 'Gender'], ['house', 'House'], ['admissionNo', 'Admission number (otherwise Tangent numbers them)'], ['bloodGroup', 'Blood group'], ['address', 'Address']], help: 'Name, class, date of birth and a guardian are always needed. These become required too when adding or editing a student.' },
+  'people.admissionNumber': { group: 'people', label: 'Admission numbers', kind: 'text', help: 'For a new student when none is typed in. {yyyy}/{seq:4} gives 2026/0001; ADM-{ay}-{seq} gives ADM-2026-27-1. Tokens: {yyyy} {yy} {mm} {ay} {seq}.' },
+  'people.admissionStart': { group: 'people', label: 'First admission number', kind: 'number', min: 1, max: 99_999_999 },
   'people.houses': { group: 'people', label: 'Houses', kind: 'houses', max: 12, help: 'The school’s houses and their colours, if it has them: on student profiles, the roll-call grid and the app. Students are put in a house by import or on their profile.' },
   'admissions.sources': { group: 'people', label: 'Where enquiries come from', kind: 'strings', max: 16, help: 'The choices on a new enquiry, and how Admissions counts them.' },
   'admissions.stages': { group: 'people', label: 'Admission stages', kind: 'multi', options: [['applied', 'Applied (form received)'], ['test', 'Entrance test'], ['offer', 'Offer (the family is told)']], help: 'The steps between an enquiry and enrolment on the Admissions board. Enquiry and Enrolled are always there.' },
@@ -137,8 +139,8 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = {
   'grading.passPct': { group: 'exams', label: 'Pass mark (%)', kind: 'number', min: 0, max: 100 },
 
   // Fees
-  'fees.receiptPrefix': { group: 'fees', label: 'Receipt number prefix', kind: 'text', help: '{year} becomes the year, for example RCPT-{year}-.' },
-  'fees.receiptStart': { group: 'fees', label: 'First receipt number', kind: 'number', min: 1, max: 99_999_999, help: 'For a school arriving from another system: carry on from its last receipt.' },
+  'fees.receiptPrefix': { group: 'fees', label: 'Receipt numbers', kind: 'text', help: 'A pattern: {yyyy} the year, {yy} its last two digits, {mm} the month, {ay} the academic year, {seq} the running number ({seq:5} pads it to 5 digits). RCPT-{yyyy}-{seq:5} gives RCPT-2026-00001; the numbers start again when the year changes.' },
+  'fees.receiptStart': { group: 'fees', label: 'First receipt number', kind: 'number', min: 1, max: 99_999_999, help: 'For a school arriving from another system: the series carries on after its highest number either way.' },
   'fees.receiptNote': { group: 'fees', label: 'Printed on receipts', kind: 'textarea', help: 'Under the school’s name and address on every receipt: the trust, its registration or GST number.' },
   'fees.paymentMethods': { group: 'fees', label: 'How the office records payments', kind: 'paymentMethods', max: 16, help: 'Each with the name the office uses and what kind of money it is.' },
   'fees.lateFeePct': { group: 'fees', label: 'Late fee (%)', kind: 'number', min: 0, max: 25, help: 'Charged once a month on each overdue invoice while the school has Late fines. 0 charges nothing.' },

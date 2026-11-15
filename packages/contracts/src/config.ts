@@ -55,6 +55,19 @@ export const DEFAULT_APP_LAYOUT: Record<AppRoleKey, AppLayout> = {
 };
 
 /** Every setting a school can change (config layer 4). Defaults here are the platform defaults (layer 1). */
+/** Whether a number-series pattern is one a school may use: some text, at most one {seq}, only known tokens, short enough to print. */
+export function seriesProblem(pattern: string): string | null {
+  if (!pattern.trim()) return 'Write the pattern, like RCPT-{yyyy}-{seq:5}.';
+  if ((pattern.match(/\{seq/g) ?? []).length > 1) return 'Use {seq} once.';
+  const unknown = (pattern.match(/\{[^}]*\}/g) ?? []).find((t) => !/^\{(yyyy|year|yy|mm|ay|seq(:\d{1,2})?)\}$/.test(t));
+  if (unknown) return `${unknown} is not a token. Use {yyyy}, {yy}, {mm}, {ay} or {seq}.`;
+  return pattern.length > 40 ? 'Keep the pattern under 40 characters.' : null;
+}
+const seriesCheck = (v: string, ctx: z.RefinementCtx) => {
+  const problem = seriesProblem(v);
+  if (problem) ctx.addIssue({ code: 'custom', message: problem });
+};
+
 /** What kind of money a payment method is: reports and reconciliation group by it, whatever the school calls the method. */
 export const PAYMENT_KINDS = ['cash', 'card', 'bank', 'cheque', 'wallet', 'online', 'other'] as const;
 export const PAYMENT_KIND_LABELS: Record<(typeof PAYMENT_KINDS)[number], string> = { cash: 'Cash', card: 'Card', bank: 'Bank transfer', cheque: 'Cheque', wallet: 'Wallet or app', online: 'Online', other: 'Other' };
@@ -116,8 +129,11 @@ export const SchoolSettingsSchema = z.object({
   'calendar.weeklyOff': z.array(z.enum(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'])).max(6).default(['sat', 'sun']),
   'feeStructures.schoolEdits': z.boolean().default(true),
   // Receipt numbers: {year} becomes the year. The start lets a school arriving from another system keep its numbering.
-  'fees.receiptPrefix': z.string().trim().min(1).max(20).default('RCPT-{year}-'),
-  'fees.receiptStart': z.number().int().min(1).max(99_999_999).default(9001),
+  // Number series (packages/db numbers.ts): {yyyy} {yy} {mm} {ay} and {seq} or {seq:5}; without {seq} it goes at the end.
+  'fees.receiptPrefix': z.string().trim().min(1).max(40).superRefine(seriesCheck).default('RCPT-{yyyy}-{seq:5}'),
+  'fees.receiptStart': z.number().int().min(1).max(99_999_999).default(1),
+  'people.admissionNumber': z.string().trim().min(1).max(40).superRefine(seriesCheck).default('{yyyy}/{seq:4}'),
+  'people.admissionStart': z.number().int().min(1).max(99_999_999).default(1),
   // Printed under the school's name on every receipt: the trust, its registration or GST number.
   'fees.receiptNote': z.string().max(300).default(''),
   // How the office may record a payment (families pay in the app by UPI, card or net banking).

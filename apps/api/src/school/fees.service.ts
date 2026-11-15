@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { newId } from '@tangent/db';
+import { nextNumber, newId } from '@tangent/db';
 import { schoolCurrency, roundToCurrency, roundMoney, currencyDigits, fmtMoney, addDays, dayName, dayMonth, schoolToday, latestSchoolDay, schoolDaysEnding, type FeeHead, type FeeHeadsPut, type FeeSummary, type InvoiceDetail, type InvoiceRow, type PaymentCreate, type ReceiptCancel, type WaiverRequest } from '@tangent/contracts';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
@@ -204,20 +204,17 @@ export class FeesService {
     if (outstanding <= 0) throw new ApiError('conflict', 'That invoice is already paid.');
     if (body.amount > outstanding) throw new ApiError('validation', `The most that can be paid on this invoice is ${fmtMoney(outstanding)}.`, { fields: { amount: 'That is more than is due.' } });
     // Receipt numbers follow the school's own series (set from the console), one at a time so two payments never share a number.
-    const v = (await this.settings.doc(t)).values;
-    const prefix = String(v['fees.receiptPrefix'] ?? 'RCPT-{year}-').replace('{year}', schoolToday().slice(0, 4));
-    const start = Number(v['fees.receiptStart'] ?? 9001);
+    const pattern = await this.settings.value<string>(t, 'fees.receiptPrefix', 'RCPT-{yyyy}-{seq:5}');
+    const start = await this.settings.value<number>(t, 'fees.receiptStart', 1);
+    const ay = (await t.pool.query<{ label: string }>('select label from academic_years where current limit 1')).rows[0]?.label ?? '';
     const tax = await this.tax(t, inv.head, body.amount);
     const paymentId = newId('pay');
     const client = await t.pool.connect();
     let receiptNo: string;
     try {
       await client.query('begin');
-      await client.query("select pg_advisory_xact_lock(hashtext('receipts'))");
       // After the highest number in the series, not start + count: receipts imported from the old system keep their own numbers.
-      const last = (await client.query<{ n: string | null }>(
-        "select max(substring(receipt_no from char_length($1) + 1)::bigint) n from payments where starts_with(receipt_no, $1) and substring(receipt_no from char_length($1) + 1) ~ '^[0-9]+$'", [prefix])).rows[0]!.n;
-      receiptNo = `${prefix}${String(Math.max(start, last === null ? start : Number(last) + 1)).padStart(5, '0')}`;
+      receiptNo = await nextNumber(client, { pattern, start, day: schoolToday(), ay, table: 'payments', column: 'receipt_no' });
       await client.query('insert into payments (id, invoice_id, amount, method, reference, receipt_no, paid_on, recorded_by, tax, provider_payment_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
         [paymentId, inv.id, body.amount, body.method, body.reference ?? null, receiptNo, schoolToday(), online ? null : user.id, tax ? JSON.stringify(tax) : null, online?.providerPaymentId ?? null]);
       await client.query('commit');

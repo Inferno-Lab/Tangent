@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { commitImport, newId, previewImport } from '@tangent/db';
+import { nextNumber, commitImport, newId, previewImport } from '@tangent/db';
 import { schoolInstant, addDays, dayLabel, initials, schoolToday, latestSchoolDay, schoolDaysEnding, type AssignFee, type AttendanceStatus, type ContactReveal, type FeeStatus, type ImportResult, type MessageRequest, type GuardianRow, type GuardiansPut, type Paged, type StudentCreate, type StudentDetail, type StudentPatch, type StudentQuery, type StudentRow, type StudentSummary, type StudentViews } from '@tangent/contracts';
 import { maskPhone } from '@tangent/security';
 import { ApiError, notFound } from '@tangent/nest-kit';
@@ -277,8 +277,10 @@ export class StudentsService {
     const limit = t.info.entitlement.limits.students;
     const count = Number((await t.pool.query<{ n: string }>('select count(*) n from students')).rows[0]!.n);
     if (count >= limit) throw new ApiError('locked', `Your plan allows ${limit} students. Ask Tangent to raise the limit.`);
-    const year = new Date().getUTCFullYear();
-    const seq = Number((await t.pool.query<{ n: string }>("select count(*) n from students where admission_no like $1", [`${year}/%`])).rows[0]!.n) + 501;
+    // The school's own admission numbers (People → Settings) when the office does not type one.
+    const pattern = await this.settings.value<string>(t, 'people.admissionNumber', '{yyyy}/{seq:4}');
+    const start = await this.settings.value<number>(t, 'people.admissionStart', 1);
+    const ay = (await t.pool.query<{ label: string }>('select label from academic_years where current limit 1')).rows[0]?.label ?? '';
     const id = newId('stu');
     const roll = body.rollNo || String(Number((await t.pool.query<{ n: string }>('select count(*) n from students where class_id = $1', [body.classId])).rows[0]!.n) + 1).padStart(2, '0');
     const digits = body.guardianPhone.replace(/\D/g, '').slice(-10);
@@ -287,8 +289,9 @@ export class StudentsService {
     const client = await t.pool.connect();
     try {
       await client.query('begin');
-      await client.query('insert into students (id, admission_no, name, class_id, roll_no, dob, blood_group, address, gender, house, admitted_on) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, current_date)',
-        [id, body.admissionNo || `${year}/${String(seq).padStart(4, '0')}`, body.name, body.classId, roll, body.dob, body.bloodGroup ?? null, body.address ?? null, body.gender ?? null, body.house || null]);
+      const admissionNo = body.admissionNo || (await nextNumber(client, { pattern, start, day: schoolToday(), ay, table: 'students', column: 'admission_no' }));
+      await client.query('insert into students (id, admission_no, name, class_id, roll_no, dob, blood_group, address, gender, house, admitted_on) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, $11)',
+        [id, admissionNo, body.name, body.classId, roll, body.dob, body.bloodGroup ?? null, body.address ?? null, body.gender ?? null, body.house || null, schoolToday()]);
       // One family, one guardian: a brother or sister joins the guardian who already has that phone number.
       let g = (await client.query<{ id: string; user_id: string | null }>(`select id, user_id from guardians where ${byPhone} limit 1`, [digits])).rows[0];
       if (!g) {
