@@ -94,6 +94,18 @@ importers:
       '@fastify/cors':
         specifier: ^11.0.0
         version: 11.3.1
+      '@nestjs/common':
+        specifier: ^11.1.0
+        version: 11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^11.1.0
+        version: 11.2.7(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/platform-fastify':
+        specifier: ^11.1.0
+        version: 11.2.7(@fastify/static@10.1.9)(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.7(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))
+      '@pdf-lib/fontkit':
+        specifier: 1.1.1
+        version: 1.1.1
       '@tangent/config-engine':
         specifier: workspace:*
         version: link:../../packages/config-engine
@@ -115,18 +127,6 @@ importers:
       '@tangent/tenancy':
         specifier: workspace:*
         version: link:../../packages/tenancy
-      '@nestjs/common':
-        specifier: ^11.1.0
-        version: 11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@nestjs/core':
-        specifier: ^11.1.0
-        version: 11.2.7(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@nestjs/platform-fastify':
-        specifier: ^11.1.0
-        version: 11.2.7(@fastify/static@10.1.9)(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.7(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))
-      '@pdf-lib/fontkit':
-        specifier: 1.1.1
-        version: 1.1.1
       drizzle-orm:
         specifier: ^0.45.0
         version: 0.45.4(@types/pg@8.23.1)(pg@8.23.1)
@@ -222,6 +222,15 @@ importers:
       '@fastify/cors':
         specifier: ^11.0.0
         version: 11.3.1
+      '@nestjs/common':
+        specifier: ^11.1.0
+        version: 11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^11.1.0
+        version: 11.2.7(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/platform-fastify':
+        specifier: ^11.1.0
+        version: 11.2.7(@fastify/static@10.1.9)(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.7(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))
       '@tangent/config-engine':
         specifier: workspace:*
         version: link:../../packages/config-engine
@@ -243,15 +252,6 @@ importers:
       '@tangent/tenancy':
         specifier: workspace:*
         version: link:../../packages/tenancy
-      '@nestjs/common':
-        specifier: ^11.1.0
-        version: 11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@nestjs/core':
-        specifier: ^11.1.0
-        version: 11.2.7(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@nestjs/platform-fastify':
-        specifier: ^11.1.0
-        version: 11.2.7(@fastify/static@10.1.9)(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.7(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))
       drizzle-orm:
         specifier: ^0.45.0
         version: 0.45.4(@types/pg@8.23.1)(pg@8.23.1)
@@ -268,12 +268,12 @@ importers:
         specifier: ^4.1.0
         version: 4.6.7
     devDependencies:
-      '@tangent/api':
-        specifier: workspace:*
-        version: link:../api
       '@swc/core':
         specifier: ^1.13.0
         version: 1.16.18
+      '@tangent/api':
+        specifier: workspace:*
+        version: link:../api
       '@types/node':
         specifier: ^24.0.0
         version: 24.19.2
@@ -301,6 +301,15 @@ importers:
       '@fastify/static':
         specifier: ^10.1.2
         version: 10.1.9
+      '@nestjs/common':
+        specifier: ^11.1.0
+        version: 11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^11.1.0
+        version: 11.2.7(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/platform-fastify':
+        specifier: ^11.1.0
+        version: 11.2.7(@fastify/static@10.1.9)(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.7(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))
       '@tangent/api':
         specifier: workspace:*
         version: link:../api
@@ -313,15 +322,6 @@ importers:
       '@tangent/tenancy':
         specifier: workspace:*
         version: link:../../packages/tenancy
-      '@nestjs/common':
-        specifier: ^11.1.0
-        version: 11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@nestjs/core':
-        specifier: ^11.1.0
-        version: 11.2.7(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@nestjs/platform-fastify':
-        specifier: ^11.1.0
-        version: 11.2.7(@fastify/static@10.1.9)(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.7(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -457,18 +457,18 @@ importers:
       '@fastify/rate-limit':
         specifier: ^10.3.0
         version: 10.3.0
-      '@tangent/contracts':
-        specifier: workspace:*
-        version: link:../contracts
-      '@tangent/security':
-        specifier: workspace:*
-        version: link:../security
       '@nestjs/common':
         specifier: ^11.1.0
         version: 11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/platform-fastify':
         specifier: ^11.1.0
         version: 11.2.7(@fastify/static@10.1.9)(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.7(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))
+      '@tangent/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@tangent/security':
+        specifier: workspace:*
+        version: link:../security
       fastify:
         specifier: ^5.12.5
         version: 5.12.7
@@ -531,6 +531,9 @@ importers:
 
   packages/web-ui:
     dependencies:
+      '@tangent/config-engine':
+        specifier: workspace:*
+        version: link:../config-engine
       '@tangent/contracts':
         specifier: workspace:*
         version: link:../contracts
