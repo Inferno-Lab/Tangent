@@ -13,7 +13,8 @@ abstract final class Validators {
     final text = value?.trim() ?? '';
     if (text.isEmpty) return 'validation.email_or_phone_required';
     if (text.contains('@')) return email(text);
-    if (text.replaceAll(RegExp(r'\D'), '').length < 10) return 'validation.phone_invalid';
+    // Lengths differ by country (8 digits in Qatar, 10 in India); the school checks the number itself.
+    if (text.replaceAll(RegExp(r'\D'), '').length < 6) return 'validation.phone_invalid';
     return null;
   }
 

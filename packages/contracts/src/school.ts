@@ -159,7 +159,7 @@ const StudentFields = {
 export const StudentCreate = z.object({
   ...StudentFields,
   guardianName: z.string().trim().min(2).max(80),
-  guardianPhone: z.string().trim().min(8).max(20),
+  guardianPhone: z.string().trim().min(1, 'Enter a phone number').max(24),
 });
 export type StudentCreate = z.infer<typeof StudentCreate>;
 /** Changes to a student's own record; a change of class keeps their marks and attendance. */
@@ -168,7 +168,7 @@ export type StudentPatch = z.infer<typeof StudentPatch>;
 /** A student's guardians, all at once: who they are, which one is first, and who may collect the child. */
 export const GuardiansPut = z.object({
   guardians: z.array(z.object({
-    id: z.string().optional(), name: z.string().trim().min(2, 'Enter the name').max(80), phone: z.string().trim().min(8, 'Enter the phone number').max(20),
+    id: z.string().optional(), name: z.string().trim().min(2, 'Enter the name').max(80), phone: z.string().trim().min(1, 'Enter the phone number').max(24),
     email: z.string().trim().email('Check the email').max(120).or(z.literal('')).optional(), relation: z.string().trim().min(2).max(30), canCollect: z.boolean(), isPrimary: z.boolean(),
   })).min(1, 'A student needs at least one guardian').max(4),
 }).refine((b) => b.guardians.filter((g) => g.isPrimary).length === 1, { message: 'Choose one guardian to contact first.', path: ['guardians'] });

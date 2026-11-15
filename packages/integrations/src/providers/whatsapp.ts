@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { call } from '../http.js';
 import { ProviderError, e164, type Adapter, type Ctx, type InboundRequest, type OutMessage } from '../types.js';
+import { splitE164 } from '@tangent/contracts';
 
 const s = (c: Ctx, k: string) => String(c.route[k] ?? c.settings[k] ?? '');
 const body = (r: InboundRequest): any => { try { return JSON.parse(r.raw.toString('utf8')); } catch { return null; } };
@@ -92,7 +93,7 @@ export const interakt: Adapter = {
     const n = e164(m.to);
     const r = await call('https://api.interakt.ai/v1/public/message/', {
       method: 'POST', headers: { authorization: `Basic ${c.secrets.apiKey}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ countryCode: `+${n.slice(0, n.length - 10)}`, phoneNumber: n.slice(-10), type: 'Template',
+      body: JSON.stringify({ countryCode: `+${splitE164(`+${n}`).code}`, phoneNumber: splitE164(`+${n}`).national, type: 'Template',
         template: { name: m.templateId, languageCode: m.language ?? 'en', bodyValues: ordered(m) } }),
     });
     if (r.json?.result === false) throw new ProviderError(`Interakt: ${r.json.message}`, true);

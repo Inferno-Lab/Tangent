@@ -54,7 +54,7 @@ const _en = <String, String>{
   'errors.bad_mock': 'A mock file was not in the expected shape.',
   'validation.email_required': 'Enter an email',
   'validation.email_or_phone_required': 'Enter your phone number or email',
-  'validation.phone_invalid': 'Enter a 10-digit phone number',
+  'validation.phone_invalid': 'Enter your full phone number',
   'validation.email_invalid': 'Enter a valid email',
   'validation.password_required': 'Enter a password',
   'validation.password_short': 'Use at least 6 characters',

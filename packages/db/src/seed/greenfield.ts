@@ -1,4 +1,4 @@
-import { packSettings, PERMISSIONS, ROLE_TEMPLATES, addDays, type RoleTemplate, schoolToday, latestSchoolDay, schoolDaysEnding } from '@tangent/contracts';
+import { toE164, packSettings, PERMISSIONS, ROLE_TEMPLATES, addDays, type RoleTemplate, schoolToday, latestSchoolDay, schoolDaysEnding } from '@tangent/contracts';
 import type { Pool, PoolClient } from 'pg';
 import { newId } from '../ids.js';
 import { bulkInsert } from './bulk.js';
@@ -110,6 +110,15 @@ export async function seedSchool(pool: Pool, input: SeedInput): Promise<SeedRepo
   try {
     await client.query('begin');
     const report = await run(client, input);
+    // Every phone in international form, as the school keeps them (a local number takes the school's country).
+    const country = input.school.country ?? 'IN';
+    for (const [table, col] of [['users', 'phone'], ['guardians', 'phone'], ['enquiries', 'phone'], ['transport_routes', 'attendant_phone'], ['transport_routes', 'driver_phone']] as const) {
+      const rows = (await client.query<{ id: string; v: string }>(`select id, ${col} v from ${table} where ${col} is not null and ${col} <> ''`)).rows;
+      for (const r of rows) {
+        const e = toE164(r.v, country);
+        if (e && e !== r.v) await client.query(`update ${table} set ${col} = $2 where id = $1`, [r.id, e]);
+      }
+    }
     await client.query('commit');
     return { ...report, ms: Date.now() - started };
   } catch (err) {

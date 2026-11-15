@@ -24,7 +24,7 @@ export function AddStudentDialog({ classes, defaultClass, onClose, onDone }: { c
     if (!f.classId) local.classId = 'Choose a class.';
     if (!/^\d{4}-\d{2}-\d{2}$/.test(f.dob)) local.dob = 'Choose the date of birth.';
     if (f.guardianName.trim().length < 2) local.guardianName = 'Enter the guardian’s name.';
-    if (f.guardianPhone.trim().length < 8) local.guardianPhone = 'Enter a phone number.';
+    if (!f.guardianPhone.trim()) local.guardianPhone = 'Enter a phone number.';
     if (Object.keys(local).length) { setErr(local); shake.hit(); return; }
     setBusy(true);
     try {

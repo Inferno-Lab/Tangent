@@ -189,15 +189,15 @@ export class PoolManager {
  * (docs/one-shot-plan.md §3.3). A request runs inside one context (the API's onRequest hook) that the tenant guard fills in;
  * a job runs inside `withSchool`. Code that serves two schools at once passes their zones explicitly.
  */
-export const schoolContext = new AsyncLocalStorage<{ zone?: string; locale?: string; currency?: string }>();
+export const schoolContext = new AsyncLocalStorage<{ zone?: string; locale?: string; currency?: string; country?: string }>();
 setZoneSource(() => schoolContext.getStore()?.zone);
 setLocaleSource(() => schoolContext.getStore());
 
-export function enterSchool(info: Pick<TenantInfo, 'timezone' | 'locale' | 'currency'>): void {
+export function enterSchool(info: Pick<TenantInfo, 'timezone' | 'locale' | 'currency' | 'country'>): void {
   const store = schoolContext.getStore();
-  if (store) Object.assign(store, { zone: info.timezone, locale: info.locale, currency: info.currency });
+  if (store) Object.assign(store, { zone: info.timezone, locale: info.locale, currency: info.currency, country: info.country });
 }
 
-export function withSchool<T>(info: Pick<TenantInfo, 'timezone' | 'locale' | 'currency'> | null | undefined, fn: () => T): T {
-  return schoolContext.run(info ? { zone: info.timezone, locale: info.locale, currency: info.currency } : {}, fn);
+export function withSchool<T>(info: Pick<TenantInfo, 'timezone' | 'locale' | 'currency' | 'country'> | null | undefined, fn: () => T): T {
+  return schoolContext.run(info ? { zone: info.timezone, locale: info.locale, currency: info.currency, country: info.country } : {}, fn);
 }

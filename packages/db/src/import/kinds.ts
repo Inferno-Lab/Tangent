@@ -1,6 +1,6 @@
 import type pg from 'pg';
 import { createHash } from 'node:crypto';
-import { ADMISSION_STAGES, PAY_METHODS, PERIOD_KINDS, WEEKDAYS, fmtMoney, schoolInstant, schoolToday, schoolZone } from '@tangent/contracts';
+import { ADMISSION_STAGES, PAY_METHODS, PERIOD_KINDS, WEEKDAYS, fmtMoney, schoolInstant, schoolToday, schoolZone, phoneProblem, schoolCountry, toE164 } from '@tangent/contracts';
 import { newId } from '../ids.js';
 
 type Q = pg.Pool | pg.PoolClient;
@@ -22,7 +22,9 @@ export interface Impl<L> {
 // ── reading what people type ───────────────────────────────────────────────
 const lc = (s: string) => s.trim().toLowerCase();
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-const digits = (s: string) => s.replace(/\D/g, '').slice(-10);
+// A phone in international form (E.164), a local number taking the school's country; empty when it cannot be one.
+const digits = (s: string) => toE164(s ?? '', schoolCountry()) ?? '';
+const badPhone = (s: string) => phoneProblem(s, schoolCountry()) ?? '';
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
 /** A day as 2026-04-18, from that or from the Indian 18/04/2026, 18-04-2026, 18.04.2026 or 18 Apr 2026. Null when it is not a real day. */
@@ -246,7 +248,7 @@ const staff = kind<StaffLookups>({
     const errors = [
       ...(!/^\S+@\S+\.\S+$/.test(r.email!) ? ['The email does not look right.'] : []),
       ...(was && was.kind !== 'staff' ? ['This email belongs to a family’s account.'] : []),
-      ...(r.phone && digits(r.phone).length < 10 ? ['Use a 10-digit phone number.'] : []),
+      ...(r.phone && !digits(r.phone) ? [badPhone(r.phone)] : []),
       ...(phoneOwner && phoneOwner !== was?.id ? ['Someone else already has this phone number.'] : []),
       ...(r.role && !l.roles.has(lc(r.role)) ? [`There is no role “${r.role}”: Tangent makes roles in the console.`] : []),
       ...(unknown.length ? [`Subjects not set up yet: ${unknown.join(', ')}. Import subjects first.`] : []),
@@ -260,7 +262,7 @@ const staff = kind<StaffLookups>({
       const was = l.byEmail.get(lc(r.email!));
       const id = was?.id ?? newId('usr');
       const old = l.staff.get(id);
-      users.push({ id, kind: 'staff', name: r.name, email: r.email!.trim().toLowerCase(), phone: r.phone || was?.phone || null });
+      users.push({ id, kind: 'staff', name: r.name, email: r.email!.trim().toLowerCase(), phone: (r.phone && digits(r.phone)) || was?.phone || null });
       st.push({ user_id: id, designation: r.designation || old?.designation || 'Teacher', department: r.department || old?.department || null, joined_on: r.joined_on ? isoDay(r.joined_on) : old?.joined_on ?? null });
       if (r.role) roles.push({ user_id: id, role_id: l.roles.get(lc(r.role)) });
       for (const s of (r.subjects ?? '').split(/[;|]/).map((x) => x.trim()).filter(Boolean)) subs.push({ user_id: id, subject_id: l.subjects.get(norm(s))!.id });
@@ -308,8 +310,8 @@ const students = kind<StudentLookups>({
       ...(!l.classes.has(classKey(r.class!)) ? [`Class “${r.class}” is not set up: import classes first.`] : []),
       ...(!isoDay(r.dob!) ? ['Write the date of birth as 2012-04-18 or 18/04/2012.'] : []),
       ...(r.admitted_on && !isoDay(r.admitted_on) ? ['Write the admission date as 2019-06-10 or 10/06/2019.'] : []),
-      ...(r.guardian_phone && digits(r.guardian_phone).length < 10 ? ['The guardian’s phone needs 10 digits: families sign in with it.'] : []),
-      ...(r.guardian2_phone && digits(r.guardian2_phone).length < 10 ? ['The second guardian’s phone needs 10 digits.'] : []),
+      ...(r.guardian_phone && !digits(r.guardian_phone) ? [`The guardian’s phone: ${badPhone(r.guardian_phone)} Families sign in with it.`] : []),
+      ...(r.guardian2_phone && !digits(r.guardian2_phone) ? [`The second guardian’s phone: ${badPhone(r.guardian2_phone)}`] : []),
       ...(r.status && !STATUS[norm(r.status)] ? ['Status is active or inactive (left, TC and transferred count as inactive).'] : []),
       ...(r.gender && !['female', 'male', 'other'].includes(norm(r.gender)) ? ['Gender is female, male or other.'] : []),
     ];
@@ -337,9 +339,9 @@ const students = kind<StudentLookups>({
       if (!userId) {
         userId = newId('usr');
         l.users.set(d, userId);
-        users.push({ id: userId, kind: 'guardian', name, phone });
+        users.push({ id: userId, kind: 'guardian', name, phone: d });
       }
-      guardians.set(d, { id: was?.id ?? newId('gdn'), user_id: userId, name: was?.name ?? name, phone: was?.phone ?? phone, email: was?.email || email || null, relation: was?.relation ?? (relation || 'Parent') });
+      guardians.set(d, { id: was?.id ?? newId('gdn'), user_id: userId, name: was?.name ?? name, phone: was?.phone ?? d, email: was?.email || email || null, relation: was?.relation ?? (relation || 'Parent') });
       return guardians.get(d)!.id as string;
     };
     for (const r of rows) {
@@ -402,7 +404,7 @@ const admissions = kind<Map<string, string>>({
   },
   writes: (rows, l) => [{ table: 'enquiries', pk: ['id'], cols: ['grade_sought', 'guardian_name', 'email', 'source', 'stage', 'test_on', 'note'], rows: rows.map((r) => ({
     id: l.get(`${norm(r.child_name!)}|${digits(r.phone ?? '')}`) ?? newId('enq'), child_name: r.child_name, grade_sought: whole(r.grade_sought!) ?? gradeSection(r.grade_sought!)!.grade, guardian_name: r.guardian_name,
-    phone: r.phone ?? '', email: r.email || null, source: r.source ? lc(r.source) : 'walk-in', stage: r.stage ? lc(r.stage) : 'enquiry', test_on: r.test_on ? isoDay(r.test_on) : null, note: r.note ?? '',
+    phone: digits(r.phone ?? '') || (r.phone ?? ''), email: r.email || null, source: r.source ? lc(r.source) : 'walk-in', stage: r.stage ? lc(r.stage) : 'enquiry', test_on: r.test_on ? isoDay(r.test_on) : null, note: r.note ?? '',
   })) }],
   totals: (rows) => STAGES.map((s) => ({ label: s[0]!.toUpperCase() + s.slice(1), value: String(rows.filter((r) => (r.stage ? lc(r.stage) : 'enquiry') === s).length) })).filter((t) => t.value !== '0'),
   async export(db) {
@@ -717,7 +719,7 @@ const contacts = kind<ContactLookups>({
   },
   check(r, l) {
     const d = digits(r.phone!);
-    if (d.length < 10) return ok(d || lc(r.name!), ['The phone needs 10 digits.'], false);
+    if (!d) return ok(lc(r.name!), [badPhone(r.phone!)], false);
     // A number the school already has is skipped, not an error: a group's list has every parent in it.
     if (l.known.has(d)) return ok(d, [], true);
     const found = matchFamily(r, l.waiting);

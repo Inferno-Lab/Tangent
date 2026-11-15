@@ -79,7 +79,7 @@ export class PeopleService {
     const client = await t.pool.connect();
     try {
       await client.query('begin');
-      await client.query("insert into users (id, kind, name, email, phone, password_hash, invited_at) values ($1,'staff',$2,$3,$4,$5,now())", [id, body.name, body.email, body.phone, await hashPassword(temp)]);
+      await client.query("insert into users (id, kind, name, email, phone, password_hash, invited_at) values ($1,'staff',$2,$3,$4,$5,now())", [id, body.name, body.email, this.settings.phone(t, body.phone), await hashPassword(temp)]);
       await client.query('insert into staff (user_id, designation, department, joined_on) values ($1,$2,$3,current_date)', [id, body.designation, body.department ?? null]);
       for (const s of known) await client.query('insert into staff_subjects (user_id, subject_id) values ($1,$2)', [id, s]);
       if (role.id) await client.query('insert into user_roles (user_id, role_id) values ($1,$2)', [id, role.id]);
@@ -107,7 +107,7 @@ export class PeopleService {
       await client.query('begin');
       if (body.name || body.email || body.phone) {
         // A changed email is how they sign in from now on.
-        await client.query('update users set name = coalesce($2, name), email = coalesce($3, email), phone = coalesce($4, phone) where id = $1', [id, body.name ?? null, body.email ?? null, body.phone ?? null]);
+        await client.query('update users set name = coalesce($2, name), email = coalesce($3, email), phone = coalesce($4, phone) where id = $1', [id, body.name ?? null, body.email ?? null, body.phone ? this.settings.phone(t, body.phone) : null]);
       }
       if (body.designation !== undefined || body.department !== undefined) {
         await client.query('update staff set designation = coalesce($2, designation), department = case when $3 then $4 else department end where user_id = $1',
@@ -202,7 +202,7 @@ export class PeopleService {
   async createEnquiry(t: TenantCtx, user: User, body: EnquiryCreate): Promise<EnquiryRow> {
     const id = newId('enq');
     await t.pool.query('insert into enquiries (id, child_name, grade_sought, guardian_name, phone, email, source, note) values ($1,$2,$3,$4,$5,$6,$7,$8)',
-      [id, body.childName, body.gradeSought, body.guardianName, body.phone, body.email || null, body.source, body.note]);
+      [id, body.childName, body.gradeSought, body.guardianName, this.settings.phone(t, body.phone), body.email || null, body.source, body.note]);
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'admission.enquiry', entity: 'enquiry', entityId: id, detail: { child: body.childName } });
     return this.enquiry(t, id);
   }

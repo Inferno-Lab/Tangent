@@ -119,7 +119,7 @@ function NewEnquiry({ onClose, onDone }: { onClose: () => void; onDone: () => vo
     const p: Record<string, string> = {};
     if (f.childName.trim().length < 2) p.childName = 'Enter the child’s name.';
     if (f.guardianName.trim().length < 2) p.guardianName = 'Enter the guardian’s name.';
-    if (f.phone.trim().length < 8) p.phone = 'Enter a phone number.';
+    if (!f.phone.trim()) p.phone = 'Enter a phone number.';
     if (f.email.trim() && !/^\S+@\S+\.\S+$/.test(f.email.trim())) p.email = 'Enter a valid email or leave it empty.';
     setErr(p);
     if (Object.keys(p).length) shake.hit(); else make.mutate();
@@ -225,7 +225,7 @@ function Details({ row, canWrite, back, onClose, onMove, onSaved }: { row: Enqui
     const p: Record<string, string> = {};
     if (f.childName.trim().length < 2) p.childName = 'Enter the child’s name.';
     if (f.guardianName.trim().length < 2) p.guardianName = 'Enter the guardian’s name.';
-    if (f.phone.trim().length < 8) p.phone = 'Enter a phone number.';
+    if (!f.phone.trim()) p.phone = 'Enter a phone number.';
     if (f.email.trim() && !/^\S+@\S+\.\S+$/.test(f.email.trim())) p.email = 'Enter a valid email or leave it empty.';
     setErr(p);
     if (Object.keys(p).length) shake.hit(); else save.mutate();

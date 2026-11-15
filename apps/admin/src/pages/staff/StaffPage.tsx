@@ -158,7 +158,7 @@ function StaffDialog({ person, onClose, onDone }: { person: StaffRow | null; onC
     const p: Record<string, string> = {};
     if (f.name.trim().length < 2) p.name = 'Enter the name.';
     if ((!person || f.email.trim()) && !/^\S+@\S+\.\S+$/.test(f.email.trim())) p.email = 'Enter a valid email.';
-    if ((!person || f.phone.trim()) && f.phone.trim().length < 8) p.phone = 'Enter a phone number.';
+    if (!person && !f.phone.trim()) p.phone = 'Enter a phone number.';
     if (f.designation.trim().length < 2) p.designation = 'Enter what they do, like Teacher.';
     setErr(p);
     if (Object.keys(p).length) shake.hit(); else save.mutate();

@@ -3,7 +3,7 @@ import { StaleSettings, newId, recordSettingsVersion, writeSettings } from '@tan
 import { checkSchoolChanges, resolveConfig, validateSettingsChanges } from '@tangent/config-engine';
 import { ApiError } from '@tangent/nest-kit';
 import type { Registry } from '@tangent/tenancy';
-import { MESSAGE_EVENTS, SETTINGS_META, gradeFor, schoolMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type SchoolSettingsPatch, type SchoolSettingsView, type SettingsDoc } from '@tangent/contracts';
+import { toE164, phoneProblem, MESSAGE_EVENTS, SETTINGS_META, gradeFor, schoolMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type SchoolSettingsPatch, type SchoolSettingsView, type SettingsDoc } from '@tangent/contracts';
 import { REGISTRY, type TenantCtx } from '../tenancy/tenant.js';
 import { HubService } from './hub.service.js';
 
@@ -123,6 +123,16 @@ export class SettingsService {
     return values;
   }
 
+  /**
+   * A phone number as the school keeps every one: international form (E.164), a local number taking the school's country.
+   * Throws the field's problem when it cannot be a number there.
+   */
+  phone(t: TenantCtx, raw: string, field = 'phone'): string {
+    const e164 = toE164(raw, t.info.country);
+    if (!e164) throw new ApiError('validation', phoneProblem(raw, t.info.country)!, { fields: { [field]: phoneProblem(raw, t.info.country)! } });
+    return e164;
+  }
+
   /** One setting as it applies (a lock wins); the fallback only when the setting does not exist at all. */
   async value<T>(t: TenantCtx, key: string, fallback: T): Promise<T> {
     const v = (await this.settingsOf(t))[key];
@@ -221,9 +231,10 @@ export class Messenger {
     const sendAfter = quiet ? new Date(Date.now() + (((mins(qt) - now + 1440) % 1440) || 1440) * 60_000) : null;
     // A person who turned this message off in the app (Settings → Notifications) does not get it; urgent ones cannot be turned off.
     const off = ev.urgent || !who.length ? new Set<string>() : new Set((await t.pool.query<{ phone: string }>(
-      `select right(regexp_replace(u.phone, '\\D', '', 'g'), 10) phone from users u join user_prefs p on p.user_id = u.id and p.key = 'notify.off'
+      `select u.phone from users u join user_prefs p on p.user_id = u.id and p.key = 'notify.off'
        where p.value ? $1 and u.phone is not null`, [key])).rows.map((r) => r.phone));
-    const digits = (s: string) => s.replace(/\D/g, '').slice(-10);
+    // Phones are kept in international form, so the same number compares equal however it reached here.
+    const digits = (s: string) => toE164(s, t.info.country) ?? s;
     let reached = 0;
     const out: OutMsg[] = [];
     for (const w of who.filter((x) => !off.has(digits(x.to)))) {

@@ -93,4 +93,25 @@ describe('the school changes its own settings', () => {
     expect((await h.call('PUT', '/v1/attendance/day', { token: principal, body: { classId: 'cls_8a', date, marks: [{ studentId: first, status: 'holiday' }] } })).status).toBe(400);
     expect((await h.call('PUT', '/v1/attendance/day', { token: principal, body: { classId: 'cls_8a', date, marks: day.marks.map((m: any) => ({ studentId: m.studentId, status: m.studentId === first ? 'medical' : 'present' })) } })).status).toBe(200);
   });
+
+  it('reads phone numbers the school’s country way, and finds a family however they type their number', async () => {
+    // The school is in the United Arab Emirates for this test (the registry's copy of its country).
+    await h.registry.query("update schools set country = 'AE' where slug = $1", [h.slug]);
+    await h.entitle({});
+    try {
+      const add = (phone: string) => h.call('POST', '/v1/students', { token: principal, body: { name: 'Layla Haddad', classId: 'cls_8a', dob: '2014-03-01', guardianName: 'Omar Haddad', guardianPhone: phone } });
+      const short = await add('050 123');
+      expect(short.status).toBe(400);
+      expect(short.json.fields.guardianPhone).toContain('+971');
+      expect((await add('050 123 4567')).status).toBe(201);
+      // The family signs in with the number in international form; it is the same person.
+      const code = (await h.call('POST', '/v1/auth/code', { body: { identifier: '+971 50 123 4567' } })).json;
+      expect(code.maskedTo).toBeTruthy();
+      const again = (await h.call('POST', '/v1/auth/code', { body: { identifier: '0501234567' } })).json;
+      expect(again.maskedTo).toBe(code.maskedTo);
+    } finally {
+      await h.registry.query("update schools set country = 'IN' where slug = $1", [h.slug]);
+      await h.entitle({});
+    }
+  });
 });

@@ -73,17 +73,19 @@ export class TransportService implements OnModuleInit {
     if (b.driverUserId && !(await t.pool.query("select 1 from users where id = $1 and kind = 'staff' and status = 'active'", [b.driverUserId])).rowCount) throw new ApiError('validation', 'Choose the driver from the staff list.', { fields: { driverUserId: 'Choose a member of staff.' } });
     const clash = (await t.pool.query('select id from transport_routes where lower(name) = lower($1) and id <> coalesce($2, \'\')', [b.name, id ?? null])).rows[0];
     if (clash) throw new ApiError('validation', 'Another route has that name.', { fields: { name: 'Choose another name.' } });
+    // Families call the attendant from the app: the number is kept in international form like every other.
+    const attendantPhone = b.attendantPhone?.trim() ? this.settings.phone(t, b.attendantPhone, 'attendantPhone') : '';
     const client = await t.pool.connect();
     try {
       await client.query('begin');
       if (id) {
         const r = await client.query('update transport_routes set name = $2, vehicle = $3, driver_user_id = $4, attendant_name = $5, attendant_phone = $6, tracker_id = $7, fee = $8 where id = $1',
-          [id, b.name, b.vehicle, b.driverUserId, b.attendantName, b.attendantPhone, b.trackerId, b.fee]);
+          [id, b.name, b.vehicle, b.driverUserId, b.attendantName, attendantPhone, b.trackerId, b.fee]);
         if (!r.rowCount) throw notFound('That route');
       } else {
         id = newId('rte');
         await client.query('insert into transport_routes (id, name, vehicle, driver_user_id, attendant_name, attendant_phone, tracker_id, fee) values ($1,$2,$3,$4,$5,$6,$7,$8)',
-          [id, b.name, b.vehicle, b.driverUserId, b.attendantName, b.attendantPhone, b.trackerId, b.fee]);
+          [id, b.name, b.vehicle, b.driverUserId, b.attendantName, attendantPhone, b.trackerId, b.fee]);
       }
       // Stops are replaced in order; a stop kept by its ID keeps its riders.
       const keep = b.stops.map((s) => s.id).filter((x): x is string => !!x);

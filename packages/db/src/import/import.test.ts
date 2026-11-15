@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ensureDatabase, startDevPostgres, type DevPostgres } from '../dev.js';
 import { migrate } from '../migrate.js';
 import { seedSchool } from '../seed/greenfield.js';
-import { IMPORT_KINDS } from '@tangent/contracts';
+import { IMPORT_KINDS, setLocaleSource } from '@tangent/contracts';
 import { commitImport, exportAll, listBatches, previewImport, templateXlsx, undoBatch } from './engine.js';
 import { parseCsv, readTable, readXlsx } from './files.js';
 import { classKey, isoDay } from './kinds.js';
@@ -19,6 +19,8 @@ const school = sampleSchool(300);
 const n = async (sql: string) => Number((await pool.query<{ n: string }>(sql)).rows[0]!.n);
 
 beforeAll(async () => {
+  // The school's own country, as the API and console give it: local phone numbers are read as Indian ones.
+  setLocaleSource(() => ({ country: 'IN', locale: 'en-IN', currency: 'INR' }));
   server = await startDevPostgres({ dataDir: path.join(mkdtempSync(path.join(tmpdir(), 'tangent-import-')), 'data'), fresh: true });
   pool = new pg.Pool({ connectionString: await ensureDatabase(server.url, 'school_import'), max: 4 });
   await migrate(pool, 'school');
@@ -193,8 +195,8 @@ describe('moving a school in', () => {
     expect(p.counts).toMatchObject({ create: 2, update: 1, skip: 1 });
     const b = await commitImport(pool, { kind: 'contacts', csv: list, fileName: 'whatsapp.csv' }, 'Migration team');
     const phone = async (child: string) => (await pool.query<{ phone: string | null }>('select g.phone from guardians g join student_guardians sg on sg.guardian_id = g.id join students s on s.id = sg.student_id where s.name = $1', [child])).rows[0]!.phone;
-    expect(await phone('Mira Qadri')).toBe('9811177001');
-    expect(await phone('Devansh Zed')).toBe('9811177003');
+    expect(await phone('Mira Qadri')).toBe('+919811177001');
+    expect(await phone('Devansh Zed')).toBe('+919811177003');
     expect(await phone('Isha Zed')).toBeNull();
     await undoBatch(pool, b.id);
     expect(await phone('Mira Qadri')).toBeNull();

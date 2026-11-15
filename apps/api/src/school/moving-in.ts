@@ -66,16 +66,15 @@ export class MovingInService {
   async inviteFamilies(t: TenantCtx, classId: string | undefined, user: Who, remind = false): Promise<{ sent: number }> {
     // Families sign in by phone, so each needs a login first: an existing one with that phone (a teacher who is also a parent), or a new one.
     const loose = await t.pool.query<{ id: string; name: string; phone: string; existing: string | null }>(
-      `select distinct g.id, g.name, g.phone, (select u.id from users u where right(regexp_replace(coalesce(u.phone,''), '\\D', '', 'g'), 10) = right(regexp_replace(g.phone, '\\D', '', 'g'), 10) limit 1) existing
+      `select distinct g.id, g.name, g.phone, (select u.id from users u where u.phone = g.phone limit 1) existing
        from students s join student_guardians sg on sg.student_id = s.id and sg.is_primary join guardians g on g.id = sg.guardian_id
        where s.status = 'active' and g.user_id is null and g.phone is not null and ($1::text is null or s.class_id = $1)`, [classId ?? null]);
     const made = new Map<string, string>();
     for (const g of loose.rows) {
-      const digits = g.phone.replace(/\D/g, '').slice(-10);
-      let id = g.existing ?? made.get(digits);
+      let id = g.existing ?? made.get(g.phone);
       if (!id) {
         id = newId('usr');
-        made.set(digits, id);
+        made.set(g.phone, id);
         // No email: it may belong to another login, and families sign in by phone.
         await t.pool.query("insert into users (id, kind, name, phone) values ($1, 'guardian', $2, $3)", [id, g.name, g.phone]);
       }

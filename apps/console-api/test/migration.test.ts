@@ -22,7 +22,7 @@ beforeAll(async () => {
   const inbox = async (to: string, re: RegExp) => re.exec((await h.registry.query("select body from sandbox_messages where school_slug = 'moveschool' and to_addr = $1 order by created_at desc limit 1", [to])).rows[0].body)![1]!;
   const password = await inbox('asha@moveschool.test', /temporary password (\S+)\./);
   const a = await h.s('POST', '/v1/auth/login', { school: 'moveschool', body: { identifier: 'asha@moveschool.test', password } });
-  school = (await h.s('POST', '/v1/auth/verify', { school: 'moveschool', body: { challengeId: a.json.challenge.challengeId, code: await inbox('+91 90000 22222', /(\d{6})/) } })).json.accessToken;
+  school = (await h.s('POST', '/v1/auth/verify', { school: 'moveschool', body: { challengeId: a.json.challenge.challengeId, code: await inbox('+919000022222', /(\d{6})/) } })).json.accessToken;
 }, 240_000);
 afterAll(async () => {
   await h?.close();

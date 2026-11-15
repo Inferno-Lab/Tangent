@@ -21,7 +21,7 @@ describe('message helpers', () => {
     expect(fill('Hi {name}, {vars.code}', { name: 'Asha', code: '42' })).toBe('Hi Asha, 42');
     expect(fill('{"t":"{text}"}', { text: 'say "hi"' }, true)).toBe('{"t":"say \\"hi\\""}');
     expect(fill('{missing}', {})).toBe('{missing}');
-    expect(e164('98220 11002')).toBe('919822011002');
+    expect(e164('+91 98220 11002')).toBe('919822011002');
   });
   it('signs links that expire and cannot be forged', () => {
     const t = signLink('key', { p: 'get', key: 'a' }, 60);

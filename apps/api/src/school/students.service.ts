@@ -283,9 +283,8 @@ export class StudentsService {
     const ay = (await t.pool.query<{ label: string }>('select label from academic_years where current limit 1')).rows[0]?.label ?? '';
     const id = newId('stu');
     const roll = body.rollNo || String(Number((await t.pool.query<{ n: string }>('select count(*) n from students where class_id = $1', [body.classId])).rows[0]!.n) + 1).padStart(2, '0');
-    const digits = body.guardianPhone.replace(/\D/g, '').slice(-10);
-    if (digits.length < 10) throw new ApiError('validation', 'Add the guardian’s 10-digit phone number.', { fields: { guardianPhone: 'Use a 10-digit phone number.' } });
-    const byPhone = "right(regexp_replace(coalesce(phone,''), '\\D', '', 'g'), 10) = $1";
+    const digits = this.settings.phone(t, body.guardianPhone, 'guardianPhone');
+    const byPhone = 'phone = $1';
     const client = await t.pool.connect();
     try {
       await client.query('begin');
@@ -296,7 +295,7 @@ export class StudentsService {
       let g = (await client.query<{ id: string; user_id: string | null }>(`select id, user_id from guardians where ${byPhone} limit 1`, [digits])).rows[0];
       if (!g) {
         g = { id: newId('gdn'), user_id: null };
-        await client.query("insert into guardians (id, name, phone, relation) values ($1,$2,$3,'Parent')", [g.id, body.guardianName, body.guardianPhone]);
+        await client.query("insert into guardians (id, name, phone, relation) values ($1,$2,$3,'Parent')", [g.id, body.guardianName, digits]);
       }
       await client.query('insert into student_guardians (student_id, guardian_id, is_primary) values ($1,$2,true)', [id, g.id]);
       // The family's app account: signs in with a code to this phone, no password.
@@ -304,7 +303,7 @@ export class StudentsService {
         let uid = (await client.query<{ id: string }>(`select id from users where ${byPhone} limit 1`, [digits])).rows[0]?.id;
         if (!uid) {
           uid = newId('usr');
-          await client.query("insert into users (id, kind, name, phone) values ($1,'guardian',$2,$3)", [uid, body.guardianName, body.guardianPhone]);
+          await client.query("insert into users (id, kind, name, phone) values ($1,'guardian',$2,$3)", [uid, body.guardianName, digits]);
         }
         await client.query('update guardians set user_id = $2 where id = $1', [g.id, uid]);
       }
@@ -350,7 +349,7 @@ export class StudentsService {
    */
   async setGuardians(t: TenantCtx, studentId: string, b: GuardiansPut, user: { id: string; name: string }): Promise<GuardianRow[]> {
     if (!(await t.pool.query('select 1 from students where id = $1', [studentId])).rowCount) throw notFound('That student');
-    const byPhone = "right(regexp_replace(coalesce(phone,''), '\\D', '', 'g'), 10) = $1";
+    const byPhone = 'phone = $1';
     const client = await t.pool.connect();
     try {
       await client.query('begin');
@@ -358,9 +357,8 @@ export class StudentsService {
       for (const g of b.guardians) {
         // An existing guardian keeps their (masked) phone unless a new one is typed in full.
         const known = g.id ? (await client.query<{ id: string; phone: string | null }>('select id, phone from guardians where id = $1', [g.id])).rows[0] : undefined;
-        const phone = known && /[^\d\s+()-]/.test(g.phone) ? known.phone ?? '' : g.phone;
-        const digits = phone.replace(/\D/g, '').slice(-10);
-        if (digits.length < 10) throw new ApiError('validation', `Add ${g.name}’s 10-digit phone number.`, { fields: { phone: 'Use a 10-digit phone number.' } });
+        const phone = known && /[^\d\s+()-]/.test(g.phone) ? known.phone ?? '' : this.settings.phone(t, g.phone);
+        const digits = phone;
         let id = known?.id ?? (await client.query<{ id: string }>(`select id from guardians where ${byPhone} limit 1`, [digits])).rows[0]?.id;
         if (id) await client.query('update guardians set name = $2, phone = $3, email = $4, relation = $5 where id = $1', [id, g.name, phone, g.email || null, g.relation]);
         else {
@@ -433,10 +431,10 @@ export class StudentsService {
     if (!roles.includes('student')) throw new ApiError('conflict', 'Your school does not use the app for students. Ask Tangent to switch it on.');
     const s = (await t.pool.query<{ name: string; user_id: string | null }>("select name, user_id from students where id = $1 and status = 'active'", [studentId])).rows[0];
     if (!s) throw notFound('That student');
-    const phone = b.phone?.replace(/[^\d+]/g, '') || null;
+    const phone = b.phone?.trim() ? this.settings.phone(t, b.phone) : null;
     const email = b.email?.trim().toLowerCase() || null;
     if (!phone && !email) throw new ApiError('validation', 'Give the student’s own phone or email.', { fields: { phone: 'Phone or email is needed.' } });
-    const taken = (await t.pool.query<{ id: string }>("select id from users where id <> coalesce($3, '') and ((lower(email) = $1 and $1 is not null) or (right(regexp_replace(coalesce(phone,''), '\\D', '', 'g'), 10) = right($2, 10) and $2 is not null))", [email, phone, s.user_id])).rows[0];
+    const taken = (await t.pool.query<{ id: string }>("select id from users where id <> coalesce($3, '') and ((lower(email) = $1 and $1 is not null) or (phone = $2 and $2 is not null))", [email, phone, s.user_id])).rows[0];
     if (taken) throw new ApiError('conflict', 'That phone or email already signs in to another account. Use the student’s own.');
     let id = s.user_id;
     if (id) await t.pool.query('update users set phone = $2, email = $3 where id = $1', [id, phone, email]);

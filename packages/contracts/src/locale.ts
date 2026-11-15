@@ -94,13 +94,13 @@ export const isRtl = (locale: string): boolean => /^(ar|he|fa|ur|ps|sd|ug|yi|dv|
 // The school whose "today" and money are meant when a caller does not say: the server sets it per request and per job, a
 // web page from the school it is open on. ponytail: one source per process; anything that serves two schools at once passes them explicitly.
 let zoneSource: () => string | undefined = () => undefined;
-let localeSource: () => { locale?: string; currency?: string } | undefined = () => undefined;
+let localeSource: () => { locale?: string; currency?: string; country?: string } | undefined = () => undefined;
 
 /** Where the current school's time zone comes from (the API's request context, a page's loaded configuration). */
 export function setZoneSource(fn: () => string | undefined): void {
   zoneSource = fn;
 }
-export function setLocaleSource(fn: () => { locale?: string; currency?: string } | undefined): void {
+export function setLocaleSource(fn: () => { locale?: string; currency?: string; country?: string } | undefined): void {
   localeSource = fn;
 }
 
@@ -108,6 +108,8 @@ export function setLocaleSource(fn: () => { locale?: string; currency?: string }
 export const schoolZone = (): string => zoneSource() || 'UTC';
 export const schoolLocale = (): string => localeSource()?.locale || 'en';
 export const schoolCurrency = (): string => localeSource()?.currency || 'USD';
+/** The current school's country (ISO 3166), for phone numbers and the country's rules; empty when not known. */
+export const schoolCountry = (): string => localeSource()?.country || '';
 
 const partsCache = new Map<string, Intl.DateTimeFormat>();
 function parts(at: Date, tz: string): Record<string, number> {

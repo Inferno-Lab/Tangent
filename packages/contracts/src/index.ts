@@ -8,6 +8,7 @@ export * from './console.js';
 export * from './dates.js';
 export * from './locale.js';
 export * from './packs.js';
+export * from './phones.js';
 export * from './settings-meta.js';
 export * from './import.js';
 export * from './theme.js';

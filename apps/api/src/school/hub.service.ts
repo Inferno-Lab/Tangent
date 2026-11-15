@@ -99,7 +99,7 @@ export class HubService implements OnModuleInit, OnApplicationShutdown {
     const s = await this.schoolPool(slug);
     if (!s) return [];
     const { rows } = await s.pool.query<{ token: string }>(
-      "select d.token from devices d join users u on u.id = d.user_id where right(regexp_replace(coalesce(u.phone, ''), '\\D', '', 'g'), 10) = right(regexp_replace($1, '\\D', '', 'g'), 10) or lower(u.email) = lower($1)",
+      "select d.token from devices d join users u on u.id = d.user_id where u.phone = $1 or lower(u.email) = lower($1)",
       [to]);
     return rows.map((r) => r.token);
   }

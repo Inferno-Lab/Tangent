@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
-import { initials, type AppRoleKey, type ClientKind, type LoginChallenge, type LoginRequest, type LoginResponse, type Permission, type SessionUser, type TokenPair } from '@tangent/contracts';
+import { toE164, initials, type AppRoleKey, type ClientKind, type LoginChallenge, type LoginRequest, type LoginResponse, type Permission, type SessionUser, type TokenPair } from '@tangent/contracts';
 import { hashPassword, maskEmail, maskPhone, passwordNeedsRehash, randomCode, randomToken, sha256, signJwt, verifyPassword, constantTimeEqual } from '@tangent/security';
 import { ENV, type Env } from '../env.js';
 import { ApiError } from '@tangent/nest-kit';
@@ -169,8 +169,9 @@ export class AuthService {
     const { rows } = await t.pool.query<UserRow & { kind: string }>(
       byEmail
         ? 'select id, name, email, phone, password_hash, status, failed_logins, locked_until, token_version, kind from users where lower(email) = $1 limit 1'
-        : "select id, name, email, phone, password_hash, status, failed_logins, locked_until, token_version, kind from users where right(regexp_replace(coalesce(phone,''), '\\D', '', 'g'), 10) = right($1, 10) limit 1",
-      [byEmail ? ident.toLowerCase() : digits],
+        : 'select id, name, email, phone, password_hash, status, failed_logins, locked_until, token_version, kind from users where phone = $1 limit 1',
+      // A number typed locally takes the school's country; one with + or 00 is taken as it is.
+      [byEmail ? ident.toLowerCase() : toE164(ident, t.info.country) ?? `+${digits}`],
     );
     return rows[0];
   }

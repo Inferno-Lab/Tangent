@@ -146,8 +146,8 @@ export function at(obj: unknown, path: string): unknown {
 
 /** Digits only, with India's 91 in front of a ten-digit number. */
 export function e164(phone: string): string {
-  const d = phone.replace(/\D/g, '');
-  return d.length === 10 ? `91${d}` : d;
+  // Schools keep every number in international form (contracts phones.ts): the provider gets its digits.
+  return phone.replace(/\D/g, '');
 }
 
 export class ProviderError extends Error {
