@@ -36,3 +36,20 @@ describe('a school’s way of writing numbers, money and dates', () => {
     expect(isCurrency('XYZ1')).toBe(false);
   });
 });
+
+describe('starter packs', () => {
+  it('a new school starts with its country’s and curriculum’s ways, and nothing Indian elsewhere', async () => {
+    const { packSettings, curriculaFor } = await import('./packs.js');
+    const india = packSettings('IN', 'CBSE');
+    expect((india['fees.paymentMethods'] as { key: string }[]).map((m) => m.key)).toContain('upi');
+    expect(india['grading.passPct']).toBe(33);
+    const uk = packSettings('GB', 'British');
+    expect((uk['fees.paymentMethods'] as { key: string }[]).map((m) => m.key)).not.toContain('upi');
+    expect((uk['grading.scale'] as { grade: string }[])[0]!.grade).toBe('9');
+    expect(uk['calendar.weeklyOff']).toEqual(['sat', 'sun']);
+    expect(curriculaFor('IN')[0]!.key).toBe('CBSE');
+    expect(curriculaFor('US').some((c) => c.key === 'CBSE')).toBe(false);
+    // A country without a pack yet still starts cleanly from the neutral defaults and its curriculum.
+    expect(packSettings('KE', 'IB')['grading.passPct']).toBe(50);
+  });
+});

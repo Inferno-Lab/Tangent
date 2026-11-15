@@ -49,8 +49,9 @@ export async function startHarness(port?: number): Promise<Harness> {
       admin: { name: 'Neha Menon', email: 'neha.menon@greenfield.edu.in', phone: '+91 98220 41200', passwordHash: demoHash },
       modules: plan.modules, data: o.data, demoPasswordHash: demoHash,
     });
-    // No quiet hours unless a test sets them: messages are held in quiet hours, so results would depend on the clock.
-    await pool.query("insert into settings (key, value) values ('notify.quietFrom', '\"00:00\"'), ('notify.quietTo', '\"00:00\"') on conflict (key) do update set value = excluded.value");
+    // No quiet hours unless a test sets them: messages are held in quiet hours, so results would depend on the clock. The
+    // school is open every day for the same reason (AGENTS rule 12: any day of the week must work); a test sets its own week.
+    await pool.query("insert into settings (key, value) values ('notify.quietFrom', '\"00:00\"'), ('notify.quietTo', '\"00:00\"'), ('calendar.weeklyOff', '[]') on conflict (key) do update set value = excluded.value");
     await pool.end();
     await registry.query(
       `insert into schools (id, slug, name, short_name, color, logo_text, status, plan, cell, target, region, db_url_sealed, db_name, entitlement, contact, demo)

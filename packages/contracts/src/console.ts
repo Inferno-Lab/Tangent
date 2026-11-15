@@ -120,7 +120,8 @@ export const PlanSave = z.object({
 export type PlanSave = z.infer<typeof PlanSave>;
 
 /** The boards a school can follow: the one list the wizard and a school's details offer. */
-export const SCHOOL_BOARDS = ['CBSE', 'ICSE', 'State', 'IB', 'International', 'Other'] as const;
+/** The curricula a school can start from (packs.ts sets each one's grading); kept as the registry's `board`. */
+export const SCHOOL_BOARDS = ['CBSE', 'ICSE', 'State', 'British', 'Cambridge', 'IB', 'American', 'International', 'Other'] as const;
 
 /** What Tangent keeps about a school beside its own settings: the contact for Tangent, tax number and board. */
 export const SchoolDetailsPatch = z.object({

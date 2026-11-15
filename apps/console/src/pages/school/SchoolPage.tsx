@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
 import { HttpError } from '@tangent/api-client';
-import { SCHOOL_BOARDS, SchoolDetailsPatch, STEP_LABELS, auditLabel, type ActionKey, type ProvisionRunRow, type SchoolDetail } from '@tangent/contracts';
+import { CURRICULA, SchoolDetailsPatch, STEP_LABELS, auditLabel, type ActionKey, type ProvisionRunRow, type SchoolDetail } from '@tangent/contracts';
 import { DateField, Dialog, EmptyCard, Field, NumberField, PageScope, Select, SelectField, useShake, useToast, EmptyNote } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { url } from '../../app/base';
@@ -391,7 +391,7 @@ function DetailsDialog({ d, onClose, onDone }: { d: SchoolDetail; onClose: () =>
         </div>
         <div className="two">
           <Field label="Tax number (GSTIN)" value={f.gstin} onChange={set('gstin')} error={err.gstin} maxLength={20} hint="On the school’s invoices." />
-          <SelectField label="Board" value={f.board} onChange={set('board')} error={err.board} options={SCHOOL_BOARDS.map((b) => ({ value: b, label: b }))} />
+          <SelectField label="Curriculum" value={f.board} onChange={set('board')} error={err.board} options={CURRICULA.map((c) => ({ value: c.key, label: c.name }))} />
         </div>
         {err._ && <div className="emsg" role="alert">{err._}</div>}
       </div>

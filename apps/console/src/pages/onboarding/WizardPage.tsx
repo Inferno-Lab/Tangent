@@ -3,7 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
 import { HttpError } from '@tangent/api-client';
 import { closeModules } from '@tangent/config-engine';
-import { countryName, ZONES, LOCALES, COUNTRY_DEFAULTS, COUNTRIES, DEFAULT_BRAND, DEPLOY_TARGET_LABELS, LANGUAGES, SCHOOL_BOARDS, readableOn, WizardAdmin, WizardBasics, WizardBranding, WizardData, WizardPayload, WizardPlacement, WizardPlan, type ProvisionRunRow, type WizardReview } from '@tangent/contracts';
+import { packSettings, curriculaFor, countryName, ZONES, LOCALES, COUNTRY_DEFAULTS, COUNTRIES, DEFAULT_BRAND, DEPLOY_TARGET_LABELS, LANGUAGES, readableOn, WizardAdmin, WizardBasics, WizardBranding, WizardData, WizardPayload, WizardPlacement, WizardPlan, type ProvisionRunRow, type WizardReview } from '@tangent/contracts';
 import { ColourField, Field, FilePick, NumberField, SelectField, useShake, Icon } from '@tangent/web-ui';
 import { Card, Page, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
@@ -153,7 +153,7 @@ export function WizardPage() {
           {f('basics', 'name', 'School name', { placeholder: 'Banyan Ridge School' })}
           <div className="two">{f('basics', 'shortName', 'Short name', { hint: 'Used in the menu and the app' })}{f('basics', 'slug', 'Address name', { hint: `Lives at …/s/${str(data.basics.slug) || 'name'}`, onBlur: checkSlug })}</div>
           <div className="two">
-            <SelectField label="Board" value={str(data.basics.board)} onChange={(v) => set('basics', 'board', v)} options={SCHOOL_BOARDS.map((b) => ({ value: b, label: b }))} />
+            <SelectField label="Curriculum" value={str(data.basics.board)} onChange={(v) => set('basics', 'board', v)} options={curriculaFor(str(data.basics.country)).map((c) => ({ value: c.key, label: c.name }))} />
             <SelectField label="App language" value={str(data.basics.language)} onChange={(v) => set('basics', 'language', v)} options={LANGUAGES.map(([value, label]) => ({ value, label }))} />
           </div>
           <div className="two">
@@ -169,6 +169,7 @@ export function WizardPage() {
             <SelectField label="Dates and numbers written as" value={str(data.basics.locale)} error={errs['basics.locale']} onChange={(v) => set('basics', 'locale', v)} options={[{ value: '', label: 'Choose a way' }, ...LOCALES.map(([value, label]) => ({ value, label }))]} />
             {f('basics', 'currency', 'Currency', { hint: 'A code like USD, GBP, INR or AED' })}
           </div>
+          <PackLine country={str(data.basics.country)} curriculum={str(data.basics.board)} />
           <div className="two">{f('basics', 'city', 'Town or city')}{str(data.basics.country) === 'IN' ? f('basics', 'gstin', 'GSTIN (optional)') : <span />}</div>
           {f('basics', 'address', 'Address (optional)')}
           <div className="lbl" style={{ margin: '8px 0' }}>Who we talk to</div>
@@ -331,4 +332,17 @@ function ReviewStep({ review, loading, error, payloadOk, missing, rehearsal }: {
       )}
     </>
   );
+}
+
+/** What the school starts with from its country and curriculum (packs.ts): changeable later, by the school or by Tangent. */
+function PackLine({ country, curriculum }: { country: string; curriculum: string }) {
+  const p = packSettings(country, curriculum);
+  const scale = p['grading.scale'] as { grade: string }[] | undefined;
+  const methods = p['fees.paymentMethods'] as { name: string }[] | undefined;
+  const off = p['calendar.weeklyOff'] as string[] | undefined;
+  const parts = [
+    scale && `grades ${scale.map((g) => g.grade).join(', ')}`, p['grading.passPct'] !== undefined && `pass at ${String(p['grading.passPct'])}%`,
+    methods && `paid by ${methods.map((m) => m.name).join(', ')}`, off && `closed ${off.map((d) => d.charAt(0).toUpperCase() + d.slice(1)).join(' and ')}`,
+  ].filter(Boolean);
+  return <div className="help" style={{ margin: '0 0 12px' }}>{parts.length ? `Starts with ${parts.join('; ')}. Everything can be changed later.` : 'Starts with Tangent’s defaults. Everything can be changed later.'}</div>;
 }

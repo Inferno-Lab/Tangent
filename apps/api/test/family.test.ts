@@ -87,8 +87,6 @@ describe('learning', () => {
     expect((await post(parent, '/homework', { classId: 'cls_8a', subject: 'maths', title: 'Not a teacher', dueOn: '2099-01-01' })).status).toBe(403);
   });
   it('lets a teacher mark attendance, and the family sees it and is told', async () => {
-    // Any day of the week must work (AGENTS rule 12): the school is open every day while this runs.
-    await h.setSettings({ 'calendar.weeklyOff': [] });
     const marked = await post(teacher, '/attendance', { stu_aarav: 'absent' });
     expect(marked.status, JSON.stringify(marked.json)).toBe(200);
     const today = (await f(teacher, '/attendance/today?students=stu_aarav,stu_diya')).json;
@@ -100,7 +98,6 @@ describe('learning', () => {
     expect(notes[0]).toMatchObject({ type: 'attendance.absent', module: 'attendance.parentAlerts', route: '/attendance', read: false });
     expect((await post(parent, `/notifications/${notes[0].id}/dismiss`)).status).toBe(200);
     expect((await f(parent, '/users/x/notifications')).json.find((n: any) => n.id === notes[0].id)).toBeUndefined();
-    await h.setSettings({ 'calendar.weeklyOff': ['sun'] });
   });
   it('lets a teacher enter marks for the open exam', async () => {
     const mid = (await f(teacher, '/classes/cls_8a/exams')).json.find((e: any) => e.name === 'Mid-term exams');
@@ -371,6 +368,7 @@ describe('what the console sets reaches families and the office', () => {
 describe('the days a school is closed', () => {
   it('leaves the school’s weekly off days out of the attendance week', async () => {
     const weekday = (d: string) => new Date(`${d}T00:00:00Z`).getUTCDay();
+    await h.setSettings({ 'calendar.weeklyOff': ['sun'] });
     const sundays = (await h.call('GET', '/v1/attendance/week', { token: admin })).json as { date: string }[];
     expect(sundays.some((p) => weekday(p.date) === 6)).toBe(true);
     expect(sundays.some((p) => weekday(p.date) === 0)).toBe(false);
@@ -380,7 +378,7 @@ describe('the days a school is closed', () => {
       expect(week).toHaveLength(sundays.length);
       expect(week.some((p) => [0, 6].includes(weekday(p.date)))).toBe(false);
     } finally {
-      await h.setSettings({ 'calendar.weeklyOff': ['sun'] });
+      await h.setSettings({ 'calendar.weeklyOff': [] });
     }
   });
 });

@@ -24,7 +24,7 @@ if (existing.some((s) => s.slug === 'greenfield')) {
   process.exit(0);
 }
 const payload = {
-  basics: { name: 'Greenfield International School', shortName: 'Greenfield', slug: 'greenfield', board: 'International', address: '42, Baner Road, Baner', city: 'Pune', contactName: 'Neha Menon', contactPhone: '+91 98220 41200', contactEmail: 'neha.menon@greenfield.edu.in', gstin: '', language: 'en', country: 'IN', timezone: 'Asia/Kolkata', locale: 'en-IN', currency: 'INR' },
+  basics: { name: 'Greenfield International School', shortName: 'Greenfield', slug: 'greenfield', board: 'CBSE', address: '42, Baner Road, Baner', city: 'Pune', contactName: 'Neha Menon', contactPhone: '+91 98220 41200', contactEmail: 'neha.menon@greenfield.edu.in', gstin: '', language: 'en', country: 'IN', timezone: 'Asia/Kolkata', locale: 'en-IN', currency: 'INR' },
   plan: { plan: 'premium', modules: ['people', 'attendance', 'fees', 'notices', 'timetable', 'homework', 'events', 'exams', 'chat', 'transport', 'library', 'gallery'], addOns: [], locks: [], students: 1500 },
   branding: { color: '#6A4CF5', logoText: 'G', appName: 'Greenfield', tagline: 'Curiosity first. Kindness always.' },
   placement: { target: cell.target, cell: cell.key, addressing: 'path', customDomain: '' },

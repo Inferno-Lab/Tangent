@@ -201,7 +201,8 @@ describe('access', () => {
   it('stops a teacher from opening fees or settings', async () => {
     const tt = await h.login('sunita.desai@greenfield.edu.in');
     expect((await h.call('GET', '/v1/fees/summary', { token: tt })).status).toBe(403);
-    expect((await h.call('PATCH', '/v1/settings', { token: tt, body: { changes: { 'school.name': 'Hacked school' } } })).status).toBe(404);
+    // Someone without the right to change settings cannot, whatever they send.
+    expect((await h.call('PATCH', '/v1/settings', { token: tt, body: { expectedVersion: 1, changes: { 'school.name': 'Hacked school' } } })).status).toBe(403);
     expect((await h.call('GET', '/v1/students?limit=2', { token: tt })).status).toBe(200);
   });
   it('closes modules the plan does not include', async () => {
@@ -226,7 +227,10 @@ describe('access', () => {
 
 describe('dashboard and approvals', () => {
   it('builds the dashboard from real data', async () => {
+    // The sample school's own week (closed on Sundays): its day at school is the last school day.
+    await h.setSettings({ 'calendar.weeklyOff': ['sun'] });
     const d = (await h.call('GET', '/v1/dashboard', { token })).json;
+    await h.setSettings({ 'calendar.weeklyOff': [] });
     expect(d.greetingName).toBe('Neha Menon');
     expect(d.present.total).toBeGreaterThanOrEqual(1498);
     expect(d.charts.attendance.points).toHaveLength(6);
@@ -367,11 +371,12 @@ describe('timetable', () => {
   });});
 
 describe('settings', () => {
-  it('shows the school its setup, and gives the school no way to change it (only the console can)', async () => {
+  it('shows the school its setup, lets it change its own settings and never Tangent’s or its roles', async () => {
     const before = (await h.call('GET', '/v1/settings', { token })).json;
     expect(before.usage.students).toBeGreaterThan(0);
     expect(before.usage.studentLimit).toBeGreaterThanOrEqual(before.usage.students);
-    expect((await h.call('PATCH', '/v1/settings', { token, body: { changes: { 'school.name': 'Changed by the school' } } })).status).toBe(404);
+    const version = (await h.call('GET', '/v1/settings/edit', { token })).json.version;
+    expect((await h.call('PATCH', '/v1/settings', { token, body: { expectedVersion: version, changes: { 'brand.color': '#123456' } } })).status).toBe(400);
     expect((await h.call('POST', '/v1/roles', { token, body: { name: 'Mine', permissions: [] } })).status).toBe(404);
     expect((await h.call('PUT', '/v1/roles/role_teacher', { token, body: { name: 'Mine', permissions: [] } })).status).toBe(404);
     expect((await h.call('GET', '/v1/me', { token })).json.permissions).not.toContain('settings.write');

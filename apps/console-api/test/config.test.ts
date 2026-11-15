@@ -8,8 +8,8 @@ let second: string;
 let id: string;
 let school: string;
 
-async function launch(slug: string) {
-  const r = await h.c('POST', '/console/v1/wizard/launch', { token: t, body: { payload: wizardPayload(slug, { data: { start: 'demo' } }) } });
+async function launch(slug: string, payload: object = wizardPayload(slug, { data: { start: 'demo' } })) {
+  const r = await h.c('POST', '/console/v1/wizard/launch', { token: t, body: { payload } });
   for (let i = 0; i < 400; i++) {
     const run = (await h.c('GET', `/console/v1/runs/${r.json.id}`, { token: t })).json;
     if (run.status === 'succeeded' || run.status === 'failed') return run;
@@ -164,4 +164,18 @@ describe('modules per school', () => {
     const none = (await h.c('GET', '/console/v1/billing/invoices', { token: t })).json.filter((i: { schoolId: string; period: string }) => i.schoolId === id && i.period === '2031-06');
     expect(none).toEqual([]);
   }, 60_000);
+
+  it('starts a school in another country with its own ways, and nothing of India', async () => {
+    const base = wizardPayload('ukschool');
+    const run = await launch('ukschool', { ...base, basics: { ...base.basics, country: 'GB', timezone: 'Europe/London', locale: 'en-GB', currency: 'GBP', board: 'British', contactPhone: '+44 20 7946 0000' } });
+    expect(run.status).toBe('succeeded');
+    const uk = (await h.c('GET', '/console/v1/schools', { token: t })).json.find((x: any) => x.slug === 'ukschool');
+    const v = (await h.c('GET', `/console/v1/schools/${uk.id}/config`, { token: t })).json.values;
+    expect(v['school.timezone']).toBe('Europe/London');
+    expect(v['school.currency']).toBe('GBP');
+    expect(v['grading.scale'][0].grade).toBe('9');
+    expect(v['fees.paymentMethods'].map((m: any) => m.key)).not.toContain('upi');
+    expect(v['calendar.weeklyOff']).toEqual(['sat', 'sun']);
+    expect((await h.registry.query('select timezone, currency from schools where slug = $1', ['ukschool'])).rows[0]).toEqual({ timezone: 'Europe/London', currency: 'GBP' });
+  });
 });

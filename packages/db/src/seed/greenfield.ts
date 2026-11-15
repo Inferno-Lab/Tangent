@@ -1,4 +1,4 @@
-import { PERMISSIONS, ROLE_TEMPLATES, addDays, type RoleTemplate, schoolToday, latestSchoolDay, schoolDaysEnding } from '@tangent/contracts';
+import { packSettings, PERMISSIONS, ROLE_TEMPLATES, addDays, type RoleTemplate, schoolToday, latestSchoolDay, schoolDaysEnding } from '@tangent/contracts';
 import type { Pool, PoolClient } from 'pg';
 import { newId } from '../ids.js';
 import { bulkInsert } from './bulk.js';
@@ -29,6 +29,8 @@ export interface SeedInput {
   data: 'empty' | 'demo';
   /** Hash used for every demo staff and guardian login. Needed for `demo`. */
   demoPasswordHash?: string;
+  /** The curriculum the school starts from (packs.ts); its country comes from `school.country`. India and CBSE when not given. */
+  curriculum?: string;
   /** The starting roles the console keeps (Blueprints → Starting roles); the built-in ones when not given. */
   roleTemplates?: RoleTemplate[];
   today?: string;
@@ -155,6 +157,9 @@ async function run(db: PoolClient, input: SeedInput): Promise<Omit<SeedReport, '
     ['homework.goalPct', 85], ['dashboard.rollClasses', ['cls_8a', 'cls_8b', 'cls_9a', 'cls_9b', 'cls_10a', 'cls_10b']], ['security.twoFactor', true],
     ['vocab.student', 'Student'], ['vocab.class', 'Class'],
   ];
+  // Its country's and curriculum's starter pack, so a new school has nothing to set up (docs/one-shot-plan.md §3.2).
+  const seen = new Set(settings.map(([k]) => k));
+  for (const [k, v] of Object.entries(packSettings(s.country ?? 'IN', input.curriculum ?? 'CBSE'))) if (!seen.has(k)) settings.push([k, v]);
   await bulkInsert(db, 'settings', ['key', 'value', 'updated_by'], settings.map(([k, v]) => [k, JSON.stringify(v), 'system']));
   await bulkInsert(db, 'meta', ['key', 'value'], [
     ['settings.version', JSON.stringify(1)], ['timetable.version', JSON.stringify(1)],

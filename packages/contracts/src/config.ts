@@ -67,7 +67,8 @@ export const SchoolSettingsSchema = z.object({
   'attendance.lockAfterDays': z.number().int().min(0).max(30).default(2),
   'fees.lateFeePct': z.number().min(0).max(25).default(0),
   'fees.remindDaysBefore': z.number().int().min(0).max(30).default(3),
-  'fees.dailyTarget': z.number().int().min(0).max(100000000).default(150000),
+  // 0: no daily target (the dashboard shows the collection without a goal line).
+  'fees.dailyTarget': z.number().int().min(0).max(100000000).default(0),
   'attendance.goalPct': z.number().min(50).max(100).default(95),
   'homework.goalPct': z.number().min(50).max(100).default(85),
   'dashboard.rollClasses': z.array(z.string()).max(8).default([]),
@@ -83,7 +84,7 @@ export const SchoolSettingsSchema = z.object({
   'classes.schoolEdits': z.boolean().default(true),
   'calendar.schoolEdits': z.boolean().default(true),
   // The days the school is closed every week (holidays and second Saturdays are calendar entries). At least one day is a school day.
-  'calendar.weeklyOff': z.array(z.enum(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'])).max(6).default(['sun']),
+  'calendar.weeklyOff': z.array(z.enum(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'])).max(6).default(['sat', 'sun']),
   'feeStructures.schoolEdits': z.boolean().default(true),
   // Receipt numbers: {year} becomes the year. The start lets a school arriving from another system keep its numbering.
   'fees.receiptPrefix': z.string().trim().min(1).max(20).default('RCPT-{year}-'),
@@ -93,11 +94,12 @@ export const SchoolSettingsSchema = z.object({
   // How the office may record a payment (families pay in the app by UPI, card or net banking).
   // GST on receipts (feature fees.gstReceipts): the school's GSTIN, the service code and rate, and which fee heads are taxable.
   'fees.gstin': z.string().trim().regex(/^$|^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/, 'A GSTIN has 15 characters, like 27AAAAA0000A1Z5').default(''),
-  'fees.gstSac': z.string().trim().max(8).default('999293'),
-  'fees.gstRatePct': z.number().min(0).max(28).default(18),
+  'fees.gstSac': z.string().trim().max(8).default(''),
+  'fees.gstRatePct': z.number().min(0).max(28).default(0),
   'fees.gstHeads': z.array(z.string()).default([]),
   // Refunds above this many rupees need a second person in the school (fees.refund on both).
-  'fees.refundApprovalAbove': z.number().int().min(0).max(10_000_000).default(5000),
+  // 0: every refund needs a second person until the school sets an amount in its own currency.
+  'fees.refundApprovalAbove': z.number().int().min(0).max(10_000_000).default(0),
   // The school's logo image (a file kept in its storage); the letters stand in until there is one.
   'brand.logoFileId': z.string().default(''),
   // Library rules.
@@ -130,7 +132,7 @@ export const SchoolSettingsSchema = z.object({
   // The attendance marks the school uses (present and absent always).
   'attendance.statuses': z.array(z.enum(ATTENDANCE_MARKS)).min(2).default(['present', 'absent', 'late', 'leave']),
   // Reasons a family picks when asking for leave.
-  'leave.reasons': z.array(z.string().trim().min(1).max(40)).min(1).max(12).default(['Unwell', 'Family function', 'Travel', 'Appointment', 'Other']),
+  'leave.reasons': z.array(z.string().trim().min(1).max(40)).min(1).max(12).default(['Unwell', 'Family', 'Travel', 'Medical appointment', 'Other']),
   // Families see how many classmates have handed in; who may hand in from the app.
   'homework.showClassProgress': z.boolean().default(false),
   'homework.defaultDueDays': z.number().int().min(1).max(30).default(2),
@@ -141,10 +143,9 @@ export const SchoolSettingsSchema = z.object({
   'exams.leadDays': z.number().int().min(0).max(120).default(7),
   'results.showRank': z.boolean().default(false),
   'grading.scale': z.array(z.object({ grade: z.string().min(1).max(4), minPct: z.number().min(0).max(100) })).min(1).max(12).default([
-    { grade: 'A1', minPct: 91 }, { grade: 'A2', minPct: 81 }, { grade: 'B1', minPct: 71 }, { grade: 'B2', minPct: 61 }, { grade: 'C1', minPct: 51 },
-    { grade: 'C2', minPct: 41 }, { grade: 'D', minPct: 33 }, { grade: 'E', minPct: 0 },
+    { grade: 'A', minPct: 90 }, { grade: 'B', minPct: 80 }, { grade: 'C', minPct: 70 }, { grade: 'D', minPct: 60 }, { grade: 'E', minPct: 50 }, { grade: 'F', minPct: 0 },
   ]),
-  'grading.passPct': z.number().min(0).max(100).default(33),
+  'grading.passPct': z.number().min(0).max(100).default(50),
   // Categories of notices and events: one list each, used by the people who write them and the people who read them.
   'notices.categories': z.array(CATEGORY).min(1).max(16).default([
     { key: 'academic', name: 'Academic', tone: 'v' }, { key: 'exams', name: 'Exams', tone: 'c' }, { key: 'events', name: 'Events', tone: 'g' },
