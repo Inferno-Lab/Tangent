@@ -58,9 +58,11 @@
     "school.email": "hello@greenfield.edu.in",
     "school.address": "42, Baner Road, Baner, Pune 411045",
     "school.language": "en",
+    "school.country": "IN",
+    "school.timezone": "Asia/Kolkata",
+    "school.locale": "en-IN",
+    "school.currency": "INR",
     "brand.logoText": "G",
-    "theme.colors": {},
-    "approvals.feeWaiver": "principal",
     "approvals.notice": "required",
     "attendance.notifyParents": true,
     "attendance.lockAfterDays": 2,
@@ -106,6 +108,21 @@
     "vocab.class": "Class",
     "vocab.students": "",
     "vocab.classes": "",
+    "admissions.sources": [
+      "Walk-in",
+      "Phone",
+      "Website",
+      "Referral",
+      "Event"
+    ],
+    "admissions.stages": [
+      "applied",
+      "test",
+      "offer"
+    ],
+    "letters.family": "Dear {guardian},\n\n{school} now has its own app. You can follow {student}’s school day on your phone: attendance, homework, results, fees and notices, as your school uses them.\n\n1. Scan the code, or open {link}, to get the {school} app.\n2. Sign in with your phone number ending {phoneEnd}.\n3. Type the code we send you. There is no password to remember.\n\nIf your phone number has changed, tell the school office.",
+    "letters.student": "Dear {student},\n\n{school} now has its own app for you: your timetable, homework, results and notices.\n\n1. Scan the code, or open {link}, to get the {school} app.\n2. Sign in with the phone number or email the school has for you.\n3. Type the code we send you.\n\nAsk your class teacher if you need help.",
+    "students.required": [],
     "people.houses": [
       {
         "key": "emerald",
@@ -143,7 +160,11 @@
       "Other"
     ],
     "homework.showClassProgress": false,
+    "homework.defaultDueDays": 2,
+    "homework.defaultMarks": 20,
     "homework.handedInBy": "either",
+    "exams.defaultMaxMarks": 100,
+    "exams.leadDays": 7,
     "results.showRank": false,
     "grading.scale": [
       {

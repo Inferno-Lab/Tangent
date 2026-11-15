@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { fmtNumber, initials, type ApprovalDecision, type ApprovalKind, type ApprovalRow, type Permission } from '@tangent/contracts';
+import { roundToCurrency, fmtNumber, initials, type ApprovalDecision, type ApprovalKind, type ApprovalRow, type Permission } from '@tangent/contracts';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { AttendanceService } from './attendance.service.js';
@@ -168,7 +168,7 @@ export class ApprovalsService {
         `select i.id, i.amount from fee_invoices i where i.student_id = $1 and i.head in (select key from fee_heads where concession) and i.amount > coalesce((select sum(amount - refunded) from payments where invoice_id = i.id),0) order by i.due_on limit 1`, [r.subject_ref]);
       const target = inv.rows[0] as { id: string; amount: number } | undefined;
       if (!target) throw new ApiError('conflict', 'This student has no unpaid fee that takes concessions to reduce.');
-      const waived = Math.round((target.amount * pct) / 100);
+      const waived = roundToCurrency((target.amount * pct) / 100);
       await client.query('update fee_invoices set waived_amount = $2 where id = $1', [target.id, waived]);
       return { ...payload, invoiceId: target.id, waived };
     }

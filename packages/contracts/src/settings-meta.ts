@@ -13,7 +13,7 @@ const regionName = (c: string): string => {
 export type SettingKind =
   | 'text' | 'textarea' | 'number' | 'bool' | 'enum' | 'color' | 'time' | 'date' | 'language'
   | 'multi' | 'appRoles' | 'appLayout' | 'notifyRules' | 'templates' | 'classes' | 'logo'
-  | 'houses' | 'categories' | 'strings' | 'gradingScale';
+  | 'houses' | 'categories' | 'strings' | 'gradingScale' | 'paymentMethods';
 
 export interface SettingMeta {
   /** One of the school-wide groups, or the key of the module that owns the setting (config-engine's MODULES lists it there too). */
@@ -140,7 +140,7 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = {
   'fees.receiptPrefix': { group: 'fees', label: 'Receipt number prefix', kind: 'text', help: '{year} becomes the year, for example RCPT-{year}-.' },
   'fees.receiptStart': { group: 'fees', label: 'First receipt number', kind: 'number', min: 1, max: 99_999_999, help: 'For a school arriving from another system: carry on from its last receipt.' },
   'fees.receiptNote': { group: 'fees', label: 'Printed on receipts', kind: 'textarea', help: 'Under the school’s name and address on every receipt: the trust, its registration or GST number.' },
-  'fees.paymentMethods': { group: 'fees', label: 'How the office records payments', kind: 'multi', options: [['cash', 'Cash'], ['upi', 'UPI'], ['card', 'Card'], ['netbanking', 'Net banking'], ['cheque', 'Cheque']] },
+  'fees.paymentMethods': { group: 'fees', label: 'How the office records payments', kind: 'paymentMethods', max: 16, help: 'Each with the name the office uses and what kind of money it is.' },
   'fees.lateFeePct': { group: 'fees', label: 'Late fee (%)', kind: 'number', min: 0, max: 25, help: 'Charged once a month on each overdue invoice while the school has Late fines. 0 charges nothing.' },
   'fees.remindDaysBefore': { group: 'fees', label: 'Remind families this many days before a due date', kind: 'number', min: 0, max: 30, help: 'Sent each morning while the school has Fee reminders, once per invoice per day.' },
   'fees.gstin': { group: 'fees', label: 'GSTIN', kind: 'text', help: 'Printed on receipts with the tax lines while the school has GST receipts.' },

@@ -9,7 +9,7 @@ part of 'campus.dart';
 Installment _$InstallmentFromJson(Map<String, dynamic> json) => Installment(
   id: json['id'] as String,
   title: json['title'] as String,
-  amount: (json['amount'] as num).toInt(),
+  amount: json['amount'] as num,
   dueDate: DateTime.parse(json['dueDate'] as String),
   paid: json['paid'] as bool,
   paidOn: json['paidOn'] == null
@@ -35,7 +35,7 @@ Receipt _$ReceiptFromJson(Map<String, dynamic> json) => Receipt(
   id: json['id'] as String,
   installmentId: json['installmentId'] as String,
   title: json['title'] as String,
-  amount: (json['amount'] as num).toInt(),
+  amount: json['amount'] as num,
   paidOn: DateTime.parse(json['paidOn'] as String),
   method: json['method'] as String,
   reference: json['reference'] as String,

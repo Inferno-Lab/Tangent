@@ -36,8 +36,8 @@ export class OfficeService {
   private invoiceBase(): string {
     return `with paid as (select invoice_id, sum(amount - refunded) p from payments group by invoice_id),
       inv as (
-        select i.id, i.student_id, s.name student_name, c.name class_name, i.head, i.title, i.amount, i.waived_amount waived, coalesce(paid.p, 0)::int paid, i.due_on::text due_on, i.due_on d,
-          greatest(i.amount - i.waived_amount - coalesce(paid.p, 0), 0)::int outstanding,
+        select i.id, i.student_id, s.name student_name, c.name class_name, i.head, i.title, i.amount, i.waived_amount waived, coalesce(paid.p, 0) paid, i.due_on::text due_on, i.due_on d,
+          greatest(i.amount - i.waived_amount - coalesce(paid.p, 0), 0) outstanding,
           case when i.amount - i.waived_amount - coalesce(paid.p, 0) <= 0 then 'paid' when i.due_on < $1::date then 'overdue' when coalesce(paid.p, 0) > 0 then 'partial' else 'due' end status
         from fee_invoices i join students s on s.id = i.student_id join classes c on c.id = s.class_id left join paid on paid.invoice_id = i.id)`;
   }

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Money, MoneyOrZero } from './locale.js';
 
 // Phase 4: files, online payments and refunds, library, transport, gallery and year-end, as the admin and the app see them.
 
@@ -23,7 +24,7 @@ export interface FileUpload { fileId: string; upload: { url: string; method: 'PU
 
 // ── Refunds and reconciliation ────────────────────────────────────────────────
 
-export const RefundRequest = z.object({ paymentId: z.string().min(1), amount: z.number().int().positive('Enter an amount'), reason: z.string().trim().min(3, 'Say why, in a few words.').max(200) });
+export const RefundRequest = z.object({ paymentId: z.string().min(1), amount: Money(), reason: z.string().trim().min(3, 'Say why, in a few words.').max(200) });
 export type RefundRequest = z.infer<typeof RefundRequest>;
 export interface RefundRow { id: string; paymentId: string; receiptNo: string; student: string; amount: number; reason: string; status: 'requested' | 'sent' | 'done' | 'failed' | 'rejected'; requestedBy: string | null; approvedBy: string | null; error: string | null; createdAt: string; decisionNote: string }
 export interface ReconRow { id: string; day: string; providerPaymentId: string; providerAmount: number | null; receiptAmount: number | null; problem: string; resolved: boolean; note: string }
@@ -85,7 +86,7 @@ export const BusRouteInput = z.object({
   attendantPhone: z.string().trim().max(20).default(''),
   /** The bus's number at the GPS tracker company, when the school uses trackers (Integrations → Bus trackers). */
   trackerId: z.string().trim().max(40).default(''),
-  fee: z.number().int().min(0).max(1_000_000).default(0),
+  fee: MoneyOrZero().default(0),
   stops: z.array(StopInput).max(60).default([]),
 });
 export type BusRouteInput = z.infer<typeof BusRouteInput>;

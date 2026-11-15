@@ -1,5 +1,6 @@
 import { ATTENDANCE_MARKS, type MenuGroup } from './config.js';
 import { z } from 'zod';
+import { Money } from './locale.js';
 import { IsoDate } from './common.js';
 
 export const AttendanceStatus = z.enum(ATTENDANCE_MARKS);
@@ -136,7 +137,7 @@ export const AssignFee = z.object({
   ids: z.array(z.string()).min(1).max(500),
   head: FeeHeadKey,
   title: z.string().trim().min(3, 'Name the fee').max(80),
-  amount: z.number().int().positive('Enter an amount'),
+  amount: Money(),
   dueOn: IsoDate,
 });
 export type AssignFee = z.infer<typeof AssignFee>;
@@ -248,8 +249,9 @@ export interface FeeSummary {
 export const PaymentCreate = z.object({
   studentId: z.string(),
   invoiceId: z.string(),
-  amount: z.number().int().positive('Enter an amount'),
-  method: z.enum(['cash', 'upi', 'card', 'netbanking', 'cheque']),
+  amount: Money(),
+  /** One of the school's own payment methods (fees.paymentMethods). */
+  method: z.string().regex(/^[a-z0-9-]{1,24}$/, 'Choose how it was paid'),
   reference: z.string().trim().max(60).optional(),
 });
 export type PaymentCreate = z.infer<typeof PaymentCreate>;
@@ -277,7 +279,7 @@ export interface InvoiceDetail extends InvoiceRow {
   pending: { id: string; title: string } | null;
 }
 /** Asks for part of an invoice to be waived, or all of what is left of it (cancel); a second person decides in Approvals. */
-export const WaiverRequest = z.object({ amount: z.number().int().positive('Enter an amount'), reason: z.string().trim().min(3, 'Say why').max(300), cancel: z.boolean().default(false) });
+export const WaiverRequest = z.object({ amount: Money(), reason: z.string().trim().min(3, 'Say why').max(300), cancel: z.boolean().default(false) });
 export type WaiverRequest = z.infer<typeof WaiverRequest>;
 export const ReceiptCancel = z.object({ reason: z.string().trim().min(3, 'Say why').max(300) });
 export type ReceiptCancel = z.infer<typeof ReceiptCancel>;
@@ -454,7 +456,7 @@ export interface DashboardData {
 
 /** What the menu needs on every page: who the school is, the term card, and the counts beside menu items. */
 export interface ShellData {
-  school: { name: string; shortName: string; logoText: string; logoUrl: string | null; place: string; color: string; address: string; phone: string; receiptNote: string; studentWord: string; classWord: string; paymentMethods: string[] };
+  school: { name: string; shortName: string; logoText: string; logoUrl: string | null; place: string; color: string; address: string; phone: string; receiptNote: string; studentWord: string; classWord: string; paymentMethods: { key: string; name: string; kind: string }[] };
   term: DashboardData['term'];
   badges: DashboardData['badges'];
   modules: string[];

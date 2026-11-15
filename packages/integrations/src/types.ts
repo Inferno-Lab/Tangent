@@ -42,13 +42,14 @@ export interface PushMessage { tokens: string[]; title: string; body: string; da
 export interface PushResult { sent: number; failedTokens: string[] }
 
 /** One payment-link the family opens in a browser: no SDK in the app. */
-export interface LinkInput { amountPaise: number; reference: string; description: string; customer: { name: string; phone?: string; email?: string }; callbackUrl: string; expiresAt?: Date }
-export interface PaymentEvent { kind: 'paid' | 'failed' | 'refunded'; reference: string; providerPaymentId: string; amountPaise: number; method?: string; refundId?: string }
+/** `amountMinor` is in the currency's smallest unit (paise, cents, fils). */
+export interface LinkInput { amountMinor: number; currency: string; reference: string; description: string; customer: { name: string; phone?: string; email?: string }; callbackUrl: string; expiresAt?: Date }
+export interface PaymentEvent { kind: 'paid' | 'failed' | 'refunded'; reference: string; providerPaymentId: string; amountMinor: number; method?: string; refundId?: string }
 export interface PaymentsAdapter {
   createLink(c: Ctx, input: LinkInput): Promise<{ linkId: string; url: string }>;
-  refund(c: Ctx, providerPaymentId: string, amountPaise: number, note: string): Promise<{ refundId: string }>;
+  refund(c: Ctx, providerPaymentId: string, amountMinor: number, note: string, currency: string): Promise<{ refundId: string }>;
   /** What the provider settled to the school for these days: for the daily reconciliation. */
-  settlements?(c: Ctx, from: Date, to: Date): Promise<{ providerPaymentId: string; amountPaise: number }[]>;
+  settlements?(c: Ctx, from: Date, to: Date): Promise<{ providerPaymentId: string; amountMinor: number }[]>;
 }
 
 export interface StorageAdapter {

@@ -13,6 +13,8 @@ const settings = {
   values: {
     'school.name': info.name, 'school.shortName': 'Greenfield', 'school.tagline': info.tagline, 'school.place': 'Pune', 'school.address': info.address,
     'school.phone': info.phone, 'school.email': info.email, 'brand.color': '#6A4CF5', 'brand.logoText': 'G',
+    // The sample school is in India; a school anywhere else has its own (wizard: country, zone, locale, currency).
+    'school.country': 'IN', 'school.timezone': 'Asia/Kolkata', 'school.locale': 'en-IN', 'school.currency': 'INR',
     // The sample school shows every role, so each can be tried from the demo card.
     'app.roles': ['parent', 'student', 'teacher', 'driver'],
     'people.houses': [

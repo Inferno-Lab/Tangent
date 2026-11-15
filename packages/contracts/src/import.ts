@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MoneyOrZero } from './locale.js';
 
 /** One column of an import: the template header, what people see, and an example for the template's second row. */
 export interface ImportColumn {
@@ -169,7 +170,7 @@ export interface Activation {
 /** Tangent's team ticks a go-live item that cannot be counted, or types the old system's total dues to reconcile against. */
 export const ReadinessMark = z.union([
   z.object({ key: z.enum(['config_reviewed', 'staff_trained']), done: z.boolean() }),
-  z.object({ key: z.literal('old_dues'), amount: z.number().int().min(0).max(10_000_000_000).nullable() }),
+  z.object({ key: z.literal('old_dues'), amount: MoneyOrZero().nullable() }),
 ]);
 export type ReadinessMark = z.infer<typeof ReadinessMark>;
 

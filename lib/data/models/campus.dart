@@ -42,7 +42,8 @@ class Installment {
 
   final String id;
   final String title;
-  final int amount;
+  /// In the school's currency, with its decimals (cents, fils).
+  final num amount;
   final DateTime dueDate;
   final bool paid;
   final DateTime? paidOn;
@@ -87,7 +88,7 @@ class Receipt {
   final String id;
   final String installmentId;
   final String title;
-  final int amount;
+  final num amount;
   final DateTime paidOn;
   final String method;
   final String reference;

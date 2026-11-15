@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, hasKey, type AppRole } from '@tangent/config-engine';
-import { CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MESSAGE_EVENTS, type AppLayout, type Category, type SettingMeta } from '@tangent/contracts';
+import { CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type Category, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
 import { Checkbox, DateField, FilePick, NumberField, TimeField } from './fields';
 import { ColourField } from './ColourPicker';
 import { ErrorLine, Field, SelectField } from './forms';
@@ -75,6 +75,8 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
       return box(<HousesEditor value={(Array.isArray(value) ? value : []) as { key: string; name: string; color: string }[]} max={meta.max ?? 12} disabled={disabled} onChange={onChange} />);
     case 'categories':
       return box(<CategoriesEditor value={(Array.isArray(value) ? value : []) as Category[]} max={meta.max ?? 16} disabled={disabled} onChange={onChange} />);
+    case 'paymentMethods':
+      return box(<PaymentMethodsEditor value={(Array.isArray(value) ? value : []) as PaymentMethod[]} max={meta.max ?? 16} disabled={disabled} onChange={onChange} />);
     case 'gradingScale':
       return box(<GradingEditor value={(Array.isArray(value) ? value : []) as { grade: string; minPct: number }[]} max={meta.max ?? 12} disabled={disabled} onChange={onChange} />);
     case 'notifyRules': {
@@ -241,3 +243,27 @@ function GradingEditor({ value, max, disabled, onChange }: { value: { grade: str
   );
 }
 
+
+/** The ways the school takes money: the name the office uses, and what kind of money it is (reports group by the kind). */
+function PaymentMethodsEditor({ value, max, disabled, onChange }: { value: PaymentMethod[]; max: number; disabled: boolean; onChange: (v: unknown) => void }) {
+  const put = (i: number, patch: Partial<PaymentMethod>) => onChange(value.map((m, j) => (j === i ? { ...m, ...patch } : m)));
+  const keyOf = (name: string) => name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24) || 'method';
+  return (
+    <div>
+      {value.map((m, i) => (
+        <div key={m.key} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 6, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 160 }}><Field label="Method" value={m.name} maxLength={30} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
+          <div style={{ width: 180 }}><SelectField label="Kind of money" value={m.kind} disabled={disabled} onChange={(k) => put(i, { kind: k as PaymentMethod['kind'] })} options={PAYMENT_KINDS.map((k) => ({ value: k, label: PAYMENT_KIND_LABELS[k] }))} /></div>
+          <button type="button" className="btn sm" disabled={disabled || value.length <= 1} onClick={() => onChange(value.filter((_, j) => j !== i))}>Remove</button>
+        </div>
+      ))}
+      {value.length < max && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={() => {
+        const name = 'New method';
+        let key = keyOf(name);
+        for (let n = 2; value.some((m) => m.key === key); n++) key = `${keyOf(name)}-${n}`;
+        onChange([...value, { key, name, kind: 'other' }]);
+      }}>Add a method</button>}
+      <div className="help">A method keeps its key when it is renamed, so payments already recorded keep it.</div>
+    </div>
+  );
+}

@@ -3,7 +3,7 @@ import { StaleSettings, newId, recordSettingsVersion, writeSettings } from '@tan
 import { checkSchoolChanges, resolveConfig, validateSettingsChanges } from '@tangent/config-engine';
 import { ApiError } from '@tangent/nest-kit';
 import type { Registry } from '@tangent/tenancy';
-import { MESSAGE_EVENTS, SETTINGS_META, SchoolSettingsSchema, gradeFor, schoolMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type SchoolSettingsPatch, type SchoolSettingsView, type SettingsDoc } from '@tangent/contracts';
+import { MESSAGE_EVENTS, SETTINGS_META, gradeFor, schoolMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type SchoolSettingsPatch, type SchoolSettingsView, type SettingsDoc } from '@tangent/contracts';
 import { REGISTRY, type TenantCtx } from '../tenancy/tenant.js';
 import { HubService } from './hub.service.js';
 
@@ -73,6 +73,7 @@ export class SettingsService {
     const after = await writeSettings(t.pool, { changes, note, expectedVersion, actorId: actor.id, actorName: actor.name })
       .catch((e) => { throw e instanceof StaleSettings ? new ApiError('conflict', e.message) : e; });
     this.cache.delete(t.info.slug);
+    this.resolved.delete(t.info.slug);
     await recordSettingsVersion(this.registry.pool, t.info.id, after, note, `${actor.name} (school)`);
     this.registry.invalidate(t.info.slug);
     return { version: after.version };
@@ -104,13 +105,27 @@ export class SettingsService {
 
   /** The school's grading scale and pass mark (console: Exams and results), with the function that turns a percentage into a grade. */
   async grading(t: TenantCtx): Promise<{ pass: number; grade: (pct: number) => string }> {
-    const v = (await this.doc(t)).values;
-    const scale = (Array.isArray(v['grading.scale']) ? v['grading.scale'] : SchoolSettingsSchema.shape['grading.scale'].parse(undefined)) as GradingScale;
-    return { pass: typeof v['grading.passPct'] === 'number' ? v['grading.passPct'] : 33, grade: (pct) => gradeFor(pct, scale) };
+    const v = await this.settingsOf(t);
+    const scale = v['grading.scale'] as GradingScale;
+    return { pass: v['grading.passPct'] as number, grade: (pct) => gradeFor(pct, scale) };
   }
 
+  private readonly resolved = new Map<string, { at: string; values: Record<string, unknown> }>();
+
+  /** Every setting as it applies: the platform default, the school's choice and Tangent's lock together (resolveConfig). */
+  async settingsOf(t: TenantCtx): Promise<Record<string, unknown>> {
+    const doc = await this.doc(t);
+    const at = `${doc.version}|${t.info.entitlement.version}|${JSON.stringify(t.info.entitlement.locks ?? [])}`;
+    const hit = this.resolved.get(t.info.slug);
+    if (hit?.at === at) return hit.values;
+    const values = resolveConfig({ settings: doc, entitlement: t.info.entitlement }).settings;
+    this.resolved.set(t.info.slug, { at, values });
+    return values;
+  }
+
+  /** One setting as it applies (a lock wins); the fallback only when the setting does not exist at all. */
   async value<T>(t: TenantCtx, key: string, fallback: T): Promise<T> {
-    const v = (await this.doc(t)).values[key];
+    const v = (await this.settingsOf(t))[key];
     return (v === undefined ? fallback : v) as T;
   }
 

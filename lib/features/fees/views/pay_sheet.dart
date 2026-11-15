@@ -83,7 +83,7 @@ class _PaySheetState extends State<PaySheet> {
                   children: [
                     Overline('${widget.item.title} · $student'),
                     const SizedBox(height: 10),
-                    Text(Formatters.inr(widget.item.amount), style: context.type.dl),
+                    Text(Formatters.money(widget.item.amount), style: context.type.dl),
                   ],
                 ),
               ),
@@ -173,7 +173,7 @@ class _PaySheetState extends State<PaySheet> {
             dragging: _drag,
             busy: _busy,
             paid: _receipt != null,
-            amount: Formatters.inr(widget.item.amount),
+            amount: Formatters.money(widget.item.amount),
             onStart: () => setState(() => _drag = true),
             onMove: (x) => setState(() => _x = x),
             onEnd: (max, velocity) {

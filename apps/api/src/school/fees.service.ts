@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
-import { fmtMoney, addDays, dayName, dayMonth, schoolToday, latestSchoolDay, schoolDaysEnding, type FeeHead, type FeeHeadsPut, type FeeSummary, type InvoiceDetail, type InvoiceRow, type PaymentCreate, type ReceiptCancel, type WaiverRequest } from '@tangent/contracts';
+import { schoolCurrency, roundToCurrency, roundMoney, currencyDigits, fmtMoney, addDays, dayName, dayMonth, schoolToday, latestSchoolDay, schoolDaysEnding, type FeeHead, type FeeHeadsPut, type FeeSummary, type InvoiceDetail, type InvoiceRow, type PaymentCreate, type ReceiptCancel, type WaiverRequest } from '@tangent/contracts';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
@@ -86,7 +86,7 @@ export class FeesService {
     const pending = (await t.pool.query<{ id: string; title: string }>(
       "select id, title from approvals where status = 'pending' and ((kind = 'fee_waiver' and payload->>'invoiceId' = $1) or (kind = 'receipt_cancel' and payload->>'invoiceId' = $1)) limit 1", [id])).rows[0] ?? null;
     const paid = pays.reduce((a, p) => a + p.amount - p.refunded, 0);
-    const outstanding = Math.max(0, i.amount - i.waived_amount - paid);
+    const outstanding = Math.max(0, roundMoney(i.amount - i.waived_amount - paid));
     return {
       id: i.id, studentId: i.student_id, title: i.title, amount: i.amount, paid, dueOn: i.due_on, status: outstanding === 0 ? 'paid' : i.due_on < schoolToday() ? 'overdue' : paid ? 'partial' : 'due',
       studentName: i.name, className: i.class_name, head: i.head, headName: i.head_name ?? i.head, waived: i.waived_amount, outstanding,
@@ -169,16 +169,16 @@ export class FeesService {
        from fee_invoices i where i.student_id = $1 order by i.due_on desc, i.title, i.id`, [studentId]);
     const today = schoolToday();
     return rows.map((r) => {
-      const net = r.amount - r.waived;
-      const paid = Number(r.paid);
+      const net = roundMoney(r.amount - r.waived);
+      const paid = roundMoney(Number(r.paid));
       return { id: r.id, studentId: r.student_id, title: r.title, amount: net, paid, dueOn: r.due_on, status: paid >= net ? 'paid' : r.due_on < today ? 'overdue' : paid > 0 ? 'partial' : 'due' };
     });
   }
 
-  /** The office records only the ways the school takes money (console: Fees → How the office records payments). */
+  /** The office records only the ways the school takes money (Fees → Settings → How the office records payments). */
   async checkMethod(t: TenantCtx, method: string): Promise<void> {
-    const allowed = (await this.settings.value<string[]>(t, 'fees.paymentMethods', ['cash', 'upi', 'card', 'netbanking', 'cheque'])) ?? [];
-    if (!allowed.includes(method)) throw new ApiError('validation', 'The school does not take payments that way.', { fields: { method: 'Choose another way to pay.' } });
+    const allowed = (await this.settings.effective(t)).settings['fees.paymentMethods'] as { key: string }[];
+    if (!allowed.some((m) => m.key === method)) throw new ApiError('validation', 'The school does not take payments that way.', { fields: { method: 'Choose another way to pay.' } });
   }
 
   /** GST inside a payment (fees are GST-inclusive) when the school has GST receipts and the invoice's head is taxable. */
@@ -189,8 +189,8 @@ export class FeesService {
     const heads = (v['fees.gstHeads'] as string[] | undefined) ?? [];
     const rate = Number(v['fees.gstRatePct'] ?? 18);
     if (!heads.includes(head) || !rate || !v['fees.gstin']) return null;
-    const taxable = Math.round((amount * 100) / (100 + rate));
-    const half = Math.round((amount - taxable) / 2);
+    const taxable = roundToCurrency((amount * 100) / (100 + rate));
+    const half = roundToCurrency((amount - taxable) / 2);
     return { gstin: v['fees.gstin'], sac: v['fees.gstSac'] ?? '', ratePct: rate, taxable, cgst: half, sgst: amount - taxable - half };
   }
 
@@ -200,7 +200,7 @@ export class FeesService {
        from fee_invoices i where i.id = $1 and i.student_id = $2`, [body.invoiceId, body.studentId]);
     const inv = rows[0];
     if (!inv) throw notFound('That invoice');
-    const outstanding = inv.amount - inv.waived - Number(inv.paid);
+    const outstanding = roundMoney(inv.amount - inv.waived - Number(inv.paid));
     if (outstanding <= 0) throw new ApiError('conflict', 'That invoice is already paid.');
     if (body.amount > outstanding) throw new ApiError('validation', `The most that can be paid on this invoice is ${fmtMoney(outstanding)}.`, { fields: { amount: 'That is more than is due.' } });
     // Receipt numbers follow the school's own series (set from the console), one at a time so two payments never share a number.
@@ -230,7 +230,7 @@ export class FeesService {
     await this.audit.record(t, { actorId: online ? null : user.id, actorName: user.name, action: 'payment.recorded', entity: 'invoice', entityId: inv.id, detail: { amount: body.amount, receipt: receiptNo } });
     const g = await t.pool.query<{ phone: string | null }>('select g.phone from student_guardians sg join guardians g on g.id = sg.guardian_id where sg.student_id = $1 and sg.is_primary', [body.studentId]);
     if (g.rows[0]?.phone) await this.messenger.notify(t, 'fees.receipt', [{ to: g.rows[0].phone, vars: { receipt: receiptNo, amount: fmtMoney(body.amount), title: inv.title } }]);
-    return { receiptNo, amount: body.amount, outstanding: outstanding - body.amount, paymentId };
+    return { receiptNo, amount: body.amount, outstanding: roundMoney(outstanding - body.amount), paymentId };
   }
 
   /** Daily (job fees.reminders): families of invoices falling due in `fees.remindDaysBefore` days, once per invoice per day. */
@@ -256,12 +256,13 @@ export class FeesService {
     if (!pct) return 'The late fee is 0%.';
     const month = day.slice(0, 7);
     const { rows } = await t.pool.query<{ id: string; student_id: string; title: string; owed: number }>(
-      `select i.id, i.student_id, i.title, (i.amount - i.waived_amount - coalesce((select sum(amount - refunded) from payments where invoice_id = i.id), 0))::int owed
+      `select i.id, i.student_id, i.title, (i.amount - i.waived_amount - coalesce((select sum(amount - refunded) from payments where invoice_id = i.id), 0)) owed
        from fee_invoices i where i.due_on < $1::date and i.head <> 'fine'
          and not exists (select 1 from fee_fines f where f.invoice_id = i.id and f.month = $2)`, [day, month]);
     let n = 0;
     for (const r of rows.filter((x) => x.owed > 0)) {
-      const amount = Math.max(1, Math.round((r.owed * pct) / 100));
+      // At least the currency's smallest unit (a paisa, a cent).
+      const amount = Math.max(1 / 10 ** currencyDigits(schoolCurrency()), roundToCurrency((r.owed * pct) / 100));
       const fineId = newId('inv');
       const client = await t.pool.connect();
       try {

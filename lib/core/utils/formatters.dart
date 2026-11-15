@@ -1,20 +1,35 @@
 import 'package:intl/intl.dart';
+import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/utils/clock.dart';
 
 abstract final class Formatters {
-  static String inr(num amount) => NumberFormat.currency(
-    locale: 'en_IN',
-    symbol: '₹',
-    decimalDigits: 0,
-  ).format(amount);
+  /// An amount in the school's currency, written its way: whole amounts without decimals ("₹22,000", "$1,250").
+  static String money(num amount) {
+    final whole = amount == amount.roundToDouble();
+    return NumberFormat.simpleCurrency(locale: _locale, name: SchoolConfig.currency, decimalDigits: whole ? 0 : null).format(amount);
+  }
 
-  static String dayMonth(DateTime date) => DateFormat('d MMM').format(date);
+  /// The currency's own sign, for a glyph or a field's label.
+  static String currencySymbol() => NumberFormat.simpleCurrency(locale: _locale, name: SchoolConfig.currency).currencySymbol;
 
-  static String fullDate(DateTime date) => DateFormat('d MMM yyyy').format(date);
+  /// A count in the school's way of grouping digits.
+  static String count(num n) => NumberFormat.decimalPattern(_locale).format(n);
 
-  static String weekday(DateTime date) => DateFormat('EEE').format(date);
+  static String dayMonth(DateTime date) => DateFormat.MMMd(_locale).format(date);
 
-  static String timeOf(DateTime date) => DateFormat('h:mm a').format(date);
+  static String fullDate(DateTime date) => DateFormat.yMMMd(_locale).format(date);
+
+  static String weekday(DateTime date) => DateFormat.E(_locale).format(date);
+
+  static String timeOf(DateTime date) => DateFormat.jm(_locale).format(date);
+
+  // intl knows most locales; one it does not falls back to its language, then to English.
+  static String get _locale {
+    final l = SchoolConfig.locale;
+    if (DateFormat.localeExists(l)) return l;
+    final lang = l.split('_').first;
+    return DateFormat.localeExists(lang) ? lang : 'en';
+  }
 
   static String greetingKey(DateTime now) {
     final hour = now.hour;

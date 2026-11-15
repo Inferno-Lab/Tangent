@@ -29,7 +29,7 @@ export const sandbox: Adapter = {
   payments: {
     async createLink(c, input) {
       const linkId = id('sbl');
-      const token = signLink(c.signKey, { p: 'pay', linkId, ref: input.reference, amount: input.amountPaise, desc: input.description, back: input.callbackUrl, conn: c.connectionId }, 24 * 3600);
+      const token = signLink(c.signKey, { p: 'pay', linkId, ref: input.reference, amount: input.amountMinor, cur: input.currency, desc: input.description, back: input.callbackUrl, conn: c.connectionId }, 24 * 3600);
       return { linkId, url: `${c.baseUrl}/hooks/sandbox-pay/${token}` };
     },
     async refund() { return { refundId: id('sbr') }; },

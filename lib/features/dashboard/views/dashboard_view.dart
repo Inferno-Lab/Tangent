@@ -331,7 +331,7 @@ class _ParentBody extends StatelessWidget {
             parent: true,
             due: [
               SectionLabel(
-                'home.due_across'.trp({'amount': Formatters.inr(data.dueTotal)}),
+                'home.due_across'.trp({'amount': Formatters.money(data.dueTotal)}),
                 action: 'nav.fees',
                 onAction: () => Get.toNamed<void>(AppRoutes.fees),
               ),

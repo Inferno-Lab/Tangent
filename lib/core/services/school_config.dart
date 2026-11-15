@@ -79,6 +79,12 @@ abstract final class SchoolConfig {
   static List<Map<String, dynamic>> _list(String key) =>
       [for (final e in (_settings[key] as List?) ?? const []) Map<String, dynamic>.from(e as Map)];
 
+  /// Where the school is and how it writes money and dates (the school's settings; the wizard sets them from its country).
+  static String get currency => _s<String>('school.currency', 'USD');
+  static String get country => _s<String>('school.country', '');
+  /// The school's locale in the form intl takes ("en_IN" from "en-IN").
+  static String get locale => _s<String>('school.locale', 'en').replaceAll('-', '_');
+
   static String get schoolName => '${(_json['school'] as Map?)?['name'] ?? ''}';
   static String get schoolAddress => '${(_json['school'] as Map?)?['address'] ?? ''}';
   static String get schoolPhone => '${(_json['school'] as Map?)?['phone'] ?? ''}';

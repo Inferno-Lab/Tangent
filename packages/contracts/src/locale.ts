@@ -3,6 +3,36 @@
  * platform's own `Intl`, so any country, zone, locale or currency works without a list to keep up to date.
  */
 
+import { z } from 'zod';
+
+/** An amount in the school's currency: positive, with no more decimals than any currency has (three, for the dinars). */
+export const Money = (empty = 'Enter an amount') => z.number({ message: empty }).positive(empty).max(1_000_000_000_000)
+  .refine((n) => Math.abs(Math.round(n * 1000) - n * 1000) < 1e-6, 'Use at most three decimals');
+
+/** The same, where zero is allowed (a free route, no fine). */
+export const MoneyOrZero = () => z.number().min(0).max(1_000_000_000_000).refine((n) => Math.abs(Math.round(n * 1000) - n * 1000) < 1e-6, 'Use at most three decimals');
+
+/** Rounds a sum of amounts to the thousandth, so 0.1 + 0.2 is 0.3 and an amount compares equal to what is due. */
+export const roundMoney = (n: number): number => Math.round(n * 1000) / 1000;
+
+/** How many decimals a currency is paid in (2 for most, 0 for yen, 3 for dinars): providers take amounts in those units. */
+export function currencyDigits(currency: string): number {
+  try {
+    return new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
+  } catch {
+    return 2;
+  }
+}
+
+/** An amount rounded to what the currency can be paid in (whole yen, cents, fils): tax lines, fines, a share of a fee. */
+export const roundToCurrency = (n: number, currency = schoolCurrency()): number => {
+  const f = 10 ** currencyDigits(currency);
+  return Math.round(n * f) / f;
+};
+
+/** An amount in the currency's smallest unit (paise, cents, fils), as payment providers take it. */
+export const toMinor = (n: number, currency: string): number => Math.round(n * 10 ** currencyDigits(currency));
+
 /** ISO 3166-1 alpha-2 country codes; names come from `Intl.DisplayNames` in the person's language. */
 export const COUNTRIES = (
   'AD AE AF AG AI AL AM AO AR AT AU AW AZ BA BB BD BE BF BG BH BI BJ BM BN BO BR BS BT BW BY BZ CA CD CF CG CH CI CL CM CN CO CR CU CV CY CZ DE ' +

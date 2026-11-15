@@ -59,6 +59,8 @@ export class TenantService {
       db = drizzle(pool, { schema });
       this.dbs.set(pool, db);
     }
+    // Whatever runs next in this request or job is for this school: its clock, its currency (locale.ts).
+    enterSchool(info);
     return { info, pool, db };
   }
 }
@@ -81,7 +83,6 @@ export class TenantGuard implements CanActivate {
     if (!slug) throw new ApiError('validation', 'Say which school this is for, with the X-School header.');
     if (!SLUG.test(slug)) throw new ApiError('not_found', 'We could not find that school. Check the address and try again.');
     req.tenant = await this.tenants.resolve(slug);
-    enterSchool(req.tenant.info);
     return true;
   }
 }

@@ -40,7 +40,7 @@ describe('webhooks', () => {
     expect(bad.ok).toBe(false);
     expect(bad.reply?.status).toBe(401);
     const good = await razorpay.inbound!(c, req(body, { 'x-razorpay-signature': createHmac('sha256', 'whsec').update(body).digest('hex') }));
-    expect(good.payments).toEqual([{ kind: 'paid', reference: 'greenfield:ord_1', providerPaymentId: 'pay_1', amountPaise: 120000, method: 'upi' }]);
+    expect(good.payments).toEqual([{ kind: 'paid', reference: 'greenfield:ord_1', providerPaymentId: 'pay_1', amountMinor: 120000, method: 'upi' }]);
   });
   it('answers Meta’s verify challenge and checks its signature', async () => {
     const c = ctx({ verifyToken: 'vt' }, { appSecret: 'app' });

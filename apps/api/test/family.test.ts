@@ -349,7 +349,11 @@ describe('what the console sets reaches families and the office', () => {
       const r = await h.call('POST', '/v1/fees/payments', { token: admin, body: { studentId: 'stu_aarav', invoiceId: 'inv_any', amount: 1, method: 'upi' } });
       expect(r.status).toBe(400);
       expect(r.json.fields.method).toBeTruthy();
-      expect((await h.call('GET', '/v1/shell', { token: admin })).json.school.paymentMethods).toEqual(['cash']);
+      // A school saved before methods had names is read as the methods it always had.
+      expect((await h.call('GET', '/v1/shell', { token: admin })).json.school.paymentMethods).toEqual([{ key: 'cash', name: 'Cash', kind: 'cash' }]);
+      await h.setSettings({ 'fees.paymentMethods': [{ key: 'mpesa', name: 'M-Pesa', kind: 'wallet' }] });
+      expect((await h.call('POST', '/v1/fees/payments', { token: admin, body: { studentId: 'stu_aarav', invoiceId: 'inv_any', amount: 1, method: 'cash' } })).status).toBe(400);
+      expect((await h.call('POST', '/v1/fees/payments', { token: admin, body: { studentId: 'stu_aarav', invoiceId: 'inv_any', amount: 1, method: 'mpesa' } })).status).toBe(404);
     } finally {
       await h.setSettings({ 'fees.paymentMethods': ['cash', 'upi', 'card', 'netbanking', 'cheque'] });
     }

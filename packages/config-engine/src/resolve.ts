@@ -40,6 +40,12 @@ export function resolveConfig({ settings, entitlement, audience, flags, live = t
   for (const [k, v] of Object.entries(settings.values)) if (!entitlement.locks.includes(k) || TIGHTEN[k as keyof typeof TIGHTEN]) merged[k] = v;
   // A lock fixes the value; on a setting the school may only tighten, Tangent's value is the floor and the stricter one wins.
   for (const [k, v] of Object.entries(entitlement.overrides)) merged[k] = stricter(k, merged[k], v);
+  // Every value read through its own schema, so one saved in an older shape reads as today's (payment methods as plain keys).
+  const shape = SchoolSettingsSchema.shape as Record<string, { safeParse: (v: unknown) => { success: boolean; data?: unknown } }>;
+  for (const k of Object.keys(merged)) {
+    const p = shape[k]?.safeParse(merged[k]);
+    if (p?.success) merged[k] = p.data;
+  }
 
   const entitled = activeModules(entitlement);
   // A console kill switch (`kill.<module>`) takes a module away from every app until it is lifted.

@@ -7,8 +7,6 @@ import { DialogActions as Actions, fieldsOf, messageOf } from '../../app/kit';
 import { useShellChrome } from '../../app/Layout';
 import { currencySymbol, fmtDate, fmtMoney } from '@tangent/contracts';
 
-/** Every way a desk can take money; the school offers those Tangent set (fees.paymentMethods). */
-const METHODS = [{ value: 'cash', label: 'Cash' }, { value: 'upi', label: 'UPI' }, { value: 'card', label: 'Card' }, { value: 'netbanking', label: 'Net banking' }, { value: 'cheque', label: 'Cheque' }];
 
 /** Records a payment at the desk against one of a student's open invoices. */
 export function CollectFeeDialog({ student, onClose, onDone }: { student: StudentDetail; onClose: () => void; onDone: (message: string) => void }) {
@@ -18,9 +16,8 @@ export function CollectFeeDialog({ student, onClose, onDone }: { student: Studen
   const open = (inv.data ?? []).filter((i) => i.paid < i.amount);
   const [pick, setPick] = useState('');
   const [amount, setAmount] = useState('');
-  // Only the ways the school takes money (console: Fees → How the office records payments).
-  const taken = useShellChrome().shell?.school.paymentMethods;
-  const methods = METHODS.filter((m) => !taken || taken.includes(m.value));
+  // The ways the school takes money, by the names it uses (Fees → Settings → How the office records payments).
+  const methods = (useShellChrome().shell?.school.paymentMethods ?? []).map((m) => ({ value: m.key, label: m.name }));
   const [method, setMethod] = useState(methods[0]?.value ?? 'cash');
   const [ref, setRef] = useState('');
   const [err, setErr] = useState<Record<string, string>>({});
@@ -33,7 +30,7 @@ export function CollectFeeDialog({ student, onClose, onDone }: { student: Studen
     const n = Math.round(Number(amount));
     if (!(n > 0)) { setErr({ amount: 'Enter an amount.' }); shake.hit(); return; }
     setBusy(true);
-    try { const r = await api.fees.pay({ studentId: student.id, invoiceId: chosen.id, amount: n, method: method as 'cash', reference: ref || undefined }); onDone(`Receipt ${r.receiptNo} recorded for ${fmtMoney(n)}`); }
+    try { const r = await api.fees.pay({ studentId: student.id, invoiceId: chosen.id, amount: n, method, reference: ref || undefined }); onDone(`Receipt ${r.receiptNo} recorded for ${fmtMoney(n)}`); }
     catch (x) { setBusy(false); setErr({ amount: fieldsOf(x).amount ?? messageOf(x) }); shake.hit(); }
   };
   return (

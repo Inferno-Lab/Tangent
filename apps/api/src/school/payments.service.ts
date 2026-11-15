@@ -1,5 +1,5 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
-import { schoolInstant, fmtMoney, addDays, schoolToday, type OnlinePaymentRow, type ReconRow, type RefundRow } from '@tangent/contracts';
+import { toMinor, schoolCurrency, roundMoney, currencyDigits, schoolInstant, fmtMoney, addDays, schoolToday, type OnlinePaymentRow, type ReconRow, type RefundRow } from '@tangent/contracts';
 import { newId, type Job } from '@tangent/db';
 import type { PaymentEvent } from '@tangent/integrations';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
@@ -57,7 +57,7 @@ export class PaymentsService implements OnModuleInit {
   /** A checkout for what is still owed on one invoice. */
   async order(t: TenantCtx, user: AuthedUser, invoiceId: string, studentId: string): Promise<{ orderId: string; url: string; amount: number }> {
     const inv = (await t.pool.query<{ title: string; owed: number; student: string; phone: string | null; email: string | null }>(
-      `select i.title, (i.amount - i.waived_amount - coalesce((select sum(amount - refunded) from payments where invoice_id = i.id), 0))::int owed, s.name student, g.phone, g.email
+      `select i.title, (i.amount - i.waived_amount - coalesce((select sum(amount - refunded) from payments where invoice_id = i.id), 0)) owed, s.name student, g.phone, g.email
        from fee_invoices i join students s on s.id = i.student_id left join student_guardians sg on sg.student_id = s.id and sg.is_primary left join guardians g on g.id = sg.guardian_id
        where i.id = $1 and i.student_id = $2`, [invoiceId, studentId])).rows[0];
     if (!inv) throw notFound('That fee');
@@ -66,7 +66,7 @@ export class PaymentsService implements OnModuleInit {
     if (!r.adapter.payments) throw new ApiError('school_unavailable', 'Online payment is not set up for this school yet.');
     const orderId = newId('ord');
     const link = await r.adapter.payments.createLink(r.ctx, {
-      amountPaise: inv.owed * 100, reference: `${t.info.slug}:${orderId}`, description: `${inv.title} · ${inv.student}`,
+      amountMinor: toMinor(inv.owed, t.info.currency), currency: t.info.currency, reference: `${t.info.slug}:${orderId}`, description: `${inv.title} · ${inv.student}`,
       customer: { name: inv.student, phone: inv.phone ?? undefined, email: inv.email ?? undefined }, callbackUrl: `${this.base()}/hooks/paid/${t.info.slug}/${orderId}`,
       expiresAt: new Date(Date.now() + 24 * 3600_000),
     }).catch((e: Error) => { throw new ApiError('school_unavailable', `The payment page could not be opened: ${e.message}`); });
@@ -98,7 +98,8 @@ export class PaymentsService implements OnModuleInit {
       "update payment_orders set status = 'paid', provider_payment_id = $2, method = $3, paid_at = now() where id = $1 and status in ('created','failed') returning invoice_id, student_id, amount",
       [orderId, ev.providerPaymentId, ev.method ?? null])).rows[0];
     if (!claimed) return `Already applied: ${ev.providerPaymentId}`;
-    const paid = Math.round(ev.amountPaise / 100);
+    // In the school's currency, from the provider's smallest unit (paise, cents, fils).
+    const paid = roundMoney(ev.amountMinor / 10 ** currencyDigits(t.info.currency));
     try {
       const done = await this.fees.pay(t, { id: 'online', name: 'Online payment' }, {
         studentId: claimed.student_id, invoiceId: claimed.invoice_id, amount: paid, method: METHODS[ev.method ?? ''] ?? 'upi', reference: ev.providerPaymentId.slice(0, 60),
@@ -171,7 +172,7 @@ export class PaymentsService implements OnModuleInit {
       'select r.amount, r.reason, r.payment_id, p.provider_payment_id, p.receipt_no, i.student_id from refunds r join payments p on p.id = r.payment_id join fee_invoices i on i.id = p.invoice_id where r.id = $1', [id])).rows[0]!;
     try {
       const route = await this.hubs.hub.resolve('payments', t.info.id, t.info.slug);
-      const out = await route.adapter.payments!.refund(route.ctx, r.provider_payment_id, r.amount * 100, r.reason);
+      const out = await route.adapter.payments!.refund(route.ctx, r.provider_payment_id, toMinor(r.amount, t.info.currency), r.reason, t.info.currency);
       await t.pool.query("update refunds set status = 'sent', provider_refund_id = $2, approved_by = $3 where id = $1", [id, out.refundId, user.id]);
       await t.pool.query('update payments set refunded = refunded + $2 where id = $1', [r.payment_id, r.amount]);
       await t.pool.query("update payment_orders set status = case when (select amount - refunded from payments where id = $1) <= 0 then 'refunded' else 'partial_refund' end where payment_id = $1", [r.payment_id]);
@@ -211,8 +212,9 @@ export class PaymentsService implements OnModuleInit {
     const problems: [string, number | null, number | null, string][] = [];
     for (const p of theirs) {
       const r = mine.get(p.providerPaymentId);
-      if (r === undefined) problems.push([p.providerPaymentId, Math.round(p.amountPaise / 100), null, 'The provider took this payment but there is no receipt.']);
-      else if (r * 100 !== p.amountPaise) problems.push([p.providerPaymentId, Math.round(p.amountPaise / 100), r, 'The amounts differ.']);
+      const theirAmount = roundMoney(p.amountMinor / 10 ** currencyDigits(schoolCurrency()));
+      if (r === undefined) problems.push([p.providerPaymentId, theirAmount, null, 'The provider took this payment but there is no receipt.']);
+      else if (toMinor(r, schoolCurrency()) !== p.amountMinor) problems.push([p.providerPaymentId, theirAmount, r, 'The amounts differ.']);
       mine.delete(p.providerPaymentId);
     }
     for (const [id, amount] of mine) problems.push([id, null, amount, 'There is a receipt but the provider has no such payment.']);

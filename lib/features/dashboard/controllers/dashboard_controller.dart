@@ -76,7 +76,7 @@ class HomeSnapshot {
   final List<ChildToday> children;
 
   /// Fees due across every child of a parent (0 for students).
-  final int dueTotal;
+  final num dueTotal;
 
   List<PeriodSlot> get periods => today?.periods ?? const [];
 
@@ -133,7 +133,7 @@ class DashboardController extends GetxController with Loadable {
       final childIds = user?.role == UserRole.parent ? user!.childIds : [studentId];
       final due = <DueItem>[];
       final children = <ChildToday>[];
-      var dueTotal = 0;
+      num dueTotal = 0;
       for (final id in childIds) {
         final child = id == studentId ? student : await directory.student(id);
         final childClass = id == studentId ? schoolClass : await directory.schoolClass(child.classId);

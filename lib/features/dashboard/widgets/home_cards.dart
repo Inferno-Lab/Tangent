@@ -142,9 +142,9 @@ class _DueRow extends StatelessWidget {
           leading: _MoneyCover(overdue: overdue),
           title: '${fee.title}$child',
           subtitle: overdue
-              ? 'home.fee_late'.trp({'amount': Formatters.inr(fee.amount), 'n': '$late'})
+              ? 'home.fee_late'.trp({'amount': Formatters.money(fee.amount), 'n': '$late'})
               : 'home.fee_due_on'.trp({
-                  'amount': Formatters.inr(fee.amount),
+                  'amount': Formatters.money(fee.amount),
                   'date': DateFormat('EEE d MMM').format(fee.dueDate),
                 }),
           subtitleColor: overdue ? c.badText : null,

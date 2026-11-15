@@ -1,5 +1,5 @@
 import { All, Body, Controller, Get, HttpCode, Inject, Param, Post, Put, Query, Req, Res } from '@nestjs/common';
-import { appIdFor } from '@tangent/contracts';
+import { fmtMoney, currencyDigits, appIdFor } from '@tangent/contracts';
 import { sandboxLink } from '@tangent/integrations';
 import { ApiError, forbidden } from '@tangent/nest-kit';
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -66,9 +66,9 @@ export class HooksController {
 
   @Get('sandbox-pay/:token')
   sandboxPay(@Param('token') token: string, @Res() reply: FastifyReply): void {
-    const d = sandboxLink<{ amount: number; desc: string }>(this.env.SECRETS_KEY, token);
+    const d = sandboxLink<{ amount: number; cur?: string; desc: string }>(this.env.SECRETS_KEY, token);
     if (!d) { void reply.code(410).type('text/html').send(page('Link expired', '<h1>This payment link has expired</h1><p>Go back to the app and try again.</p>')); return; }
-    void reply.type('text/html').send(page('Test payment', `<h1>Test payment</h1><p>${esc(d.desc)}</p><div class="amt">₹${(d.amount / 100).toLocaleString('en-IN')}</div>
+    void reply.type('text/html').send(page('Test payment', `<h1>Test payment</h1><p>${esc(d.desc)}</p><div class="amt">${esc(fmtMoney(d.amount / 10 ** currencyDigits(d.cur ?? 'INR'), d.cur ?? 'INR'))}</div>
 <div class="note">This is Tangent's test checkout. No money moves: choose what the bank would say.</div>
 <form method="post"><button name="outcome" value="failed">Payment fails</button><button class="go" name="outcome" value="paid">Pay</button></form>`));
   }
@@ -77,7 +77,7 @@ export class HooksController {
   async sandboxPaid(@Param('token') token: string, @Body() body: { outcome?: string }, @Res() reply: FastifyReply): Promise<void> {
     const d = sandboxLink<{ linkId: string; ref: string; amount: number; back: string }>(this.env.SECRETS_KEY, token);
     if (!d) { void reply.code(410).type('text/html').send(page('Link expired', '<h1>This payment link has expired</h1>')); return; }
-    await this.payments.apply({ kind: body?.outcome === 'paid' ? 'paid' : 'failed', reference: d.ref, providerPaymentId: `sbp_${d.linkId}`, amountPaise: d.amount, method: 'upi' });
+    await this.payments.apply({ kind: body?.outcome === 'paid' ? 'paid' : 'failed', reference: d.ref, providerPaymentId: `sbp_${d.linkId}`, amountMinor: d.amount, method: 'upi' });
     void reply.redirect(d.back, 303);
   }
 

@@ -50,6 +50,16 @@ export function whole(v: string): number | null {
   const n = Number(`${int}${decimals ? `.${decimals}` : ''}`);
   return Number.isInteger(n) ? n : null;
 }
+/** An amount as any school writes it, with the currency's decimals: "18,500", "$1,250.50", "AED 1.250,75". */
+export function money(v: string): number | null {
+  const raw = v.replace(/[^\d.,\-]/g, '');
+  if (!/\d/.test(raw)) return null;
+  const last = Math.max(raw.lastIndexOf('.'), raw.lastIndexOf(','));
+  // A last separator followed by three digits groups thousands ("1,250"); any other is the decimal point ("1,250.50", "12,5").
+  const decimal = last >= 0 && raw.length - last - 1 !== 3;
+  const n = Number(decimal ? `${raw.slice(0, last).replace(/[.,]/g, '')}.${raw.slice(last + 1)}` : raw.replace(/[.,]/g, ''));
+  return Number.isFinite(n) && Math.abs(Math.round(n * 1000) - n * 1000) < 1e-6 ? n : null;
+}
 const yes = (v: string) => /^(y|yes|true|1|current|active)$/i.test(v.trim());
 const hhmm = (v: string) => { const x = /^([01]?\d|2[0-3])[:.]([0-5]\d)$/.exec(v.trim()); return x ? `${x[1]!.padStart(2, '0')}:${x[2]}` : null; };
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -72,7 +82,7 @@ function gradeSection(v: string): { grade: number; section: string; label: strin
   return { grade, section, label: `${x[1]! in EARLY ? x[1]!.toUpperCase().replace('NURSERY', 'Nursery') : grade} ${section}` };
 }
 // Imports run for one school: its currency, its clock (locale.ts reads the school the request is for).
-const rupees = (n: number) => fmtMoney(n);
+const amountText = (n: number) => fmtMoney(n);
 const ist = (day: string, time = '00:00') => schoolInstant(day, time).toISOString();
 const today = () => schoolToday();
 const ok = (key: string, errors: string[], exists: boolean) => ({ key, errors, exists });
@@ -426,15 +436,15 @@ const feeStructures = kind<{ ids: Map<string, string>; heads: Map<string, string
     return { ids: new Map(rows.map((r) => [`${r.grade ?? 0}|${lc(r.title)}`, r.id])), heads: await headMap(db) };
   },
   check(r, l) {
-    const errors = [...(r.grade && whole(r.grade) === null ? ['Grade is a number like 8, or blank for every grade.'] : []), ...(whole(r.amount!) === null || whole(r.amount!)! < 0 ? ['Amount is whole rupees, like 18500.'] : []),
+    const errors = [...(r.grade && whole(r.grade) === null ? ['Grade is a number like 8, or blank for every grade.'] : []), ...(money(r.amount!) === null || money(r.amount!)! < 0 ? ['Amount is a number, like 18500 or 18,500.50.'] : []),
       ...(!isoDay(r.due_on!) ? ['Write the due date as 2026-11-10 or 10/11/2026.'] : []), ...needHead(l.heads, r.head!)];
     return ok(feeKey(r.grade ?? '', r.title!), errors, l.ids.has(feeKey(r.grade ?? '', r.title!)));
   },
   writes: (rows, l) => [{ table: 'fee_structures', pk: ['id'], cols: ['head', 'amount', 'due_on'], rows: rows.map((r) => ({
-    id: l.ids.get(feeKey(r.grade ?? '', r.title!)) ?? newId('fst'), grade: r.grade ? whole(r.grade) : null, head: l.heads.get(headKey(r.head!)), title: r.title, amount: whole(r.amount!), due_on: isoDay(r.due_on!),
+    id: l.ids.get(feeKey(r.grade ?? '', r.title!)) ?? newId('fst'), grade: r.grade ? whole(r.grade) : null, head: l.heads.get(headKey(r.head!)), title: r.title, amount: money(r.amount!), due_on: isoDay(r.due_on!),
   })) }],
   totals: (rows) => [{ label: 'Fees', value: String(rows.length) }, { label: 'Grades', value: String(new Set(rows.map((r) => r.grade || 'all')).size) }],
-  async export(db) { return (await db.query<Row>("select id, coalesce(grade::text, '') as grade, head, title, amount::text, due_on::text from fee_structures order by grade nulls first, due_on, title")).rows; },
+  async export(db) { return (await db.query<Row>("select id, coalesce(grade::text, '') as grade, head, title, trim_scale(amount)::text as amount, due_on::text from fee_structures order by grade nulls first, due_on, title")).rows; },
 });
 
 type InvoiceRow = { id: string; student_id: string; title: string; amount: number; waived_amount: number };
@@ -452,22 +462,22 @@ const feeDues = kind<DueLookups>({
   async load(db) { return { students: await studentMap(db), invoices: await invoiceMap(db), heads: await headMap(db) }; },
   check(r, l) {
     const s = l.students.get(lc(r.admission_no!));
-    const [amount, waived] = [whole(r.amount!), r.waived ? whole(r.waived) : 0];
-    const errors = [...needStudent(l.students, r.admission_no!), ...(amount === null || amount < 0 ? ['Amount is whole rupees, like 18500.'] : []),
-      ...(waived === null || waived < 0 || (amount !== null && waived > amount) ? ['Waived is whole rupees, no more than the amount.'] : []), ...(!isoDay(r.due_on!) ? ['Write the due date as 2026-11-10 or 10/11/2026.'] : []), ...needHead(l.heads, r.head!)];
+    const [amount, waived] = [money(r.amount!), r.waived ? money(r.waived) : 0];
+    const errors = [...needStudent(l.students, r.admission_no!), ...(amount === null || amount < 0 ? ['Amount is a number, like 18500 or 18,500.50.'] : []),
+      ...(waived === null || waived < 0 || (amount !== null && waived > amount) ? ['Waived is a number, no more than the amount.'] : []), ...(!isoDay(r.due_on!) ? ['Write the due date as 2026-11-10 or 10/11/2026.'] : []), ...needHead(l.heads, r.head!)];
     return ok(`${s?.id}|${lc(r.title!)}`, errors, !!s && l.invoices.has(`${s.id}|${lc(r.title!)}`));
   },
   writes: (rows, l) => [{ table: 'fee_invoices', pk: ['id'], cols: ['head', 'amount', 'due_on', 'waived_amount'], rows: rows.map((r) => {
     const sid = l.students.get(lc(r.admission_no!))!.id;
-    return { id: l.invoices.get(`${sid}|${lc(r.title!)}`)?.id ?? newId('inv'), student_id: sid, head: l.heads.get(headKey(r.head!)), title: r.title, amount: whole(r.amount!), due_on: isoDay(r.due_on!), waived_amount: r.waived ? whole(r.waived) : 0 };
+    return { id: l.invoices.get(`${sid}|${lc(r.title!)}`)?.id ?? newId('inv'), student_id: sid, head: l.heads.get(headKey(r.head!)), title: r.title, amount: money(r.amount!), due_on: isoDay(r.due_on!), waived_amount: r.waived ? money(r.waived) : 0 };
   }) }],
   totals(rows) {
-    const net = (r: Row) => whole(r.amount!)! - (r.waived ? whole(r.waived)! : 0);
+    const net = (r: Row) => money(r.amount!)! - (r.waived ? money(r.waived)! : 0);
     const heads = sumBy(rows, (r) => lc(r.head!), net);
-    return [{ label: 'Dues', value: String(rows.length) }, { label: 'Total due', value: rupees([...heads.values()].reduce((a, b) => a + b, 0)) }, ...[...heads].map(([h, v]) => ({ label: `Due: ${h}`, value: rupees(v) }))];
+    return [{ label: 'Dues', value: String(rows.length) }, { label: 'Total due', value: amountText([...heads.values()].reduce((a, b) => a + b, 0)) }, ...[...heads].map(([h, v]) => ({ label: `Due: ${h}`, value: amountText(v) }))];
   },
   async export(db) {
-    return (await db.query<Row>('select s.admission_no, i.head, i.title, i.amount::text, i.due_on::text, i.waived_amount::text as waived from fee_invoices i join students s on s.id = i.student_id order by s.admission_no, i.due_on')).rows;
+    return (await db.query<Row>('select s.admission_no, i.head, i.title, trim_scale(i.amount)::text as amount, i.due_on::text, trim_scale(i.waived_amount)::text as waived from fee_invoices i join students s on s.id = i.student_id order by s.admission_no, i.due_on')).rows;
   },
 });
 
@@ -485,20 +495,20 @@ const payments = kind<PayLookups>({
   },
   check(r, l) {
     const s = l.students.get(lc(r.admission_no!));
-    const amount = whole(r.amount!);
+    const amount = money(r.amount!);
     const errors = [...needStudent(l.students, r.admission_no!), ...(s && !l.invoices.has(`${s.id}|${lc(r.fee_title!)}`) ? [`This student has no fee “${r.fee_title}”: import opening dues first.`] : []),
-      ...(amount === null || amount <= 0 ? ['Amount is whole rupees, more than 0.'] : []), ...(!isoDay(r.paid_on!) ? ['Write the payment date as 2026-06-10 or 10/06/2026.'] : []),
+      ...(amount === null || amount <= 0 ? ['Amount is a number more than 0, like 18500 or 18,500.50.'] : []), ...(!isoDay(r.paid_on!) ? ['Write the payment date as 2026-06-10 or 10/06/2026.'] : []),
       ...(!method(r.method) ? [`Method is one of ${PAY_METHODS.join(', ')} (UPI apps, NEFT and DD are read too).`] : [])];
     return ok(r.receipt_no!.trim(), errors, l.payments.has(r.receipt_no!.trim()));
   },
   writes: (rows, l) => [{ table: 'payments', pk: ['id'], cols: ['invoice_id', 'amount', 'method', 'reference', 'paid_on'], rows: rows.map((r) => {
     const sid = l.students.get(lc(r.admission_no!))!.id;
-    return { id: l.payments.get(r.receipt_no!.trim()) ?? newId('pay'), invoice_id: l.invoices.get(`${sid}|${lc(r.fee_title!)}`)!.id, amount: whole(r.amount!), method: method(r.method),
+    return { id: l.payments.get(r.receipt_no!.trim()) ?? newId('pay'), invoice_id: l.invoices.get(`${sid}|${lc(r.fee_title!)}`)!.id, amount: money(r.amount!), method: method(r.method),
       reference: r.reference || null, receipt_no: r.receipt_no!.trim(), paid_on: isoDay(r.paid_on!) };
   }) }],
   totals(rows) {
-    const methods = sumBy(rows, (r) => method(r.method)!, (r) => whole(r.amount!)!);
-    return [{ label: 'Payments', value: String(rows.length) }, { label: 'Total paid', value: rupees([...methods.values()].reduce((a, b) => a + b, 0)) }, ...[...methods].map(([m, v]) => ({ label: `Paid by ${m}`, value: rupees(v) }))];
+    const methods = sumBy(rows, (r) => method(r.method)!, (r) => money(r.amount!)!);
+    return [{ label: 'Payments', value: String(rows.length) }, { label: 'Total paid', value: amountText([...methods.values()].reduce((a, b) => a + b, 0)) }, ...[...methods].map(([m, v]) => ({ label: `Paid by ${m}`, value: amountText(v) }))];
   },
   async notes(db) {
     const { rows } = await db.query<{ n: string }>(`select count(*) n from fee_invoices i where i.amount - i.waived_amount < (select coalesce(sum(p.amount), 0) from payments p where p.invoice_id = i.id)`);
@@ -506,7 +516,7 @@ const payments = kind<PayLookups>({
     return over ? [`${over} fees now show more paid than due: check them against the old system before go-live.`] : [];
   },
   async export(db) {
-    return (await db.query<Row>(`select p.receipt_no, s.admission_no, i.title as fee_title, p.amount::text, p.paid_on::text, p.method, coalesce(p.reference, '') as reference
+    return (await db.query<Row>(`select p.receipt_no, s.admission_no, i.title as fee_title, trim_scale(p.amount)::text as amount, p.paid_on::text, p.method, coalesce(p.reference, '') as reference
       from payments p join fee_invoices i on i.id = p.invoice_id join students s on s.id = i.student_id order by p.paid_on, p.receipt_no`)).rows;
   },
 });

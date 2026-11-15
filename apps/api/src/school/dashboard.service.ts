@@ -147,7 +147,7 @@ export class DashboardService {
     return {
       school: { name: String(v['school.name'] ?? t.info.name), shortName: String(v['school.shortName'] ?? t.info.shortName), logoText: String(v['brand.logoText'] ?? '') || String(v['school.shortName'] ?? t.info.shortName).slice(0, 1).toUpperCase(), logoUrl: await this.files.logoUrl(t), place: String(v['school.place'] ?? ''),
         color: String(v['brand.color'] ?? ''), address: String(v['school.address'] ?? ''), phone: String(v['school.phone'] ?? ''), receiptNote: String(v['fees.receiptNote'] ?? ''), studentWord: String(v['vocab.student'] ?? '').trim() || 'Student', classWord: String(v['vocab.class'] ?? '').trim() || 'Class',
-        paymentMethods: Array.isArray(v['fees.paymentMethods']) ? (v['fees.paymentMethods'] as string[]) : ['cash', 'upi', 'card', 'netbanking', 'cheque'] },
+        paymentMethods: (await this.settings.effective(t)).settings['fees.paymentMethods'] as { key: string; name: string; kind: string }[] },
       term,
       badges: { attendance: unmarked.length, admissions: counts.admissions, messages: counts.messages }, modules, features,
       menu: (await this.settings.effective(t, [...perms])).menu,

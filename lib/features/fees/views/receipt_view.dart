@@ -170,7 +170,7 @@ class _Slip extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text('fees.school_address'.tr, style: context.type.cap),
                   const SizedBox(height: 20),
-                  Text(Formatters.inr(receipt.amount), style: context.type.dl),
+                  Text(Formatters.money(receipt.amount), style: context.type.dl),
                   const SizedBox(height: 6),
                   Text(receipt.title, style: context.type.t),
                   const Padding(padding: EdgeInsets.only(top: 20, bottom: 8), child: DashedLine()),

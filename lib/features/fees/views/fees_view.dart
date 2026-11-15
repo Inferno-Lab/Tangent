@@ -120,7 +120,7 @@ class _Due extends StatelessWidget {
         children: [
           Text('fees.all_paid'.tr, style: context.type.capB),
           const SizedBox(height: 4),
-          Text(Formatters.inr(controller.paid), style: context.type.dl.copyWith(color: c.bright)),
+          Text(Formatters.money(controller.paid), style: context.type.dl.copyWith(color: c.bright)),
         ],
       );
     }
@@ -134,7 +134,7 @@ class _Due extends StatelessWidget {
           style: context.type.capB,
         ),
         const SizedBox(height: 4),
-        Text(Formatters.inr(next.amount), style: context.type.dl.copyWith(color: c.bright)),
+        Text(Formatters.money(next.amount), style: context.type.dl.copyWith(color: c.bright)),
         const SizedBox(height: 4),
         Text(
           '${next.title} · ${overdue ? 'fees.days_late'.trn(-days) : 'fees.due_in'.trn(days)}',
@@ -143,7 +143,7 @@ class _Due extends StatelessWidget {
         if (SchoolConfig.allows('fees.onlinePayment')) ...[
           const SizedBox(height: 16),
           Btn(
-            'fees.pay_amount'.trp({'amount': Formatters.inr(next.amount)}),
+            'fees.pay_amount'.trp({'amount': Formatters.money(next.amount)}),
             kind: BtnKind.bright,
             expand: true,
             onPressed: () => unawaited(openPaySheet(next)),
@@ -178,7 +178,7 @@ class _Body extends StatelessWidget {
                 for (final (i, item) in items.indexed) _PlanRow(item: item, first: i == 0),
                 _Kv(
                   label: Text('fees.total'.tr, style: context.type.t),
-                  value: Text(Formatters.inr(controller.total), style: context.type.h3),
+                  value: Text(Formatters.money(controller.total), style: context.type.h3),
                 ),
               ],
             ),
@@ -329,7 +329,7 @@ class _PlanRow extends StatelessWidget {
           Stamp(tag, color: colour),
         ],
       ),
-      value: Text(Formatters.inr(item.amount), style: context.type.t),
+      value: Text(Formatters.money(item.amount), style: context.type.t),
     );
   }
 }
@@ -364,7 +364,7 @@ class _ReceiptRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'fees.paid_on_line'.trp({'amount': Formatters.inr(receipt.amount), 'date': DateFormat('d MMMM').format(receipt.paidOn)}),
+                    'fees.paid_on_line'.trp({'amount': Formatters.money(receipt.amount), 'date': DateFormat('d MMMM').format(receipt.paidOn)}),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: context.type.t,
@@ -414,7 +414,7 @@ Future<void> _receipts(BuildContext context, FeeAccount account, FeesController 
                       ],
                     ),
                   ),
-                  Text(Formatters.inr(r.amount), style: context.type.t),
+                  Text(Formatters.money(r.amount), style: context.type.t),
                 ],
               ),
             ),

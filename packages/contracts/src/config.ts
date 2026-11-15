@@ -26,6 +26,26 @@ export const DEFAULT_APP_LAYOUT: Record<AppRoleKey, AppLayout> = {
 };
 
 /** Every setting a school can change (config layer 4). Defaults here are the platform defaults (layer 1). */
+/** What kind of money a payment method is: reports and reconciliation group by it, whatever the school calls the method. */
+export const PAYMENT_KINDS = ['cash', 'card', 'bank', 'cheque', 'wallet', 'online', 'other'] as const;
+export const PAYMENT_KIND_LABELS: Record<(typeof PAYMENT_KINDS)[number], string> = { cash: 'Cash', card: 'Card', bank: 'Bank transfer', cheque: 'Cheque', wallet: 'Wallet or app', online: 'Online', other: 'Other' };
+export const PaymentMethod = z.object({
+  key: z.string().regex(/^[a-z0-9-]{1,24}$/),
+  name: z.string().trim().min(1, 'Name the method').max(30),
+  kind: z.enum(PAYMENT_KINDS),
+});
+export type PaymentMethod = z.infer<typeof PaymentMethod>;
+// Schools saved before methods had names kept plain keys: each is read as the method it always was.
+const OLD_METHODS: Record<string, [string, PaymentMethod['kind']]> = { cash: ['Cash', 'cash'], upi: ['UPI', 'wallet'], card: ['Card', 'card'], netbanking: ['Net banking', 'bank'], cheque: ['Cheque', 'cheque'] };
+const PaymentMethods = z.preprocess(
+  (v) => (Array.isArray(v) ? v.map((x) => (typeof x === 'string' ? { key: x, name: OLD_METHODS[x]?.[0] ?? x, kind: OLD_METHODS[x]?.[1] ?? 'other' } : x)) : v),
+  z.array(PaymentMethod).min(1, 'Keep at least one way to pay').max(16),
+);
+/** A school anywhere starts with these; a country's pack adds its own (UPI in India, direct debit in the United Kingdom). */
+export const DEFAULT_PAYMENT_METHODS: PaymentMethod[] = [
+  { key: 'cash', name: 'Cash', kind: 'cash' }, { key: 'card', name: 'Card', kind: 'card' }, { key: 'bank', name: 'Bank transfer', kind: 'bank' }, { key: 'cheque', name: 'Cheque', kind: 'cheque' },
+];
+
 export const SchoolSettingsSchema = z.object({
   'school.name': z.string().min(2).max(80),
   'school.shortName': z.string().min(2).max(20),
@@ -89,7 +109,7 @@ export const SchoolSettingsSchema = z.object({
   'library.staffMaxLoans': z.number().int().min(1).max(50).default(5),
   // Families are told the bus is near when it is this many minutes from their stop.
   'transport.nearMinutes': z.number().int().min(2).max(30).default(10),
-  'fees.paymentMethods': z.array(z.enum(['cash', 'upi', 'card', 'netbanking', 'cheque'])).min(1).default(['cash', 'upi', 'card', 'netbanking', 'cheque']),
+  'fees.paymentMethods': PaymentMethods.default(DEFAULT_PAYMENT_METHODS),
   'vocab.student': z.string().max(24).default('Student'),
   'vocab.class': z.string().max(24).default('Class'),
   // Plurals, for words that do not take an "s" ("Children"); empty means the singular with the usual English ending.
