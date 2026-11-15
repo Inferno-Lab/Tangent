@@ -2,7 +2,7 @@ import { Inject, Injectable, SetMetadata, createParamDecorator, type CanActivate
 import { Reflector } from '@nestjs/core';
 import * as schema from '@tangent/db/school';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { PoolManager, Registry, type TenantInfo } from '@tangent/tenancy';
+import { PoolManager, Registry, enterSchool, type TenantInfo } from '@tangent/tenancy';
 import type { Pool } from 'pg';
 import type { FastifyRequest } from 'fastify';
 import { ApiError } from '@tangent/nest-kit';
@@ -81,6 +81,7 @@ export class TenantGuard implements CanActivate {
     if (!slug) throw new ApiError('validation', 'Say which school this is for, with the X-School header.');
     if (!SLUG.test(slug)) throw new ApiError('not_found', 'We could not find that school. Check the address and try again.');
     req.tenant = await this.tenants.resolve(slug);
+    enterSchool(req.tenant.info);
     return true;
   }
 }

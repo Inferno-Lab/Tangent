@@ -81,6 +81,8 @@ export async function recordSettingsVersion(registry: pg.Pool, schoolId: string,
     [newId('cfv'), schoolId, after.version, JSON.stringify(after.values), JSON.stringify(after.changes), note, by]);
   const v = after.values;
   const id = (k: string) => (typeof v[k] === 'string' && (v[k] as string).trim() ? (v[k] as string).trim() : null);
-  await registry.query('update schools set config_version = config_version + 1, name = coalesce($2, name), short_name = coalesce($3, short_name), color = coalesce($4, color), logo_text = coalesce($5, logo_text) where id = $1',
-    [schoolId, id('school.name'), id('school.shortName'), id('brand.color'), id('brand.logoText')]);
+  await registry.query(
+    `update schools set config_version = config_version + 1, name = coalesce($2, name), short_name = coalesce($3, short_name), color = coalesce($4, color), logo_text = coalesce($5, logo_text),
+       country = coalesce($6, country), timezone = coalesce($7, timezone), locale = coalesce($8, locale), currency = coalesce($9, currency) where id = $1`,
+    [schoolId, id('school.name'), id('school.shortName'), id('brand.color'), id('brand.logoText'), id('school.country'), id('school.timezone'), id('school.locale'), id('school.currency')]);
 }

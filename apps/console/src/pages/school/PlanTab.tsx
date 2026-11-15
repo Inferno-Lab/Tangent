@@ -7,6 +7,7 @@ import type { CatalogDoc } from '@tangent/api-client';
 import { Card } from '../../app/Page';
 import { useApp } from '../../app/context';
 import { ReviewDialog, docOf, sig } from '../modules/ModulesPage';
+import { count } from '../../app/format';
 
 type Say = (text: string, tone?: 'ok' | 'bad') => void;
 type Mod = CatalogDoc['modules'][number];
@@ -59,7 +60,7 @@ export function PlanTab({ d, say }: { d: SchoolDetail; say: Say }) {
       {review && <ReviewDialog list={[{ schoolId: d.id, name: d.name, cur, change }]} onClose={() => setReview(false)} onDone={(m) => { setReview(false); say(m); }} />}
       {next && (
         <Dialog title={`Move to ${next.name}?`} tag={{ text: 'Resets modules and limits', tone: 'a' }} onClose={() => setAsking(null)} width={480}>
-          <p style={{ marginTop: 0 }}>The modules, features and limits below change to the {next.name} plan’s: {next.modules.length} modules, up to {next.limits.students.toLocaleString('en-IN')} students. You can change them for this school afterwards; nothing is sent until you review it.</p>
+          <p style={{ marginTop: 0 }}>The modules, features and limits below change to the {next.name} plan’s: {next.modules.length} modules, up to {count(next.limits.students)} students. You can change them for this school afterwards; nothing is sent until you review it.</p>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
             <button className="btn" onClick={() => setAsking(null)}>Keep {plans.data?.find((p) => p.key === plan)?.name ?? 'this plan'}</button>
             <button className="btn pri" onClick={() => takePlan(next.key)}>Use {next.name}</button>

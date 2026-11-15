@@ -1,4 +1,4 @@
-import { PERMISSIONS, ROLE_TEMPLATES, addDays, type RoleTemplate, istToday, latestSchoolDay, schoolDaysEnding } from '@tangent/contracts';
+import { PERMISSIONS, ROLE_TEMPLATES, addDays, type RoleTemplate, schoolToday, latestSchoolDay, schoolDaysEnding } from '@tangent/contracts';
 import type { Pool, PoolClient } from 'pg';
 import { newId } from '../ids.js';
 import { bulkInsert } from './bulk.js';
@@ -17,6 +17,11 @@ export interface SeedInput {
     color: string;
     logoText: string;
     language: 'en' | 'hi' | 'mr';
+    /** Where the school is (ISO country, IANA zone, BCP 47 locale, ISO currency); India when not given. */
+    country?: string;
+    timezone?: string;
+    locale?: string;
+    currency?: string;
   };
   admin: { name: string; email: string; phone: string; passwordHash: string };
   modules: string[];
@@ -114,7 +119,7 @@ export async function seedSchool(pool: Pool, input: SeedInput): Promise<SeedRepo
 }
 
 async function run(db: PoolClient, input: SeedInput): Promise<Omit<SeedReport, 'ms'>> {
-  const today = input.today ?? istToday();
+  const today = input.today ?? schoolToday();
   const last = latestSchoolDay(today, OFF_DAYS);
   const r = rng(20261014);
   const year = Number(last.slice(0, 4));
@@ -144,6 +149,7 @@ async function run(db: PoolClient, input: SeedInput): Promise<Omit<SeedReport, '
     ['school.name', s.name], ['school.shortName', s.shortName], ['school.tagline', s.tagline], ['school.place', s.place ?? ''], ['school.phone', s.phone],
     ['school.email', s.email], ['school.address', s.address], ['school.language', s.language], ['brand.color', s.color],
     ['brand.logoText', s.logoText],
+    ['school.country', s.country ?? 'IN'], ['school.timezone', s.timezone ?? 'Asia/Kolkata'], ['school.locale', s.locale ?? 'en-IN'], ['school.currency', s.currency ?? 'INR'],
     ['approvals.notice', 'required'], ['attendance.notifyParents', true], ['attendance.lockAfterDays', 2],
     ['fees.lateFeePct', 0], ['fees.remindDaysBefore', 3], ['fees.dailyTarget', 150000], ['attendance.goalPct', 95],
     ['homework.goalPct', 85], ['dashboard.rollClasses', ['cls_8a', 'cls_8b', 'cls_9a', 'cls_9b', 'cls_10a', 'cls_10b']], ['security.twoFactor', true],

@@ -1,4 +1,10 @@
-import type { SchoolRow } from '@tangent/contracts';
+import { fmtDate, fmtMoney, fmtNumber, setLocaleSource, setZoneSource, type SchoolRow } from '@tangent/contracts';
+
+// The console is read by Tangent's own people: dates and numbers their browser's way, prices in rupees (Tangent bills in
+// rupees today; docs/one-shot-plan.md D13). A school's own amounts are written in its currency where they are shown.
+const reader = { zone: Intl.DateTimeFormat().resolvedOptions().timeZone, locale: typeof navigator === 'undefined' ? 'en' : navigator.language, currency: 'INR' };
+setZoneSource(() => reader.zone);
+setLocaleSource(() => reader);
 
 export type Tone = 'g' | 'a' | 'v' | 'c' | 'n';
 
@@ -26,11 +32,10 @@ export function ago(iso: string | null | undefined, now = Date.now()): string {
   return `${Math.round(s / 86400)} d ago`;
 }
 
-export const when = (iso: string | null | undefined) =>
-  iso ? new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '–';
+export const when = (iso: string | null | undefined) => (iso ? fmtDate(iso, 'stamp') : '–');
 
-export const rupees = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
-export const count = (n: number) => n.toLocaleString('en-IN');
+export const rupees = (n: number) => fmtMoney(Math.round(n), 'INR');
+export const count = (n: number) => fmtNumber(n);
 
 /** A smooth line through hourly values, in the 600 by 240 box the chart draws in. */
 export function curve(values: number[], max: number, close = false): string {

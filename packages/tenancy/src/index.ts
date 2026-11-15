@@ -1,4 +1,5 @@
-import type { EntitlementDoc } from '@tangent/contracts';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { setLocaleSource, setZoneSource, type EntitlementDoc } from '@tangent/contracts';
 import { pg } from '@tangent/db';
 import { schools } from '@tangent/db/registry';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -24,6 +25,11 @@ export interface TenantInfo {
   demo: boolean;
   /** Tangent pressed Go live: the school has moved in. */
   wentLive: boolean;
+  /** Where the school is (ISO 3166 country), its IANA time zone, BCP 47 locale and ISO 4217 currency. */
+  country: string;
+  timezone: string;
+  locale: string;
+  currency: string;
 }
 
 export interface RegistryOptions {
@@ -80,6 +86,7 @@ export class Registry {
         flags: Object.fromEntries(fl.rows.map((f) => [f.key, f.enabled])),
         demo: row.demo,
         wentLive: !!row.wentLiveAt,
+        country: row.country, timezone: row.timezone, locale: row.locale, currency: row.currency,
       };
     }
     this.cache.set(slug, { at: now, value });
@@ -175,4 +182,22 @@ export class PoolManager {
     await Promise.all([...this.pools.values()].map((e) => e.pool.end().catch(() => undefined)));
     this.pools.clear();
   }
+}
+
+/**
+ * Which school the code running now is for, so "today", amounts and dates follow its own zone, locale and currency
+ * (docs/one-shot-plan.md §3.3). A request runs inside one context (the API's onRequest hook) that the tenant guard fills in;
+ * a job runs inside `withSchool`. Code that serves two schools at once passes their zones explicitly.
+ */
+export const schoolContext = new AsyncLocalStorage<{ zone?: string; locale?: string; currency?: string }>();
+setZoneSource(() => schoolContext.getStore()?.zone);
+setLocaleSource(() => schoolContext.getStore());
+
+export function enterSchool(info: Pick<TenantInfo, 'timezone' | 'locale' | 'currency'>): void {
+  const store = schoolContext.getStore();
+  if (store) Object.assign(store, { zone: info.timezone, locale: info.locale, currency: info.currency });
+}
+
+export function withSchool<T>(info: Pick<TenantInfo, 'timezone' | 'locale' | 'currency'> | null | undefined, fn: () => T): T {
+  return schoolContext.run(info ? { zone: info.timezone, locale: info.locale, currency: info.currency } : {}, fn);
 }

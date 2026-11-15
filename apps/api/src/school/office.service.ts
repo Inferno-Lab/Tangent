@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
-import {
-  addDays, dayMonth, inr, istToday, latestSchoolDay, type DataRequestCreate, type DataRequestDecision, type DataRequestRow, type EventReply, type EventRow, type EventSave, type FeeStatus, type InvoiceListQuery,
-  type InvoiceListRow, type InvoiceListSummary, type Paged, type ReceiptRow, type ReportData, type ReportInfo, type ReportQuery, type ThreadCreate, type ThreadDetail, type ThreadPatch, type ThreadReply, type ThreadRow,
-} from '@tangent/contracts';
+import { fmtNumber, fmtMoney, fmtDate, addDays, dayMonth, schoolToday, latestSchoolDay, type DataRequestCreate, type DataRequestDecision, type DataRequestRow, type EventReply, type EventRow, type EventSave, type FeeStatus, type InvoiceListQuery, type InvoiceListRow, type InvoiceListSummary, type Paged, type ReceiptRow, type ReportData, type ReportInfo, type ReportQuery, type ThreadCreate, type ThreadDetail, type ThreadPatch, type ThreadReply, type ThreadRow } from '@tangent/contracts';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
@@ -11,7 +8,7 @@ import { ChatService } from './chat.service.js';
 
 type User = { id: string; name: string };
 const esc = (q: string) => q.replace(/[\\%_]/g, (c) => `\\${c}`);
-const money = (n: number) => `₹${inr(Math.round(n))}`;
+const money = (n: number) => fmtMoney(n);
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
 
 const REPORTS: ReportInfo[] = [
@@ -46,7 +43,7 @@ export class OfficeService {
   }
 
   async invoiceList(t: TenantCtx, q: InvoiceListQuery): Promise<Paged<InvoiceListRow> & { summary: InvoiceListSummary }> {
-    const params: unknown[] = [istToday()];
+    const params: unknown[] = [schoolToday()];
     const where: string[] = [];
     if (q.status) { params.push(q.status); where.push(`status = $${params.length}`); }
     if (q.head) { params.push(q.head); where.push(`head = $${params.length}`); }
@@ -93,7 +90,7 @@ export class OfficeService {
   async report(t: TenantCtx, id: string, q: ReportQuery = {}): Promise<ReportData> {
     const info = (await this.reportList(t)).find((r) => r.id === id);
     if (!info) throw notFound('That report');
-    const today = istToday();
+    const today = schoolToday();
     const last = latestSchoolDay(today, await this.settings.offDays(t));
     const cls = q.classId ? (await t.pool.query<{ name: string }>('select name from classes where id = $1', [q.classId])).rows[0]?.name ?? null : null;
     if (q.classId && !cls) throw notFound('That class');
@@ -151,7 +148,7 @@ export class OfficeService {
     if (id === 'strength') {
       const { rows } = await t.pool.query<{ name: string; teacher: string | null; n: string }>(
         `select c.name, u.name teacher, count(s.id) n from classes c left join users u on u.id = c.class_teacher_id left join students s on s.class_id = c.id and s.status = 'active' group by c.id, c.name, u.name, c.grade, c.section order by c.grade, c.section`);
-      return { ...base, scope: scope(), summary: [{ label: 'Classes', value: String(rows.length) }, { label: 'Students', value: inr(rows.reduce((a, r) => a + Number(r.n), 0)) }],
+      return { ...base, scope: scope(), summary: [{ label: 'Classes', value: String(rows.length) }, { label: 'Students', value: fmtNumber(rows.reduce((a, r) => a + Number(r.n), 0)) }],
         columns: [{ key: 'class', label: 'Class' }, { key: 'teacher', label: 'Class teacher' }, { key: 'students', label: 'Students', align: 'right' }],
         rows: rows.map((r) => ({ class: r.name, teacher: r.teacher ?? 'Not assigned', students: Number(r.n) })) };
     }
@@ -277,7 +274,7 @@ export class OfficeService {
         [id, body.title, body.startsAt, body.endsAt ?? null, body.kind, body.venue, body.note, body.audience, user.id, body.category, body.needsRsvp, body.lat, body.lng, classId]);
       if (body.audience !== 'staff') {
         const g = await t.pool.query<{ phone: string | null }>("select distinct g.phone from guardians g join student_guardians sg on sg.guardian_id = g.id join students s on s.id = sg.student_id where s.status = 'active' and g.phone is not null and ($1::text is null or s.class_id = $1) limit 5000", [classId]);
-        const date = new Date(body.startsAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
+        const date = fmtDate(body.startsAt, 'day');
         await this.messenger.notify(t, 'event.created', g.rows.map((x) => ({ to: x.phone!, vars: { title: body.title, date } })));
       }
     }

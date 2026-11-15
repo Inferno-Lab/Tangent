@@ -5,8 +5,9 @@ import { Dialog, Field, NumberField, Segmented, useShake, EmptyState, EmptyNote 
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { AreaField, dateLabel, openPdf, problem, stamp, useOpenParam } from '../../app/kit';
+import { fmtMoney } from '@tangent/contracts';
 
-const rupees = (n: number) => `₹${n.toLocaleString('en-IN')}`;
+const rupees = (n: number) => fmtMoney(n);
 const REFUND: Record<RefundRow['status'], { text: string; tone: string }> = {
   requested: { text: 'Needs a second person', tone: 'a' }, sent: { text: 'Sent to the bank', tone: 'v' }, done: { text: 'Refunded', tone: 'g' }, failed: { text: 'Failed', tone: 'c' }, rejected: { text: 'Declined', tone: '' },
 };

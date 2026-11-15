@@ -1,5 +1,5 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
-import { addDays, istToday, type OnlinePaymentRow, type ReconRow, type RefundRow } from '@tangent/contracts';
+import { schoolInstant, fmtMoney, addDays, schoolToday, type OnlinePaymentRow, type ReconRow, type RefundRow } from '@tangent/contracts';
 import { newId, type Job } from '@tangent/db';
 import type { PaymentEvent } from '@tangent/integrations';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
@@ -9,7 +9,7 @@ import { FeesService } from './fees.service.js';
 import { HubService } from './hub.service.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
 
-const rupees = (n: number) => `₹${n.toLocaleString('en-IN')}`;
+const rupees = (n: number) => fmtMoney(n);
 const METHODS: Record<string, 'upi' | 'card' | 'netbanking'> = { upi: 'upi', card: 'card', netbanking: 'netbanking', nb: 'netbanking', wallet: 'upi' };
 
 
@@ -38,7 +38,7 @@ export class PaymentsService implements OnModuleInit {
     const daily = (fn: (t: TenantCtx, day: string) => Promise<string>) => async (job: Job) => {
       const s = await this.hubs.schoolPool(job.schoolId ?? '');
       if (!s) return 'School not found.';
-      return fn(await this.tenants.resolve(s.slug), String(job.payload.day ?? istToday()));
+      return fn(await this.tenants.resolve(s.slug), String(job.payload.day ?? schoolToday()));
     };
     this.hubs.handle('fees.reminders', daily((t, day) => this.fees.dailyReminders(t, day)));
     this.hubs.handle('fees.lateFines', daily((t, day) => this.fees.lateFines(t, day)));
@@ -108,7 +108,7 @@ export class PaymentsService implements OnModuleInit {
     } catch (e) {
       // Money arrived but no receipt could be written (the invoice was settled at the desk meanwhile): listed for the office to refund.
       await t.pool.query('insert into reconciliation (id, day, provider_payment_id, provider_amount, receipt_amount, problem) values ($1,$2,$3,$4,null,$5) on conflict do nothing',
-        [newId('rec'), istToday(), ev.providerPaymentId, paid, `Paid online but not receipted: ${(e as Error).message}`]);
+        [newId('rec'), schoolToday(), ev.providerPaymentId, paid, `Paid online but not receipted: ${(e as Error).message}`]);
       return `Paid but not receipted: ${(e as Error).message}`;
     }
   }
@@ -201,10 +201,10 @@ export class PaymentsService implements OnModuleInit {
   private async reconcileJob(job: Job): Promise<string> {
     const s = await this.hubs.schoolPool(job.schoolId ?? '');
     if (!s) return 'School not found.';
-    const day = addDays(String(job.payload.day ?? istToday()), -1);
+    const day = addDays(String(job.payload.day ?? schoolToday()), -1);
     const route = await this.hubs.hub.resolve('payments', s.id, s.slug).catch(() => null);
     if (!route?.adapter.payments?.settlements || route.sandbox) return 'No provider to reconcile with.';
-    const from = new Date(`${day}T00:00:00+05:30`);
+    const from = schoolInstant(day);
     const theirs = await route.adapter.payments.settlements(route.ctx, from, new Date(from.getTime() + 24 * 3600_000));
     const ours = (await s.pool.query<{ provider_payment_id: string; amount: number }>('select provider_payment_id, amount from payments where paid_on = $1 and provider_payment_id is not null', [day])).rows;
     const mine = new Map(ours.map((o) => [o.provider_payment_id, o.amount]));

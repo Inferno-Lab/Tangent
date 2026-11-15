@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
-import { CAPABILITY_LABELS, istToday, type Capability, type InvoiceRowC } from '@tangent/contracts';
+import { CAPABILITY_LABELS, schoolToday, type Capability, type InvoiceRowC } from '@tangent/contracts';
 import { DateField, Dialog, EmptyCard, Field, MonthField, Select, useShake, EmptyState, EmptyNote } from '@tangent/web-ui';
 import { Card, Page, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
@@ -107,7 +107,7 @@ function InvoiceDialog({ r, can, onClose, onDone }: { r: InvoiceRowC; can: boole
   const app = useApp();
   const shake = useShake();
   const [paying, setPaying] = useState(false);
-  const [f, setF] = useState({ paidOn: istToday(), reference: '' });
+  const [f, setF] = useState({ paidOn: schoolToday(), reference: '' });
   const [err, setErr] = useState<Record<string, string>>({});
   const fail = (e: unknown) => { setErr(e instanceof HttpError && Object.keys(e.fields).length ? e.fields : { _: (e as Error).message }); shake.hit(); };
   const send = useMutation({ mutationFn: () => app.api.billing.send(r.id), onSuccess: (x) => onDone(`Sent to ${x.to}.`), onError: fail });
@@ -134,7 +134,7 @@ function InvoiceDialog({ r, can, onClose, onDone }: { r: InvoiceRowC; can: boole
         <div className="help">Due by {r.dueOn}.{r.sentAt ? ` Sent to ${r.sentTo} on ${when(r.sentAt)}.` : ' Not sent yet.'}{r.status === 'paid' ? ` Paid on ${r.paidOn}, reference ${r.paidRef}.` : ''}</div>
         {paying && (
           <div className="two">
-            <DateField label="Paid on" value={f.paidOn} max={istToday()} onChange={(v) => { setF({ ...f, paidOn: v }); setErr({}); }} error={err.paidOn} />
+            <DateField label="Paid on" value={f.paidOn} max={schoolToday()} onChange={(v) => { setF({ ...f, paidOn: v }); setErr({}); }} error={err.paidOn} />
             <Field label="Payment reference" value={f.reference} onChange={(v) => { setF({ ...f, reference: v }); setErr({}); }} error={err.reference} maxLength={80} placeholder="Bank transfer reference" />
           </div>
         )}

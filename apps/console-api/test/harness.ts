@@ -66,7 +66,7 @@ export async function startHarness(extra: Record<string, string> = {}): Promise<
 }
 
 export const wizardPayload = (slug: string, over: Record<string, unknown> = {}) => ({
-  basics: { name: `${slug} School`, shortName: slug.slice(0, 8), slug, board: 'CBSE', address: '1 Main Road', city: 'Pune', contactName: 'Asha Rao', contactPhone: '+91 90000 11111', contactEmail: `office@${slug}.test`, gstin: '', language: 'en' },
+  basics: { name: `${slug} School`, shortName: slug.slice(0, 8), slug, board: 'CBSE', address: '1 Main Road', city: 'Pune', contactName: 'Asha Rao', contactPhone: '+91 90000 11111', contactEmail: `office@${slug}.test`, gstin: '', language: 'en', country: 'IN', timezone: 'Asia/Kolkata', locale: 'en-IN', currency: 'INR' },
   plan: { plan: 'standard', modules: ['people', 'attendance', 'fees', 'notices', 'timetable'], addOns: [], locks: [], students: 300 },
   branding: { color: '#0EA5E9', logoText: slug.slice(0, 1).toUpperCase(), appName: `${slug} App`, tagline: 'Learning together' },
   placement: { target: 'local', cell: 'local-1', addressing: 'path', customDomain: '' },

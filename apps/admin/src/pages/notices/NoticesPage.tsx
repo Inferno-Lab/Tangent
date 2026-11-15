@@ -6,11 +6,13 @@ import { Checkbox, DateField, Dialog, Field, SelectField, TimeField, useShake, I
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { Attach, useSetting } from '../../app/kit';
+import { usePageTabs } from '../../app/tabs';
+import { fmtDate, schoolInstant } from '@tangent/contracts';
 
 const TONE: Record<NoticeRow['status'], string> = { draft: 'n', pending: 'a', scheduled: 'v', published: 'g' };
 const LABEL: Record<NoticeRow['status'], string> = { draft: 'Draft', pending: 'Waiting for approval', scheduled: 'Scheduled', published: 'Sent' };
 const AUDIENCE: Record<string, string> = { everyone: 'Everyone', parents: 'Parents', students: 'Students', staff: 'Staff', class: 'One class' };
-const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
+const when = (iso: string | null) => (iso ? fmtDate(iso, 'stamp') : '');
 
 /**
  * What the school tells families, students and staff: written here or by teachers in the app, sent now or at a set time,
@@ -18,6 +20,7 @@ const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString('en-IN'
  * who has not acknowledged it yet.
  */
 export function NoticesPage() {
+  const { tabs } = usePageTabs('/notices');
   const app = useApp();
   const qc = useQueryClient();
   const { toast, say } = useToast();
@@ -30,7 +33,7 @@ export function NoticesPage() {
   const mayChange = (n: NoticeRow) => canWrite && (n.authorId === app.user.id || app.user.permissions.includes('notices.publish'));
   const done = (msg: string) => { setDlg(null); void qc.invalidateQueries({ predicate: (q) => ['notices', 'dashboard', 'shell'].includes(String(q.queryKey[0])) }); say(msg); };
   return (
-    <Page title="Notices" sub="What the school tells families, students and staff" toast={toast} loading={list.isLoading}
+    <Page title="Notices" sub="What the school tells families, students and staff" tabs={tabs} toast={toast} loading={list.isLoading}
       error={list.isError && !list.data ? { message: (list.error as Error).message, retry: () => void list.refetch() } : null}
       actions={canWrite ? <button className="btn pri" onClick={() => setDlg({ kind: 'new' })}><Icon name="plus" />New notice</button> : undefined}
       overlays={<>
@@ -95,7 +98,7 @@ function Compose({ n, onClose, onDone }: { n?: NoticeRow; onClose: () => void; o
     mutationFn: async (publish: boolean) => {
       const body = {
         title: f.title.trim(), body: f.body.trim(), audience: f.audience as 'everyone', classId: f.audience === 'class' ? f.classId : undefined, category: f.category || cats[0]?.key || 'academic',
-        pinned: f.pinned, needsAck: f.needsAck, publish, publishAt: f.later && !published ? new Date(`${f.day}T${f.time}:00+05:30`).toISOString() : null, fileIds: [],
+        pinned: f.pinned, needsAck: f.needsAck, publish, publishAt: f.later && !published ? schoolInstant(f.day, f.time).toISOString() : null, fileIds: [],
       };
       const saved = n ? await app.api.notices.update(n.id, { ...body, tellAgain: f.tellAgain }) : await app.api.notices.create(body);
       const failed: string[] = [];
@@ -111,7 +114,7 @@ function Compose({ n, onClose, onDone }: { n?: NoticeRow; onClose: () => void; o
     if (f.title.trim().length < 3) p.title = 'Give the notice a title.';
     if (f.body.trim().length < 3) p.body = 'Write the notice.';
     if (f.audience === 'class' && !f.classId) p.classId = 'Pick the class.';
-    if (f.later && !published && (!f.day || new Date(`${f.day}T${f.time}:00+05:30`) <= new Date())) p.day = 'Choose a time that has not passed yet.';
+    if (f.later && !published && (!f.day || schoolInstant(f.day, f.time) <= new Date())) p.day = 'Choose a time that has not passed yet.';
     setErr(p);
     if (Object.keys(p).length) shake.hit(); else save.mutate(publish);
   };

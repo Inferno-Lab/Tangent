@@ -1,4 +1,4 @@
-import { istToday } from '@tangent/contracts';
+import { schoolToday } from '@tangent/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startHarness, type Harness } from './harness.js';
 
@@ -260,7 +260,7 @@ describe('dashboard and approvals', () => {
 
 describe('attendance and fees', () => {
   it('marks a class, refuses the future, and notifies guardians of absences', async () => {
-    const date = istToday();
+    const date = schoolToday();
     const day = (await h.call('GET', `/v1/attendance/day?classId=cls_6a&date=${date}`, { token })).json;
     expect(day.marks.length).toBeGreaterThan(30);
     const marks = day.marks.map((m: any, i: number) => ({ studentId: m.studentId, status: i === 0 ? 'absent' : 'present' }));

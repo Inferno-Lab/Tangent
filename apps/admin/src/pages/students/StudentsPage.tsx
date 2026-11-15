@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { dayLabel, inr, istToday, plural, type StudentRow } from '@tangent/contracts';
+import { fmtNumber, fmtMoney, fmtDate, dayLabel, schoolToday, plural, type StudentRow } from '@tangent/contracts';
 import { EmptyCard, Menu, PageScope, Select, ToastSlot, rollDigits, tintFor, useToast, Icon, type IconName } from '@tangent/web-ui';
 import type { StudentListQuery } from '@tangent/api-client';
 import { useApp } from '../../app/context';
@@ -23,7 +23,7 @@ const PILL_ICON = {
   fee: 'fees',
   add: 'plus',
 } as const;
-const fmtFee = (s: StudentRow) => (s.feeStatus === 'paid' ? 'Paid' : s.feeStatus === 'due' ? `Due ₹${inr(s.amountDue)}` : `Overdue ₹${inr(s.amountDue)}`);
+const fmtFee = (s: StudentRow) => (s.feeStatus === 'paid' ? 'Paid' : s.feeStatus === 'due' ? `Due ${fmtMoney(s.amountDue)}` : `Overdue ${fmtMoney(s.amountDue)}`);
 const tickClass = (st: string | null) => (st === 'late' ? 'l' : st === 'present' ? '' : st ? 'a' : 'h');
 
 type Dialog = null | { kind: 'add' } | { kind: 'import' } | { kind: 'message'; ids: string[]; label: string } | { kind: 'fee'; ids: string[]; label: string } | { kind: 'edit' } | { kind: 'guardians' } | { kind: 'leave' };
@@ -137,7 +137,7 @@ function StudentList({ tabs }: { tabs: React.ReactNode }) {
   const mods = chrome.shell?.modules ?? [];
   const has = { fees: mods.includes('fees'), attendance: mods.includes('attendance') };
   const allViews = [
-    { n: 'All', c: inr(allCount), cc: 'v' }, { n: pinned?.name ?? 'My class', c: String(pinned?.count ?? 0), cc: 'g' },
+    { n: 'All', c: fmtNumber(allCount), cc: 'v' }, { n: pinned?.name ?? 'My class', c: String(pinned?.count ?? 0), cc: 'g' },
     { n: 'Fees overdue', c: String(views.data?.overdue ?? 0), cc: 'c' }, { n: 'New this year', c: String(views.data?.newThisYear ?? 0), cc: 'a' },
     { n: 'Left the school', c: String(views.data?.left ?? 0), cc: '' },
   ].map((x, i) => ({ ...x, i }));
@@ -146,7 +146,7 @@ function StudentList({ tabs }: { tabs: React.ReactNode }) {
     ...chrome, has, tabs,
     // What the school calls its students (console: People), "Pupils" for "Pupil".
     heading: plural(chrome.shell?.school.studentWord ?? 'Student'),
-    subtitle: `${allCount.toLocaleString('en-IN')} enrolled across ${classes.data?.length ?? 0} sections`,
+    subtitle: `${fmtNumber(allCount)} enrolled across ${classes.data?.length ?? 0} sections`,
     openImport: () => setDialog({ kind: 'import' }), exportAll: () => void download(), openAdd: () => setDialog({ kind: 'add' }),
     views: shownViews.map((x) => ({ ...x, on: x.i === active ? 'on' : '', sel: x.i === active ? 'true' : 'false', pick: () => { setView(x.i); setClassId(null); setHouse(''); setFee(''); setAtt(''); setPage(1); } })),
     pills: (
@@ -173,8 +173,8 @@ function StudentList({ tabs }: { tabs: React.ReactNode }) {
     sum: (() => {
       const s = sum.data;
       return {
-        inView: s ? inr(s.inView) : '–', total: inr(s?.total ?? 0), marked: s?.markedToday ?? 0, unmarked: inr(Math.max(0, (s?.inView ?? 0) - (s?.markedToday ?? 0))), presD: rollDigits(String(s?.presentToday ?? 0)),
-        dayWord: s && s.dayLabel !== dayLabel(istToday()) ? `on ${s.dayLabel}` : 'today', overdue: inr(s?.overdueAmount ?? 0),
+        inView: s ? fmtNumber(s.inView) : '–', total: fmtNumber(s?.total ?? 0), marked: s?.markedToday ?? 0, unmarked: fmtNumber(Math.max(0, (s?.inView ?? 0) - (s?.markedToday ?? 0))), presD: rollDigits(String(s?.presentToday ?? 0)),
+        dayWord: s && s.dayLabel !== dayLabel(schoolToday()) ? `on ${s.dayLabel}` : 'today', overdue: fmtMoney(s?.overdueAmount ?? 0),
         families: `${s?.overdueFamilies ?? 0} ${s?.overdueFamilies === 1 ? 'family' : 'families'}`, avg: s?.avgAttendance ?? 0, avgNone: !s || s.total === 0,
         delta: `${(s?.avgDelta ?? 0) >= 0 ? '+' : ''}${s?.avgDelta ?? 0}%`, deltaCls: (s?.avgDelta ?? 0) >= 0 ? 'up' : 'dn',
       };
@@ -194,7 +194,7 @@ function StudentList({ tabs }: { tabs: React.ReactNode }) {
         key: (e: React.KeyboardEvent) => { if (e.key === 'Enter' && e.target === e.currentTarget) setOpenId(r.id); },
       };
     }),
-    range: total ? `${(page - 1) * per + 1}–${(page - 1) * per + rows.length} of ${inr(total)}` : '0',
+    range: total ? `${(page - 1) * per + 1}–${(page - 1) * per + rows.length} of ${fmtNumber(total)}` : '0',
     // The optional columns follow the school's modules; the grid keeps the same proportions either way.
     cols: ['44px', 'minmax(0,1.5fr)', '84px', 'minmax(0,1.1fr)', ...(has.attendance ? ['150px'] : []), ...(has.fees ? ['150px'] : [])].join(' '),
     dir, flipSort: () => { setDir((d) => (d === 'asc' ? 'desc' : 'asc')); setPage(1); },
@@ -222,7 +222,7 @@ function StudentList({ tabs }: { tabs: React.ReactNode }) {
         homework: s.facts.homework.total ? `${s.facts.homework.onTime} of ${s.facts.homework.total}` : '–', library: s.facts.libraryOut,
         show: { att: has.attendance, exam: mods.includes('exams'), hw: mods.includes('homework'), lib: mods.includes('library') },
         rollTitle: `Last ${s.roll24.length} school days`, rollAria: `${p} present, ${l} late, ${a} absent`, gi: s.guardianName.split(' ').map((w) => w[0]).slice(0, 2).join(''), g: s.guardianName,
-        activity: s.recentActivity.map((e) => ({ label: e.label, sub: [e.sub, new Date(e.at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })].filter(Boolean).join(' · '), color: e.tone === 'g' ? 'var(--ok)' : e.tone === 'v' ? 'var(--brand)' : 'var(--warn)' })),
+        activity: s.recentActivity.map((e) => ({ label: e.label, sub: [e.sub, fmtDate(e.at, 'day')].filter(Boolean).join(' · '), color: e.tone === 'g' ? 'var(--ok)' : e.tone === 'v' ? 'var(--brand)' : 'var(--warn)' })),
       };
     })(),
     heat: (detail.data?.roll24 ?? []).map((x, i) => ({ c: x === 'late' ? 'l' : x === 'absent' ? 'a' : x === 'leave' ? 'h' : x === null ? 'h' : '', d: (0.2 + i * 0.02).toFixed(2) })),
@@ -233,7 +233,7 @@ function StudentList({ tabs }: { tabs: React.ReactNode }) {
     collect: () => openId && app.go(`/fees?collect=${openId}`),
     may: { edit: app.user.permissions.includes('students.write') && !detail.data?.left, leave: app.user.permissions.includes('year.manage') && !detail.data?.left },
     // A student who left: when and why, and (for someone who manages the year) bringing them back on the roll.
-    left: detail.data?.left ? { line: `Left on ${new Date(`${detail.data.left.on}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}${detail.data.left.reason ? `: ${detail.data.left.reason}` : ''}`,
+    left: detail.data?.left ? { line: `Left on ${fmtDate(detail.data.left.on, 'dayYear')}${detail.data.left.reason ? `: ${detail.data.left.reason}` : ''}`,
       back: app.user.permissions.includes('year.manage') ? () => void app.api.year.rejoin(detail.data!.id).then(() => { say(`${detail.data!.name} is back on the roll.`); refreshAll(); }).catch((e: Error) => say(e.message)) : null } : null,
     edit: () => setDialog({ kind: 'edit' }), editGuardians: () => setDialog({ kind: 'guardians' }), leave: () => setDialog({ kind: 'leave' }),
     guardians: (detail.data?.guardians ?? []).map((g) => ({

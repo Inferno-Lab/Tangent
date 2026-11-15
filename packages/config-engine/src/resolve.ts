@@ -55,6 +55,7 @@ export function resolveConfig({ settings, entitlement, audience, flags, live = t
       id: p.id, module: p.module, icon: p.icon, keys: p.keys, href: p.path,
       label: p.id === 'stu' ? words.students : p.label,
       tabs: (p.tabs ?? []).map((t) => ({ key: t.key, label: t.key === 'classes' ? words.classes : t.label, href: `${p.path === '/' ? '' : p.path}/${t.key}` })),
+      settings: p.settings ?? [],
     })),
   }));
 

@@ -9,7 +9,7 @@ import { Card, Page, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
 import { url } from '../../app/base';
 import { usePageTabs } from '../../app/tabs';
-import { count } from '../../app/format';
+import { count, rupees } from '../../app/format';
 
 type Say = (text: string, tone?: 'ok' | 'bad') => void;
 type Mod = CatalogDoc['modules'][number];
@@ -266,7 +266,7 @@ function Plans({ say }: { say: Say }) {
           <div key={p.key} style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '12px 0', borderTop: '1px solid var(--line)', flexWrap: 'wrap' }}>
             <span style={{ flex: '1 1 260px', minWidth: 0 }}>
               <b style={{ font: '700 15px var(--fb)' }}>{p.name}</b> <span className="chip">{p.schools ?? 0} {p.schools === 1 ? 'school' : 'schools'}</span>
-              <small style={{ display: 'block', color: 'var(--ink3)' }}>₹{count(p.perStudentYear)} a student a year · {p.modules.length} modules · up to {count(p.limits.students)} students · {count(p.limits.storageGb)} GB · {count(p.limits.smsPerMonth)} texts a month</small>
+              <small style={{ display: 'block', color: 'var(--ink3)' }}>{rupees(p.perStudentYear)} a student a year · {p.modules.length} modules · up to {count(p.limits.students)} students · {count(p.limits.storageGb)} GB · {count(p.limits.smsPerMonth)} texts a month</small>
             </span>
             {can && <span className="tgrow"><button className="btn sm" onClick={() => setEditing(p)}>Change</button><button className="btn sm dng" disabled={!!p.schools || remove.isPending} data-tip={p.schools ? 'Move its schools to another plan first' : undefined} onClick={() => remove.mutate(p.key)}>Remove</button></span>}
           </div>

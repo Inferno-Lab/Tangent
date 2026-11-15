@@ -1,4 +1,4 @@
-import { addDays, istToday, latestSchoolDay } from '@tangent/contracts';
+import { addDays, schoolToday, latestSchoolDay } from '@tangent/contracts';
 import type { Pool, PoolClient } from 'pg';
 import { newId } from '../ids.js';
 import { bulkInsert } from './bulk.js';
@@ -17,7 +17,7 @@ const count = async (db: Db, table: string): Promise<number> => Number((await db
  */
 export async function seedModulesDemo(db: Db, todayIn?: string): Promise<string[]> {
   const did: string[] = [];
-  const last = latestSchoolDay(todayIn ?? istToday(), [0]);
+  const last = latestSchoolDay(todayIn ?? schoolToday(), [0]);
   const r = rng(20261018);
   const admin = (await db.query<{ id: string }>("select u.id from users u join user_roles ur on ur.user_id = u.id where ur.role_id = 'role_principal' order by u.created_at limit 1")).rows[0]?.id ?? null;
   const classes = new Set((await db.query<{ id: string }>('select id from classes')).rows.map((c) => c.id));

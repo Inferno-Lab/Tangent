@@ -4,7 +4,7 @@ import { Dialog, EmptyCard, PageScope, tintFor, EmptyNote } from '@tangent/web-u
 import { useApp } from '../../app/context';
 import { url } from '../../app/base';
 import { useShellChrome } from '../../app/Layout';
-import { curve, initials, statusOf } from '../../app/format';
+import { curve, initials, statusOf, count } from '../../app/format';
 import { FleetHue } from './FleetHue';
 
 const TICKS = 60;
@@ -121,9 +121,9 @@ export function FleetPage() {
     p1: curve(today, max), p2: curve(before, max), pArea: curve(today, max, true),
     // The bubble stays inside the chart near the ends of the day; the dot and the line still sit on the hour.
     tx: Math.min(86, Math.max(14, (at / 23) * 100)).toFixed(2),
-    cx: ((at / 23) * 100).toFixed(2), cy: cy.toFixed(1), ty: Math.max(84, cy).toFixed(1), cv: today[at]!.toLocaleString('en-IN'),
-    ct: `${String(at).padStart(2, '0')}:00 · ${delta >= 0 ? '+' : ''}${delta.toLocaleString('en-IN')} vs yesterday`,
-    chartLabel: `Requests per minute across the day, highest around ${String(peak.hour).padStart(2, '0')}:00 at ${peak.value.toLocaleString('en-IN')}`,
+    cx: ((at / 23) * 100).toFixed(2), cy: cy.toFixed(1), ty: Math.max(84, cy).toFixed(1), cv: count(today[at]!),
+    ct: `${String(at).padStart(2, '0')}:00 · ${delta >= 0 ? '+' : ''}${count(delta)} vs yesterday`,
+    chartLabel: `Requests per minute across the day, highest around ${String(peak.hour).padStart(2, '0')}:00 at ${count(peak.value)}`,
     cmove: (e: React.MouseEvent<HTMLElement>) => place(e.clientX, e.currentTarget), ctouch: (e: React.TouchEvent<HTMLElement>) => place(e.touches[0]!.clientX, e.currentTarget),
     cells: cellRows, rows, loading: schools.isLoading,
     inc: incident ? {

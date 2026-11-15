@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { istToday, type ClassInfo } from '@tangent/contracts';
+import { currencySymbol, schoolToday, type ClassInfo } from '@tangent/contracts';
 import { DateField, Dialog, ErrorLine, Field, FilePick, SelectField, useShake } from '@tangent/web-ui';
 import { DialogActions as Actions, fieldsOf, messageOf, useFeeHeads } from '../../app/kit';
 import { useApp } from '../../app/context';
@@ -43,7 +43,7 @@ export function AddStudentDialog({ classes, defaultClass, onClose, onDone }: { c
           <Field label="Roll no. (optional)" value={f.rollNo} onChange={set('rollNo')} maxLength={10} />
         </div>
         <div className="two">
-          <DateField label="Date of birth" value={f.dob} onChange={set('dob')} error={err.dob} max={istToday()} />
+          <DateField label="Date of birth" value={f.dob} onChange={set('dob')} error={err.dob} max={schoolToday()} />
         </div>
         <RecordFields f={f} set={set} err={err} adding />
         <Field label="Guardian" value={f.guardianName} onChange={set('guardianName')} error={err.guardianName} />
@@ -177,7 +177,7 @@ export function AssignFeeDialog({ ids, label, onClose, onDone }: { ids: string[]
         <SelectField label="Kind of fee" value={head} onChange={set('head')} options={heads} />
         <Field label="Name of the fee" value={f.title} onChange={set('title')} error={err.title} placeholder="Annual day costume" />
         <div className="two">
-          <Field label="Amount (₹)" value={f.amount} onChange={set('amount')} error={err.amount} inputMode="numeric" />
+          <Field label={`Amount (${currencySymbol()})`} value={f.amount} onChange={set('amount')} error={err.amount} inputMode="numeric" />
           <DateField label="Due on" value={f.dueOn} onChange={set('dueOn')} error={err.dueOn} />
         </div>
         <Actions onClose={onClose} busy={busy} label="Assign fee" />

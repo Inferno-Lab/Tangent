@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { PromotionPreview, YearRow } from '@tangent/contracts';
-import { istToday } from '@tangent/contracts';
+import { fmtMoney, schoolToday } from '@tangent/contracts';
 import { DateField, Dialog, EmptyCard, Field, Select, useShake, EmptyNote } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
@@ -10,7 +10,7 @@ import { usePageTabs } from '../../app/tabs';
 import { useSetupSections } from './SetupSections';
 
 const STATUS: Record<YearRow['status'], { text: string; tone: string }> = { current: { text: 'Current', tone: 'g' }, draft: { text: 'Draft', tone: 'a' }, archived: { text: 'Archived', tone: '' } };
-const rupees = (n: number) => `₹${n.toLocaleString('en-IN')}`;
+const rupees = (n: number) => fmtMoney(n);
 type Kid = { id: string; name: string; className: string };
 
 /** Which of the school's setup records each tab of Academic year lists (config-engine: the school module's year page). */
@@ -107,7 +107,7 @@ function NewYear({ years, onClose, onDone }: { years: YearRow[]; onClose: () => 
   const app = useApp();
   const shake = useShake();
   const cur = years.find((y) => y.status === 'current');
-  const nextStart = cur ? `${Number(cur.endsOn.slice(0, 4))}-${cur.startsOn.slice(5)}` : istToday();
+  const nextStart = cur ? `${Number(cur.endsOn.slice(0, 4))}-${cur.startsOn.slice(5)}` : schoolToday();
   const [f, setF] = useState({ label: cur ? `${Number(cur.label.slice(0, 4)) + 1}-${String(Number(cur.label.slice(0, 4)) + 2).slice(2)}` : '', startsOn: nextStart > (cur?.endsOn ?? '') ? nextStart : '', endsOn: '' });
   const [err, setErr] = useState<Record<string, string>>({});
   const set = (k: keyof typeof f) => (x: string) => { setF((o) => ({ ...o, [k]: x })); setErr((e) => ({ ...e, [k]: '', _: '' })); };

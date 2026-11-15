@@ -1,6 +1,6 @@
 import { Icon } from './Icon';
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { addDays, istToday } from '@tangent/contracts';
+import { addDays, schoolToday } from '@tangent/contracts';
 import { ErrorLine } from './forms';
 import { Pop } from './Menu';
 import { Select } from './Select';
@@ -16,7 +16,7 @@ const dow = (iso: string) => new Date(`${iso}T00:00:00Z`).getUTCDay();
 export const formatDay = (iso: string) => (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${Number(iso.slice(8))} ${MONTHS[Number(iso.slice(5, 7)) - 1]} ${iso.slice(0, 4)}` : '');
 
 /** A date as people type it: 2026-11-12, 12/11/2026, 12-11-26, 12.11.2026, 12 Nov 2026 or 12 Nov (this year). */
-export function parseDay(text: string, year = Number(istToday().slice(0, 4))): string | null {
+export function parseDay(text: string, year = Number(schoolToday().slice(0, 4))): string | null {
   const t = text.trim().toLowerCase();
   let y: number, m: number, d: number;
   let x = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(t);
@@ -40,7 +40,7 @@ function addMonths(iso: string, n: number): string {
 
 /** A month to pick a day from. Monday first; arrows move by day and week, Page Up and Down by month, Enter picks. */
 export function Calendar({ value, min, max, onPick }: { value: string; min?: string; max?: string; onPick: (iso: string) => void }) {
-  const today = istToday();
+  const today = schoolToday();
   const clamp = (iso: string) => (min && iso < min ? min : max && iso > max ? max : iso);
   const [at, setAt] = useState(() => clamp(value || today));
   const grid = useRef<HTMLDivElement>(null);
@@ -183,7 +183,7 @@ export function TimeField({ label, value, onChange, error, hint, disabled }: Fie
 // ── months ──────────────────────────────────────────────────────────────────
 /** A month (YYYY-MM) from the last two years and the next one. */
 export function MonthField({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
-  const now = istToday();
+  const now = schoolToday();
   const options = Array.from({ length: 36 }, (_, i) => addMonths(now, 12 - i).slice(0, 7)).map((m) => ({ value: m, label: `${LONG[Number(m.slice(5)) - 1]} ${m.slice(0, 4)}` }));
   return <Select value={value} onChange={onChange} options={options} aria-label={label} compact />;
 }

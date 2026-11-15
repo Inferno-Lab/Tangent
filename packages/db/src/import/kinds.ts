@@ -1,6 +1,6 @@
 import type pg from 'pg';
 import { createHash } from 'node:crypto';
-import { ADMISSION_STAGES, PAY_METHODS, PERIOD_KINDS, WEEKDAYS } from '@tangent/contracts';
+import { ADMISSION_STAGES, PAY_METHODS, PERIOD_KINDS, WEEKDAYS, fmtMoney, schoolInstant, schoolToday, schoolZone } from '@tangent/contracts';
 import { newId } from '../ids.js';
 
 type Q = pg.Pool | pg.PoolClient;
@@ -37,10 +37,18 @@ export function isoDay(v: string): string | null {
   const t = new Date(Date.UTC(y, m - 1, d));
   return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d ? t.toISOString().slice(0, 10) : null;
 }
-/** Whole rupees or counts: "18,500", "₹18500", "18500.00". */
+/**
+ * A whole amount or count as any school writes it: "18,500", "₹18500", "$1,250", "AED 1.250", "1 250", "18500.00". A
+ * separator followed by exactly three digits groups thousands; otherwise it is the decimal point.
+ */
 export function whole(v: string): number | null {
-  const n = Number(v.replace(/[₹,\s]/g, '').replace(/^rs\.?/i, ''));
-  return v.trim() !== '' && Number.isInteger(n) ? n : null;
+  const raw = v.replace(/[^\d.,\-]/g, '');
+  if (!/\d/.test(raw)) return null;
+  const last = Math.max(raw.lastIndexOf('.'), raw.lastIndexOf(','));
+  const decimals = last >= 0 && raw.length - last - 1 !== 3 ? raw.slice(last + 1) : '';
+  const int = (decimals || last >= 0 && raw.length - last - 1 !== 3 ? raw.slice(0, last) : raw).replace(/[.,]/g, '');
+  const n = Number(`${int}${decimals ? `.${decimals}` : ''}`);
+  return Number.isInteger(n) ? n : null;
 }
 const yes = (v: string) => /^(y|yes|true|1|current|active)$/i.test(v.trim());
 const hhmm = (v: string) => { const x = /^([01]?\d|2[0-3])[:.]([0-5]\d)$/.exec(v.trim()); return x ? `${x[1]!.padStart(2, '0')}:${x[2]}` : null; };
@@ -63,9 +71,10 @@ function gradeSection(v: string): { grade: number; section: string; label: strin
   const section = (x[2] || 'a').toUpperCase();
   return { grade, section, label: `${x[1]! in EARLY ? x[1]!.toUpperCase().replace('NURSERY', 'Nursery') : grade} ${section}` };
 }
-const rupees = (n: number) => `₹${n.toLocaleString('en-IN')}`;
-const ist = (day: string, time = '00:00') => `${day}T${time}:00+05:30`;
-const today = () => new Date(Date.now() + 5.5 * 3600_000).toISOString().slice(0, 10);
+// Imports run for one school: its currency, its clock (locale.ts reads the school the request is for).
+const rupees = (n: number) => fmtMoney(n);
+const ist = (day: string, time = '00:00') => schoolInstant(day, time).toISOString();
+const today = () => schoolToday();
 const ok = (key: string, errors: string[], exists: boolean) => ({ key, errors, exists });
 const kind = <L>(impl: Impl<L>) => impl;
 
@@ -135,7 +144,7 @@ const terms = kind<TermLookups>({
 
 const holidays = kind<Map<string, string>>({
   async load(db) {
-    const { rows } = await db.query<{ id: string; title: string; day: string }>("select id, title, (starts_at at time zone 'Asia/Kolkata')::date::text as day from events where kind = 'holiday'");
+    const { rows } = await db.query<{ id: string; title: string; day: string }>("select id, title, (starts_at at time zone $1)::date::text as day from events where kind = 'holiday'", [schoolZone()]);
     return new Map(rows.map((r) => [`${lc(r.title)}|${r.day}`, r.id]));
   },
   check(r, l) {
@@ -149,7 +158,7 @@ const holidays = kind<Map<string, string>>({
   }) }],
   totals: (rows) => [{ label: 'Holidays', value: String(rows.length) }],
   async export(db) {
-    return (await db.query<Row>("select id, title as name, (starts_at at time zone 'Asia/Kolkata')::date::text as starts_on, (ends_at at time zone 'Asia/Kolkata')::date::text as ends_on from events where kind = 'holiday' order by starts_at")).rows;
+    return (await db.query<Row>("select id, title as name, (starts_at at time zone $1)::date::text as starts_on, (ends_at at time zone $1)::date::text as ends_on from events where kind = 'holiday' order by starts_at", [schoolZone()])).rows;
   },
 });
 

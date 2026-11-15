@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { EVENT_KINDS, istToday, type Category, type EventKind, type EventRow, type ExamRow } from '@tangent/contracts';
+import { schoolInstant, fmtDate, EVENT_KINDS, schoolToday, type Category, type EventKind, type EventRow, type ExamRow } from '@tangent/contracts';
 import { Checkbox, DateField, Dialog, Field, NumberField, SelectField, TimeField, useShake, EmptyState, EmptyNote } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { AddBtn, AreaField, Ico, problem, useSetting } from '../../app/kit';
 import { useShellChrome } from '../../app/Layout';
+import { usePageTabs } from '../../app/tabs';
 
 const KIND: Record<EventKind, { label: string; tone: string }> = { event: { label: 'Event', tone: 'v' }, holiday: { label: 'Holiday', tone: 'g' }, exam: { label: 'Exams', tone: 'a' }, ptm: { label: 'Parent meeting', tone: 'k' }, routine: { label: 'Routine', tone: '' } };
 const AUDIENCE: Record<string, string> = { everyone: 'Everyone', parents: 'Parents', staff: 'Staff only', class: 'One class' };
@@ -16,19 +17,20 @@ const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
 const dayOf = (iso: string) => ymd(new Date(iso));
 const when = (e: EventRow) => {
   const s = new Date(e.startsAt);
-  const day = s.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
-  const t = (d: Date) => d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
-  if (e.kind === 'holiday' || e.kind === 'exam') return e.endsAt ? `${day} to ${new Date(e.endsAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : day;
+  const day = fmtDate(s, 'weekday');
+  const t = (d: Date) => fmtDate(d, 'time');
+  if (e.kind === 'holiday' || e.kind === 'exam') return e.endsAt ? `${day} to ${fmtDate(e.endsAt, 'day')}` : day;
   return `${day} · ${t(s)}${e.endsAt ? ` to ${t(new Date(e.endsAt))}` : ''}`;
 };
 /** Exams shown on the calendar as the weeks they run (opened in Exams, not edited here). */
 const examEvents = (exams: ExamRow[]): EventRow[] => exams.map((x) => ({
-  id: `exam:${x.id}`, title: `${x.name} · Class ${x.className}`, startsAt: `${x.startsOn}T00:00:00+05:30`, endsAt: `${x.endsOn}T00:00:00+05:30`, kind: 'exam', venue: '', note: '', audience: 'everyone',
+  id: `exam:${x.id}`, title: `${x.name} · Class ${x.className}`, startsAt: schoolInstant(x.startsOn).toISOString(), endsAt: schoolInstant(x.endsOn).toISOString(), kind: 'exam', venue: '', note: '', audience: 'everyone',
   category: '', needsRsvp: false, lat: null, lng: null, going: 0, maybe: 0, cant: 0, adults: 0, classId: x.classId, className: x.className,
 }));
 const refresh = (qc: ReturnType<typeof useQueryClient>) => void qc.invalidateQueries({ predicate: (q) => ['events', 'dashboard'].includes(String(q.queryKey[0])) });
 
 export function EventsPage() {
+  const { tabs } = usePageTabs('/events');
   const app = useApp();
   const qc = useQueryClient();
   const { toast, say } = useToast();
@@ -43,7 +45,7 @@ export function EventsPage() {
   const exams = useQuery({ queryKey: ['exams', ''], queryFn: () => app.api.exams.list(), enabled: seeExams });
   const sunday = useSetting<string>('calendar.weekStarts', 'mon') === 'sun';
   const all = useMemo(() => [...(list.data ?? []).filter((e) => e.kind !== 'exam'), ...examEvents(exams.data ?? [])].sort((a, b) => a.startsAt.localeCompare(b.startsAt)), [list.data, exams.data]);
-  const today = istToday();
+  const today = schoolToday();
   const byDay = useMemo(() => {
     const m = new Map<string, EventRow[]>();
     for (const e of all) {
@@ -60,7 +62,7 @@ export function EventsPage() {
   const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
   const cells = [...Array.from({ length: first }, () => null), ...Array.from({ length: days }, (_, i) => ymd(new Date(month.getFullYear(), month.getMonth(), i + 1)))];
   return (
-    <Page title="Events" sub="The school calendar, and who is coming" toast={toast} loading={list.isLoading && !list.data}
+    <Page title="Events" sub="The school calendar, and who is coming" tabs={tabs} toast={toast} loading={list.isLoading && !list.data}
       error={list.isError && !list.data ? { message: (list.error as Error).message, retry: () => void list.refetch() } : null}
       actions={canWrite ? <AddBtn onClick={() => setEditing('new')}>Add event</AddBtn> : undefined}
       overlays={editing && <EventDialog event={editing === 'new' ? null : editing} defaultDay={day} onClose={() => setEditing(null)} onDone={(m) => { setEditing(null); refresh(qc); say(m); }} />}>
@@ -70,7 +72,7 @@ export function EventsPage() {
         <section className="evg" data-even="">
           <div className="evcol">
           <div className="card rise evc">
-            <div className="ch"><h2>{month.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</h2>
+            <div className="ch"><h2>{fmtDate(month, 'month')}</h2>
               <button className="btn sm" aria-label="Previous month" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}><Ico d={PREV} /></button>
               <button className="btn sm" aria-label="Next month" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}><Ico d={NEXT} /></button>
             </div>
@@ -87,7 +89,7 @@ export function EventsPage() {
           </div>
           </div>
           <div className="card rise evl" style={{ '--d': '.06s' } as React.CSSProperties}>
-            <div className="ch"><h2>{day ? new Date(`${day}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' }) : 'Coming up'}</h2>{day && <button className="btn sm" onClick={() => setDay(null)}>Show all</button>}</div>
+            <div className="ch"><h2>{day ? fmtDate(day, 'weekdayLong') : 'Coming up'}</h2>{day && <button className="btn sm" onClick={() => setDay(null)}>Show all</button>}</div>
             <div className="lscroll" data-even-scroll="" style={{ maxHeight: 'min(62dvh,620px)', marginTop: 8 }}>
               {shown.length === 0 && <EmptyNote icon="calendar" title={day ? 'Nothing on this day' : 'Nothing coming up'} body={day ? 'Pick another day, or add an event for this one.' : 'Add an event and it shows here and in the families’ app.'} />}
               {shown.map((e) => <EventItem key={e.id} e={e} canWrite={canWrite} onOpen={() => (e.id.startsWith('exam:') ? app.go(`/exams?open=${e.id.slice(5)}`) : setEditing(e))} />)}
@@ -125,7 +127,7 @@ const local = (iso: string) => { const d = new Date(new Date(iso).getTime() + 33
 function EventDialog({ event, defaultDay, onClose, onDone }: { event: EventRow | null; defaultDay: string | null; onClose: () => void; onDone: (msg: string) => void }) {
   const app = useApp();
   const canWrite = app.user.permissions.includes('events.write');
-  const s = event ? local(event.startsAt) : { date: defaultDay ?? istToday(), time: '10:00' };
+  const s = event ? local(event.startsAt) : { date: defaultDay ?? schoolToday(), time: '10:00' };
   const en = event?.endsAt ? local(event.endsAt) : { date: s.date, time: '12:00' };
   const cats = useSetting<Category[]>('events.categories', []);
   const classes = useQuery({ queryKey: ['classes'], queryFn: app.api.classes, staleTime: 5 * 60_000, enabled: canWrite });
@@ -143,7 +145,7 @@ function EventDialog({ event, defaultDay, onClose, onDone }: { event: EventRow |
   const body = () => ({
     title: f.title.trim(), kind: f.kind, venue: f.venue.trim(), note: f.note.trim(), audience: f.audience as 'everyone', classId: f.audience === 'class' ? f.classId : null, category: f.category, needsRsvp: !holiday && needsRsvp,
     lat: f.lat ? Number(f.lat) : null, lng: f.lng ? Number(f.lng) : null,
-    startsAt: new Date(`${f.date}T${holiday ? '00:00' : f.time}:00+05:30`).toISOString(), endsAt: new Date(`${f.endDate}T${holiday ? '00:00' : f.endTime}:00+05:30`).toISOString(),
+    startsAt: schoolInstant(f.date, holiday ? '00:00' : f.time).toISOString(), endsAt: schoolInstant(f.endDate, holiday ? '00:00' : f.endTime).toISOString(),
   });
   const save = useMutation({
     mutationFn: () => (event ? app.api.events.save(event.id, body()) : app.api.events.create(body())),

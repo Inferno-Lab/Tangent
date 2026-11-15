@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
-import { breachNotice, istToday, type ComplianceRow } from '@tangent/contracts';
+import { breachNotice, schoolToday, type ComplianceRow } from '@tangent/contracts';
 import { AreaField, DateField, Dialog, Field, FilePick, SelectField, useShake, EmptyState, Icon } from '@tangent/web-ui';
 import { Card, Page, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
@@ -110,7 +110,7 @@ function Row({ r, canWrite, busy, onTell, onClose, onSign, onFile }: { r: Compli
 function Sign({ r, onClose, onDone }: { r: ComplianceRow; onClose: () => void; onDone: () => void }) {
   const app = useApp();
   const shake = useShake();
-  const [f, setF] = useState({ on: istToday(), by: '' });
+  const [f, setF] = useState({ on: schoolToday(), by: '' });
   const [file, setFile] = useState<{ name: string; data: string } | null>(null);
   const [err, setErr] = useState('');
   const go = useMutation({
@@ -122,7 +122,7 @@ function Sign({ r, onClose, onDone }: { r: ComplianceRow; onClose: () => void; o
     <Dialog title={`${r.schoolName} signed`} tag={{ text: r.title, tone: 'v' }} onClose={onClose} width={480} shake={shake.cls}>
       <div className="stack">
         <div className="two">
-          <DateField label="Signed on" value={f.on} max={istToday()} onChange={(v) => setF({ ...f, on: v })} />
+          <DateField label="Signed on" value={f.on} max={schoolToday()} onChange={(v) => setF({ ...f, on: v })} />
           <Field label="Signed by (for the school)" value={f.by} onChange={(v) => { setF({ ...f, by: v }); setErr(''); }} maxLength={80} placeholder="Name and title" />
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>

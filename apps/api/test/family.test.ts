@@ -1,4 +1,4 @@
-import { addDays, istToday } from '@tangent/contracts';
+import { addDays, schoolToday } from '@tangent/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startHarness, type Harness } from './harness.js';
 
@@ -87,8 +87,10 @@ describe('learning', () => {
     expect((await post(parent, '/homework', { classId: 'cls_8a', subject: 'maths', title: 'Not a teacher', dueOn: '2099-01-01' })).status).toBe(403);
   });
   it('lets a teacher mark attendance, and the family sees it and is told', async () => {
+    // Any day of the week must work (AGENTS rule 12): the school is open every day while this runs.
+    await h.setSettings({ 'calendar.weeklyOff': [] });
     const marked = await post(teacher, '/attendance', { stu_aarav: 'absent' });
-    expect(marked.status).toBe(200);
+    expect(marked.status, JSON.stringify(marked.json)).toBe(200);
     const today = (await f(teacher, '/attendance/today?students=stu_aarav,stu_diya')).json;
     expect(today.stu_aarav).toBe('absent');
     const days = (await f(parent, '/students/stu_aarav/attendance')).json;
@@ -98,6 +100,7 @@ describe('learning', () => {
     expect(notes[0]).toMatchObject({ type: 'attendance.absent', module: 'attendance.parentAlerts', route: '/attendance', read: false });
     expect((await post(parent, `/notifications/${notes[0].id}/dismiss`)).status).toBe(200);
     expect((await f(parent, '/users/x/notifications')).json.find((n: any) => n.id === notes[0].id)).toBeUndefined();
+    await h.setSettings({ 'calendar.weeklyOff': ['sun'] });
   });
   it('lets a teacher enter marks for the open exam', async () => {
     const mid = (await f(teacher, '/classes/cls_8a/exams')).json.find((e: any) => e.name === 'Mid-term exams');
@@ -220,7 +223,7 @@ describe('the teacher’s class', () => {
     expect(other).not.toHaveProperty('attendancePct');
   });
   it('fills approved leave into the roll call and keeps a past day within the correction window', async () => {
-    const day = addDays(istToday(), -1);
+    const day = addDays(schoolToday(), -1);
     const applied = await post(parent, '/leave', { studentId: 'stu_aarav', from: day, to: day, reason: 'Family function' });
     expect((await post(teacher, `/leave/${applied.json.id}/review`, { status: 'approved' })).status).toBe(200);
     const roll = (await f(teacher, `/attendance/roll?classId=cls_8a&date=${day}`)).json;
@@ -228,18 +231,18 @@ describe('the teacher’s class', () => {
     expect(row.onLeave).toBe(true);
     if (!roll.submitted) expect(row.status).toBe('leave');
     expect((await f(parent, `/attendance/roll?classId=cls_8a&date=${day}`)).status).toBe(403);
-    expect((await post(teacher, `/attendance?date=${addDays(istToday(), -20)}`, { stu_aarav: 'present' })).status).toBe(423);
-    expect((await post(teacher, `/attendance?date=${addDays(istToday(), 2)}`, { stu_aarav: 'present' })).status).toBe(400);
+    expect((await post(teacher, `/attendance?date=${addDays(schoolToday(), -20)}`, { stu_aarav: 'present' })).status).toBe(423);
+    expect((await post(teacher, `/attendance?date=${addDays(schoolToday(), 2)}`, { stu_aarav: 'present' })).status).toBe(400);
   });
 });
 
 describe('attendance every period', () => {
   it('lets the period’s teacher mark it, and no one else but someone who approves', async () => {
     // The most recent day the class has lessons: a test run on a Sunday (or a day off) would otherwise find none.
-    let day = istToday();
+    let day = schoolToday();
     let roll = await f(teacher, `/attendance/periods?classId=cls_8a&date=${day}`);
     for (let back = 1; back < 7 && roll.status === 200 && !roll.json.periods.length; back++) {
-      day = addDays(istToday(), -back);
+      day = addDays(schoolToday(), -back);
       roll = await f(teacher, `/attendance/periods?classId=cls_8a&date=${day}`);
     }
     expect(roll.status).toBe(200);
@@ -427,9 +430,8 @@ describe('messages and background work through the Hub', () => {
     const hub = h.app.get(HubService);
     await h.setSettings({ 'fees.lateFeePct': 5 });
     await h.registry.query('delete from job_queue');
-    const today = new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
-    expect(await hub.queueDaily(today)).toBeGreaterThan(0);
-    expect(await hub.queueDaily(today)).toBe(0);
+    expect(await hub.queueDaily()).toBeGreaterThan(0);
+    expect(await hub.queueDaily()).toBe(0);
     await h.registry.query('update job_queue set run_at = now()');
     for (let i = 0; i < 4; i++) await hub.tick();
     const jobs = (await h.registry.query("select kind, status, result, last_error from job_queue where kind = 'fees.lateFines'")).rows;

@@ -1,8 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  addDays, dayName, istToday, latestSchoolDay, schoolDaysEnding,
-  type AttendanceDay, type AttendanceDayPut, type AttendanceStatus, type AttendanceWeekPoint, type PeriodMarksPut, type PeriodRoll,
-} from '@tangent/contracts';
+import { schoolZone, addDays, dayName, schoolToday, latestSchoolDay, schoolDaysEnding, type AttendanceDay, type AttendanceDayPut, type AttendanceStatus, type AttendanceWeekPoint, type PeriodMarksPut, type PeriodRoll } from '@tangent/contracts';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
@@ -47,7 +44,7 @@ export class AttendanceService {
 
   /** A day can be marked when it has happened, is inside the correction window (or the person approves requests), and the school was open. */
   private async markable(t: TenantCtx, userId: string, date: string): Promise<void> {
-    const today = istToday();
+    const today = schoolToday();
     if (date > today) throw new ApiError('validation', 'You cannot mark a day that has not happened yet.', { fields: { date: 'That day is in the future.' } });
     const lockDays = await this.settings.value<number>(t, 'attendance.lockAfterDays', 2);
     // After the window only someone who may approve changes it (console: Attendance → can be corrected for this many days).
@@ -58,7 +55,7 @@ export class AttendanceService {
     const off = await this.settings.offDays(t);
     if (off.includes(new Date(`${date}T00:00:00Z`).getUTCDay())) throw new ApiError('validation', 'The school is closed every week on that day, so there is no roll call.');
     const holiday = await t.pool.query<{ name: string }>(
-      "select title as name from events where kind = 'holiday' and (starts_at at time zone 'Asia/Kolkata')::date <= $1 and (coalesce(ends_at, starts_at) at time zone 'Asia/Kolkata')::date >= $1 limit 1", [date]);
+      "select title as name from events where kind = 'holiday' and (starts_at at time zone $2)::date <= $1 and (coalesce(ends_at, starts_at) at time zone $2)::date >= $1 limit 1", [date, schoolZone()]);
     if (holiday.rows[0]) throw new ApiError('validation', `The school is closed that day (${holiday.rows[0].name}), so there is no roll call.`);
   }
 
@@ -146,7 +143,7 @@ export class AttendanceService {
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'attendance.period', entity: 'class', entityId: body.classId, detail: { date: body.date, period: p.label, marks: body.marks.length } });
     const missing = body.marks.filter((m) => m.status === 'absent' && p.marks[m.studentId] !== 'absent'
       && ['present', 'late', 'half_day'].includes(roll.students.find((s) => s.studentId === m.studentId)?.day ?? ''));
-    if (missing.length && body.date === istToday() && (await this.settings.value<boolean>(t, 'attendance.notifyParents', true))) {
+    if (missing.length && body.date === schoolToday() && (await this.settings.value<boolean>(t, 'attendance.notifyParents', true))) {
       const g = await t.pool.query<{ phone: string | null; name: string }>(
         'select g.phone, s.name from students s join student_guardians sg on sg.student_id = s.id and sg.is_primary join guardians g on g.id = sg.guardian_id where s.id = any($1)', [missing.map((m) => m.studentId)]);
       await this.messenger.notify(t, 'attendance.absent', g.rows.filter((r) => r.phone).map((r) => ({ to: r.phone!, vars: { student: r.name, status: `absent from ${p.subject} (${p.label})` } })));
@@ -157,7 +154,7 @@ export class AttendanceService {
   /** Percentage present for each of the last six school days, with the same weekday a week earlier for comparison. */
   async week(t: TenantCtx, count = 6): Promise<AttendanceWeekPoint[]> {
     const OFF_DAYS = await this.settings.offDays(t);
-    const today = istToday();
+    const today = schoolToday();
     const last = latestSchoolDay(today, OFF_DAYS);
     const days = schoolDaysEnding(last, count, OFF_DAYS);
     const before = days.map((d) => addDays(d, -7));
@@ -174,7 +171,7 @@ export class AttendanceService {
 
   async unmarked(t: TenantCtx): Promise<{ id: string; name: string; teacherId: string | null }[]> {
     const OFF_DAYS = await this.settings.offDays(t);
-    const last = latestSchoolDay(istToday(), OFF_DAYS);
+    const last = latestSchoolDay(schoolToday(), OFF_DAYS);
     const { rows } = await t.pool.query<{ id: string; name: string; teacher: string | null }>(
       `select c.id, c.name, c.class_teacher_id teacher from classes c where not exists (select 1 from attendance_sessions a where a.class_id = c.id and a.date = $1)
        and exists (select 1 from students s where s.class_id = c.id) order by c.grade, c.section`, [last]);

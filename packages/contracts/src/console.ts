@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { COUNTRIES, isCurrency, isLocale, isZone } from './locale.js';
 import { RESERVED_SLUGS, SLUG_RE } from './common.js';
 import type { Limits, ModuleDates } from './config.js';
 
@@ -141,6 +142,11 @@ export const WizardBasics = z.object({
   contactEmail: z.string().trim().email('Enter a valid email'),
   gstin: z.string().trim().max(20).default(''),
   language: z.enum(['en', 'hi', 'mr']).default('en'),
+  // Where the school is (locale.ts): its rules, its clock, its way of writing numbers and its currency.
+  country: z.string().refine((c) => COUNTRIES.includes(c), 'Choose the school’s country'),
+  timezone: z.string().refine(isZone, 'Choose a time zone'),
+  locale: z.string().refine(isLocale, 'Choose how dates and numbers are written'),
+  currency: z.string().trim().toUpperCase().refine(isCurrency, 'Write a currency code like USD'),
 });
 
 export const WizardPlan = z.object({

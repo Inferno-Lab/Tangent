@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Header, HttpCode, Param, Patch, Post, Pu
 import type { FastifyReply } from 'fastify';
 import {
   DataRequestCreate, DataRequestDecision, EnquiryCreate, EnquiryEnrol, EnquiryPatch, EventSave, ExamCreate, ExamMarksPut, HomeworkCreate, HomeworkMarks, InvoiceListQuery, StaffCreate, StaffPatch,
-  ThreadCreate, ThreadPatch, ThreadReply, ReportQuery, StudentImport, istToday,
+  ThreadCreate, ThreadPatch, ThreadReply, ReportQuery, StudentImport, schoolToday,
   type DataRequestRow, type EnquiryRow, type EventReply, type EventRow, type ExamMarksView, type ImportResult, type ExamResults, type ExamRow, type HomeworkDetail, type HomeworkRow, type InvoiceListRow, type InvoiceListSummary, type Paged,
   type ReceiptRow, type ReportData, type ReportInfo, type RoleRow, type StaffRow, type StudentDetail, type ThreadDetail, type ThreadRow,
 } from '@tangent/contracts';
@@ -216,7 +216,7 @@ export class OfficeController {
   async reportCsv(@Tenant() t: TenantCtx, @Param('id') id: string, @Query(new ZodPipe(ReportQuery)) q: ReportQuery, @Res({ passthrough: true }) reply: FastifyReply): Promise<string> {
     const r = await this.office.report(t, id, q);
     // Named after the report, what it covers and the day: "Low attendance - Class 8 A - 2026-11-11.csv".
-    const name = `${r.title} - ${r.scope} - ${istToday()}.csv`.replace(/[^\w ,.-]+/g, ' ');
+    const name = `${r.title} - ${r.scope} - ${schoolToday()}.csv`.replace(/[^\w ,.-]+/g, ' ');
     reply.header('content-disposition', `attachment; filename="${name}"`);
     return this.office.csv(r);
   }

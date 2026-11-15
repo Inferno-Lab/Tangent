@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { addDays, istToday, type HomeworkDetail, type HomeworkFile, type HomeworkRow } from '@tangent/contracts';
+import { addDays, schoolToday, type HomeworkDetail, type HomeworkFile, type HomeworkRow } from '@tangent/contracts';
 import { Checkbox, DateField, Dialog, Field, NumberField, Segmented, Select, SelectField, useShake, EmptyState, EmptyNote } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { AddBtn, AreaField, Attach, Avatar, dateLabel, problem, useOpenParam, useSetting } from '../../app/kit';
 import { uploadFile } from '@tangent/api-client';
+import { usePageTabs } from '../../app/tabs';
 
 const refresh = (qc: ReturnType<typeof useQueryClient>) => void qc.invalidateQueries({ predicate: (q) => ['homework', 'dashboard'].includes(String(q.queryKey[0])) });
 
 export function HomeworkPage() {
+  const { tabs } = usePageTabs('/homework');
   const app = useApp();
   const qc = useQueryClient();
   const { toast, say } = useToast();
@@ -25,7 +27,7 @@ export function HomeworkPage() {
   const list = useQuery({ queryKey: ['homework', classId, subjectId], queryFn: () => app.api.homework.list({ ...(classId ? { classId } : {}), ...(subjectId ? { subjectId } : {}) }) });
   const all = list.data ?? [];
   // A teacher's own homework comes first; "Mine" shows only theirs.
-  const rows = all.filter((r) => (state === 'all' || (state === 'open') === (r.dueOn >= istToday())) && (!mine || r.teacherId === app.user.id))
+  const rows = all.filter((r) => (state === 'all' || (state === 'open') === (r.dueOn >= schoolToday())) && (!mine || r.teacherId === app.user.id))
     .sort((a, b) => Number(b.teacherId === app.user.id) - Number(a.teacherId === app.user.id));
   const iSet = all.some((r) => r.teacherId === app.user.id);
   const canWrite = app.user.permissions.includes('homework.write');
@@ -33,9 +35,9 @@ export function HomeworkPage() {
   const total = rows.reduce((a, r) => a + r.total, 0);
   const onTime = rows.reduce((a, r) => a + r.onTime, 0);
   const pct = (n: number) => (total ? Math.round((n / total) * 100) : 0);
-  const today = istToday();
+  const today = schoolToday();
   return (
-    <Page title="Homework" sub={classId ? `Class ${classes.data?.find((c) => c.id === classId)?.name ?? ''}` : 'What has been set, and what has come back'} toast={toast} loading={list.isLoading && !list.data}
+    <Page title="Homework" sub={classId ? `Class ${classes.data?.find((c) => c.id === classId)?.name ?? ''}` : 'What has been set, and what has come back'} tabs={tabs} toast={toast} loading={list.isLoading && !list.data}
       error={list.isError && !list.data ? { message: (list.error as Error).message, retry: () => void list.refetch() } : null}
       filters={<Select compact aria-label="Class" value={classId} onChange={setClassId} options={[{ value: '', label: 'All classes' }, ...(classes.data ?? []).map((c) => ({ value: c.id, label: `Class ${c.name}` }))]} />}
       actions={canWrite && <AddBtn onClick={() => setSetting(true)}>Set homework</AddBtn>}
@@ -101,7 +103,7 @@ function SetHomework({ hw, defaultClass, onClose, onDone }: { hw?: HomeworkDetai
   const subjects = useQuery({ queryKey: ['subjects'], queryFn: app.api.subjects, staleTime: 10 * 60_000 });
   const dueDays = useSetting<number>('homework.defaultDueDays', 2);
   const outOf = useSetting<number>('homework.defaultMarks', 20);
-  const [f, setF] = useState({ classId: hw?.classId ?? defaultClass, subjectId: hw?.subjectId ?? '', title: hw?.title ?? '', description: hw?.description ?? '', dueOn: hw?.dueOn ?? addDays(istToday(), dueDays), maxMarks: String(hw?.maxMarks ?? outOf) });
+  const [f, setF] = useState({ classId: hw?.classId ?? defaultClass, subjectId: hw?.subjectId ?? '', title: hw?.title ?? '', description: hw?.description ?? '', dueOn: hw?.dueOn ?? addDays(schoolToday(), dueDays), maxMarks: String(hw?.maxMarks ?? outOf) });
   const [graded, setGraded] = useState(hw?.graded ?? true);
   const [err, setErr] = useState<Record<string, string>>({});
   const shake = useShake();
@@ -123,7 +125,7 @@ function SetHomework({ hw, defaultClass, onClose, onDone }: { hw?: HomeworkDetai
     if (!f.classId) p.classId = 'Choose a class.';
     if (!f.subjectId) p.subjectId = 'Choose a subject.';
     if (f.title.trim().length < 3) p.title = 'Give the homework a title.';
-    if (f.dueOn < istToday() && f.dueOn !== hw?.dueOn) p.dueOn = 'Pick today or a later day.';
+    if (f.dueOn < schoolToday() && f.dueOn !== hw?.dueOn) p.dueOn = 'Pick today or a later day.';
     setErr(p);
     if (Object.keys(p).length) shake.hit(); else make.mutate();
   };
@@ -137,7 +139,7 @@ function SetHomework({ hw, defaultClass, onClose, onDone }: { hw?: HomeworkDetai
         <Field label="Title" value={f.title} onChange={set('title')} error={err.title} maxLength={120} placeholder="Linear equations, questions 1 to 10" />
         <AreaField label="What to do (optional)" value={f.description} onChange={set('description')} error={err.description} maxLength={1000} rows={3} />
         <div className="two">
-          <DateField label="Due on" value={f.dueOn} min={istToday()} onChange={set('dueOn')} error={err.dueOn} />
+          <DateField label="Due on" value={f.dueOn} min={schoolToday()} onChange={set('dueOn')} error={err.dueOn} />
           {graded ? <NumberField label="Marks out of" min={1} max={100} value={f.maxMarks} onChange={set('maxMarks')} error={err.maxMarks} /> : <div className="help" style={{ alignSelf: 'center' }}>Checked when handed in, not marked.</div>}
         </div>
         <Checkbox checked={graded} onChange={setGraded} label="Marked out of a number" />

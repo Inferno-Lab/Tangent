@@ -1,4 +1,4 @@
-import { istToday, type ApprovalKind, type EntitlementDoc, type Permission } from '@tangent/contracts';
+import { SETTINGS_META, schoolToday, settingOwner, type ApprovalKind, type EntitlementDoc, type Permission } from '@tangent/contracts';
 
 /** The admin menu's groups, in order (docs/product-map.md §3). A group shows once a page in it does. */
 export const ADMIN_GROUPS = ['Home', 'People', 'Teach', 'Care', 'Money', 'Reach', 'Campus', 'School'] as const;
@@ -29,6 +29,8 @@ export interface AdminPage {
   tabs?: AdminTab[];
   /** Leaves the menu once the school is live (Moving in). */
   untilLive?: boolean;
+  /** The module's settings shown on this page's Settings tab; a module's first page takes the ones no other page names. */
+  settings?: string[];
 }
 
 /** Who uses the app. Each role is switched on or off per school in the console (`app.roles`). */
@@ -121,10 +123,11 @@ export const MODULES: ModuleManifest[] = [
       P('appr', 'Approvals', 'approvals', 'G Q', '/approvals', 'Home', ['approvals.read'], { tabs: [{ key: 'waiting', label: 'Waiting for me' }, { key: 'sent', label: 'Sent by me' }, { key: 'decided', label: 'Decided' }] }),
       P('rep', 'Reports', 'reports', 'G R', '/reports', 'Home', ['reports.read'], { tabs: [{ key: 'attendance', label: 'Attendance', feature: 'attendance' }, { key: 'money', label: 'Money', feature: 'fees' }, { key: 'learning', label: 'Learning' }, { key: 'people', label: 'People' }] }),
       P('year', 'Academic year', 'year', 'G Y', '/year', 'School', ['settings.read', 'setup.write', 'year.manage'], {
+        settings: ['calendar.weeklyOff', 'calendar.weekStarts', 'dashboard.rollClasses', 'classes.schoolEdits', 'calendar.schoolEdits'],
         tabs: [{ key: 'terms', label: 'Years and terms' }, { key: 'holidays', label: 'Holidays' }, { key: 'classes', label: 'Classes' }, { key: 'subjects', label: 'Subjects' }, { key: 'bells', label: 'Bell times' }, { key: 'year-end', label: 'Year-end', anyOf: ['year.manage'] }],
       }),
       P('profile', 'School profile', 'setup', 'G ,', '/profile', 'School', ['settings.read'], {
-        tabs: [{ key: 'identity', label: 'Identity' }, { key: 'plan', label: 'Plan and modules' }, { key: 'app', label: 'The app' }, { key: 'roles', label: 'Roles' }, { key: 'messages', label: 'Messages' }, { key: 'privacy', label: 'Privacy notice' }, { key: 'data', label: 'Your data', anyOf: ['privacy.manage'] }],
+        tabs: [{ key: 'identity', label: 'Identity' }, { key: 'security', label: 'Sign-in' }, { key: 'plan', label: 'Plan and modules' }, { key: 'app', label: 'The app' }, { key: 'roles', label: 'Roles' }, { key: 'messages', label: 'Messages' }, { key: 'privacy', label: 'Privacy notice' }, { key: 'data', label: 'Your data', anyOf: ['privacy.manage'] }],
       }),
       P('privacy', 'Privacy requests', 'privacy', 'G P', '/privacy', 'School', ['privacy.manage']),
       P('audit', 'Audit log', 'audit', 'G L', '/audit', 'School', ['audit.read']),
@@ -132,7 +135,7 @@ export const MODULES: ModuleManifest[] = [
     ],
     app: [A('dock', 'home', 'Home', EVERYONE)],
     settings: ['classes.schoolEdits', 'calendar.weeklyOff', 'calendar.weekStarts', 'calendar.schoolEdits', 'dashboard.rollClasses'],
-    permissions: ['approvals.read', 'approvals.decide', 'settings.read', 'privacy.manage', 'audit.read', 'reports.read', 'setup.write', 'year.manage'],
+    permissions: ['approvals.read', 'approvals.decide', 'settings.read', 'settings.manage', 'privacy.manage', 'audit.read', 'reports.read', 'setup.write', 'year.manage'],
     messages: ['privacy.answered'],
     imports: ['years', 'terms', 'holidays', 'subjects', 'periods', 'classes'],
     approvals: ['settings'],
@@ -388,7 +391,7 @@ export function featureByKey(key: string): (FeatureDef & { module: string }) | u
 }
 
 /** Modules the school has today: its entitlement within each module's dates (a trial ends, a module starts later), plus what they need. */
-export function activeModules(ent: Pick<EntitlementDoc, 'modules' | 'dates'>, today: string = istToday()): string[] {
+export function activeModules(ent: Pick<EntitlementDoc, 'modules' | 'dates'>, today: string = schoolToday()): string[] {
   const inDates = ent.modules.filter((k) => {
     const d = ent.dates?.[k];
     return !d || ((!d.from || d.from <= today) && (!d.until || today <= d.until));
@@ -416,8 +419,25 @@ const pieces = (slot: AppPiece['slot']) => MODULES.flatMap((m) => m.app.filter((
 /** What the app can put in its dock, on its home screen and in its quick buttons, with the module and roles of each: built from MODULES. */
 export const APP_CATALOG: Record<AppPiece['slot'], (AppPiece & { module: string })[]> = { dock: pieces('dock'), home: pieces('home'), quick: pieces('quick') };
 
+/** The settings each page shows: its own list, or, for a module's first page, what no other page of the module names. */
+function pageSettings(m: ModuleManifest, p: AdminPage): string[] {
+  if (p.settings) return p.settings;
+  if (m.pages[0] !== p) return [];
+  const claimed = new Set(m.pages.flatMap((x) => x.settings ?? []));
+  return m.settings.filter((k) => !claimed.has(k));
+}
+
+/** The Settings tab a page gets when the school owns any of its settings (product map rule 7: a setting is edited where it applies). */
+const SETTINGS_TAB: AdminTab = { key: 'settings', label: 'Settings', anyOf: ['settings.read'] };
+
 /** Every admin page with its module, in menu order. */
-export const ADMIN_PAGES: (AdminPage & { module: string })[] = ADMIN_GROUPS.flatMap((g) => MODULES.flatMap((m) => m.pages.filter((p) => p.group === g).map((p) => ({ ...p, module: m.key }))));
+export const ADMIN_PAGES: (AdminPage & { module: string })[] = ADMIN_GROUPS.flatMap((g) => MODULES.flatMap((m) => m.pages.filter((p) => p.group === g).map((p) => {
+  const settings = pageSettings(m, p).filter((k) => k in SETTINGS_META);
+  const tabbed = settings.some((k) => settingOwner(k) === 'school') && p.path !== '/profile';
+  // A page without tabs gets one for itself first, so its Settings sit beside it.
+  const tabs = tabbed ? [...(p.tabs?.length ? p.tabs : [{ key: 'main', label: p.label }]), SETTINGS_TAB] : p.tabs;
+  return { ...p, module: m.key, settings, ...(tabs ? { tabs } : {}) };
+})));
 
 /** The admin page a path belongs to: its own, or the closest one above it (`/students/x` is Students). */
 export function pageForPath(path: string): (AdminPage & { module: string }) | undefined {

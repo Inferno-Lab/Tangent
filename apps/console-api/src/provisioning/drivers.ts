@@ -9,6 +9,7 @@ import type { Db, reg } from '../core.js';
 import type { Env } from '../env.js';
 import type { Sandbox } from '../sandbox.js';
 import type { Hub } from '@tangent/integrations';
+import { fmtNumber } from '@tangent/contracts';
 
 type SchoolRecord = typeof reg.schools.$inferSelect;
 
@@ -162,11 +163,11 @@ const migrateSeed: Driver = {
         demoHash ??= hashPassword('nest2026');
         const p = c.payload;
         const report = await seedSchool(pool, {
-          school: { name: p.basics.name, shortName: p.basics.shortName, tagline: p.branding.tagline, place: [p.basics.board, p.basics.city].filter(Boolean).join(' · '), phone: p.basics.contactPhone, email: p.basics.contactEmail, address: [p.basics.address, p.basics.city].filter(Boolean).join(', '), color: p.branding.color, logoText: p.branding.logoText, language: p.basics.language },
+          school: { name: p.basics.name, shortName: p.basics.shortName, tagline: p.branding.tagline, place: [p.basics.board, p.basics.city].filter(Boolean).join(' · '), phone: p.basics.contactPhone, country: p.basics.country, timezone: p.basics.timezone, locale: p.basics.locale, currency: p.basics.currency, email: p.basics.contactEmail, address: [p.basics.address, p.basics.city].filter(Boolean).join(', '), color: p.branding.color, logoText: p.branding.logoText, language: p.basics.language },
           admin: { name: p.admin.name, email: p.admin.email, phone: p.admin.phone, passwordHash: '!' },
           modules: closeModules(p.plan.modules), data: p.data.start === 'demo' ? 'demo' : 'empty', demoPasswordHash: await demoHash, roleTemplates: c.roles,
         });
-        tail = report.students ? `roles, periods and templates, then ${report.students.toLocaleString('en-IN')} sample students in ${report.classes} classes` : 'roles, periods and templates';
+        tail = report.students ? `roles, periods and templates, then ${fmtNumber(report.students)} sample students in ${report.classes} classes` : 'roles, periods and templates';
         c.log('info', `seeded in ${report.ms} ms`);
       }
       return { detail: `${applied.length ? `${applied.length} ${applied.length === 1 ? "migration" : "migrations"}` : "All migrations"}, then ${tail}` };

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
-import { addDays, dayLabel, dayMonth, dayName, istMinutes, istToday, weekday, type SlotRow, type TimetableView as TT, subjectColour } from '@tangent/contracts';
+import { fmtNumber, addDays, dayLabel, dayMonth, dayName, schoolMinutes, schoolToday, weekday, type SlotRow, type TimetableView as TT, subjectColour } from '@tangent/contracts';
 import { Dialog, EmptyCard, PageScope, tintFor, useToast, EmptyState } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { useShellChrome } from '../../app/Layout';
@@ -22,7 +22,7 @@ export function TimetablePage() {
   const [clsOpen, setClsOpen] = useState(false);
   const [mode, setMode] = useState(() => (window.innerWidth < 640 ? 1 : 0)); // the week grid needs more width than a phone has
   // Opens on today and the period running now (or the first one), like a teacher looking up what is on.
-  const [sel, setSel] = useState<{ day: number; period: number }>({ day: ((weekday(istToday()) + 6) % 7) + 1, period: 0 });
+  const [sel, setSel] = useState<{ day: number; period: number }>({ day: ((weekday(schoolToday()) + 6) % 7) + 1, period: 0 });
   // The school's working days: every day except the weekly off days the console set.
   const off = useSetting<string[]>('calendar.weeklyOff', ['sun']);
   const DAYS = (Object.entries(WEEK) as [string, number][]).filter(([k]) => !off.includes(k)).map(([, n]) => n);
@@ -44,7 +44,7 @@ export function TimetablePage() {
   });
   const publish = useMutation({
     mutationFn: () => app.api.timetable.publish(),
-    onSuccess: (r) => { say(`Published · ${r.families.toLocaleString('en-IN')} families and ${r.teachers} teachers notified`); refresh(); },
+    onSuccess: (r) => { say(`Published · ${fmtNumber(r.families)} families and ${r.teachers} teachers notified`); refresh(); },
     onError: (e) => say(e instanceof HttpError ? e.message : 'Could not publish. Try again.', 'bad'),
   });
 
@@ -79,14 +79,14 @@ export function TimetablePage() {
     );
   }
 
-  const today = istToday();
+  const today = schoolToday();
   const monday = addDays(today, -((weekday(today) + 6) % 7));
   const dateOf = (day: number) => addDays(monday, day - 1);
   const shownDays = mode === 1 ? [DAYS.includes(sel.day) ? sel.day : DAYS[0] ?? 1] : DAYS;
   const slotAt = (d: number, p: number) => data.slots.find((s) => s.day === d && s.period === p);
   const badIds = new Set(data.clashes.flatMap((c) => c.slotIds));
   const periodDef = (idx: number) => data.periods.find((p) => p.idx === idx);
-  const now = istMinutes();
+  const now = schoolMinutes();
   // A subject's spectrum colour (contracts subjectColour), the same in the admin and the app.
   const subjectKey = (s: Pick<SlotRow, 'subjectName' | 'subjectColor'>) => `sub sp-${subjectColour(s.subjectName, s.subjectColor)}`;
   const running = data.periods.find((p) => p.kind === 'period' && now >= toMin(p.starts) && now < toMin(p.ends)) ?? data.periods.find((p) => p.kind === 'period');

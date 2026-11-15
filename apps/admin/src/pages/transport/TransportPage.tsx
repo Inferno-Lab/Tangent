@@ -7,8 +7,9 @@ import { Card, Page, useToast } from '../../app/Page';
 import { AddBtn, Ico, problem, stamp } from '../../app/kit';
 import { usePageTabs } from '../../app/tabs';
 import { useShellChrome } from '../../app/Layout';
+import { currencySymbol, fmtMoney } from '@tangent/contracts';
 
-const rupees = (n: number) => `₹${n.toLocaleString('en-IN')}`;
+const rupees = (n: number) => fmtMoney(n);
 const UP = 'up';
 const DOWN = 'down';
 const X = 'close';
@@ -149,7 +150,7 @@ function RouteDialog({ route, onClose, onDone }: { route: BusRouteRow | null; on
         </div>
         <div className="two"><Field label="Attendant" value={f.attendantName} onChange={set('attendantName')} placeholder="Meena Kale" /><Field label="Attendant’s phone" type="tel" value={f.attendantPhone} onChange={set('attendantPhone')} hint="Families call the attendant or the office about the bus, never the driver." /></div>
         <Field label="GPS tracker number (optional)" value={f.trackerId} onChange={set('trackerId')} hint="If the bus has a tracker: its number at the tracker company. Its position is used while a trip runs." />
-        <NumberField label="Route fee for a term (₹)" value={f.fee} onChange={set('fee')} min={0} />
+        <NumberField label={`Route fee for a term (${currencySymbol()})`} value={f.fee} onChange={set('fee')} min={0} />
         <div>
           <div className="lbl" style={{ marginBottom: 8 }}>Stops, in order</div>
           {stops.map((s, i) => (

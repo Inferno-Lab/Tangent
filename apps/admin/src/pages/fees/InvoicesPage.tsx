@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { inr, lakhs, type InvoiceListQuery, type StudentDetail } from '@tangent/contracts';
+import { fmtNumber, fmtMoneyShort, fmtMoney, type InvoiceListQuery, type StudentDetail } from '@tangent/contracts';
 import { EmptyCard, EmptyNote, Segmented, Select, EmptyState } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
@@ -8,7 +8,7 @@ import { Avatar, Ico, dateLabel, useFeeHeads, useOpenParam } from '../../app/kit
 import { CollectFeeDialog } from './CollectFee';
 import { InvoiceSheet } from './InvoiceSheet';
 
-const money = (n: number) => (n >= 100000 ? `₹${lakhs(n)}` : `₹${inr(Math.round(n))}`);
+const money = (n: number) => (n >= 100000 ? fmtMoneyShort(n) : fmtMoney(n));
 const STATUS: Record<string, { tone: string; label: string }> = { paid: { tone: 'g', label: 'Paid' }, partial: { tone: 'v', label: 'Part paid' }, due: { tone: 'a', label: 'Due' }, overdue: { tone: 'c', label: 'Overdue' } };
 const SEARCH = 'search';
 type Filter = 'all' | 'overdue' | 'due' | 'partial' | 'paid';
@@ -48,7 +48,7 @@ export function InvoicesPage({ view, tabs }: { view: 'invoices' | 'receipts'; ta
       </>}>
       <section className="grid">
         {view === 'invoices' && s && <>
-          <div className="tile t-v s4 rise"><span className="lbl">Billed</span><div className="big" style={{ marginTop: 8 }}>{money(s.billed)}</div><div style={{ font: '600 13px var(--fb)', opacity: 0.8 }}>{s.count.toLocaleString('en-IN')} {s.count === 1 ? 'invoice' : 'invoices'} in view</div></div>
+          <div className="tile t-v s4 rise"><span className="lbl">Billed</span><div className="big" style={{ marginTop: 8 }}>{money(s.billed)}</div><div style={{ font: '600 13px var(--fb)', opacity: 0.8 }}>{fmtNumber(s.count)} {s.count === 1 ? 'invoice' : 'invoices'} in view</div></div>
           <div className="tile t-a s4 rise" style={{ '--d': '.05s' } as React.CSSProperties}><span className="lbl">Collected</span><div className="big" style={{ marginTop: 8 }}>{money(s.collected)}</div><div style={{ font: '600 13px var(--fb)', opacity: 0.75 }}>{s.billed ? Math.round((s.collected / s.billed) * 100) : 0}% of what was billed</div></div>
           <div className="tile t-p s4 rise" style={{ '--d': '.1s' } as React.CSSProperties}><span className="lbl">Still to pay</span><div className="big" style={{ marginTop: 8, color: s.outstanding ? 'var(--bad)' : undefined }}>{money(s.outstanding)}</div><div style={{ font: '600 13px var(--fb)', color: 'var(--ink3)' }}>across the invoices in view</div></div>
         </>}
@@ -77,8 +77,8 @@ export function InvoicesPage({ view, tabs }: { view: 'invoices' | 'receipts'; ta
                         <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}><Avatar name={r.studentName} size={30} /><span style={{ minWidth: 0 }}><b data-tip={r.studentName} style={{ font: '700 14px var(--fb)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.studentName}</b><small style={{ color: 'var(--ink3)', font: '600 12px var(--fb)' }}>Class {r.className}</small></span></span>
                         <span className="hs" data-tip={r.title} style={{ font: '600 13px var(--fb)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.title}</span>
                         <span className="hs" style={{ font: '600 13px var(--fb)', color: 'var(--ink2)' }}>{dateLabel(r.dueOn)}</span>
-                        <b className="num" style={{ font: '700 13px var(--fb)', textAlign: 'right' }}>₹{inr(r.amount - r.waived)}</b>
-                        <span className="num hs" style={{ font: '600 13px var(--fb)', textAlign: 'right', color: 'var(--ink2)' }}>₹{inr(r.paid)}</span>
+                        <b className="num" style={{ font: '700 13px var(--fb)', textAlign: 'right' }}>{fmtMoney(r.amount - r.waived)}</b>
+                        <span className="num hs" style={{ font: '600 13px var(--fb)', textAlign: 'right', color: 'var(--ink2)' }}>{fmtMoney(r.paid)}</span>
                         <span className={`st ${STATUS[r.status]!.tone}`}><i></i>{STATUS[r.status]!.label}</span>
                         <span>{canPay && r.outstanding > 0 && <button className="btn sm" disabled={open.isPending} onClick={(e) => { e.stopPropagation(); open.mutate(r.studentId); }}>Collect</button>}</span>
                       </div>
@@ -86,7 +86,7 @@ export function InvoicesPage({ view, tabs }: { view: 'invoices' | 'receipts'; ta
                   </div>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '16px 24px 20px', borderTop: '1px solid var(--line)', flexWrap: 'wrap' }}>
-                  <span className="help">Page {page} of {pages} · {inv.data!.total.toLocaleString('en-IN')} invoices</span>
+                  <span className="help">Page {page} of {pages} · {fmtNumber(inv.data!.total)} invoices</span>
                   <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><button className="btn sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button><button className="btn sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button></span>
                 </div>
               </>
@@ -105,14 +105,14 @@ export function InvoicesPage({ view, tabs }: { view: 'invoices' | 'receipts'; ta
                       <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}><Avatar name={r.studentName} size={28} /><b data-tip={r.studentName} style={{ font: '700 14px var(--fb)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.studentName}</b></span>
                       <span className="hs" data-tip={r.title} style={{ font: '600 13px var(--fb)', color: 'var(--ink2)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.title}</span>
                       <span style={{ font: '600 13px var(--fb)', color: 'var(--ink3)' }}>{dateLabel(r.paidOn)}</span>
-                      <b className="num" style={{ font: '700 14px var(--fb)', textAlign: 'right', textDecoration: r.cancelled ? 'line-through' : undefined }} data-tip={r.cancelled ? `Cancelled: ${r.cancelReason}` : undefined}>₹{inr(r.amount)}</b>
+                      <b className="num" style={{ font: '700 14px var(--fb)', textAlign: 'right', textDecoration: r.cancelled ? 'line-through' : undefined }} data-tip={r.cancelled ? `Cancelled: ${r.cancelReason}` : undefined}>{fmtMoney(r.amount)}</b>
                     </div>
                   </button>
                 ))}
               </div>
               {rec.data!.total > 25 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '16px 24px 20px', borderTop: '1px solid var(--line)', flexWrap: 'wrap' }}>
-                  <span className="help">{(rpage - 1) * 25 + 1}–{(rpage - 1) * 25 + rec.data!.items.length} of {rec.data!.total.toLocaleString('en-IN')} receipts</span>
+                  <span className="help">{(rpage - 1) * 25 + 1}–{(rpage - 1) * 25 + rec.data!.items.length} of {fmtNumber(rec.data!.total)} receipts</span>
                   <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><button className="btn sm" disabled={rpage <= 1} onClick={() => setRpage(rpage - 1)}>Previous</button><button className="btn sm" disabled={rpage * 25 >= rec.data!.total} onClick={() => setRpage(rpage + 1)}>Next</button></span>
                 </div>
               )}

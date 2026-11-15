@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { addDays, istToday, type BookInput, type BookRow, type GiveBack, type IssueInput, type LibraryView, type LoanRow, type ReservationRow } from '@tangent/contracts';
+import { addDays, schoolToday, type BookInput, type BookRow, type GiveBack, type IssueInput, type LibraryView, type LoanRow, type ReservationRow } from '@tangent/contracts';
 import { newId } from '@tangent/db';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
@@ -43,7 +43,7 @@ export class LibraryService {
   /** Open loans (the desk), or every loan of some students or one member of staff (the app's shelf and history). */
   async loans(t: TenantCtx, studentIds?: string[], staffUserId?: string): Promise<LoanRow[]> {
     const fine = (await this.rules(t)).finePerDay;
-    const today = istToday();
+    const today = schoolToday();
     const all = !studentIds && !staffUserId;
     const { rows } = await t.pool.query(
       `select l.*, l.due_on::text due, l.issued_on::text issued, l.returned_on::text returned, coalesce(s.name, u.name) student, coalesce(c.name, 'Staff') class_name from library_loans l
@@ -101,7 +101,7 @@ export class LibraryService {
     const out = Number((await t.pool.query<{ n: string }>('select count(*) n from library_loans where returned_on is null and (student_id = $1 or staff_user_id = $2)', [b.studentId ?? '', b.staffUserId ?? ''])).rows[0]!.n);
     const most = b.studentId ? rules.maxLoans : rules.staffMaxLoans;
     if (out >= most) throw new ApiError('conflict', `They already have ${out} ${out === 1 ? 'book' : 'books'} out, the most the school allows. A book must come back first.`);
-    const today = istToday();
+    const today = schoolToday();
     const due = b.dueOn ?? addDays(today, rules.loanDays);
     const id = newId('lon');
     await t.pool.query('insert into library_loans (id, student_id, staff_user_id, title, due_on, book_id, issued_on) values ($1,$2,$3,$4,$5,$6,$7)', [id, b.studentId, b.staffUserId, book.title, due, b.bookId, today]);
@@ -114,7 +114,7 @@ export class LibraryService {
   async giveBack(t: TenantCtx, user: User, loanId: string, b: GiveBack = { outcome: 'returned', charge: 0, fine: 'bill', reason: '' }): Promise<{ fine: number; billed: boolean }> {
     const l = (await t.pool.query<{ book_id: string | null; due: string; student_id: string | null; title: string }>("select book_id, due_on::text due, student_id, title from library_loans where id = $1 and returned_on is null", [loanId])).rows[0];
     if (!l) throw notFound('That loan');
-    const today = istToday();
+    const today = schoolToday();
     // A late fine, plus what a lost or damaged book costs the school.
     const fine = Math.max(0, daysBetween(l.due, today)) * (await this.rules(t)).finePerDay + (b.outcome === 'returned' ? 0 : b.charge);
     let invoiceId: string | null = null;
@@ -149,7 +149,7 @@ export class LibraryService {
     const l = (await t.pool.query<{ student_id: string | null; staff_user_id: string | null; book_id: string | null; due: string }>('select student_id, staff_user_id, book_id, due_on::text due from library_loans where id = $1 and returned_on is null', [loanId])).rows[0];
     if (!l) throw notFound('That loan');
     if (l.book_id && (await t.pool.query("select 1 from library_reservations where book_id = $1 and status = 'waiting'", [l.book_id])).rowCount) throw new ApiError('conflict', 'Someone is waiting for this book, so it cannot be renewed.');
-    const due = addDays(l.due < istToday() ? istToday() : l.due, rules.loanDays);
+    const due = addDays(l.due < schoolToday() ? schoolToday() : l.due, rules.loanDays);
     await t.pool.query('update library_loans set due_on = $2, renewals = renewals + 1 where id = $1', [loanId, due]);
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'library.renewed', entity: 'loan', entityId: loanId, detail: { due } });
     return (await this.loans(t, l.student_id ? [l.student_id] : undefined, l.staff_user_id ?? undefined)).find((x) => x.id === loanId)!;
@@ -185,7 +185,7 @@ export class LibraryService {
     if (!l) throw notFound('That book');
     if (l.renewals >= rules.maxRenewals) throw new ApiError('conflict', rules.maxRenewals ? `A book can be renewed ${rules.maxRenewals === 1 ? 'once' : `${rules.maxRenewals} times`}. Please return it to the library.` : 'Books cannot be renewed from the app. Ask at the library desk.');
     if (l.book_id && (await t.pool.query("select 1 from library_reservations where book_id = $1 and status = 'waiting'", [l.book_id])).rowCount) throw new ApiError('conflict', 'Someone is waiting for this book, so it cannot be renewed.');
-    const due = addDays(l.due < istToday() ? istToday() : l.due, rules.loanDays);
+    const due = addDays(l.due < schoolToday() ? schoolToday() : l.due, rules.loanDays);
     await t.pool.query('update library_loans set due_on = $2, renewals = renewals + 1 where id = $1', [loanId, due]);
     return (await this.loans(t, l.student_id ? [l.student_id] : undefined, l.staff_user_id ?? undefined)).find((x) => x.id === loanId)!;
   }

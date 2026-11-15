@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GENDERS, istToday, type ClassInfo, type GuardianRow, type StudentDetail } from '@tangent/contracts';
+import { GENDERS, schoolToday, type ClassInfo, type GuardianRow, type StudentDetail } from '@tangent/contracts';
 import { Checkbox, DateField, Dialog, ErrorLine, Field, SelectField, useShake } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { AreaField, problem, useSetting } from '../../app/kit';
@@ -55,7 +55,7 @@ export function EditStudentDialog({ s, classes, onClose, onDone }: { s: StudentD
           <SelectField label="Class" value={f.classId} onChange={set('classId')} error={err.classId} options={classes.map((c) => ({ value: c.id, label: c.name }))} />
           <Field label="Roll number" value={f.rollNo} onChange={set('rollNo')} error={err.rollNo} maxLength={10} />
         </div>
-        <DateField label="Date of birth" value={f.dob} onChange={set('dob')} error={err.dob} max={istToday()} />
+        <DateField label="Date of birth" value={f.dob} onChange={set('dob')} error={err.dob} max={schoolToday()} />
         <RecordFields f={f} set={set} err={err} />
         {err._ && <ErrorLine>{err._}</ErrorLine>}
         <div className="tgrow" style={{ justifyContent: 'flex-end' }}>
@@ -121,7 +121,7 @@ export function GuardiansDialog({ s, onClose, onDone }: { s: StudentDetail; onCl
 export function LeaveDialog({ s, onClose, onDone }: { s: StudentDetail; onClose: () => void; onDone: (m: string) => void }) {
   const { api } = useApp();
   const shake = useShake();
-  const [f, setF] = useState({ leftOn: istToday(), reason: '' });
+  const [f, setF] = useState({ leftOn: schoolToday(), reason: '' });
   const [err, setErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const save = async () => {

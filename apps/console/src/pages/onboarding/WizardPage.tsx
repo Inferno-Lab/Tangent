@@ -3,7 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
 import { HttpError } from '@tangent/api-client';
 import { closeModules } from '@tangent/config-engine';
-import { DEFAULT_BRAND, DEPLOY_TARGET_LABELS, LANGUAGES, SCHOOL_BOARDS, readableOn, WizardAdmin, WizardBasics, WizardBranding, WizardData, WizardPayload, WizardPlacement, WizardPlan, type ProvisionRunRow, type WizardReview } from '@tangent/contracts';
+import { countryName, ZONES, LOCALES, COUNTRY_DEFAULTS, COUNTRIES, DEFAULT_BRAND, DEPLOY_TARGET_LABELS, LANGUAGES, SCHOOL_BOARDS, readableOn, WizardAdmin, WizardBasics, WizardBranding, WizardData, WizardPayload, WizardPlacement, WizardPlan, type ProvisionRunRow, type WizardReview } from '@tangent/contracts';
 import { ColourField, Field, FilePick, NumberField, SelectField, useShake, Icon } from '@tangent/web-ui';
 import { Card, Page, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
@@ -22,7 +22,7 @@ type Key = 'basics' | 'plan' | 'branding' | 'placement' | 'admin' | 'data';
 type Data = Record<Key, Record<string, unknown>>;
 
 const DEFAULTS: Data = {
-  basics: { name: '', shortName: '', slug: '', board: 'CBSE', address: '', city: '', contactName: '', contactPhone: '', contactEmail: '', gstin: '', language: 'en' },
+  basics: { name: '', shortName: '', slug: '', board: 'CBSE', address: '', city: '', contactName: '', contactPhone: '', contactEmail: '', gstin: '', language: 'en', country: '', timezone: '', locale: '', currency: '' },
   plan: { plan: '', modules: [], students: 500 },
   branding: { color: DEFAULT_BRAND, logoText: '', appName: '', tagline: '', logo: null },
   placement: { target: '', cell: '', addressing: 'path', customDomain: '' },
@@ -156,7 +156,20 @@ export function WizardPage() {
             <SelectField label="Board" value={str(data.basics.board)} onChange={(v) => set('basics', 'board', v)} options={SCHOOL_BOARDS.map((b) => ({ value: b, label: b }))} />
             <SelectField label="App language" value={str(data.basics.language)} onChange={(v) => set('basics', 'language', v)} options={LANGUAGES.map(([value, label]) => ({ value, label }))} />
           </div>
-          <div className="two">{f('basics', 'city', 'Town or city')}{f('basics', 'gstin', 'GSTIN (optional)')}</div>
+          <div className="two">
+            <SelectField label="Country" value={str(data.basics.country)} error={errs['basics.country']} onChange={(c) => {
+              set('basics', 'country', c);
+              // The country's usual zone, locale and currency, each still changeable.
+              const d = COUNTRY_DEFAULTS[c];
+              if (d) { set('basics', 'timezone', d.zone); set('basics', 'locale', d.locale); set('basics', 'currency', d.currency); }
+            }} options={[{ value: '', label: 'Choose a country' }, ...COUNTRIES.map((c) => ({ value: c, label: countryName(c) })).sort((a, b) => a.label.localeCompare(b.label))]} />
+            <SelectField label="Time zone" value={str(data.basics.timezone)} error={errs['basics.timezone']} onChange={(v) => set('basics', 'timezone', v)} options={[{ value: '', label: 'Choose a time zone' }, ...ZONES.map((z) => ({ value: z, label: z.replace(/_/g, ' ') }))]} />
+          </div>
+          <div className="two">
+            <SelectField label="Dates and numbers written as" value={str(data.basics.locale)} error={errs['basics.locale']} onChange={(v) => set('basics', 'locale', v)} options={[{ value: '', label: 'Choose a way' }, ...LOCALES.map(([value, label]) => ({ value, label }))]} />
+            {f('basics', 'currency', 'Currency', { hint: 'A code like USD, GBP, INR or AED' })}
+          </div>
+          <div className="two">{f('basics', 'city', 'Town or city')}{str(data.basics.country) === 'IN' ? f('basics', 'gstin', 'GSTIN (optional)') : <span />}</div>
           {f('basics', 'address', 'Address (optional)')}
           <div className="lbl" style={{ margin: '8px 0' }}>Who we talk to</div>
           <div className="two">{f('basics', 'contactName', 'Contact name')}{f('basics', 'contactPhone', 'Phone', { type: 'tel' })}</div>

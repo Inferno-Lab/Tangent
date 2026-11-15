@@ -4,13 +4,14 @@ import type { ApprovalKind, ApprovalRow } from '@tangent/contracts';
 import { Dialog, EmptyCard, useShake, EmptyState } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { AreaField, Avatar, problem } from '../../app/kit';
+import { fmtDate } from '@tangent/contracts';
 
 export type ApprovalView = 'waiting' | 'sent' | 'decided';
 
 const STATUS: Record<ApprovalRow['status'], { text: string; tone: string }> = {
   pending: { text: 'Waiting', tone: 'a' }, approved: { text: 'Approved', tone: 'g' }, rejected: { text: 'Declined', tone: 'c' }, withdrawn: { text: 'Withdrawn', tone: '' },
 };
-const when = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' });
+const when = (iso: string) => fmtDate(iso, 'stamp');
 
 /**
  * Requests for one view (waiting for me, sent by me, decided), optionally of one kind; approve, or decline saying why. Returns the

@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { lakhs, type ApprovalRow } from '@tangent/contracts';
+import { fmtMoneyShort, type ApprovalRow } from '@tangent/contracts';
 import { EmptyCard, PageScope, TONES, useToast } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { useShellChrome } from '../../app/Layout';
 import { PhoneView } from './phone.view';
 import { fewNames } from '../dashboard/DashboardPage';
 
-const money = (n: number) => (n >= 100000 ? `₹${lakhs(n)}` : n >= 1000 ? `₹${Math.round(n / 1000)}k` : `₹${n}`);
+const money = (n: number) => fmtMoneyShort(n);
 const hello = () => { const h = ((new Date().getUTCHours() * 60 + new Date().getUTCMinutes() + 330) / 60) % 24; return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; };
 
 /** The phone's home: the day at a glance and what needs you, from the same numbers as the desktop dashboard. */

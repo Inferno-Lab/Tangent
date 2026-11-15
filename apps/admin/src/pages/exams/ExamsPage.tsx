@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { addDays, istToday, type ExamRow } from '@tangent/contracts';
+import { addDays, schoolToday, type ExamRow } from '@tangent/contracts';
 import { Checkbox, DateField, Dialog, Field, Segmented, Select, SelectField, TimeField, useShake, EmptyState } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { AddBtn, Avatar, dateLabel, problem, useOpenParam, useSetting } from '../../app/kit';
+import { usePageTabs } from '../../app/tabs';
 
 const TONE = { upcoming: 'n', marking: 'a', published: 'g' } as const;
 const LABEL = { upcoming: 'Coming up', marking: 'Marking', published: 'Published' } as const;
 const refresh = (qc: ReturnType<typeof useQueryClient>) => void qc.invalidateQueries({ predicate: (q) => ['exams', 'students', 'dashboard'].includes(String(q.queryKey[0])) });
 
 export function ExamsPage() {
+  const { tabs } = usePageTabs('/exams');
   const app = useApp();
   const qc = useQueryClient();
   const { toast, say } = useToast();
@@ -24,7 +26,7 @@ export function ExamsPage() {
   const canWrite = app.user.permissions.includes('exams.write');
   const groups = useMemo(() => (['marking', 'upcoming', 'published'] as const).map((s) => ({ s, items: rows.filter((r) => r.status === s) })).filter((g) => g.items.length), [rows]);
   return (
-    <Page title="Exams" sub="Schedules, marks and results" toast={toast} loading={list.isLoading && !list.data}
+    <Page title="Exams" sub="Schedules, marks and results" tabs={tabs} toast={toast} loading={list.isLoading && !list.data}
       error={list.isError && !list.data ? { message: (list.error as Error).message, retry: () => void list.refetch() } : null}
       filters={<Select compact aria-label="Class" value={classId} onChange={setClassId} options={[{ value: '', label: 'All classes' }, ...(classes.data ?? []).map((c) => ({ value: c.id, label: `Class ${c.name}` }))]} />}
       actions={canWrite && <AddBtn onClick={() => setCreating(true)}>New exam</AddBtn>}
@@ -75,7 +77,7 @@ function ExamDialog({ exam, defaultClass, onClose, onDone }: { exam?: ExamRow; d
   const subjects = useQuery({ queryKey: ['subjects'], queryFn: app.api.subjects, staleTime: 10 * 60_000 });
   const lead = useSetting<number>('exams.leadDays', 7);
   const outOf = useSetting<number>('exams.defaultMaxMarks', 100);
-  const [f, setF] = useState({ name: exam?.name ?? '', classId: exam?.classId ?? defaultClass, startsOn: exam?.startsOn ?? addDays(istToday(), lead), endsOn: exam?.endsOn ?? addDays(istToday(), lead + 4) });
+  const [f, setF] = useState({ name: exam?.name ?? '', classId: exam?.classId ?? defaultClass, startsOn: exam?.startsOn ?? addDays(schoolToday(), lead), endsOn: exam?.endsOn ?? addDays(schoolToday(), lead + 4) });
   const [also, setAlso] = useState<string[]>([]);
   const [picked, setPicked] = useState<Record<string, Paper>>(() => Object.fromEntries((exam?.subjects ?? []).map((s) => [s.subjectId, { on: s.onDate ?? '', from: s.startsAt ?? '', to: s.endsAt ?? '', room: s.room, max: String(s.maxMarks) }])));
   const [err, setErr] = useState<Record<string, string>>({});

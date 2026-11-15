@@ -464,7 +464,11 @@ export interface ShellData {
   menu: MenuGroup[];
   /** The seed hue (0–359) of the school's colours, from its brand colour. */
   hue: number;
+  /** Where the school is and how it writes dates, numbers and money (locale.ts): every page formats with these. */
+  locale: SchoolLocale;
 }
+
+export interface SchoolLocale { country: string; zone: string; locale: string; currency: string }
 
 // Search (command palette)
 export interface SearchHit {

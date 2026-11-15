@@ -4,7 +4,7 @@ import { Checkbox, Segmented, Select, tintFor, EmptyState, EmptyNote } from '@ta
 import { Card, Page, Tiles, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
 import { url } from '../../app/base';
-import { ago, initials, statusOf } from '../../app/format';
+import { ago, initials, statusOf, count } from '../../app/format';
 
 export function HealthPage() {
   const app = useApp();
@@ -17,7 +17,7 @@ export function HealthPage() {
   const errors = useQuery({ queryKey: ['errors', days, handled], queryFn: () => app.api.errors(Number(days), handled), refetchInterval: 60_000 });
   const done = useMutation({ mutationFn: app.api.errorHandled, onSuccess: () => { void qc.invalidateQueries({ queryKey: ['errors'] }); say('Marked handled. It comes back if it happens again.'); }, onError: (e) => say((e as Error).message, 'bad') });
   const drills = useQuery({ queryKey: ['drills'], queryFn: app.api.drills });
-  const drill = useMutation({ mutationFn: app.api.runDrill, onSuccess: (d) => { void qc.invalidateQueries({ queryKey: ['drills'] }); say(d.ok ? `Restored ${d.rows.toLocaleString('en-IN')} rows of ${d.schoolName} into a scratch database.` : `The drill failed: ${d.error}`, d.ok ? undefined : 'bad'); }, onError: (e) => say((e as Error).message, 'bad') });
+  const drill = useMutation({ mutationFn: app.api.runDrill, onSuccess: (d) => { void qc.invalidateQueries({ queryKey: ['drills'] }); say(d.ok ? `Restored ${count(d.rows)} rows of ${d.schoolName} into a scratch database.` : `The drill failed: ${d.error}`, d.ok ? undefined : 'bad'); }, onError: (e) => say((e as Error).message, 'bad') });
   const probe = useMutation({ mutationFn: app.api.probe, onSuccess: (r) => { void qc.invalidateQueries({ predicate: (q) => ['schools', 'fleet'].includes(String(q.queryKey[0])) }); say(`Checked ${r.probed} ${r.probed === 1 ? 'school' : 'schools'}.`); }, onError: (e) => say((e as Error).message, 'bad') });
   const rows = (schools.data ?? []).filter((s) => s.status !== 'archived');
   const order = { down: 0, degraded: 1, unknown: 2, ok: 3 } as const;
@@ -88,7 +88,7 @@ export function HealthPage() {
             <div key={d.id} className="rw" style={{ display: 'flex', gap: 10, alignItems: 'center', height: 'auto', minHeight: 52, padding: '10px 20px', flexWrap: 'wrap' }}>
               <span className={`chip ${d.ok ? 'g' : 'c'}`}>{d.ok ? 'Restored' : 'Failed'}</span>
               <b style={{ flex: 1, minWidth: 160, font: '700 13px/1.35 var(--fb)' }}>{d.schoolName}</b>
-              <span className="help" style={{ margin: 0 }} data-tip={d.error ?? undefined}>{d.ok ? `${d.rows.toLocaleString('en-IN')} rows · ${d.students.toLocaleString('en-IN')} students · ${(d.ms / 1000).toFixed(1)} s` : (d.error ?? '').slice(0, 80)}</span>
+              <span className="help" style={{ margin: 0 }} data-tip={d.error ?? undefined}>{d.ok ? `${count(d.rows)} rows · ${count(d.students)} students · ${(d.ms / 1000).toFixed(1)} s` : (d.error ?? '').slice(0, 80)}</span>
               <span style={{ color: 'var(--ink3)', font: '600 13px var(--fb)', whiteSpace: 'nowrap' }}>{ago(d.at)}</span>
             </div>
           ))}

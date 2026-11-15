@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Header, HttpCode, Inject, Injectable, Param, Patch, Post, type OnModuleInit } from '@nestjs/common';
 import { activeFeatures, activeModules } from '@tangent/config-engine';
-import { IMPORT_KINDS, ImportInput, ReadinessMark, SampleLoad, importKind, inr, type EntitlementDoc, type ImportBatchRow, type ImportPreview, type MigrationView, type UploadRow } from '@tangent/contracts';
+import { fmtMoney, IMPORT_KINDS, ImportInput, ReadinessMark, SampleLoad, importKind, type EntitlementDoc, type ImportBatchRow, type ImportPreview, type MigrationView, type UploadRow } from '@tangent/contracts';
 import { commitImport, exportAll, listBatches, pg, previewImport, sampleSchool, templateXlsx, undoBatch } from '@tangent/db';
 import { ApiError, ZodPipe, notFound } from '@tangent/nest-kit';
 import { z } from 'zod';
@@ -83,13 +83,16 @@ export class Migration implements OnModuleInit {
       const oldDues = typeof s.checklist['golive.old_dues'] === 'number' ? (s.checklist['golive.old_dues'] as number) : null;
       const ticked = (k: string) => s.checklist[`golive.${k}`] === true;
       const fees = s.kinds.includes('fee_dues');
+      // Amounts in the school's own currency and way of writing them.
+      const cur = (await this.db.pool.query<{ currency: string; locale: string }>('select currency, locale from schools where id = $1', [id])).rows[0];
+      const owed = (n: number) => fmtMoney(n, cur?.currency, cur?.locale);
       const readiness = [
         { key: 'structure', label: 'The year and its classes are set up', done: year > 0 && classes > 0, detail: `${classes} classes${year ? '' : ', no current year'}` },
         { key: 'staff', label: 'Staff are in', done: staff > 1, detail: `${staff} staff` },
         { key: 'students', label: 'Every student has a family who can sign in', done: students > 0 && orphans === 0, detail: orphans ? `${orphans} students have no guardian phone` : `${students} students, ${families} families` },
         // Reconciled to the rupee: what is still owed here against the old system's own dues report.
         ...(fees ? [{ key: 'fees', label: 'Opening fee dues are in and match the old system', done: dues > 0 && oldDues !== null && outstanding === oldDues,
-          detail: oldDues === null ? `₹${inr(outstanding)} owed here; type the old system’s total to compare` : outstanding === oldDues ? `₹${inr(outstanding)}, the same as the old system` : `₹${inr(outstanding)} here, ₹${inr(oldDues)} in the old system` }] : []),
+          detail: oldDues === null ? `${owed(outstanding)} owed here; type the old system’s total to compare` : outstanding === oldDues ? `${owed(outstanding)}, the same as the old system` : `${owed(outstanding)} here, ${owed(oldDues)} in the old system` }] : []),
         ...(s.modules.has('timetable') ? [{ key: 'timetable', label: 'The timetable is in', done: slots > 0, detail: `${slots} lessons a week` }] : []),
         { key: 'config_reviewed', label: 'Tangent has reviewed the school’s configuration', done: ticked('config_reviewed'), detail: ticked('config_reviewed') ? 'Done' : 'Not yet', manual: true },
         { key: 'staff_trained', label: 'The school’s staff are trained', done: ticked('staff_trained'), detail: ticked('staff_trained') ? 'Done' : 'Not yet', manual: true },

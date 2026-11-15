@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
 import {
-  istToday,
+  schoolToday,
   type ExamCreate, type ExamMarksPut, type ExamMarksView, type ExamResults, type ExamRow, type HomeworkCreate, type HomeworkDetail, type HomeworkMarks, type HomeworkRow,
 } from '@tangent/contracts';
 import { ApiError, notFound } from '@tangent/nest-kit';
@@ -88,7 +88,7 @@ export class LearningService {
     ]);
     if (!cls.rows[0]) throw new ApiError('validation', 'Choose a class from the list.', { fields: { classId: 'Choose a class from the list.' } });
     if (!sub.rows[0]) throw new ApiError('validation', 'Choose a subject from the list.', { fields: { subjectId: 'Choose a subject from the list.' } });
-    const today = istToday();
+    const today = schoolToday();
     if (body.dueOn < today) throw new ApiError('validation', 'The due date cannot be in the past.', { fields: { dueOn: 'Pick today or a later day.' } });
     const status = body.draft ? 'draft' : 'set';
     const client = await t.pool.connect();
@@ -132,7 +132,7 @@ export class LearningService {
     for (const m of body.marks) {
       if (m.score != null && m.score > hw.max_marks) throw new ApiError('validation', `Marks cannot be more than ${hw.max_marks}.`, { fields: { score: `The most is ${hw.max_marks}.` } });
     }
-    const today = istToday();
+    const today = schoolToday();
     const client = await t.pool.connect();
     try {
       await client.query('begin');

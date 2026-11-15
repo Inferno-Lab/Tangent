@@ -7,6 +7,7 @@ import { FilesService } from './files.service.js';
 import { HubService } from './hub.service.js';
 import { StreamService } from './stream.service.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
+import { fmtDate } from '@tangent/contracts';
 
 type User = { id: string; name: string; permissions: readonly string[] };
 type Row = {
@@ -101,7 +102,7 @@ export class NoticesService implements OnModuleInit {
     await this.attach(t, id, b.fileIds);
     if (status === 'pending') {
       await t.pool.query("insert into approvals (id, kind, title, subtitle, requester_name, requested_by, subject_ref, payload) values ($1,'notice',$2,$3,$4,$5,$6,$7)",
-        [newId('apr'), b.title, `Written by ${user.name}${b.publishAt ? `, to go out ${new Date(b.publishAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}` : ''}`, user.name, user.id, id, JSON.stringify({ noticeId: id })]);
+        [newId('apr'), b.title, `Written by ${user.name}${b.publishAt ? `, to go out ${fmtDate(b.publishAt, 'stamp')}` : ''}`, user.name, user.id, id, JSON.stringify({ noticeId: id })]);
     }
     if (b.publishAt && !needsApproval) await enqueue(this.hubs.hub.o.pool as never, 'notices.publish', t.info.id, { noticeId: id }, new Date(b.publishAt));
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: `notice.${b.publishAt && status === 'draft' ? 'scheduled' : status}`, entity: 'notice', entityId: id, detail: { title: b.title } });

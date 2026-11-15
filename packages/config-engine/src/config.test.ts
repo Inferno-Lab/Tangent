@@ -42,7 +42,7 @@ describe('resolveConfig', () => {
   it('builds the whole menu in group order, tabs with their own addresses, Moving in only before go-live', () => {
     const all = resolveConfig({ settings, entitlement: entitlement(['fees', 'library']), live: false });
     expect(all.menu.map((g) => g.group)).toEqual(['Home', 'People', 'Money', 'Campus', 'School']);
-    expect(all.menu.find((g) => g.group === 'Money')!.pages[0]!.tabs.map((t) => t.href)).toEqual(['/fees/overview', '/fees/invoices', '/fees/receipts', '/fees/online', '/fees/structure']);
+    expect(all.menu.find((g) => g.group === 'Money')!.pages[0]!.tabs.map((t) => t.href)).toEqual(['/fees/overview', '/fees/invoices', '/fees/receipts', '/fees/online', '/fees/structure', '/fees/settings']);
     expect(all.menu.flatMap((g) => g.pages.map((p) => p.id))).toContain('move');
     expect(resolveConfig({ settings, entitlement: entitlement(['fees']) }).menu.flatMap((g) => g.pages.map((p) => p.id))).not.toContain('move');
   });

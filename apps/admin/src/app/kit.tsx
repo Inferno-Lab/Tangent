@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Field, FilePick, tintFor, Icon, type IconName } from '@tangent/web-ui';
 import { useApp } from './context';
 import { HttpError } from '@tangent/api-client';
+import { fmtDate } from '@tangent/contracts';
 
 export const Ico = ({ d }: { d: IconName }) => <Icon name={d} />;
 export const PLUS = 'plus';
@@ -26,8 +27,8 @@ export function problem(e: unknown): Record<string, string> {
   return { _: (e as Error).message || 'Something went wrong. Try again.' };
 }
 
-export const dateLabel = (day: string) => new Date(`${day}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-export const stamp = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true });
+export const dateLabel = (day: string) => fmtDate(day, 'day');
+export const stamp = (iso: string) => fmtDate(iso, 'stamp');
 
 /** Find a student by name or admission number; the choice shows as a chip that clears with a click. */
 export function StudentPick({ label, value, onChange, error }: { label: string; value: { id: string; name: string; className: string } | null; onChange: (s: { id: string; name: string; className: string } | null) => void; error?: string }) {

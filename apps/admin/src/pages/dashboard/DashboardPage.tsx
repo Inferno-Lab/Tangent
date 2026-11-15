@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { dashboardPieces } from '@tangent/config-engine';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { inr, lakhs, type ApprovalRow, type DashboardData } from '@tangent/contracts';
+import { fmtNumber, fmtMoneyShort, fmtMoney, type ApprovalRow, type DashboardData } from '@tangent/contracts';
 import { Dialog, EmptyCard, IC, type PageIcon, PageScope, TONES, rollDigits, tintFor, useIsPhone, useToast, EmptyState } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { useShellChrome } from '../../app/Layout';
@@ -30,7 +30,7 @@ const H = 236;
 const UP = 'upRight';
 const DOWN = 'downRight';
 
-const money = (n: number) => (n >= 100000 ? `₹${lakhs(n)}` : `₹${Math.round(n / 1000)}k`);
+const money = (n: number) => fmtMoneyShort(n);
 /** A round top for the chart so the gridlines fall on friendly numbers. */
 function niceMax(v: number): number {
   const steps = [20000, 40000, 100000, 200000, 400000, 1000000, 2000000, 4000000, 10000000];
@@ -158,9 +158,9 @@ function DashboardDesktop() {
       newOpen, setNewOpen: (o: boolean) => { setNewOpen(o); setRangeOpen(false); },
       news: pieces.filter((p) => p.kind === 'new').map((n, i) => ({ t: n.label, ic: ((n.icon && n.icon in IC ? n.icon : 'dashboard') as PageIcon), k: n.keys ?? '', d: 50 + i * 45, go: () => { setNewOpen(false); app.go(n.to ?? '/'); } })),
       dayLine: d.day.isToday ? `${d.day.label} · ${d.day.clock}` : `${d.day.label} · last school day`,
-      kPresent: rollDigits(inr(d.present.value)), totalStudents: inr(d.present.total),
+      kPresent: rollDigits(fmtNumber(d.present.value)), totalStudents: fmtNumber(d.present.total),
       presentTrend: trend(d.present.deltaPct), presentVersus: d.present.versus,
-      kFees: rollDigits(inr(d.fees.collected)), feeMonth: d.fees.monthLabel, feePct: d.fees.pct, feeDue: inr(d.fees.due), feeTrend: trend(d.fees.deltaPct),
+      kFees: rollDigits(fmtNumber(d.fees.collected)), feeMonth: d.fees.monthLabel, feePct: d.fees.pct, feeDue: fmtMoney(d.fees.due), feeTrend: trend(d.fees.deltaPct),
       overdueLine: `${d.fees.overdueFamilies} ${d.fees.overdueFamilies === 1 ? 'family' : 'families'} overdue`,
       kLeft: rollDigits(String(left)), avatars: d.approvals.avatars.map((a) => ({ initials: a.initials, ...(TONES[a.tone] ?? TONES.violet!) })), moreAvatars: Math.max(0, d.approvals.count - 3),
       chartTitle: kind === 'attendance' ? `Attendance, last ${pts.length} school ${pts.length === 1 ? 'day' : 'days'}` : kind === 'fees' ? 'Fees collected each day' : 'Homework handed in on time',

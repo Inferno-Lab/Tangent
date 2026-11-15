@@ -1,23 +1,21 @@
 import { useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { APP_CATALOG, MODULES } from '@tangent/config-engine';
-import {
-  APP_ROLE_KEYS, MESSAGE_EVENTS, PERMISSION_CATALOG, SETTINGS_META, SchoolSettingsSchema,
-  type EffectiveConfig, type SettingMeta, type SettingsResponse,
-} from '@tangent/contracts';
+import { MODULES } from '@tangent/config-engine';
+import { fmtNumber, PERMISSION_CATALOG, SETTINGS_META, SchoolSettingsSchema, type EffectiveConfig, type SettingMeta, type SettingsResponse } from '@tangent/contracts';
 import { EmptyCard, Segmented, useToast } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page } from '../../app/Page';
+import { SettingsEditor } from '../../app/SettingsView';
 import { usePageTabs } from '../../app/tabs';
 import { AskTangent } from './AskTangent';
 
 /**
- * How Tangent has set the school up, to read: the school changes none of it (docs/product-map.md, "schools configure nothing").
- * Every value is read from the settings and the module definitions, so a new setting shows here with no change to this page.
+ * Who the school is and how it works: the school changes its own settings here (identity, the app, messages, privacy,
+ * sign-in) and each module's on that module's Settings tab; what Tangent sets (the plan, the app's look, locks) shows
+ * read-only, and "Ask Tangent" asks for the rest. Every value comes from the settings and the module definitions.
  */
 const dflt = (k: string): unknown => (SchoolSettingsSchema.shape as Record<string, { safeParse: (v: unknown) => { data?: unknown } }>)[k]?.safeParse(undefined).data;
-const ROLE_NAMES: Record<string, string> = { parent: 'Parents', student: 'Students', teacher: 'Teachers', driver: 'Bus drivers' };
-const AREA: Record<string, string> = { data: 'Your data', identity: 'School identity', plan: 'Plan and modules', app: 'The app', roles: 'Roles', messages: 'Messages', privacy: 'Privacy notice' };
+const AREA: Record<string, string> = { data: 'Your data', identity: 'School identity', plan: 'Plan and modules', app: 'The app', roles: 'Roles', messages: 'Messages', privacy: 'Privacy notice', security: 'Sign-in and security' };
 
 function show(m: SettingMeta, v: unknown): ReactNode {
   if (v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length)) return <span className="help">Not set</span>;
@@ -51,7 +49,7 @@ function Rows({ doc, keys }: { doc: SettingsResponse; keys: string[] }) {
     </div>
   );
 }
-const keysIn = (...groups: string[]) => Object.entries(SETTINGS_META).filter(([, m]) => groups.includes(m.group) && !['appRoles', 'appLayout', 'notifyRules', 'templates'].includes(m.kind)).map(([k]) => k);
+const editable = (...groups: string[]) => Object.entries(SETTINGS_META).filter(([, m]) => groups.includes(m.group)).map(([k]) => k);
 
 export function ProfilePage() {
   const app = useApp();
@@ -64,31 +62,26 @@ export function ProfilePage() {
   const d = doc.data;
   const c = cfg.data;
   return (
-    <Page title="School profile" sub="How Tangent has set up your school. To change anything, ask Tangent." toast={toast} loading={doc.isLoading || cfg.isLoading}
+    <Page title="School profile" sub="Who your school is and how it works. Change what is yours; ask Tangent for the rest." toast={toast} loading={doc.isLoading || cfg.isLoading}
       error={err ? { message: (err.error as Error).message, retry: () => void err.refetch() } : null}
       tabs={tabs} actions={<><button className="btn pri" onClick={() => setAsking(true)}>Ask Tangent to change this</button></>}
       overlays={asking && <AskTangent area={AREA[tab] ?? 'School profile'} onClose={() => setAsking(false)} onDone={() => { setAsking(false); say('Sent to Tangent. The answer shows when you ask again.'); }} />}>
       {d && c && (
         <div className="stack" style={{ gap: 16 }}>
           {tab === 'identity' && <>
-            <Card title="The school"><Rows doc={d} keys={keysIn('School identity', 'Look')} /></Card>
+            <SettingsEditor title="The school" keys={editable('School identity', 'Look')} say={say} />
             <Card title="Addresses">
               <div className="kv"><span>The admin</span><b>{`${window.location.host}${app.base}`}</b></div>
               <div className="kv"><span>School code (families type it in the app)</span><b>{app.slug.toUpperCase()}</b></div>
             </Card>
-            <Card title="Sign-in and security"><Rows doc={d} keys={keysIn('Sign-in and security')} /></Card>
           </>}
+          {tab === 'security' && <SettingsEditor title="Sign-in and security" keys={editable('Sign-in and security')} say={say} />}
           {tab === 'plan' && <Plan doc={d} cfg={c} />}
-          {tab === 'app' && <AppSetup doc={d} cfg={c} />}
+          {tab === 'app' && <SettingsEditor title="The app" keys={editable('The app')} say={say} />}
           {tab === 'roles' && <Roles cfg={c} />}
-          {tab === 'messages' && <Messages doc={d} cfg={c} />}
+          {tab === 'messages' && <><Channels /><SettingsEditor title="Messages" keys={editable('Messaging')} say={say} /></>}
           {tab === 'data' && <YourData say={say} />}
-          {tab === 'privacy' && <>
-            <Card title="Privacy notice">
-              <p style={{ margin: 0, font: '400 14px/1.6 var(--fb)', whiteSpace: 'pre-wrap' }}>{c.privacy.notice || 'Tangent has not written the school’s privacy notice yet.'}</p>
-            </Card>
-            <Card title="Privacy and consent"><Rows doc={d} keys={keysIn('Privacy').filter((k) => k !== 'privacy.notice')} /></Card>
-          </>}
+          {tab === 'privacy' && <SettingsEditor title="Privacy and consent" keys={editable('Privacy')} say={say} />}
         </div>
       )}
     </Page>
@@ -101,9 +94,9 @@ function Plan({ doc, cfg }: { doc: SettingsResponse; cfg: EffectiveConfig }) {
   const off = MODULES.filter((m) => !m.core && m.state !== 'planned' && !cfg.modules.includes(m.key));
   return <>
     <Card title={`${u.plan.charAt(0).toUpperCase()}${u.plan.slice(1)} plan`}>
-      <div className="kv"><span>Students</span><b>{u.students.toLocaleString('en-IN')}{u.studentLimit ? ` of ${u.studentLimit.toLocaleString('en-IN')}` : ''}</b></div>
-      <div className="kv"><span>Staff</span><b>{u.staff.toLocaleString('en-IN')}</b></div>
-      <div className="kv"><span>Texts this month</span><b>{u.smsUsed.toLocaleString('en-IN')} of {u.smsLimit.toLocaleString('en-IN')}</b></div>
+      <div className="kv"><span>Students</span><b>{fmtNumber(u.students)}{u.studentLimit ? ` of ${fmtNumber(u.studentLimit)}` : ''}</b></div>
+      <div className="kv"><span>Staff</span><b>{fmtNumber(u.staff)}</b></div>
+      <div className="kv"><span>Texts this month</span><b>{fmtNumber(u.smsUsed)} of {fmtNumber(u.smsLimit)}</b></div>
     </Card>
     {on.map((m) => {
       const keys = m.settings.filter((k) => k in SETTINGS_META);
@@ -121,27 +114,6 @@ function Plan({ doc, cfg }: { doc: SettingsResponse; cfg: EffectiveConfig }) {
         {off.map((m) => <div key={m.key} className="kv" style={{ alignItems: 'flex-start' }}><span style={{ minWidth: 0 }}>{m.name}<small style={{ display: 'block', color: 'var(--ink3)' }}>{m.blurb}</small></span><b></b></div>)}
       </Card>
     )}
-  </>;
-}
-
-function AppSetup({ doc, cfg }: { doc: SettingsResponse; cfg: EffectiveConfig }) {
-  const label = (slot: 'dock' | 'home' | 'quick', k: string) => APP_CATALOG[slot].find((p) => p.key === k)?.label ?? k;
-  const roles = APP_ROLE_KEYS.filter((r) => cfg.app.roles.includes(r));
-  return <>
-    <Card title="Who uses the app">
-      {APP_ROLE_KEYS.map((r) => <div key={r} className="kv"><span>{ROLE_NAMES[r]}</span><b><span className={`chip ${cfg.app.roles.includes(r) ? 'g' : ''}`}>{cfg.app.roles.includes(r) ? 'Use the app' : 'Off'}</span></b></div>)}
-    </Card>
-    {roles.map((r) => {
-      const l = cfg.app.layout[r];
-      return (
-        <Card key={r} title={`What ${ROLE_NAMES[r]!.toLowerCase()} see`}>
-          <div className="kv"><span>Tabs along the bottom</span><b>{l.dock.map((k) => label('dock', k)).join(' · ') || '–'}</b></div>
-          <div className="kv"><span>Home screen</span><b>{l.home.map((k) => label('home', k)).join(' · ') || '–'}</b></div>
-          <div className="kv"><span>Quick buttons</span><b>{l.quick.map((k) => label('quick', k)).join(' · ') || '–'}</b></div>
-        </Card>
-      );
-    })}
-    <Card title="Languages and look"><Rows doc={doc} keys={keysIn('The app')} /></Card>
   </>;
 }
 
@@ -172,35 +144,19 @@ function Roles({ cfg }: { cfg: EffectiveConfig }) {
   </>;
 }
 
-const CH = [['push', 'App'], ['sms', 'Text'], ['email', 'Email']] as const;
 const STATE = { on: { text: 'On', tone: 'g' }, test: { text: 'Test mode', tone: 'a' }, sandbox: { text: 'Not connected yet', tone: '' } } as const;
 
-function Messages({ doc, cfg }: { doc: SettingsResponse; cfg: EffectiveConfig }) {
+/** Which services carry the school's messages: Tangent connects them, so this is read-only. */
+function Channels() {
   const app = useApp();
   const ch = useQuery({ queryKey: ['settings', 'channels'], queryFn: app.api.settings.channels });
-  const rules = (doc.values['notify.rules'] ?? {}) as Record<string, { push: boolean; sms: boolean; email: boolean }>;
-  const words = (doc.values['templates.messages'] ?? {}) as Record<string, string>;
-  const has = (k: string) => cfg.modules.includes(k) || cfg.features.includes(k) || MODULES.some((m) => m.core && m.key === k);
-  const events = MESSAGE_EVENTS.filter((e) => has(e.needs));
-  return <>
+  return (
     <Card title="How messages travel">
       {ch.isError ? <p className="help">{(ch.error as Error).message}</p> : (ch.data?.channels ?? []).map((x) => (
         <div key={x.capability} className="kv"><span style={{ minWidth: 0 }}>{x.label}<small style={{ display: 'block', color: 'var(--ink3)' }}>{x.provider ?? (x.state === 'sandbox' ? 'Messages go to Tangent’s test inbox for now.' : '')}</small></span><b><span className={`chip ${STATE[x.state].tone}`}>{STATE[x.state].text}</span></b></div>
       ))}
-      <Rows doc={doc} keys={keysIn('Messaging')} />
     </Card>
-    <Card title="Each message">
-      {events.map((e) => {
-        const r = rules[e.key] ?? e.defaults;
-        return (
-          <div key={e.key} className="kv" style={{ alignItems: 'flex-start', gap: 16 }}>
-            <span style={{ minWidth: 0 }}>{e.label}<small style={{ display: 'block', color: 'var(--ink3)', font: '400 12px/1.4 var(--fb)' }}>“{words[e.key]?.trim() || e.text}”</small></span>
-            <b style={{ textAlign: 'right' }}>{CH.filter(([k]) => r[k]).map(([, l]) => l).join(' · ') || 'Not sent'}</b>
-          </div>
-        );
-      })}
-    </Card>
-  </>;
+  );
 }
 
 /** Everything the school has, in the import templates: what it would take to another system. Its data is its own. */

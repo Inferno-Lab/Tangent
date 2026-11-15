@@ -6,6 +6,7 @@ import { uploadFile } from '@tangent/api-client';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { AddBtn, AreaField, Avatar, Ico, problem, stamp, useOpenParam } from '../../app/kit';
+import { fmtDate } from '@tangent/contracts';
 
 const BACK = 'caretLeft';
 const SEND = 'send';
@@ -14,7 +15,7 @@ const ago = (iso: string) => {
   if (m < 1) return 'now';
   if (m < 60) return `${m}m`;
   if (m < 1440) return `${Math.round(m / 60)}h`;
-  return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  return fmtDate(iso, 'day');
 };
 const refresh = (qc: ReturnType<typeof useQueryClient>) => void qc.invalidateQueries({ predicate: (q) => ['messages', 'shell'].includes(String(q.queryKey[0])) });
 

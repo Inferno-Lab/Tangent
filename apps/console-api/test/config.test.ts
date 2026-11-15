@@ -117,7 +117,9 @@ describe('configuration from the console', () => {
     await h.invite(t, { name: 'Ira Implement', email: 'ira@tangent.app', roles: ['implementation'] }, 'long-enough-pass');
     const ira = await h.signIn('ira@tangent.app', 'long-enough-pass');
     expect((await patch({ expectedVersion: (await cfg()).json.version, changes: { 'school.tagline': 'Set by implementation' } }, ira)).status).toBe(200);
-    expect((await h.s('PATCH', '/v1/settings', { school: 'cfgschool', token: school, body: { changes: { 'school.tagline': 'x' } } })).status).toBe(404);
+    // The school changes its own settings now, never Tangent's (the app's look stays with Tangent).
+    const own = await h.s('GET', '/v1/settings/edit', { school: 'cfgschool', token: school });
+    expect((await h.s('PATCH', '/v1/settings', { school: 'cfgschool', token: school, body: { expectedVersion: own.json.version, changes: { 'brand.color': '#123456' } } })).status).toBe(400);
   });
 });
 

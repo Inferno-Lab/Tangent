@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { initials, type ApprovalDecision, type ApprovalKind, type ApprovalRow, type Permission } from '@tangent/contracts';
+import { fmtNumber, initials, type ApprovalDecision, type ApprovalKind, type ApprovalRow, type Permission } from '@tangent/contracts';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { AttendanceService } from './attendance.service.js';
@@ -49,7 +49,7 @@ export class ApprovalsService {
     const n = noticeId ? await t.pool.query<{ n: string }>(
       `select count(distinct sg.guardian_id) n from notices x left join students s on x.class_id is null or s.class_id = x.class_id
        join student_guardians sg on sg.student_id = s.id where x.id = $1`, [noticeId]) : null;
-    return `Notice sent to ${Number(n?.rows[0]?.n ?? 0).toLocaleString('en-IN')} families`;
+    return `Notice sent to ${fmtNumber(Number(n?.rows[0]?.n ?? 0))} families`;
   }
 
   /** The queue behind "Needs you": open requests, plus one line for classes that have not marked attendance. */

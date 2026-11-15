@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Inject, Injectable, Param, Patch, Query } from '@nestjs/common';
 import { POOLS } from './tokens.js';
 import { activeModules, closeModules } from '@tangent/config-engine';
-import { SchoolDetailsPatch, type BuildRow, type DeployTarget, type FleetSummary, type SchoolDetail, type SchoolRow, type SchoolStatus } from '@tangent/contracts';
+import { SchoolDetailsPatch, isZone, type BuildRow, type DeployTarget, type FleetSummary, type SchoolDetail, type SchoolRow, type SchoolStatus } from '@tangent/contracts';
 import { notFound, ApiError, ZodPipe } from '@tangent/nest-kit';
 import type { PoolManager } from '@tangent/tenancy';
 import { unseal } from '@tangent/security';
@@ -100,14 +100,16 @@ export class Schools {
     await this.db.audit(user, 'checklist.changed', 'school', r.id, { key, state });
   }
 
-  async fleet(userId: string): Promise<FleetSummary> {
+  /** The fleet at a glance; requests per hour are counted on the reader's own clock (`tz`, their browser's zone). */
+  async fleet(userId: string, tz = 'UTC'): Promise<FleetSummary> {
+    const zone = isZone(tz) ? tz : 'UTC';
     const [schools, cells, series, p95, incident, seen] = await Promise.all([
       this.db.pool.query<{ status: string; health: string; cell: string; slug: string; name: string; id: string; created_at: Date }>('select id, slug, name, status, health, cell, created_at from schools where deleted_at is null'),
       this.db.pool.query<{ key: string; target: DeployTarget; region: string; max_schools: number }>('select key, target, region, max_schools from cells order by key'),
       this.db.pool.query<{ hour: number; day: string; per_min: number }>(
-        `select extract(hour from m.at at time zone 'Asia/Kolkata')::int as hour, case when (m.at at time zone 'Asia/Kolkata')::date = (now() at time zone 'Asia/Kolkata')::date then 'today' else 'previous' end as day,
+        `select extract(hour from m.at at time zone $1)::int as hour, case when (m.at at time zone $1)::date = (now() at time zone $1)::date then 'today' else 'previous' end as day,
            sum(m.requests)::float / 60 as per_min
-         from metrics_minute m where m.at >= (date_trunc('day', now() at time zone 'Asia/Kolkata') - interval '1 day') at time zone 'Asia/Kolkata' group by 1, 2`),
+         from metrics_minute m where m.at >= (date_trunc('day', now() at time zone $1) - interval '1 day') at time zone $1 group by 1, 2`, [zone]),
       this.db.pool.query<{ p95: number | null; at: Date | null }>("select max(p95_ms) p95, (select max(at) from metrics_minute) at from metrics_minute where at >= now() - interval '1 hour'"),
       this.db.pool.query<{ id: string; title: string; state: 'open' | 'resolved'; started_at: Date; school_id: string | null; school_name: string | null }>(
         `select i.id, i.title, i.state, i.started_at, i.school_id, s.name school_name from incidents i left join schools s on s.id = i.school_id

@@ -5,9 +5,11 @@ import { FilesService } from './files.service.js';
 import { LearningService } from './learning.service.js';
 import { pdf, type PdfLine } from './pdf.js';
 import { SettingsService } from './support.js';
+import { fmtDate, fmtMoney } from '@tangent/contracts';
 
-const rupees = (n: number) => `₹${n.toLocaleString('en-IN')}`;
-const date = (d: string) => new Date(`${d}T00:00:00+05:30`).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' });
+// A receipt or report card is written in the school's own way: its currency, its dates.
+const rupees = (n: number) => fmtMoney(n);
+const date = (d: string) => fmtDate(d, 'long');
 
 /** Printable receipts and report cards, made on request (nothing to keep in sync): the school's header, then the facts. */
 @Injectable()

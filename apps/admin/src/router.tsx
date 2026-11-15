@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { reportErrors } from '@tangent/web-ui';
-import { Outlet, createRootRouteWithContext, createRoute, createRouter, redirect, useRouter, lazyRouteComponent } from '@tanstack/react-router';
+import { Outlet, createRootRouteWithContext, createRoute, createRouter, redirect, useParams, useRouter, lazyRouteComponent } from '@tanstack/react-router';
 import { useMemo } from 'react';
 import { AppContext, type AppCtx } from './app/context';
 import { makeClient, session, type Client } from './app/client';
@@ -9,6 +9,7 @@ import { LoginRoute } from './pages/login/LoginRoute';
 import { NotFoundPage } from './pages/status/StatusPages';
 import { PlanGate } from './pages/status/PlanGate';
 import { AppLayout } from './app/Layout';
+import { SettingsTab } from './app/SettingsView';
 
 export interface RouterCtx {
   slug: string;
@@ -57,10 +58,16 @@ const authed = createRoute({
 });
 
 // Each page also answers at `<page>/<tab>`: the tabs its module defines (app/tabs.tsx reads which one).
+// Any page's Settings tab (`<page>/settings`) is the one shared settings view, with the page's own title and tabs.
 const page = (path: string, load: () => Promise<Record<string, unknown>>, name: string) => {
   const component = lazyRouteComponent(load as never, name);
   const at = createRoute({ getParentRoute: () => authed, path, component });
-  return path === '/' ? [at] : [at, createRoute({ getParentRoute: () => authed, path: `${path}/$tab`, component })];
+  const Tabbed = () => {
+    const { tab } = useParams({ strict: false }) as { tab?: string };
+    const Page = component;
+    return tab === 'settings' ? <SettingsTab path={path} /> : <Page />;
+  };
+  return path === '/' ? [at] : [at, createRoute({ getParentRoute: () => authed, path: `${path}/$tab`, component: Tabbed })];
 };
 
 const routeTree = root.addChildren([

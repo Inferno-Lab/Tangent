@@ -7,9 +7,10 @@ import { Card, Page, useToast } from '../../app/Page';
 import { AddBtn, AreaField, SEARCH, StudentPick, dateLabel, problem, stamp } from '../../app/kit';
 import { useShellChrome } from '../../app/Layout';
 import { usePageTabs } from '../../app/tabs';
+import { fmtMoney } from '@tangent/contracts';
 
 type Tab = 'books' | 'loans' | 'waiting';
-const rupees = (n: number) => `₹${n.toLocaleString('en-IN')}`;
+const rupees = (n: number) => fmtMoney(n);
 
 export function LibraryPage() {
   const app = useApp();

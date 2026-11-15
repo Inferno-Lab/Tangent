@@ -1,5 +1,5 @@
 import { Injectable, type OnModuleInit } from '@nestjs/common';
-import { istToday, type BusPosition, type BusRouteInput, type BusRouteRow, type RiderInput, type RiderRow, type TransportView } from '@tangent/contracts';
+import { fmtDate, schoolToday, type BusPosition, type BusRouteInput, type BusRouteRow, type RiderInput, type RiderRow, type TransportView } from '@tangent/contracts';
 import { enqueue, newId, type Job } from '@tangent/db';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import { TenantService, type AuthedUser, type TenantCtx } from '../tenancy/tenant.js';
@@ -31,7 +31,7 @@ export class TransportService implements OnModuleInit {
       if (!s) return 'School not found.';
       const t = await this.tenants.resolve(s.slug);
       const moved = await this.pollTrackers(t);
-      const still = (await t.pool.query("select 1 from bus_trips b join transport_routes r on r.id = b.route_id where b.day = $1 and b.ended_at is null and r.tracker_id <> '' limit 1", [istToday()])).rowCount;
+      const still = (await t.pool.query("select 1 from bus_trips b join transport_routes r on r.id = b.route_id where b.day = $1 and b.ended_at is null and r.tracker_id <> '' limit 1", [schoolToday()])).rowCount;
       if (still) await enqueue(this.hubs.hub.o.pool as never, 'transport.poll', s.id, { at: Date.now() }, new Date(Date.now() + 30_000));
       return `${moved} buses moved.`;
     });
@@ -49,7 +49,7 @@ export class TransportService implements OnModuleInit {
       t.pool.query('select * from bus_positions'),
       t.pool.query(`select b.*, (select count(*) filter (where m.event = 'boarded') from bus_trip_marks m where m.trip_id = b.id)::int boarded,
         (select count(*) filter (where m.event = 'dropped') from bus_trip_marks m where m.trip_id = b.id)::int dropped,
-        (select count(*) filter (where m.event = 'absent') from bus_trip_marks m where m.trip_id = b.id)::int absent from bus_trips b where b.day = $1 order by b.started_at`, [istToday()]),
+        (select count(*) filter (where m.event = 'absent') from bus_trip_marks m where m.trip_id = b.id)::int absent from bus_trips b where b.day = $1 order by b.started_at`, [schoolToday()]),
     ]);
     const n = new Map(riders.rows.map((r) => [r.route_id, r.n]));
     const pos = new Map(bus.rows.map((b) => [b.route_id, b]));
@@ -192,7 +192,7 @@ export class TransportService implements OnModuleInit {
       this.routes(t, routes),
       t.pool.query<{ route_id: string; stop_id: string | null; id: string; name: string; class_name: string }>(
         "select a.route_id, a.stop_id, s.id, s.name, c.name class_name from transport_assignments a join students s on s.id = a.student_id and s.status = 'active' join classes c on c.id = s.class_id where a.route_id = any($1) order by s.name", [routes]),
-      t.pool.query<{ trip_id: string; student_id: string; event: string }>('select m.trip_id, m.student_id, m.event from bus_trip_marks m join bus_trips b on b.id = m.trip_id where b.day = $1 and b.route_id = any($2)', [istToday(), routes]),
+      t.pool.query<{ trip_id: string; student_id: string; event: string }>('select m.trip_id, m.student_id, m.event from bus_trip_marks m join bus_trips b on b.id = m.trip_id where b.day = $1 and b.route_id = any($2)', [schoolToday(), routes]),
     ]);
     return {
       routes: rows.map((r) => ({
@@ -205,7 +205,7 @@ export class TransportService implements OnModuleInit {
 
   async startTrip(t: TenantCtx, user: AuthedUser, routeId: string, kind: 'morning' | 'afternoon') {
     await this.mayDrive(t, user, routeId);
-    const day = istToday();
+    const day = schoolToday();
     const open = (await t.pool.query<{ id: string }>('select id from bus_trips where route_id = $1 and day = $2 and kind = $3', [routeId, day, kind])).rows[0];
     const id = open?.id ?? newId('trp');
     if (!open) await t.pool.query('insert into bus_trips (id, route_id, day, kind, driver_id) values ($1,$2,$3,$4,$5)', [id, routeId, day, kind, user.id]);
@@ -255,7 +255,7 @@ export class TransportService implements OnModuleInit {
     await t.pool.query('insert into bus_trip_marks (trip_id, student_id, event, stop_id) values ($1,$2,$3,$4) on conflict (trip_id, student_id) do update set event = excluded.event, stop_id = excluded.stop_id, at = now()',
       [tripId, m.studentId, m.event, m.stopId]);
     const fam = await this.families(t, trip.route_id, m.studentId);
-    const time = new Date().toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' });
+    const time = fmtDate(new Date(), 'time');
     const event = m.event === 'boarded' ? 'got on' : m.event === 'dropped' ? 'got off' : 'was not at';
     await this.messenger.notify(t, 'bus.dropped', fam.filter((f) => f.phone).map((f) => ({ to: f.phone!, vars: { student: f.student, stop: f.stop ?? 'the stop', event, time } })));
     await this.stream.emit(t, fam.map((f) => f.user_id).filter((x): x is string => !!x), { type: 'bus.trip', data: { routeId: trip.route_id, tripId, studentId: m.studentId, event: m.event } });
@@ -280,7 +280,7 @@ export class TransportService implements OnModuleInit {
    */
   async pollTrackers(t: TenantCtx): Promise<number> {
     const running = (await t.pool.query<{ route_id: string; tracker_id: string }>(
-      "select b.route_id, r.tracker_id from bus_trips b join transport_routes r on r.id = b.route_id where b.day = $1 and b.ended_at is null and r.tracker_id <> ''", [istToday()])).rows;
+      "select b.route_id, r.tracker_id from bus_trips b join transport_routes r on r.id = b.route_id where b.day = $1 and b.ended_at is null and r.tracker_id <> ''", [schoolToday()])).rows;
     if (!running.length) return 0;
     const r = await this.hubs.hub.resolve('tracking', t.info.id, t.info.slug).catch(() => null);
     if (!r?.adapter.tracking) return 0;
@@ -297,7 +297,7 @@ export class TransportService implements OnModuleInit {
     const cfg = await this.settings.effective(t);
     if (!cfg.features.includes('transport.liveBus')) return 0;
     const near = await this.settings.value<number>(t, 'transport.nearMinutes', 10);
-    const today = istToday();
+    const today = schoolToday();
     const stops = (await t.pool.query<{ id: string; name: string; lat: number; lng: number }>(
       'select id, name, lat, lng from transport_stops s where route_id = $1 and lat is not null and not exists (select 1 from bus_near_sent n where n.stop_id = s.id and n.day = $2)', [routeId, today])).rows;
     const maps = await this.hubs.hub.resolve('maps', t.info.id, t.info.slug).catch(() => null);

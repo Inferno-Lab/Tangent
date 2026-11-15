@@ -1,10 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { commitImport, newId, previewImport } from '@tangent/db';
-import {
-  addDays, dayLabel, initials, istToday, latestSchoolDay, schoolDaysEnding,
-  type AssignFee, type AttendanceStatus, type ContactReveal, type FeeStatus, type ImportResult, type MessageRequest,
-  type GuardianRow, type GuardiansPut, type Paged, type StudentCreate, type StudentDetail, type StudentPatch, type StudentQuery, type StudentRow, type StudentSummary, type StudentViews,
-} from '@tangent/contracts';
+import { schoolInstant, addDays, dayLabel, initials, schoolToday, latestSchoolDay, schoolDaysEnding, type AssignFee, type AttendanceStatus, type ContactReveal, type FeeStatus, type ImportResult, type MessageRequest, type GuardianRow, type GuardiansPut, type Paged, type StudentCreate, type StudentDetail, type StudentPatch, type StudentQuery, type StudentRow, type StudentSummary, type StudentViews } from '@tangent/contracts';
 import { maskPhone } from '@tangent/security';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
@@ -29,7 +25,7 @@ export class StudentsService {
 
   /** The latest school day and the ten before it, for the tick marks. */
   private days(OFF_DAYS: readonly number[], n = 10): { last: string; days: string[]; today: string } {
-    const today = istToday();
+    const today = schoolToday();
     return { today, last: latestSchoolDay(today, OFF_DAYS), days: schoolDaysEnding(today, n, OFF_DAYS) };
   }
 
@@ -251,7 +247,7 @@ export class StudentsService {
     const h = hw.rows[0];
     if (h) out.push({ id: h.id, at: h.at.toISOString(), label: `Handed in “${h.title}”`, sub: '', tone: 'v' });
     const a = att.rows[0];
-    if (a) out.push({ id: a.id, at: `${a.date}T08:00:00+05:30`, label: a.status === 'late' ? 'Arrived late' : 'Absent', sub: a.marker ? `marked by ${a.marker}` : '', tone: 'a' });
+    if (a) out.push({ id: a.id, at: schoolInstant(a.date, '08:00').toISOString(), label: a.status === 'late' ? 'Arrived late' : 'Absent', sub: a.marker ? `marked by ${a.marker}` : '', tone: 'a' });
     return out;
   }
 

@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { DATA_REQUEST_KINDS, type DataRequestRow } from '@tangent/contracts';
+import { fmtDate, DATA_REQUEST_KINDS, type DataRequestRow } from '@tangent/contracts';
 import { Dialog, Field, SelectField, useShake, useToast, EmptyState } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { AddBtn, AreaField, problem } from '../../app/kit';
 import { Page } from '../../app/Page';
 
 const KIND = { access: 'Copy of their data', correction: 'Correction', erasure: 'Erasure' } as const;
-const when = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
+const when = (iso: string) => fmtDate(iso, 'dayYear');
 
 /** Families' requests about their data: those sent from the app and those the office logs, each answered and closed once. */
 export function PrivacyPage() {

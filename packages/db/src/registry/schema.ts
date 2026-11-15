@@ -83,6 +83,11 @@ export const schools = pgTable(
     /** What the host said about the school's own address: verified, certificate, the DNS target to point at. */
     domainState: jsonb('domain_state').$type<{ verified?: boolean; certificate?: string; target?: string; checkedAt?: string; error?: string }>().notNull().default({}),
     appName: text('app_name').notNull().default(''),
+    /** A copy of the school's own settings (school.country, .timezone, .locale, .currency), so every server knows its "today". */
+    country: text('country').notNull().default('IN'),
+    timezone: text('timezone').notNull().default('Asia/Kolkata'),
+    locale: text('locale').notNull().default('en-IN'),
+    currency: text('currency').notNull().default('INR'),
     studentsCount: integer('students_count').notNull().default(0),
     health: text('health').notNull().default('unknown'),
     healthMs: integer('health_ms'),

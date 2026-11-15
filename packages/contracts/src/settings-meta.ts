@@ -1,4 +1,13 @@
 import type { SettingKey } from './config.js';
+import { COUNTRIES, LOCALES, ZONES } from './locale.js';
+
+const regionName = (c: string): string => {
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'region' }).of(c) ?? c;
+  } catch {
+    return c;
+  }
+};
 
 /** How the console edits a setting. The console builds its Configuration forms from this list, so a new setting needs no new screen. */
 export type SettingKind =
@@ -27,7 +36,7 @@ export interface SettingMeta {
  * lock a whole area of the school's data. Tangent can still change any setting for support, and lock one for one school.
  */
 export const TANGENT_SETTINGS: readonly SettingKey[] = [
-  'brand.color', 'classes.schoolEdits', 'calendar.schoolEdits', 'timetable.schoolEdits', 'feeStructures.schoolEdits', 'staff.schoolAssignsRoles',
+  'brand.color', 'school.country', 'school.currency', 'classes.schoolEdits', 'calendar.schoolEdits', 'timetable.schoolEdits', 'feeStructures.schoolEdits', 'staff.schoolAssignsRoles',
 ];
 export const settingOwner = (key: string): 'school' | 'tangent' => ((TANGENT_SETTINGS as readonly string[]).includes(key) ? 'tangent' : 'school');
 
@@ -57,6 +66,10 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = {
   'school.email': { group: 'School identity', label: 'Office email', kind: 'text', help: 'The app’s Help writes to it.' },
   'school.address': { group: 'School identity', label: 'Address', kind: 'textarea', help: 'On receipts, report cards and the app’s Help.' },
   'school.language': { group: 'School identity', label: 'Default language', kind: 'language', options: LANGUAGES },
+  'school.country': { group: 'School identity', label: 'Country', kind: 'enum', options: COUNTRIES.map((c) => [c, regionName(c)]), help: 'Sets the rules that follow the country: tax, IDs, phone numbers, holidays and reports to the government.' },
+  'school.timezone': { group: 'School identity', label: 'Time zone', kind: 'enum', options: ZONES.map((z) => [z, z.replace(/_/g, ' ')]), help: 'The school’s “today”: attendance, due dates, reminders and every time shown.' },
+  'school.locale': { group: 'School identity', label: 'How dates and numbers are written', kind: 'enum', options: LOCALES, help: 'For example 1,50,000 or 150,000, and 14 Oct or Oct 14.' },
+  'school.currency': { group: 'School identity', label: 'Currency', kind: 'text', help: 'Fees, fines and receipts. Changing it does not convert amounts already recorded, so Tangent changes it.' },
   'brand.logoText': { group: 'School identity', label: 'Logo letters', kind: 'text', help: 'One or two letters, until a logo image is uploaded.' },
   'brand.logoFileId': { group: 'School identity', label: 'Logo image', kind: 'logo', help: 'A square PNG or JPEG. Shown in the admin menu, on the sign-in pages, receipts and the app.' },
   'brand.color': { group: 'Look', label: 'Brand colour', kind: 'color', help: 'Every colour of the school’s admin, sign-in pages and app is worked out from this colour’s hue (Tangent Hue), in light, dark and AMOLED. Any colour reads well: the contrast is checked for every hue.' },

@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { addDays, istToday, type EnquiryPatch, type EnquiryRow, type EnquiryStage } from '@tangent/contracts';
+import { addDays, schoolToday, type EnquiryPatch, type EnquiryRow, type EnquiryStage } from '@tangent/contracts';
 import { DateField, Dialog, Field, SelectField, useShake, EmptyState } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { AddBtn, AreaField, Avatar, dateLabel, problem, useGrades, useSetting } from '../../app/kit';
+import { usePageTabs } from '../../app/tabs';
 
 const COLUMNS: { stage: EnquiryStage; label: string; hint: string; next: string }[] = [
   { stage: 'enquiry', label: 'Enquiry', hint: 'Asked about a seat', next: 'Back to enquiry' },
@@ -19,6 +20,7 @@ const sourceLabel = (s: string) => (s.includes(' ') || /[A-Z]/.test(s) ? s : s.r
 const refresh = (qc: ReturnType<typeof useQueryClient>) => void qc.invalidateQueries({ predicate: (q) => ['admissions', 'students', 'shell', 'dashboard', 'classes'].includes(String(q.queryKey[0])) });
 
 export function AdmissionsPage() {
+  const { tabs } = usePageTabs('/admissions');
   const app = useApp();
   const qc = useQueryClient();
   const { toast, say } = useToast();
@@ -48,7 +50,7 @@ export function AdmissionsPage() {
   const declined = rows.filter((r) => r.stage === 'declined');
   const open = rows.filter((r) => r.stage !== 'enrolled' && r.stage !== 'declined').length;
   return (
-    <Page title="Admissions" sub={rows.length ? `${open} open · ${rows.filter((r) => r.stage === 'enrolled').length} enrolled` : 'From first enquiry to first day'} toast={toast} loading={list.isLoading && !list.data}
+    <Page title="Admissions" sub={rows.length ? `${open} open · ${rows.filter((r) => r.stage === 'enrolled').length} enrolled` : 'From first enquiry to first day'} tabs={tabs} toast={toast} loading={list.isLoading && !list.data}
       error={list.isError && !list.data ? { message: (list.error as Error).message, retry: () => void list.refetch() } : null}
       actions={canWrite ? <AddBtn onClick={() => setAdding(true)}>New enquiry</AddBtn> : undefined}
       overlays={<>
@@ -147,10 +149,10 @@ function NewEnquiry({ onClose, onDone }: { onClose: () => void; onDone: () => vo
 }
 
 function TestDay({ row, onClose, onPick, busy }: { row: EnquiryRow; onClose: () => void; onPick: (d: string) => void; busy: boolean }) {
-  const [d, setD] = useState(row.testOn ?? addDays(istToday(), 3));
+  const [d, setD] = useState(row.testOn ?? addDays(schoolToday(), 3));
   return (
     <Dialog title="Entrance test" tag={{ text: row.childName, tone: 'v' }} onClose={onClose} width={440}>
-      <DateField label="Day of the test" value={d} min={istToday()} onChange={setD} />
+      <DateField label="Day of the test" value={d} min={schoolToday()} onChange={setD} />
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
         <button className="btn" onClick={onClose}>Cancel</button>
         <button className="btn pri" disabled={busy || !d} onClick={() => onPick(d)}>{busy ? 'Saving…' : 'Book the test'}</button>
@@ -182,7 +184,7 @@ function Enrol({ row, onClose, onDone }: { row: EnquiryRow; onClose: () => void;
       <div className="stack">
         <SelectField label="Class" value={chosen} onChange={(v) => { setClassId(v); setErr({ ...err, classId: '' }); }} error={err.classId}
           options={(fit.length ? fit : classes.data ?? []).map((c) => ({ value: c.id, label: `Class ${c.name} · ${c.studentCount} students` }))} />
-        <DateField label="Date of birth" value={dob} max={istToday()} onChange={(v) => { setDob(v); setErr({ ...err, dob: '' }); }} error={err.dob} />
+        <DateField label="Date of birth" value={dob} max={schoolToday()} onChange={(v) => { setDob(v); setErr({ ...err, dob: '' }); }} error={err.dob} />
         <div className="help">{row.guardianName} · {row.phone || 'no phone yet'} becomes the guardian on the student record.</div>
         {err._ && <div className="emsg" role="alert">{err._}</div>}
       </div>

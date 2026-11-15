@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { PublicStatus } from '@tangent/contracts';
 import { useTheme, Icon, EmptyNote } from '@tangent/web-ui';
+import { fmtDate } from '@tangent/contracts';
 
 const TEXT = { ok: 'Everything is working', degraded: 'Some things are slow', down: 'Something is down' } as const;
 const TONE = { ok: 'g', degraded: 'a', down: 'c' } as const;
@@ -21,7 +22,7 @@ export function StatusBoard() {
         <header>
           <div className="lbl">Tangent status</div>
           <h1 className="fd" style={{ margin: '6px 0 4px', font: '700 30px/1.1 var(--fd)', letterSpacing: '-.035em' }}>{s ? TEXT[s.state] : q.isError ? 'We could not check' : 'Checking…'}</h1>
-          <p style={{ margin: 0, color: 'var(--ink3)', font: '600 14px var(--fb)' }}>{s ? `Updated ${new Date(s.updatedAt).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}. This page refreshes by itself.` : q.isError ? 'Try again in a minute.' : ' '}</p>
+          <p style={{ margin: 0, color: 'var(--ink3)', font: '600 14px var(--fb)' }}>{s ? `Updated ${fmtDate(s.updatedAt, 'time')}. This page refreshes by itself.` : q.isError ? 'Try again in a minute.' : ' '}</p>
         </header>
         {!s && !q.isError && <div className="skc" style={{ height: 220, borderRadius: 24 }} />}
         {s && (
@@ -37,7 +38,7 @@ export function StatusBoard() {
               <div className="ch"><h2>Recent incidents</h2></div>
               {s.incidents.length === 0 ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}><div style={{ width: 90, flex: 'none' }}><span className="itile"><Icon name="checkCircle" size={24} /></span></div><div className="help">Nothing in the last 7 days.</div></div>
-              ) : s.incidents.map((i) => <div className="kv" key={i.id}><span>{i.title}<br /><small style={{ color: 'var(--ink3)' }}>{new Date(i.startedAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</small></span><b><span className={`st ${i.open ? 'c' : 'g'}`}><i></i>{i.open ? 'Open' : 'Resolved'}</span></b></div>)}
+              ) : s.incidents.map((i) => <div className="kv" key={i.id}><span>{i.title}<br /><small style={{ color: 'var(--ink3)' }}>{fmtDate(i.startedAt, 'stamp')}</small></span><b><span className={`st ${i.open ? 'c' : 'g'}`}><i></i>{i.open ? 'Open' : 'Resolved'}</span></b></div>)}
             </section>
           </>
         )}

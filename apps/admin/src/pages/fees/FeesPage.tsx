@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { inr, lakhs, type StudentDetail } from '@tangent/contracts';
+import { fmtMoneyShort, fmtMoney, type StudentDetail } from '@tangent/contracts';
 import { Dialog, EmptyState, Icon, Roll, Select, rollDigits } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
@@ -11,7 +11,7 @@ import { FeeStructure } from './FeeStructure';
 import { InvoicesPage } from './InvoicesPage';
 import { OnlinePaymentsPage } from './OnlinePaymentsPage';
 
-const money = (n: number) => (n >= 100000 ? `₹${lakhs(n)}` : `₹${inr(Math.round(n))}`);
+const money = (n: number) => (n >= 100000 ? fmtMoneyShort(n) : fmtMoney(n));
 
 /** Fees: one page whose tabs the fees module defines (overview, invoices, receipts, online payments, the fee structure). */
 export function FeesPage() {
@@ -137,7 +137,7 @@ function Overview({ tabs }: { tabs: React.ReactNode }) {
                       <span className="fx" style={{ gap: 12, minWidth: 0 }}><span className="av sm">{r.initials}</span><b className="cut">{r.name}</b></span>
                       <span>{r.className}</span>
                       <span className="t2 cut">{r.guardianName}</span>
-                      <b className="num r">₹{inr(r.amountDue)}</b>
+                      <b className="num r">{fmtMoney(r.amountDue)}</b>
                       <span className="r">{canPay && <button className="btn ton sm" disabled={open.isPending} onClick={(e) => { e.stopPropagation(); open.mutate(r.id); }}>Collect</button>}</span>
                     </div>
                   ))}

@@ -35,3 +35,4 @@ export * from './shell/Dock';
 export * from './useMedia';
 export * from './reportErrors';
 export * from './empty/EmptyState';
+export * from './settings';

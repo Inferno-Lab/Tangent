@@ -56,7 +56,7 @@ export function StudentsView({ v }: { v: any }) {
           <div className="sm">
             <span className="l">Fees overdue</span>
             <div className="v">
-              ₹{v.sum.overdue}
+              {v.sum.overdue}
             </div>
             <div className="s">
               <span className="tr dn">{v.sum.families}</span>past the due date

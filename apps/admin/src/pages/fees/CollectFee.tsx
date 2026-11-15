@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { inr, type StudentDetail } from '@tangent/contracts';
+import { type StudentDetail } from '@tangent/contracts';
 import { Dialog, Field, SelectField, useShake } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { DialogActions as Actions, fieldsOf, messageOf } from '../../app/kit';
 import { useShellChrome } from '../../app/Layout';
+import { currencySymbol, fmtDate, fmtMoney } from '@tangent/contracts';
 
 /** Every way a desk can take money; the school offers those Tangent set (fees.paymentMethods). */
 const METHODS = [{ value: 'cash', label: 'Cash' }, { value: 'upi', label: 'UPI' }, { value: 'card', label: 'Card' }, { value: 'netbanking', label: 'Net banking' }, { value: 'cheque', label: 'Cheque' }];
@@ -32,7 +33,7 @@ export function CollectFeeDialog({ student, onClose, onDone }: { student: Studen
     const n = Math.round(Number(amount));
     if (!(n > 0)) { setErr({ amount: 'Enter an amount.' }); shake.hit(); return; }
     setBusy(true);
-    try { const r = await api.fees.pay({ studentId: student.id, invoiceId: chosen.id, amount: n, method: method as 'cash', reference: ref || undefined }); onDone(`Receipt ${r.receiptNo} recorded for ₹${inr(n)}`); }
+    try { const r = await api.fees.pay({ studentId: student.id, invoiceId: chosen.id, amount: n, method: method as 'cash', reference: ref || undefined }); onDone(`Receipt ${r.receiptNo} recorded for ${fmtMoney(n)}`); }
     catch (x) { setBusy(false); setErr({ amount: fieldsOf(x).amount ?? messageOf(x) }); shake.hit(); }
   };
   return (
@@ -44,9 +45,9 @@ export function CollectFeeDialog({ student, onClose, onDone }: { student: Studen
         </>
       ) : (
         <form onSubmit={submit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <SelectField label="Invoice" value={chosen?.id ?? ''} onChange={setPick} options={open.map((i) => ({ value: i.id, label: `${i.title} · ₹${inr(i.amount - i.paid)} due ${i.dueOn.slice(5)}` }))} />
+          <SelectField label="Invoice" value={chosen?.id ?? ''} onChange={setPick} options={open.map((i) => ({ value: i.id, label: `${i.title} · ${fmtMoney(i.amount - i.paid)} due ${fmtDate(i.dueOn, 'day')}` }))} />
           <div className="two">
-            <Field label="Amount (₹)" value={amount} onChange={(v) => { setAmount(v); setErr({}); }} error={err.amount} inputMode="numeric" />
+            <Field label={`Amount (${currencySymbol()})`} value={amount} onChange={(v) => { setAmount(v); setErr({}); }} error={err.amount} inputMode="numeric" />
             <SelectField label="Paid by" value={method} onChange={setMethod} options={methods} />
           </div>
           {method !== 'cash' && <Field label="Reference (optional)" value={ref} onChange={setRef} maxLength={60} />}

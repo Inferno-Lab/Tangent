@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { AppMode } from './theme.js';
+import { COUNTRIES, isCurrency, isLocale, isZone } from './locale.js';
 
 
 /** Attendance marks the data model knows; a school picks which it uses (`attendance.statuses`). */
@@ -34,6 +35,11 @@ export const SchoolSettingsSchema = z.object({
   'school.email': z.string().max(120).default(''),
   'school.address': z.string().max(240).default(''),
   'school.language': z.enum(['en', 'hi', 'mr']).default('en'),
+  // Where the school is and how it writes dates, numbers and money (locale.ts). The wizard sets them from the country.
+  'school.country': z.string().trim().refine((c) => c === '' || COUNTRIES.includes(c), 'Choose a country from the list').default(''),
+  'school.timezone': z.string().refine(isZone, 'Choose a time zone from the list').default('UTC'),
+  'school.locale': z.string().refine(isLocale, 'Write a locale like en-GB').default('en'),
+  'school.currency': z.string().trim().toUpperCase().refine(isCurrency, 'Write a currency code like USD or INR').default('USD'),
   'brand.color': z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a colour like #6A4CF5'),
   'brand.logoText': z.string().max(2).default(''),
   'approvals.notice': z.enum(['required', 'off']).default('required'),
@@ -219,7 +225,7 @@ export interface SchoolBrand {
 
 export interface MenuGroup {
   group: string;
-  pages: { id: string; module: string; label: string; icon: string; keys: string; href: string; tabs: { key: string; label: string; href: string }[] }[];
+  pages: { id: string; module: string; label: string; icon: string; keys: string; href: string; tabs: { key: string; label: string; href: string }[]; /** The school's settings on this page's Settings tab. */ settings: string[] }[];
 }
 
 /** What the apps fetch: layers 1 to 5 resolved for one audience, with the version it was built from. */

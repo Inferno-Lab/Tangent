@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
-import { ATTENDANCE_MARKS, MESSAGE_EVENTS, addDays, istToday, type AttendanceStatus, type NoticeCreate, type PeriodMarksPut } from '@tangent/contracts';
+import { ATTENDANCE_MARKS, MESSAGE_EVENTS, addDays, schoolToday, type AttendanceStatus, type NoticeCreate, type PeriodMarksPut } from '@tangent/contracts';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import type { Registry } from '@tangent/tenancy';
 import { REGISTRY, type AuthedUser, type TenantCtx } from '../tenancy/tenant.js';
@@ -211,7 +211,7 @@ export class FamilyService {
     const { rows } = await t.pool.query(`${this.studentSql} where s.class_id = $1 and s.status = 'active' order by s.roll_no, s.name`, [classId]);
     const list = rows.map((r) => this.studentJson(w, r));
     if (w.kind !== 'staff') return list;
-    const today = istToday();
+    const today = schoolToday();
     const from = (await t.pool.query<{ d: string }>('select starts_on::text d from terms where starts_on <= $1 order by starts_on desc limit 1', [today])).rows[0]?.d ?? addDays(today, -120);
     const [att, res] = await Promise.all([
       t.pool.query<{ student_id: string; days: string; present: string; absent_today: boolean }>(
@@ -272,7 +272,7 @@ export class FamilyService {
   async attendanceOf(t: TenantCtx, user: AuthedUser, studentId: string) {
     await this.mayStudent(await this.who(t, user), studentId, t);
     const { rows } = await t.pool.query<{ date: string; status: AttendanceStatus }>(
-      `select x.date::text date, m.status from attendance_marks m join attendance_sessions x on x.id = m.session_id where m.student_id = $1 and x.date >= $2 order by x.date`, [studentId, addDays(istToday(), -120)]);
+      `select x.date::text date, m.status from attendance_marks m join attendance_sessions x on x.id = m.session_id where m.student_id = $1 and x.date >= $2 order by x.date`, [studentId, addDays(schoolToday(), -120)]);
     return rows.map((r) => ({ studentId, date: r.date, status: r.status === 'leave' ? 'absent' : r.status }));
   }
 
@@ -280,7 +280,7 @@ export class FamilyService {
     const w = await this.who(t, user);
     if (w.kind !== 'staff') students = students.filter((s) => w.children.includes(s));
     const { rows } = await t.pool.query<{ student_id: string; status: string }>(
-      `select m.student_id, m.status from attendance_marks m join attendance_sessions x on x.id = m.session_id where x.date = $1 and m.student_id = any($2)`, [istToday(), students]);
+      `select m.student_id, m.status from attendance_marks m join attendance_sessions x on x.id = m.session_id where x.date = $1 and m.student_id = any($2)`, [schoolToday(), students]);
     return Object.fromEntries(rows.map((r) => [r.student_id, r.status === 'leave' ? 'absent' : r.status]));
   }
 
@@ -302,7 +302,7 @@ export class FamilyService {
   }
 
   /** Marks a day (today unless said): any mark the school uses; a day past the correction window is refused by AttendanceService. */
-  async markToday(t: TenantCtx, user: AuthedUser, byStudent: Record<string, string>, date = istToday()) {
+  async markToday(t: TenantCtx, user: AuthedUser, byStudent: Record<string, string>, date = schoolToday()) {
     if (!user.permissions.includes('attendance.mark')) throw forbidden('You are not allowed to mark attendance.');
     const ids = Object.keys(byStudent);
     const { rows } = await t.pool.query<{ id: string; class_id: string }>('select id, class_id from students where id = any($1)', [ids]);
@@ -410,7 +410,7 @@ export class FamilyService {
     for (const f of fileIds) await this.files.done(t, user.id, f);
     await t.pool.query(
       `insert into homework_submissions (homework_id, student_id, handed_at, on_time) values ($1,$2,now(),$3)
-       on conflict (homework_id, student_id) do update set handed_at = now(), on_time = homework_submissions.on_time or excluded.on_time`, [id, studentId, istToday() <= h.due_on]);
+       on conflict (homework_id, student_id) do update set handed_at = now(), on_time = homework_submissions.on_time or excluded.on_time`, [id, studentId, schoolToday() <= h.due_on]);
     return { ok: true };
   }
 

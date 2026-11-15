@@ -1,7 +1,7 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { latestSchoolDay, istToday } from '@tangent/contracts';
+import { latestSchoolDay, schoolToday } from '@tangent/contracts';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ensureDatabase, startDevPostgres, type DevPostgres } from '../dev.js';
@@ -39,7 +39,7 @@ describe('Greenfield demo seed', () => {
     expect(who[0]!.name).toBe('Kavita Iyer');
   });
   it('leaves four classes unmarked on the latest school day', async () => {
-    const last = latestSchoolDay(istToday());
+    const last = latestSchoolDay(schoolToday());
     const unmarked = await q<{ name: string }>(
       'select c.name from classes c where not exists (select 1 from attendance_sessions a where a.class_id=c.id and a.date=$1) order by 1', [last]);
     expect(unmarked.map((u) => u.name)).toEqual(['10 A', '6 A', '7 C', '9 B']);

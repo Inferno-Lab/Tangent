@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { inr, type InvoiceDetail } from '@tangent/contracts';
+import { type InvoiceDetail } from '@tangent/contracts';
 import { Dialog, ErrorLine, NumberField, Segmented, useShake, EmptyNote } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { AreaField, dateLabel, problem } from '../../app/kit';
+import { fmtMoney } from '@tangent/contracts';
 
 /** Opens a receipt as the server's PDF (the same one families get), in a new tab to print or save. */
 export function useReceiptPdf(say: (m: string, tone?: 'bad') => void) {
@@ -57,10 +58,10 @@ export function InvoiceSheet({ id, onClose, say, onCollect }: { id: string; onCl
           <div>
             <div className="kv"><span>Kind of fee</span><b>{d.headName}</b></div>
             <div className="kv"><span>Due</span><b>{dateLabel(d.dueOn)}</b></div>
-            <div className="kv"><span>Billed</span><b>₹{inr(d.amount)}</b></div>
-            {d.waived > 0 && <div className="kv"><span>Waived</span><b>− ₹{inr(d.waived)}</b></div>}
-            <div className="kv"><span>Paid</span><b>₹{inr(d.paid)}</b></div>
-            <div className="kv"><span>Still to pay</span><b style={{ color: d.outstanding ? 'var(--bad)' : undefined }}>₹{inr(d.outstanding)}</b></div>
+            <div className="kv"><span>Billed</span><b>{fmtMoney(d.amount)}</b></div>
+            {d.waived > 0 && <div className="kv"><span>Waived</span><b>− {fmtMoney(d.waived)}</b></div>}
+            <div className="kv"><span>Paid</span><b>{fmtMoney(d.paid)}</b></div>
+            <div className="kv"><span>Still to pay</span><b style={{ color: d.outstanding ? 'var(--bad)' : undefined }}>{fmtMoney(d.outstanding)}</b></div>
           </div>
           <div>
             <div className="lbl" style={{ marginBottom: 6 }}>Payments</div>
@@ -69,7 +70,7 @@ export function InvoiceSheet({ id, onClose, say, onCollect }: { id: string; onCl
               <div key={p.id} className="kv" style={{ alignItems: 'center', gap: 8 }}>
                 <span style={{ minWidth: 0 }}>{p.receiptNo} · {dateLabel(p.paidOn)} · {p.method.toUpperCase()}{p.cancelled && <small style={{ display: 'block', color: 'var(--bad)' }}>Cancelled: {p.cancelReason}</small>}</span>
                 <b style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  ₹{inr(p.amount)}
+                  {fmtMoney(p.amount)}
                   <button className="btn sm" onClick={() => pdf(p.id)}>Receipt</button>
                   {may && !p.cancelled && p.method !== 'online' && !d.pending && <button className="btn sm" onClick={() => setAsk({ kind: 'receipt', paymentId: p.id, receiptNo: p.receiptNo })}>Cancel</button>}
                 </b>
@@ -79,9 +80,9 @@ export function InvoiceSheet({ id, onClose, say, onCollect }: { id: string; onCl
           {d.pending && <p className="help" style={{ margin: 0 }}>Waiting in Approvals: {d.pending.title}.</p>}
           {ask && (
             <div className="card" style={{ padding: 16, display: 'grid', gap: 10 }}>
-              {ask.kind !== 'receipt' && <Segmented label="What to ask" value={ask.kind} onChange={(k) => setAsk({ kind: k })} options={[{ value: 'waive', label: 'Waive part of it' }, { value: 'cancel', label: `Cancel the ₹${inr(d.outstanding)} left` }]} />}
+              {ask.kind !== 'receipt' && <Segmented label="What to ask" value={ask.kind} onChange={(k) => setAsk({ kind: k })} options={[{ value: 'waive', label: 'Waive part of it' }, { value: 'cancel', label: `Cancel the ${fmtMoney(d.outstanding)} left` }]} />}
               {ask.kind === 'receipt' && <b style={{ font: '700 14px var(--fb)' }}>Cancel receipt {ask.receiptNo}</b>}
-              {ask.kind === 'waive' && <NumberField label={`Amount to waive (at most ₹${inr(d.outstanding)})`} value={f.amount} onChange={(amount) => { setF({ ...f, amount }); setErr({}); }} error={err.amount} min={1} max={d.outstanding} />}
+              {ask.kind === 'waive' && <NumberField label={`Amount to waive (at most ${fmtMoney(d.outstanding)})`} value={f.amount} onChange={(amount) => { setF({ ...f, amount }); setErr({}); }} error={err.amount} min={1} max={d.outstanding} />}
               <AreaField label="Why" value={f.reason} onChange={(reason) => { setF({ ...f, reason }); setErr({}); }} error={err.reason} rows={2} maxLength={300} placeholder={ask.kind === 'receipt' ? 'Recorded against the wrong student' : 'Sibling concession agreed with the principal'} />
               {err._ && <ErrorLine>{err._}</ErrorLine>}
               <div className="tgrow" style={{ justifyContent: 'flex-end' }}>

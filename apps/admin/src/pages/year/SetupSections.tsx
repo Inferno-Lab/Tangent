@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { importKind, type ImportColumn, type SetupSection } from '@tangent/contracts';
+import { fmtMoney, fmtDate, importKind, type ImportColumn, type SetupSection } from '@tangent/contracts';
 import { DateField, Dialog, EmptyCard, Field, SelectField, TimeField, useShake, EmptyState, EmptyNote, type EmptyScene, type IconName } from '@tangent/web-ui';
 
 // The lists that have a scene of their own; the rest show an EmptyNote.
@@ -18,8 +18,8 @@ const isTime = (key: string) => /_at$/.test(key);
 
 function shown(col: ImportColumn, v: string): string {
   if (!v) return '–';
-  if (isDay(col.key)) return new Date(`${v}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-  if (col.key === 'amount') return `₹${Number(v).toLocaleString('en-IN')}`;
+  if (isDay(col.key)) return fmtDate(String(v), 'dayYear');
+  if (col.key === 'amount') return fmtMoney(Number(v));
   if (col.key === 'current') return v ? 'Current' : '';
   return v;
 }

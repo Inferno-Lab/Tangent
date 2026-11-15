@@ -1,4 +1,4 @@
-import { addDays, istToday } from '@tangent/contracts';
+import { addDays, schoolToday } from '@tangent/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startHarness, type Harness } from './harness.js';
 
@@ -17,7 +17,7 @@ const send = (method: string, url: string, body?: unknown) => h.call(method, url
 
 describe('homework', () => {
   it('sets homework for a class, records hand-ins and checks marks against the maximum', async () => {
-    const due = addDays(istToday(), 3);
+    const due = addDays(schoolToday(), 3);
     const made = await send('POST', '/v1/homework', { classId: 'cls_8a', subjectId: 'sub_maths', title: 'Quadratic practice', dueOn: due, maxMarks: 10 });
     expect(made.status).toBe(201);
     expect(made.json.total).toBe(36);
@@ -32,7 +32,7 @@ describe('homework', () => {
     expect(tooHigh.status).toBe(400);
     const undo = await send('PUT', `/v1/homework/${made.json.id}/marks`, { marks: [{ studentId: first, handed: false }] });
     expect(undo.json.handedIn).toBe(0);
-    expect((await send('POST', '/v1/homework', { classId: 'cls_8a', subjectId: 'sub_maths', title: 'Late one', dueOn: addDays(istToday(), -1) })).status).toBe(400);
+    expect((await send('POST', '/v1/homework', { classId: 'cls_8a', subjectId: 'sub_maths', title: 'Late one', dueOn: addDays(schoolToday(), -1) })).status).toBe(400);
     expect((await get('/v1/homework?classId=cls_8a')).json.some((x: any) => x.id === made.json.id)).toBe(true);
     expect((await send('DELETE', `/v1/homework/${made.json.id}`)).status).toBe(204);
   });
@@ -45,7 +45,7 @@ describe('homework', () => {
 
 describe('exams', () => {
   it('goes from schedule to marks to published results with ranks', async () => {
-    const day = addDays(istToday(), -1);
+    const day = addDays(schoolToday(), -1);
     const made = await send('POST', '/v1/exams', { name: 'Class test', classId: 'cls_8a', startsOn: day, endsOn: day, subjects: [{ subjectId: 'sub_maths', onDate: day, maxMarks: 50 }, { subjectId: 'sub_english', maxMarks: 50 }] });
     expect(made.status).toBe(201);
     expect(made.json.expected).toBe(72);
@@ -78,7 +78,7 @@ describe('exams', () => {
     expect((await send('PUT', `/v1/exams/${id}/marks`, fix)).json.exam.status).toBe('marking');
   });
   it('rejects an exam that ends before it starts or names an unknown subject', async () => {
-    const d = istToday();
+    const d = schoolToday();
     expect((await send('POST', '/v1/exams', { name: 'Odd exam', classId: 'cls_8a', startsOn: d, endsOn: addDays(d, -2), subjects: [{ subjectId: 'sub_maths', maxMarks: 20 }] })).status).toBe(400);
     expect((await send('POST', '/v1/exams', { name: 'Odd exam', classId: 'cls_8a', startsOn: d, endsOn: d, subjects: [{ subjectId: 'sub_nope', maxMarks: 20 }] })).status).toBe(400);
   });
@@ -153,8 +153,8 @@ describe('admissions', () => {
     expect(made.status).toBe(201);
     expect(made.json.stage).toBe('enquiry');
     expect((await send('PATCH', `/v1/admissions/${made.json.id}`, { stage: 'test' })).status).toBe(400);
-    const test = await send('PATCH', `/v1/admissions/${made.json.id}`, { stage: 'test', testOn: addDays(istToday(), 4) });
-    expect(test.json).toMatchObject({ stage: 'test', testOn: addDays(istToday(), 4) });
+    const test = await send('PATCH', `/v1/admissions/${made.json.id}`, { stage: 'test', testOn: addDays(schoolToday(), 4) });
+    expect(test.json).toMatchObject({ stage: 'test', testOn: addDays(schoolToday(), 4) });
     const offer = await send('PATCH', `/v1/admissions/${made.json.id}`, { stage: 'offer' });
     expect(offer.json.stage).toBe('offer');
     expect((await send('PATCH', `/v1/admissions/${made.json.id}`, { stage: 'enrolled' })).status).toBe(400);
@@ -210,7 +210,7 @@ describe('money lists and reports', () => {
     const strength = (await get('/v1/reports/strength')).json;
     expect(strength.rows).toHaveLength(42);
     // Narrowed to a class and a period, and named after them.
-    const low = await get(`/v1/reports/attendance-class?classId=cls_8a&from=${addDays(istToday(), -10)}&to=${istToday()}`);
+    const low = await get(`/v1/reports/attendance-class?classId=cls_8a&from=${addDays(schoolToday(), -10)}&to=${schoolToday()}`);
     expect(low.json.rows).toHaveLength(1);
     expect(low.json.scope).toMatch(/^Class 8 A, /);
     expect((await get('/v1/reports/attendance-low/csv?classId=cls_8a')).headers['content-disposition']).toMatch(/Low attendance - Class 8 A/);

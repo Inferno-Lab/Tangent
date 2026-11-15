@@ -1,5 +1,5 @@
 import { Injectable, type OnModuleInit } from '@nestjs/common';
-import { istToday, type LeaverInput, type NewYearInput, type PromotionInput, type PromotionPreview, type YearView } from '@tangent/contracts';
+import { schoolToday, type LeaverInput, type NewYearInput, type PromotionInput, type PromotionPreview, type YearView } from '@tangent/contracts';
 import { newId, type Job } from '@tangent/db';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
@@ -35,7 +35,7 @@ export class YearService implements OnModuleInit {
       t.pool.query(`select id, name, admission_no, left_on::text left_on, coalesce(leaving_reason, '') reason, (left_on + make_interval(months => $1))::date::text erase_after
           from students where status = 'left' and erased_at is null and left_on is not null order by left_on desc limit 500`, [months]),
     ]);
-    const today = istToday();
+    const today = schoolToday();
     return {
       years: years.rows.map((y) => ({ id: y.id, label: y.label, startsOn: y.s, endsOn: y.e, status: y.status, classes: y.classes, students: y.students })),
       runs: runs.rows.map((r) => ({ id: r.id, fromYear: r.from_label ?? r.from_year, toYear: r.to_label ?? r.to_year, students: r.n, createdAt: r.created_at.toISOString(), undoneAt: r.undone_at?.toISOString() ?? null })),
@@ -119,7 +119,7 @@ export class YearService implements OnModuleInit {
       const leaving = b.leaving.includes(s.id) || (!b.detained.includes(s.id) && map.get(s.class_id) === null);
       return { studentId: s.id, fromClassId: s.class_id, toClassId: b.detained.includes(s.id) || leaving ? s.class_id : map.get(s.class_id)!, status: leaving ? 'left' : 'active' };
     });
-    const leftOn = from?.ends_on ?? istToday();
+    const leftOn = from?.ends_on ?? schoolToday();
     const runId = newId('prm');
     const client = await t.pool.connect();
     try {
