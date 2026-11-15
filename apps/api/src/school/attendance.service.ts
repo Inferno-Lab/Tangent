@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { schoolZone, addDays, dayName, schoolToday, latestSchoolDay, schoolDaysEnding, type AttendanceDay, type AttendanceDayPut, type AttendanceStatus, type AttendanceWeekPoint, type PeriodMarksPut, type PeriodRoll } from '@tangent/contracts';
+import { type AttendanceMarkDef, markMeaning, schoolZone, addDays, dayName, schoolToday, latestSchoolDay, schoolDaysEnding, type AttendanceDay, type AttendanceDayPut, type AttendanceWeekPoint, type PeriodMarksPut, type PeriodRoll } from '@tangent/contracts';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
@@ -16,8 +16,8 @@ export class AttendanceService {
   async day(t: TenantCtx, classId: string, date: string): Promise<AttendanceDay> {
     const cls = await t.pool.query('select 1 from classes where id = $1', [classId]);
     if (!cls.rowCount) throw notFound('That class');
-    const { rows } = await t.pool.query<{ id: string; name: string; roll_no: string; status: AttendanceStatus | null; submitted: Date | null }>(
-      `select s.id, s.name, s.roll_no, m.status, ses.submitted_at submitted from students s
+    const { rows } = await t.pool.query<{ id: string; name: string; roll_no: string; status: string | null; submitted: Date | null }>(
+      `select s.id, s.name, s.roll_no, coalesce(m.code, m.status) status, ses.submitted_at submitted from students s
        left join attendance_sessions ses on ses.class_id = s.class_id and ses.date = $2
        left join attendance_marks m on m.session_id = ses.id and m.student_id = s.id
        where s.class_id = $1 and s.status = 'active' order by s.roll_no, s.name`, [classId, date]);
@@ -25,8 +25,10 @@ export class AttendanceService {
     const leave = await t.pool.query<{ student_id: string; half: string | null }>(
       `select payload->>'studentId' student_id, payload->>'halfDay' half from approvals where kind = 'leave' and status = 'approved'
        and payload->>'studentId' = any($1) and (payload->>'from')::date <= $2 and (payload->>'to')::date >= $2`, [rows.map((r) => r.id), date]);
-    const used = await this.settings.value<string[]>(t, 'attendance.statuses', ['present', 'absent', 'late', 'leave']);
-    const away = (half: string | null): AttendanceStatus => (half && used.includes('half_day') ? 'half_day' : used.includes('leave') ? 'leave' : 'absent');
+    // Approved leave starts as the school's first mark for it: a half day, or an authorised absence (else plain absent).
+    const used = await this.settings.value<AttendanceMarkDef[]>(t, 'attendance.statuses', []);
+    const first = (meaning: string) => used.find((m) => m.meaning === meaning)?.key;
+    const away = (half: string | null): string => (half && first('half_day')) || first('leave') || first('absent') || 'absent';
     const submitted = rows.some((r) => r.submitted);
     return {
       classId, date, submitted,
@@ -61,9 +63,11 @@ export class AttendanceService {
 
   async put(t: TenantCtx, user: { id: string; name: string }, body: AttendanceDayPut): Promise<AttendanceDay> {
     await this.markable(t, user.id, body.date);
-    const used = await this.settings.value<string[]>(t, 'attendance.statuses', ['present', 'absent', 'late', 'leave']);
-    const unused = body.marks.find((m) => !used.includes(m.status) && m.status !== 'present' && m.status !== 'absent');
+    const used = await this.settings.value<AttendanceMarkDef[]>(t, 'attendance.statuses', []);
+    const unused = body.marks.find((m) => !markMeaning(used, m.status));
     if (unused) throw new ApiError('validation', `The school does not use the mark “${unused.status.replace('_', ' ')}”.`);
+    // Each mark is kept by what it means (every count works on that) with the school's own mark beside it.
+    const marks = body.marks.map((m) => ({ ...m, meaning: markMeaning(used, m.status)!, code: used.some((u) => u.key === m.status) && m.status !== markMeaning(used, m.status) ? m.status : null }));
     const roster = await t.pool.query<{ id: string; name: string }>("select id, name from students where class_id = $1 and status = 'active'", [body.classId]);
     if (!roster.rowCount) throw notFound('That class');
     const ids = new Set(roster.rows.map((r) => r.id));
@@ -78,8 +82,8 @@ export class AttendanceService {
          on conflict (class_id, date) do update set marked_by = excluded.marked_by, submitted_at = now()`, [sid, body.classId, body.date, user.id]);
       await client.query('delete from attendance_marks where session_id = $1', [sid]);
       const params: unknown[] = [];
-      const tuples = body.marks.map((m) => `(${[sid, m.studentId, m.status].map((v) => { params.push(v); return `$${params.length}`; }).join(',')})`);
-      await client.query(`insert into attendance_marks (session_id, student_id, status) values ${tuples.join(',')}`, params);
+      const tuples = marks.map((m) => `(${[sid, m.studentId, m.meaning, m.code].map((v) => { params.push(v); return `$${params.length}`; }).join(',')})`);
+      await client.query(`insert into attendance_marks (session_id, student_id, status, code) values ${tuples.join(',')}`, params);
       await client.query('commit');
     } catch (err) {
       await client.query('rollback').catch(() => undefined);
@@ -89,11 +93,12 @@ export class AttendanceService {
     }
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'attendance.marked', entity: 'class', entityId: body.classId, detail: { date: body.date, marks: body.marks.length } });
     if (await this.settings.value<boolean>(t, 'attendance.notifyParents', true)) {
-      const away = body.marks.filter((m) => m.status === 'absent' || m.status === 'late');
+      // Families hear about an absence the school did not expect and about lateness, not about approved leave.
+      const away = marks.filter((m) => m.meaning === 'absent' || m.meaning === 'late');
       if (away.length) {
         const g = await t.pool.query<{ phone: string | null; name: string; student_id: string }>(
           'select g.phone, s.name, s.id student_id from students s join student_guardians sg on sg.student_id = s.id and sg.is_primary join guardians g on g.id = sg.guardian_id where s.id = any($1)', [away.map((a) => a.studentId)]);
-        const status = new Map(away.map((a) => [a.studentId, a.status]));
+        const status = new Map(away.map((a) => [a.studentId, a.meaning]));
         await this.messenger.notify(t, 'attendance.absent', g.rows.filter((r) => r.phone).map((r) => ({ to: r.phone!, vars: { student: r.name, status: status.get(r.student_id) === 'late' ? 'late' : 'absent' } })));
       }
     }
@@ -141,8 +146,9 @@ export class AttendanceService {
       `insert into period_marks (class_id, date, period, student_id, status, marked_by, marked_at) values ${tuples.join(',')}
        on conflict (class_id, date, period, student_id) do update set status = excluded.status, marked_by = excluded.marked_by, marked_at = now()`, params);
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'attendance.period', entity: 'class', entityId: body.classId, detail: { date: body.date, period: p.label, marks: body.marks.length } });
+    const used = await this.settings.value<AttendanceMarkDef[]>(t, 'attendance.statuses', []);
     const missing = body.marks.filter((m) => m.status === 'absent' && p.marks[m.studentId] !== 'absent'
-      && ['present', 'late', 'half_day'].includes(roll.students.find((s) => s.studentId === m.studentId)?.day ?? ''));
+      && ['present', 'late', 'half_day'].includes(markMeaning(used, roll.students.find((s) => s.studentId === m.studentId)?.day ?? '') ?? ''));
     if (missing.length && body.date === schoolToday() && (await this.settings.value<boolean>(t, 'attendance.notifyParents', true))) {
       const g = await t.pool.query<{ phone: string | null; name: string }>(
         'select g.phone, s.name from students s join student_guardians sg on sg.student_id = s.id and sg.is_primary join guardians g on g.id = sg.guardian_id where s.id = any($1)', [missing.map((m) => m.studentId)]);

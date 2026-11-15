@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { PeriodRoll } from '@tangent/contracts';
+import { markMeaning, type AttendanceMarkDef, type PeriodRoll } from '@tangent/contracts';
 import { EmptyCard, Select } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
-import { problem } from '../../app/kit';
+import { problem, useSetting } from '../../app/kit';
 
 type Mark = PeriodRoll['periods'][number]['marks'][string];
 const MARK: Record<Mark, { label: string; cls: string }> = { present: { label: 'Present', cls: 'p' }, late: { label: 'Late', cls: 'l' }, absent: { label: 'Absent', cls: 'a' } };
-const DAY: Record<string, string> = { present: 'Present', late: 'Late', half_day: 'Half day', leave: 'On leave', absent: 'Absent' };
 
 /**
  * Attendance every period: one period at a time, marked by its teacher (or someone who approves requests). The day's roll call is
@@ -17,6 +16,10 @@ export function PeriodGrid({ classId, date, say }: { classId: string; date: stri
   const app = useApp();
   const qc = useQueryClient();
   const roll = useQuery({ queryKey: ['attendance-periods', classId, date], queryFn: () => app.api.attendance.periods(classId, date) });
+  // The day's mark as the school names it, and whether it means the child is away.
+  const used = useSetting<AttendanceMarkDef[]>('attendance.statuses', []);
+  const dayName = (k: string) => used.find((m) => m.key === k)?.name ?? k;
+  const away = (k: string | null) => !!k && ['absent', 'leave'].includes(markMeaning(used, k) ?? '');
   const [period, setPeriod] = useState<number | null>(null);
   const [draft, setDraft] = useState<Record<string, Mark>>({});
   const periods = roll.data?.periods ?? [];
@@ -24,7 +27,7 @@ export function PeriodGrid({ classId, date, say }: { classId: string; date: stri
   useEffect(() => { setDraft({}); }, [classId, date, p?.period]);
   // An unmarked period starts with everyone present who is in school that day; the teacher taps the ones who are not.
   const markOf = (s: PeriodRoll['students'][number]): Mark | undefined =>
-    draft[s.studentId] ?? p?.marks[s.studentId] ?? (p?.mine && !p.markedBy && s.day !== 'absent' && s.day !== 'leave' ? 'present' : undefined);
+    draft[s.studentId] ?? p?.marks[s.studentId] ?? (p?.mine && !p.markedBy && !away(s.day) ? 'present' : undefined);
   const save = useMutation({
     mutationFn: () => app.api.attendance.savePeriod({ classId, date, period: p!.period, marks: roll.data!.students.flatMap((s) => { const m = markOf(s); return m ? [{ studentId: s.studentId, status: m }] : []; }) }),
     onSuccess: (next) => { qc.setQueryData(['attendance-periods', classId, date], next); setDraft({}); say(`${p!.label} saved.`); },
@@ -54,7 +57,7 @@ export function PeriodGrid({ classId, date, say }: { classId: string; date: stri
               <span className="rn num">{s.rollNo || '–'}</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                 <b style={{ font: '700 14px var(--fb)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</b>
-                {s.day && <span className={`chip ${s.day === 'absent' || s.day === 'leave' ? 'c' : ''}`} data-tip="The day’s roll call">{DAY[s.day]}</span>}
+                {s.day && <span className={`chip ${away(s.day) ? 'c' : ''}`} data-tip="The day’s roll call">{dayName(s.day)}</span>}
               </span>
               <span className="mk" role="group" aria-label={`${p.label} for ${s.name}`}>
                 {(Object.keys(MARK) as Mark[]).map((k) => (

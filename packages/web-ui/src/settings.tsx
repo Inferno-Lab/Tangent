@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, hasKey, type AppRole } from '@tangent/config-engine';
-import { CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type Category, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
+import { ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
 import { Checkbox, DateField, FilePick, NumberField, TimeField } from './fields';
 import { ColourField } from './ColourPicker';
 import { ErrorLine, Field, SelectField } from './forms';
@@ -75,6 +75,8 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
       return box(<HousesEditor value={(Array.isArray(value) ? value : []) as { key: string; name: string; color: string }[]} max={meta.max ?? 12} disabled={disabled} onChange={onChange} />);
     case 'categories':
       return box(<CategoriesEditor value={(Array.isArray(value) ? value : []) as Category[]} max={meta.max ?? 16} disabled={disabled} onChange={onChange} />);
+    case 'attendanceMarks':
+      return box(<AttendanceMarksEditor value={(Array.isArray(value) ? value : []) as AttendanceMarkDef[]} max={meta.max ?? 20} disabled={disabled} onChange={onChange} />);
     case 'paymentMethods':
       return box(<PaymentMethodsEditor value={(Array.isArray(value) ? value : []) as PaymentMethod[]} max={meta.max ?? 16} disabled={disabled} onChange={onChange} />);
     case 'gradingScale':
@@ -264,6 +266,29 @@ function PaymentMethodsEditor({ value, max, disabled, onChange }: { value: Payme
         onChange([...value, { key, name, kind: 'other' }]);
       }}>Add a method</button>}
       <div className="help">A method keeps its key when it is renamed, so payments already recorded keep it.</div>
+    </div>
+  );
+}
+
+/** The marks a register uses: what it is called, the letter written for it, and what it means for attendance figures. */
+function AttendanceMarksEditor({ value, max, disabled, onChange }: { value: AttendanceMarkDef[]; max: number; disabled: boolean; onChange: (v: unknown) => void }) {
+  const put = (i: number, patch: Partial<AttendanceMarkDef>) => onChange(value.map((m, j) => (j === i ? { ...m, ...patch } : m)));
+  return (
+    <div>
+      {value.map((m, i) => (
+        <div key={m.key} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 6, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 150 }}><Field label="Mark" value={m.name} maxLength={30} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
+          <div style={{ width: 90 }}><Field label="Letter" value={m.code} maxLength={3} disabled={disabled} onChange={(v) => put(i, { code: v })} /></div>
+          <div style={{ width: 200 }}><SelectField label="Means" value={m.meaning} disabled={disabled} onChange={(k) => put(i, { meaning: k as AttendanceMarkDef['meaning'] })} options={ATTENDANCE_MARKS.map((k) => ({ value: k, label: MARK_MEANING_LABELS[k] }))} /></div>
+          <button type="button" className="btn sm" disabled={disabled || value.length <= 2} onClick={() => onChange(value.filter((_, j) => j !== i))}>Remove</button>
+        </div>
+      ))}
+      {value.length < max && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={() => {
+        let n = value.length + 1;
+        while (value.some((m) => m.key === `mark-${n}`)) n++;
+        onChange([...value, { key: `mark-${n}`, name: 'New mark', meaning: 'leave', code: '' }]);
+      }}>Add a mark</button>}
+      <div className="help">A mark keeps its key when it is renamed, so days already marked keep it. Keep one that means present and one that means absent.</div>
     </div>
   );
 }

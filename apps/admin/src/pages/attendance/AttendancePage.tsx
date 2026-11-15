@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
-import { addDays, dayLabel, type AttendanceStatus } from '@tangent/contracts';
+import { addDays, dayLabel, markMeaning, type AttendanceMarkDef, type AttendanceStatus } from '@tangent/contracts';
 import { DateField, EmptyCard, EmptyState, Icon, Segmented, Select } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { useSetting } from '../../app/kit';
@@ -10,12 +10,8 @@ import { usePageTabs } from '../../app/tabs';
 import { useApprovalList } from '../approvals/ApprovalList';
 import { PeriodGrid } from './PeriodGrid';
 
-/** Every mark there is; the school uses the ones Tangent chose for it (console: Attendance → marks). */
-// The roll call's letters and their status colour, as the Attendance board (design/hue/src/Attendance.html).
-const MARKS: Record<AttendanceStatus, { label: string; cls: string; key: string }> = {
-  present: { label: 'Present', cls: 'ok', key: 'P' }, late: { label: 'Late', cls: 'warn', key: 'L' }, half_day: { label: 'Half day', cls: 'warn', key: 'H' }, leave: { label: 'On leave', cls: 'info', key: 'V' }, absent: { label: 'Absent', cls: 'bad', key: 'A' },
-};
-const ORDER: AttendanceStatus[] = ['present', 'late', 'half_day', 'leave', 'absent'];
+// The roll call's status colour for what each mark means (design/hue/src/Attendance.html); the school names its own marks.
+const TONE: Record<AttendanceStatus, string> = { present: 'ok', late: 'warn', half_day: 'warn', leave: 'info', absent: 'bad' };
 
 export function AttendancePage() {
   const app = useApp();
@@ -25,11 +21,13 @@ export function AttendancePage() {
   const [leaveView, setLeaveView] = useState<'waiting' | 'decided'>('waiting');
   const leave = useApprovalList(leaveView, 'leave', say, tab === 'leave');
   const [classId, setClassId] = useState('');
-  const [draft, setDraft] = useState<Record<string, AttendanceStatus>>({});
+  const [draft, setDraft] = useState<Record<string, string>>({});
   const [picked, setPicked] = useState<string | null>(null);
-  const used = useSetting<AttendanceStatus[]>('attendance.statuses', ['present', 'absent', 'late', 'leave']);
+  // The school's own marks (Attendance → Settings): its names and letters, each with what it means.
+  const used = useSetting<AttendanceMarkDef[]>('attendance.statuses', []);
   const lockDays = useSetting<number>('attendance.lockAfterDays', 2);
-  const options = ORDER.filter((s) => used.includes(s) || s === 'present' || s === 'absent').map((value) => ({ value, ...MARKS[value] }));
+  const options = used.map((m) => ({ value: m.key, label: m.name, cls: TONE[m.meaning], key: m.code || m.name.charAt(0).toUpperCase() }));
+  const meaningOf = (key: string | null) => (key ? markMeaning(used, key) : null);
   const classes = useQuery({ queryKey: ['classes'], queryFn: app.api.classes, staleTime: 5 * 60_000 });
   // The roll call opens on the latest school day, which the dashboard already works out; an earlier day can be picked to correct it.
   const today = useQuery({ queryKey: ['dashboard', 1], queryFn: () => app.api.dashboard(1), staleTime: 60_000 });
@@ -54,9 +52,9 @@ export function AttendancePage() {
 
   const canMark = app.user.permissions.includes('attendance.mark');
   const marks = day.data?.marks ?? [];
-  const statusOf = (id: string, saved: AttendanceStatus | null) => draft[id] ?? saved;
+  const statusOf = (id: string, saved: string | null) => draft[id] ?? saved;
   const counts = { present: 0, late: 0, absent: 0, none: 0 };
-  for (const m of marks) { const s = statusOf(m.studentId, m.status); if (s === 'present' || s === 'half_day') counts.present++; else if (s === 'late') counts.late++; else if (s === 'absent' || s === 'leave') counts.absent++; else counts.none++; }
+  for (const m of marks) { const s = meaningOf(statusOf(m.studentId, m.status)); if (s === 'present' || s === 'half_day') counts.present++; else if (s === 'late') counts.late++; else if (s === 'absent' || s === 'leave') counts.absent++; else counts.none++; }
   // Marks filled in from approved leave are not saved yet, so they count as changes to save.
   const changed = Object.keys(draft).length + (day.data?.submitted ? 0 : marks.filter((m) => m.status && !(m.studentId in draft)).length);
   const cls = classes.data?.find((c) => c.id === classId);

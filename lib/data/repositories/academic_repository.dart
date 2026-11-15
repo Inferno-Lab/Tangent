@@ -84,12 +84,7 @@ class RemoteAttendanceRepository implements AttendanceRepository {
     final json = await _remote.get('/attendance/today', query: {'students': studentIds.join(',')});
     return {
       for (final e in (json as Map).entries)
-        e.key as String: switch (e.value) {
-          'absent' => AttendanceStatus.absent,
-          'late' => AttendanceStatus.lateArrival,
-          'holiday' => AttendanceStatus.holiday,
-          _ => AttendanceStatus.present,
-        },
+        e.key as String: attendanceStatusOf(e.value),
     };
   }
 

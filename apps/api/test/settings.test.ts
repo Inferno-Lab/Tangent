@@ -74,4 +74,23 @@ describe('the school changes its own settings', () => {
     expect(ok.status).toBe(200);
     expect((await view()).json.values['privacy.retentionMonths']).toBe(48);
   });
+
+  it('marks attendance with the school’s own marks, named its way and counted by what they mean', async () => {
+    const marks = [
+      { key: 'present', name: 'Present', meaning: 'present', code: '/' }, { key: 'absent', name: 'Unauthorised absence', meaning: 'absent', code: 'O' },
+      { key: 'late', name: 'Late', meaning: 'late', code: 'L' }, { key: 'medical', name: 'Medical appointment', meaning: 'leave', code: 'M' },
+    ];
+    expect((await change({ 'attendance.statuses': marks })).status).toBe(200);
+    // A list without a mark for present, or with two of the same key, is refused.
+    expect((await change({ 'attendance.statuses': marks.filter((m) => m.meaning !== 'present') })).status).toBe(400);
+    const date = new Date().toISOString().slice(0, 10);
+    const day = (await h.call('GET', `/v1/attendance/day?classId=cls_8a&date=${date}`, { token: principal })).json;
+    const first = day.marks[0].studentId;
+    const put = await h.call('PUT', '/v1/attendance/day', { token: principal, body: { classId: 'cls_8a', date, marks: day.marks.map((m: any, i: number) => ({ studentId: m.studentId, status: i === 0 ? 'medical' : 'present' })) } });
+    expect(put.status).toBe(200);
+    expect(put.json.marks.find((m: any) => m.studentId === first).status).toBe('medical');
+    // A mark the school does not use is refused; the meaning's own name (as the app sends it) still works.
+    expect((await h.call('PUT', '/v1/attendance/day', { token: principal, body: { classId: 'cls_8a', date, marks: [{ studentId: first, status: 'holiday' }] } })).status).toBe(400);
+    expect((await h.call('PUT', '/v1/attendance/day', { token: principal, body: { classId: 'cls_8a', date, marks: day.marks.map((m: any) => ({ studentId: m.studentId, status: m.studentId === first ? 'medical' : 'present' })) } })).status).toBe(200);
+  });
 });

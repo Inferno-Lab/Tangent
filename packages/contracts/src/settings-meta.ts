@@ -13,7 +13,7 @@ const regionName = (c: string): string => {
 export type SettingKind =
   | 'text' | 'textarea' | 'number' | 'bool' | 'enum' | 'color' | 'time' | 'date' | 'language'
   | 'multi' | 'appRoles' | 'appLayout' | 'notifyRules' | 'templates' | 'classes' | 'logo'
-  | 'houses' | 'categories' | 'strings' | 'gradingScale' | 'paymentMethods';
+  | 'houses' | 'categories' | 'strings' | 'gradingScale' | 'paymentMethods' | 'attendanceMarks';
 
 export interface SettingMeta {
   /** One of the school-wide groups, or the key of the module that owns the setting (config-engine's MODULES lists it there too). */
@@ -116,7 +116,7 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = {
   'attendance.notifyParents': { group: 'attendance', label: 'Tell families when a child is absent or late', kind: 'bool' },
   'attendance.lockAfterDays': { group: 'attendance', label: 'Attendance can be corrected for this many days', kind: 'number', min: 0, max: 30, help: 'In the admin and in the teachers’ app; after that, only someone allowed to approve can change it.' },
   'attendance.goalPct': { group: 'attendance', label: 'Attendance goal (%)', kind: 'number', min: 50, max: 100, help: 'The dashboard and reports measure against it.' },
-  'attendance.statuses': { group: 'attendance', label: 'Marks the school uses', kind: 'multi', options: [['present', 'Present'], ['absent', 'Absent'], ['late', 'Late'], ['half_day', 'Half day'], ['leave', 'On leave']], help: 'Present and absent are always used; a half day counts as a day attended. Approved leave is marked “On leave” by itself when the school uses it.' },
+  'attendance.statuses': { group: 'attendance', label: 'Marks the school uses', kind: 'attendanceMarks', max: 20, help: 'Each with the name and letter the register uses, and what it means for attendance figures. Approved leave is filled in with the first mark that means authorised absence.' },
   'leave.reasons': { group: 'attendance', label: 'Reasons families give for leave', kind: 'strings', max: 12 },
 
   // Timetable

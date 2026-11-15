@@ -13,6 +13,15 @@ enum AttendanceStatus {
   holiday,
 }
 
+/// What a day's mark means, from the server's meaning: a half day counts as attended and authorised leave as away, as the
+/// school's figures count them; anything new reads as not there rather than failing to load.
+AttendanceStatus attendanceStatusOf(Object? v) => switch (v) {
+  'present' || 'half_day' => AttendanceStatus.present,
+  'late' => AttendanceStatus.lateArrival,
+  'holiday' => AttendanceStatus.holiday,
+  _ => AttendanceStatus.absent,
+};
+
 enum PeriodKind {
   @JsonValue('class')
   klass,
@@ -56,6 +65,7 @@ class AttendanceDay {
     required this.studentId,
     required this.date,
     required this.status,
+    this.label,
   });
 
   factory AttendanceDay.fromJson(Map<String, dynamic> json) =>
@@ -63,7 +73,11 @@ class AttendanceDay {
 
   final String studentId;
   final DateTime date;
+  @JsonKey(fromJson: attendanceStatusOf)
   final AttendanceStatus status;
+
+  /// The school's own name for the mark ("Half day", "Medical"), when it has one.
+  final String? label;
 
   Map<String, dynamic> toJson() => _$AttendanceDayToJson(this);
 }

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
-import { ATTENDANCE_MARKS, MESSAGE_EVENTS, addDays, schoolToday, type AttendanceStatus, type NoticeCreate, type PeriodMarksPut } from '@tangent/contracts';
+import { type AttendanceMarkDef, MESSAGE_EVENTS, addDays, schoolToday, type AttendanceStatus, type NoticeCreate, type PeriodMarksPut } from '@tangent/contracts';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import type { Registry } from '@tangent/tenancy';
 import { REGISTRY, type AuthedUser, type TenantCtx } from '../tenancy/tenant.js';
@@ -271,9 +271,12 @@ export class FamilyService {
 
   async attendanceOf(t: TenantCtx, user: AuthedUser, studentId: string) {
     await this.mayStudent(await this.who(t, user), studentId, t);
-    const { rows } = await t.pool.query<{ date: string; status: AttendanceStatus }>(
-      `select x.date::text date, m.status from attendance_marks m join attendance_sessions x on x.id = m.session_id where m.student_id = $1 and x.date >= $2 order by x.date`, [studentId, addDays(schoolToday(), -120)]);
-    return rows.map((r) => ({ studentId, date: r.date, status: r.status === 'leave' ? 'absent' : r.status }));
+    const { rows } = await t.pool.query<{ date: string; status: AttendanceStatus; code: string | null }>(
+      `select x.date::text date, m.status, m.code from attendance_marks m join attendance_sessions x on x.id = m.session_id where m.student_id = $1 and x.date >= $2 order by x.date`, [studentId, addDays(schoolToday(), -120)]);
+    // The app draws each day by what the mark means and names it the school's way.
+    const used = await this.settings.value<AttendanceMarkDef[]>(t, 'attendance.statuses', []);
+    const name = (r: { status: string; code: string | null }) => used.find((m) => m.key === (r.code ?? r.status))?.name ?? used.find((m) => m.meaning === r.status)?.name ?? '';
+    return rows.map((r) => ({ studentId, date: r.date, status: r.status, label: name(r) }));
   }
 
   async today(t: TenantCtx, user: AuthedUser, students: string[]) {
@@ -307,12 +310,12 @@ export class FamilyService {
     const ids = Object.keys(byStudent);
     const { rows } = await t.pool.query<{ id: string; class_id: string }>('select id, class_id from students where id = any($1)', [ids]);
     for (const cls of new Set(rows.map((r) => r.class_id))) {
-      const existing = await t.pool.query<{ student_id: string; status: AttendanceStatus }>(
-        'select m.student_id, m.status from attendance_marks m join attendance_sessions x on x.id = m.session_id where x.class_id = $1 and x.date = $2', [cls, date]);
+      const existing = await t.pool.query<{ student_id: string; status: string }>(
+        'select m.student_id, coalesce(m.code, m.status) status from attendance_marks m join attendance_sessions x on x.id = m.session_id where x.class_id = $1 and x.date = $2', [cls, date]);
       const merged = new Map(existing.rows.map((e) => [e.student_id, e.status]));
       for (const r of rows.filter((x) => x.class_id === cls)) {
-        const s = byStudent[r.id] as AttendanceStatus;
-        if (ATTENDANCE_MARKS.includes(s)) merged.set(r.id, s);
+        // Any mark the school uses, by its key or by its meaning (the app sends present, late or absent).
+        if (byStudent[r.id]) merged.set(r.id, byStudent[r.id]!);
       }
       await this.attendance.put(t, user, { classId: cls, date, marks: [...merged].map(([studentId, status]) => ({ studentId, status })) });
     }

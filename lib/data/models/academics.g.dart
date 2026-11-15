@@ -10,7 +10,8 @@ AttendanceDay _$AttendanceDayFromJson(Map<String, dynamic> json) =>
     AttendanceDay(
       studentId: json['studentId'] as String,
       date: DateTime.parse(json['date'] as String),
-      status: $enumDecode(_$AttendanceStatusEnumMap, json['status']),
+      status: attendanceStatusOf(json['status']),
+      label: json['label'] as String?,
     );
 
 Map<String, dynamic> _$AttendanceDayToJson(AttendanceDay instance) =>
@@ -18,6 +19,7 @@ Map<String, dynamic> _$AttendanceDayToJson(AttendanceDay instance) =>
       'studentId': instance.studentId,
       'date': instance.date.toIso8601String(),
       'status': _$AttendanceStatusEnumMap[instance.status]!,
+      'label': ?instance.label,
     };
 
 const _$AttendanceStatusEnumMap = {

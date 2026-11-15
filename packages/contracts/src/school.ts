@@ -185,7 +185,8 @@ export type BulkStudentAction = z.infer<typeof BulkStudentAction>;
 export const AttendanceDayPut = z.object({
   classId: z.string(),
   date: IsoDate,
-  marks: z.array(z.object({ studentId: z.string(), status: AttendanceStatus })).min(1).max(200),
+  /** Each a mark the school uses (attendance.statuses), by its key. */
+  marks: z.array(z.object({ studentId: z.string(), status: z.string().min(1).max(24) })).min(1).max(200),
 });
 export type AttendanceDayPut = z.infer<typeof AttendanceDayPut>;
 
@@ -194,7 +195,8 @@ export interface AttendanceDay {
   date: string;
   submitted: boolean;
   /** onLeave: an approved leave covers the day; until the roll is taken its mark is filled in from the leave. */
-  marks: { studentId: string; name: string; rollNo: string; status: AttendanceStatus | null; onLeave: boolean }[];
+  /** status: the school's mark (its key); null until the roll is taken. */
+  marks: { studentId: string; name: string; rollNo: string; status: string | null; onLeave: boolean }[];
 }
 
 /** Attendance every period (feature attendance.periodWise): only present, late and absent; leave comes from the day. */
@@ -211,7 +213,7 @@ export type PeriodMarksPut = z.infer<typeof PeriodMarksPut>;
 export interface PeriodRoll {
   classId: string;
   date: string;
-  students: { studentId: string; name: string; rollNo: string; day: AttendanceStatus | null }[];
+  students: { studentId: string; name: string; rollNo: string; day: string | null }[];
   periods: {
     period: number; label: string; startsAt: string; endsAt: string; subject: string; teacherId: string; teacherName: string;
     /** Whether the person asking may mark it: the period's teacher (or its cover), or someone who approves requests. */

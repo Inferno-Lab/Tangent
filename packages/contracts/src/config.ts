@@ -4,8 +4,37 @@ import { COUNTRIES, isCurrency, isLocale, isZone } from './locale.js';
 
 
 /** Attendance marks the data model knows; a school picks which it uses (`attendance.statuses`). */
+/**
+ * What an attendance mark means: every count and percentage works on these, whatever the school calls its marks. `leave` is
+ * an authorised absence (on leave, medical, a school trip elsewhere); `absent` is one that was not authorised.
+ */
 export const ATTENDANCE_MARKS = ['present', 'absent', 'late', 'half_day', 'leave'] as const;
 export type AttendanceMark = (typeof ATTENDANCE_MARKS)[number];
+export const MARK_MEANING_LABELS: Record<AttendanceMark, string> = { present: 'Present', late: 'Late', half_day: 'Half day', leave: 'Away, authorised', absent: 'Absent, not authorised' };
+
+/** One of the school's own attendance marks: its name, what it means, and the code it is written as (a register's letter). */
+export const AttendanceMarkDef = z.object({
+  key: z.string().regex(/^[a-z0-9-_]{1,24}$/),
+  name: z.string().trim().min(1, 'Name the mark').max(30),
+  meaning: z.enum(ATTENDANCE_MARKS),
+  code: z.string().trim().max(3).default(''),
+});
+export type AttendanceMarkDef = z.infer<typeof AttendanceMarkDef>;
+const OLD_MARKS: Record<string, [string, string]> = { present: ['Present', 'P'], absent: ['Absent', 'A'], late: ['Late', 'L'], half_day: ['Half day', 'H'], leave: ['On leave', 'V'] };
+const AttendanceMarks = z.preprocess(
+  (v) => (Array.isArray(v) ? v.map((x) => (typeof x === 'string' ? { key: x, name: OLD_MARKS[x]?.[0] ?? x, meaning: x, code: OLD_MARKS[x]?.[1] ?? '' } : x)) : v),
+  z.array(AttendanceMarkDef).min(2).max(20)
+    .refine((l) => l.some((m) => m.meaning === 'present') && l.some((m) => m.meaning === 'absent'), 'Keep at least one mark for present and one for absent')
+    .refine((l) => new Set(l.map((m) => m.key)).size === l.length, 'Two marks have the same key'),
+);
+export const DEFAULT_ATTENDANCE_MARKS: AttendanceMarkDef[] = [
+  { key: 'present', name: 'Present', meaning: 'present', code: 'P' }, { key: 'absent', name: 'Absent', meaning: 'absent', code: 'A' },
+  { key: 'late', name: 'Late', meaning: 'late', code: 'L' }, { key: 'leave', name: 'On leave', meaning: 'leave', code: 'V' },
+];
+/** The meaning of a mark the school uses; a meaning's own name (an app sending "present") stands for the first mark with it. */
+export function markMeaning(marks: readonly AttendanceMarkDef[], key: string): AttendanceMark | null {
+  return marks.find((m) => m.key === key)?.meaning ?? ((ATTENDANCE_MARKS as readonly string[]).includes(key) && marks.some((m) => m.meaning === key) ? (key as AttendanceMark) : null);
+}
 
 /** A category of notices or events: its name, and the tone (a theme colour pair) it is drawn in. */
 export const CATEGORY_TONES = ['v', 'g', 'a', 'c'] as const;
@@ -130,7 +159,7 @@ export const SchoolSettingsSchema = z.object({
   // The first column of every week grid (attendance, leave, the app's calendars).
   'calendar.weekStarts': z.enum(['mon', 'sun']).default('mon'),
   // The attendance marks the school uses (present and absent always).
-  'attendance.statuses': z.array(z.enum(ATTENDANCE_MARKS)).min(2).default(['present', 'absent', 'late', 'leave']),
+  'attendance.statuses': AttendanceMarks.default(DEFAULT_ATTENDANCE_MARKS),
   // Reasons a family picks when asking for leave.
   'leave.reasons': z.array(z.string().trim().min(1).max(40)).min(1).max(12).default(['Unwell', 'Family', 'Travel', 'Medical appointment', 'Other']),
   // Families see how many classmates have handed in; who may hand in from the app.
