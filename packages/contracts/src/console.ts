@@ -671,7 +671,18 @@ export interface SchoolConfig {
   feeHeads: { key: string; name: string }[];
   staff: { id: string; name: string; designation: string; roleId: string | null }[];
   versions: ConfigVersionRow[];
+  /** Settings Tangent locked for this school, with the locked value and why. */
+  locks: { key: string; value: unknown; note: string }[];
 }
+
+/** Locks a setting for one school at a value (a floor for a tightened one), or lifts the lock. */
+export const SettingLockPut = z.object({
+  key: z.string().min(1).max(60),
+  locked: z.boolean(),
+  value: z.unknown().optional(),
+  note: z.string().trim().max(200).default(''),
+});
+export type SettingLockPut = z.infer<typeof SettingLockPut>;
 
 export interface RoleDef { id: string; key: string; name: string; description: string; permissions: string[]; locked: boolean; people: number }
 
@@ -739,3 +750,26 @@ export function auditLabel(action: string): string {
   if (c) return `${c[1] === 'breach' ? 'Breach' : c[1] === 'agreement' ? 'Agreement' : 'Compliance item'} ${c[2]!.replace(/_/g, ' ')}`;
   return action.replace(/[._]/g, ' ').replace(/^./, (x) => x.toUpperCase());
 }
+
+/**
+ * A school's settings as its own admin edits them: the values in force, which ones Tangent locked (with the value and why),
+ * and the school's lists the editors pick from. Only the school's own settings can be changed from here (settingOwner).
+ */
+export interface SchoolSettingsView {
+  version: number;
+  /** Every setting as it applies now: defaults, the school's choices and Tangent's locks together. */
+  values: Record<string, unknown>;
+  locks: { key: string; value: unknown; note: string }[];
+  entitled: string[];
+  features: string[];
+  classes: { id: string; name: string }[];
+  feeHeads: { key: string; name: string }[];
+}
+
+/** A change the school makes to its own settings; a risky one waits for a second person in Approvals. */
+export const SchoolSettingsPatch = z.object({
+  expectedVersion: z.number().int(),
+  changes: z.record(z.string(), z.unknown()),
+  note: z.string().trim().max(200).default(''),
+});
+export type SchoolSettingsPatch = z.infer<typeof SchoolSettingsPatch>;

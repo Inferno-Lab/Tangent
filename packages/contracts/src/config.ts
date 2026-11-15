@@ -191,8 +191,11 @@ export interface EntitlementDoc {
   /** The school pays nothing until this day (inclusive). */
   trialUntil?: string;
   limits: Limits;
+  /** Settings Tangent fixed for this school (their values are in `overrides`); a tightened one is a floor (TIGHTEN). */
   locks: string[];
   overrides: Record<string, unknown>;
+  /** Why each lock is there, shown to the school next to the setting. */
+  lockNotes?: Record<string, string>;
   version: number;
 }
 

@@ -135,7 +135,7 @@ export const MODULES: ModuleManifest[] = [
     permissions: ['approvals.read', 'approvals.decide', 'settings.read', 'privacy.manage', 'audit.read', 'reports.read', 'setup.write', 'year.manage'],
     messages: ['privacy.answered'],
     imports: ['years', 'terms', 'holidays', 'subjects', 'periods', 'classes'],
-    approvals: [],
+    approvals: ['settings'],
     dashboard: [],
   },
   {

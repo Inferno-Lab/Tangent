@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Header, HttpCode, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import {
+  SchoolSettingsPatch, type SchoolSettingsView,
   ApprovalDecision, AssignFee, FeeHeadsPut, AttendanceDayPut, PeriodMarksPut, CoverRequest, SlotCreate, WaiverRequest, ReceiptCancel, IsoDate, MessageRequest, NoticeCreate, PaymentCreate, SlotPatch, StudentCreate, StudentImport, StudentPatch, GuardiansPut, StudentQuery,
   type ApprovalRow, type AttendanceDay, type AttendanceWeekPoint, type PeriodRoll, type AuditRow, type ClassInfo, type ContactReveal, type DashboardData, type FeeHead, type FeeSummary, type ImportResult, type InvoiceRow, type InvoiceDetail,
   type NoticeRow, type SearchHit, type SettingsResponse, type ShellData, type GuardianRow, type StudentDetail, type StudentRow, type StudentSummary, type StudentViews, type TeacherLoad, type TeacherOption, type TimetableView, type WeekOf, type Paged,
@@ -22,7 +23,7 @@ import { TimetableService } from './timetable.service.js';
 const DayQuery = z.object({ classId: z.string().min(1), date: IsoDate });
 const InvoiceQuery = z.object({ studentId: z.string().min(1) });
 const NoticeEdit = NoticeCreate.and(z.object({ tellAgain: z.boolean().default(false) }));
-const ListApprovals = z.object({ view: z.enum(['waiting', 'sent', 'decided']).default('waiting'), kind: z.enum(['leave', 'fee_waiver', 'admission', 'notice', 'attendance', 'photo', 'receipt_cancel']).optional() });
+const ListApprovals = z.object({ view: z.enum(['waiting', 'sent', 'decided']).default('waiting'), kind: z.enum(['leave', 'fee_waiver', 'admission', 'notice', 'attendance', 'photo', 'receipt_cancel', 'settings']).optional() });
 const ClassQuery = z.object({ classId: z.string().min(1) });
 const DashQuery = z.object({ days: z.coerce.number().int().min(1).max(30).default(6) });
 const SearchQuery = z.object({ q: z.string().max(80).default('') });
@@ -368,7 +369,17 @@ export class SettingsController {
     return { ...doc, usage, modules: MODULES.map((m) => ({ key: m.key, name: m.name, blurb: m.blurb, requires: m.requires, core: !!m.core, backend: m.backend, entitled: entitled.includes(m.key) })) };
   }
 
-  // No write route: a school's configuration changes only from the console (Tangent staff). See ConfigService in the console API.
+  /** The school's own settings as its admin edits them on each module's Settings tab; Tangent's and locked ones are read-only. */
+  @Get('edit') @Require('settings.read')
+  edit(@Tenant() t: TenantCtx): Promise<SchoolSettingsView> {
+    return this.settings.view(t);
+  }
+
+  /** A change the school makes itself (its own settings only); a risky one waits for a second person in Approvals. */
+  @Patch() @Require('settings.manage')
+  change(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(SchoolSettingsPatch)) b: SchoolSettingsPatch): ReturnType<SettingsService['change']> {
+    return this.settings.change(t, u, b);
+  }
 
   @Get('audit') @Require('audit.read')
   auditLog(@Tenant() t: TenantCtx): Promise<AuditRow[]> {

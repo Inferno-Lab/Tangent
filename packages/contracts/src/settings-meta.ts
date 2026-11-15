@@ -15,11 +15,31 @@ export interface SettingMeta {
   options?: [value: string, label: string][];
   min?: number;
   max?: number;
-  /** A change needs a second person's approval in the console. */
+  /** A change needs a second person's approval (in the console for Tangent, in the school's Approvals for the school). */
   risky?: true;
   /** Saved, but nothing acts on it yet: the console hides it unless asked (AGENTS.md: a new setting is marked until it is used). */
   notUsedYet?: true;
 }
+
+/**
+ * Who changes a setting (docs/one-shot-plan.md §1). The school runs its own day, so every setting is the school's (edited in
+ * the admin on the page of the module it changes) except these: the look Tangent builds the app with, and the switches that
+ * lock a whole area of the school's data. Tangent can still change any setting for support, and lock one for one school.
+ */
+export const TANGENT_SETTINGS: readonly SettingKey[] = [
+  'brand.color', 'classes.schoolEdits', 'calendar.schoolEdits', 'timetable.schoolEdits', 'feeStructures.schoolEdits', 'staff.schoolAssignsRoles',
+];
+export const settingOwner = (key: string): 'school' | 'tangent' => ((TANGENT_SETTINGS as readonly string[]).includes(key) ? 'tangent' : 'school');
+
+/**
+ * Settings where a value Tangent locks is a floor, not a fixed value: the school may only make them stricter (a longer
+ * password, a shorter sign-in, keeping records longer, asking for consent). `min`: the school's number may not go below
+ * Tangent's; `max`: not above; `on`: once Tangent turns it on, the school cannot turn it off.
+ */
+export const TIGHTEN: Partial<Record<SettingKey, 'min' | 'max' | 'on'>> = {
+  'security.twoFactor': 'on', 'security.passwordMinLength': 'min', 'security.webSessionDays': 'max', 'security.appSessionDays': 'max',
+  'privacy.retentionMonths': 'min', 'privacy.photoConsent': 'on', 'privacy.consentRequired': 'on',
+};
 
 /** Settings that belong to the whole school rather than one module (docs/product-map.md §5). */
 export const SETTING_GROUPS = ['School identity', 'Look', 'The app', 'Sign-in and security', 'Privacy', 'Messaging'] as const;

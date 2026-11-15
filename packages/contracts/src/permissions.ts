@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 /**
  * Every action a role can be allowed to do. The admin hides UI and the API refuses requests from this one list.
- * Nothing here changes the school's configuration or roles: only Tangent does that, from the console.
+ * `settings.manage` lets a person change the school's own settings, for the modules they may also change (Library settings
+ * need `library.write` too); Tangent's own settings and locks stay with the console.
  */
 export const PERMISSIONS = [
   'students.read',
@@ -22,6 +23,7 @@ export const PERMISSIONS = [
   'timetable.edit',
   'timetable.publish',
   'settings.read',
+  'settings.manage',
   'privacy.manage',
   'staff.read',
   'staff.write',
@@ -101,7 +103,8 @@ export const PERMISSION_CATALOG: PermissionInfo[] = [
   { key: 'timetable.read', area: 'Timetable', label: 'See the timetable' },
   { key: 'timetable.edit', area: 'Timetable', label: 'Edit periods and cover' },
   { key: 'timetable.publish', area: 'Timetable', label: 'Publish the timetable' },
-  { key: 'settings.read', area: 'Settings', label: 'See how Tangent has set up the school' },
+  { key: 'settings.read', area: 'Settings', label: 'See the school’s settings' },
+  { key: 'settings.manage', area: 'Settings', label: 'Change the school’s settings (each module’s with its own write permission)', sensitive: true },
   { key: 'privacy.manage', area: 'Settings', label: 'Log and answer families’ data requests', sensitive: true },
   { key: 'audit.read', area: 'Settings', label: 'Read the audit log' },
   { key: 'reports.read', area: 'Reports', label: 'See reports' },

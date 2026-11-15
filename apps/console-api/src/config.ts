@@ -1,16 +1,18 @@
 import { Body, Controller, Delete, Get, HttpCode, Inject, Injectable, Param, Patch, Post, Put, Query, type OnModuleInit } from '@nestjs/common';
-import { activeFeatures, activeModules, diffSettings, resolveConfig, validateSettingsChanges } from '@tangent/config-engine';
+import { activeFeatures, activeModules, resolveConfig, validateSettingsChanges } from '@tangent/config-engine';
 import {
-  ConfigPatch, PERMISSIONS, RoleDefSave, SETTINGS_META,
+  ConfigPatch, PERMISSIONS, RoleDefSave, SETTINGS_META, SettingLockPut,
   type ChangeRequestRow, type ConfigTemplateRow, type ConfigVersionRow, type EffectiveConfig, type EntitlementDoc, type RoleDef, type SchoolConfig,
 } from '@tangent/contracts';
-import { newId, type pg } from '@tangent/db';
+import { StaleSettings, newId, readSettings, recordSettingsVersion, writeSettings, type pg } from '@tangent/db';
 import { ApiError, ZodPipe, notFound } from '@tangent/nest-kit';
 import { z } from 'zod';
 import { Actions } from './actions.js';
 import { Db, Me, Needs, type ConsoleUser } from './core.js';
 import { ENV, type Env } from './env.js';
 import { withSchoolDb } from './school-db.js';
+import { REGISTRY } from './tokens.js';
+import type { Registry } from '@tangent/tenancy';
 
 /** What a template never carries from one school to another: who the school is. */
 const OWN_KEYS = ['school.name', 'school.shortName', 'school.tagline', 'school.place', 'school.phone', 'school.email', 'school.address', 'brand.logoText',
@@ -25,7 +27,7 @@ type Q = pg.Pool | pg.PoolClient;
  */
 @Injectable()
 export class ConfigService implements OnModuleInit {
-  constructor(private readonly db: Db, @Inject(ENV) private readonly env: Env, private readonly actions: Actions) {}
+  constructor(private readonly db: Db, @Inject(ENV) private readonly env: Env, private readonly actions: Actions, @Inject(REGISTRY) private readonly registry: Registry) {}
 
   /** Risky changes wait in Approvals; when a second person says yes, this applies them. */
   onModuleInit(): void {
@@ -42,15 +44,11 @@ export class ConfigService implements OnModuleInit {
   private async entitlement(schoolId: string): Promise<EntitlementDoc> {
     const r = (await this.db.pool.query<{ entitlement: EntitlementDoc; plan: string }>('select entitlement, plan from schools where id = $1 and deleted_at is null', [schoolId])).rows[0];
     if (!r) throw notFound('That school');
-    return { ...r.entitlement, plan: r.plan, overrides: r.entitlement.overrides ?? {}, locks: r.entitlement.locks ?? [] };
+    return { ...r.entitlement, plan: r.plan, overrides: r.entitlement.overrides ?? {}, locks: r.entitlement.locks ?? [], lockNotes: r.entitlement.lockNotes ?? {} };
   }
 
-  private async values(q: Q): Promise<{ version: number; values: Record<string, unknown> }> {
-    const [rows, meta] = await Promise.all([
-      q.query<{ key: string; value: unknown }>('select key, value from settings'),
-      q.query<{ value: number }>("select value from meta where key = 'settings.version'"),
-    ]);
-    return { version: Number(meta.rows[0]?.value ?? 1), values: Object.fromEntries(rows.rows.map((r) => [r.key, r.value])) };
+  private values(q: Q): Promise<{ version: number; values: Record<string, unknown> }> {
+    return readSettings(q);
   }
 
   private async roles(q: Q): Promise<RoleDef[]> {
@@ -74,6 +72,7 @@ export class ConfigService implements OnModuleInit {
       return {
         ...cur, entitled: activeModules(ent), features: activeFeatures(ent, activeModules(ent)), roles, classes: classes.rows, feeHeads: heads.rows,
         staff: staff.rows.map((s) => ({ id: s.id, name: s.name, designation: s.designation, roleId: s.role_id })),
+        locks: ent.locks.map((key) => ({ key, value: ent.overrides[key] ?? null, note: ent.lockNotes?.[key] ?? '' })),
         versions: versions.rows.map((v) => ({ id: v.id, version: v.version, changes: v.changes, note: v.note, by: v.by, at: v.at.toISOString() })),
       };
     });
@@ -87,45 +86,39 @@ export class ConfigService implements OnModuleInit {
     if (!checked.ok) throw new ApiError('validation', checked.problems[0]!.message, { fields: Object.fromEntries(checked.problems.map((p) => [p.key, p.message])) });
     const unknown = resets.find((k) => !(k in SETTINGS_META));
     if (unknown) throw new ApiError('validation', 'That setting does not exist.', { fields: { [unknown]: 'That setting does not exist.' } });
-    const after = await this.school(schoolId, async (p) => {
-      const client = await p.connect();
-      try {
-        await client.query('begin');
-        await client.query("select pg_advisory_xact_lock(hashtext('settings'))");
-        const before = await this.values(client);
-        if (patch.expectedVersion !== undefined && patch.expectedVersion !== before.version) {
-          throw new ApiError('conflict', 'Someone else changed this school’s configuration a moment ago. Reload to see their change.');
-        }
-        for (const [k, v] of Object.entries(checked.values)) {
-          await client.query(
-            'insert into settings (key, value, updated_by, updated_at) values ($1,$2,$3,now()) on conflict (key) do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now()',
-            [k, JSON.stringify(v), `tangent:${by}`]);
-        }
-        if (resets.length) await client.query('delete from settings where key = any($1)', [resets]);
-        await client.query("insert into meta (key, value) values ('settings.version', '2') on conflict (key) do update set value = to_jsonb((meta.value)::int + 1)");
-        const now = await this.values(client);
-        const changes = diffSettings(before.values, now.values);
-        await client.query('insert into audit_log (id, actor_id, actor_name, action, entity, detail) values ($1,null,$2,$3,$4,$5)',
-          [newId('aud'), `Tangent · ${by}`, 'settings.changed', 'settings', JSON.stringify({ keys: changes.map((c) => c.key).join(', '), note: patch.note ?? '' })]);
-        await client.query('commit');
-        return { ...now, changes };
-      } catch (err) {
-        await client.query('rollback').catch(() => undefined);
-        throw err;
-      } finally {
-        client.release();
-      }
-    });
+    const after = await this.school(schoolId, (p) => writeSettings(p, { changes: { ...checked.values, ...Object.fromEntries(resets.map((k) => [k, null])) }, expectedVersion: patch.expectedVersion, note: patch.note, actorId: null, actorName: `Tangent · ${by}` }))
+      .catch((e) => { throw e instanceof StaleSettings ? new ApiError('conflict', 'Someone else changed this school’s configuration a moment ago. Reload to see their change.') : e; });
     if (after.changes.length) {
-      await this.db.pool.query('insert into config_versions (id, school_id, version, values, changes, note, by) values ($1,$2,$3,$4,$5,$6,$7)',
-        [newId('cfv'), schoolId, after.version, JSON.stringify(after.values), JSON.stringify(after.changes), patch.note ?? '', by]);
-      // Who the school is lives in its settings; the registry keeps a copy for the fleet, the console and the school's address.
-      const v = after.values as Record<string, unknown>;
-      const id = (k: string) => (typeof v[k] === 'string' && (v[k] as string).trim() ? (v[k] as string).trim() : null);
-      await this.db.pool.query('update schools set config_version = config_version + 1, name = coalesce($2, name), short_name = coalesce($3, short_name), color = coalesce($4, color), logo_text = coalesce($5, logo_text) where id = $1',
-        [schoolId, id('school.name'), id('school.shortName'), id('brand.color'), id('brand.logoText')]);
+      await recordSettingsVersion(this.db.pool, schoolId, after, patch.note ?? '', by);
       await this.db.audit(by, 'config.changed', 'school', schoolId, { keys: after.changes.map((c) => c.key).join(', ') });
     }
+    return this.get(schoolId);
+  }
+
+  /**
+   * Fixes one setting for one school at a value, or lifts the fix. The school then sees it read-only with the reason; on a
+   * setting it may only tighten (security, privacy), the value is a floor and the school may still be stricter.
+   */
+  async lock(schoolId: string, by: string, body: SettingLockPut): Promise<SchoolConfig> {
+    if (!(body.key in SETTINGS_META)) throw new ApiError('validation', 'That setting does not exist.');
+    const ent = await this.entitlement(schoolId);
+    const locks = ent.locks.filter((k) => k !== body.key);
+    const overrides = { ...ent.overrides };
+    const notes = { ...(ent.lockNotes ?? {}) };
+    delete overrides[body.key];
+    delete notes[body.key];
+    if (body.locked) {
+      const checked = validateSettingsChanges({ [body.key]: body.value }, []);
+      if (!checked.ok) throw new ApiError('validation', checked.problems[0]!.message, { fields: { [body.key]: checked.problems[0]!.message } });
+      locks.push(body.key);
+      overrides[body.key] = checked.values[body.key];
+      if (body.note) notes[body.key] = body.note;
+    }
+    const { plan: _plan, ...doc } = { ...ent, locks, overrides, lockNotes: notes, version: ent.version + 1 };
+    await this.db.pool.query('update schools set entitlement = $2, config_version = config_version + 1 where id = $1', [schoolId, JSON.stringify(doc)]);
+    const slug = (await this.db.pool.query<{ slug: string }>('select slug from schools where id = $1', [schoolId])).rows[0]?.slug;
+    if (slug) this.registry.invalidate(slug);
+    await this.db.audit(by, body.locked ? 'setting.locked' : 'setting.unlocked', 'school', schoolId, { key: body.key, note: body.note });
     return this.get(schoolId);
   }
 
@@ -278,6 +271,11 @@ export class ConfigController {
       return this.config.get(id);
     }
     return this.config.apply(id, me.email, body);
+  }
+
+  @Put('schools/:id/config/locks') @Needs('schools.configure')
+  lock(@Me() me: ConsoleUser, @Param('id') id: string, @Body(new ZodPipe(SettingLockPut)) body: SettingLockPut): Promise<SchoolConfig> {
+    return this.config.lock(id, me.email, body);
   }
 
   @Post('schools/:id/config/rollback') @HttpCode(200) @Needs('schools.configure')

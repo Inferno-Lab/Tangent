@@ -11,13 +11,13 @@ interface Row {
   payload: Record<string, unknown>; status: ApprovalRow['status']; created_at: Date; decided_at: Date | null; decision_note?: string; decided_by_name?: string | null;
 }
 
-const TONE: Record<ApprovalKind, ApprovalRow['tone']> = { leave: 'blue', fee_waiver: 'mint', attendance: 'amber', notice: 'violet', admission: 'coral', photo: 'violet', receipt_cancel: 'coral' };
-const ACTION: Record<ApprovalKind, string> = { leave: 'Review', fee_waiver: 'Approve', attendance: 'Remind', notice: 'Publish', admission: 'Approve', photo: 'Use photo', receipt_cancel: 'Cancel receipt' };
+const TONE: Record<ApprovalKind, ApprovalRow['tone']> = { leave: 'blue', fee_waiver: 'mint', attendance: 'amber', notice: 'violet', admission: 'coral', photo: 'violet', receipt_cancel: 'coral', settings: 'amber' };
+const ACTION: Record<ApprovalKind, string> = { leave: 'Review', fee_waiver: 'Approve', attendance: 'Remind', notice: 'Publish', admission: 'Approve', photo: 'Use photo', receipt_cancel: 'Cancel receipt', settings: 'Apply' };
 /** What a person needs to be allowed to decide each kind. */
-const KIND_NEEDS: Record<ApprovalKind, string | null> = { leave: null, fee_waiver: 'fees', notice: 'notices', admission: 'people.admissions', attendance: 'attendance', photo: null, receipt_cancel: 'fees' };
+const KIND_NEEDS: Record<ApprovalKind, string | null> = { leave: null, fee_waiver: 'fees', notice: 'notices', admission: 'people.admissions', attendance: 'attendance', photo: null, receipt_cancel: 'fees', settings: null };
 const NEEDS: Record<ApprovalKind, Permission[]> = {
   leave: ['approvals.decide'], fee_waiver: ['approvals.decide', 'fees.waive'], notice: ['approvals.decide', 'notices.publish'], admission: ['approvals.decide'], attendance: ['attendance.read'],
-  photo: ['approvals.decide', 'students.write'], receipt_cancel: ['approvals.decide', 'fees.refund'],
+  photo: ['approvals.decide', 'students.write'], receipt_cancel: ['approvals.decide', 'fees.refund'], settings: ['approvals.decide', 'settings.manage'],
 };
 
 @Injectable()
@@ -44,6 +44,7 @@ export class ApprovalsService {
     if (r.kind === 'receipt_cancel') return 'Receipt cancelled';
     if (r.kind === 'admission') return 'Admission approved';
     if (r.kind === 'photo') return 'New photo in use';
+    if (r.kind === 'settings') return 'Setting changed';
     const noticeId = (r.payload as { noticeId?: string }).noticeId;
     const n = noticeId ? await t.pool.query<{ n: string }>(
       `select count(distinct sg.guardian_id) n from notices x left join students s on x.class_id is null or s.class_id = x.class_id
@@ -114,6 +115,12 @@ export class ApprovalsService {
     if (r.requested_by === user.id && r.kind !== 'attendance') throw forbidden('Someone else decides a request you made.');
     if (body.decision === 'undo' ? r.status === 'pending' : r.status !== 'pending') throw new ApiError('conflict', body.decision === 'undo' ? 'That request is still open.' : 'Someone has already decided this request.');
     const next = body.decision === 'approve' ? 'approved' : body.decision === 'reject' ? 'rejected' : 'pending';
+    if (r.kind === 'settings' && body.decision === 'undo') throw new ApiError('conflict', 'A setting that was changed is changed back from Settings.');
+    // A settings change applies first: if the settings moved on since it was asked for, nothing is marked decided.
+    if (r.kind === 'settings' && body.decision === 'approve') {
+      const p = r.payload as { changes: Record<string, unknown>; note?: string; expectedVersion?: number };
+      await this.settings.apply(t, { id: r.requested_by ?? user.id, name: `${r.requester_name}, approved by ${user.name}` }, p.changes, p.note ?? '', p.expectedVersion);
+    }
     const client = await t.pool.connect();
     try {
       await client.query('begin');

@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
-import { newId } from '@tangent/db';
-import { resolveConfig } from '@tangent/config-engine';
-import { MESSAGE_EVENTS, SchoolSettingsSchema, gradeFor, istMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type SettingsDoc } from '@tangent/contracts';
-import type { TenantCtx } from '../tenancy/tenant.js';
+import { Inject, Injectable } from '@nestjs/common';
+import { StaleSettings, newId, recordSettingsVersion, writeSettings } from '@tangent/db';
+import { checkSchoolChanges, resolveConfig, validateSettingsChanges } from '@tangent/config-engine';
+import { ApiError } from '@tangent/nest-kit';
+import type { Registry } from '@tangent/tenancy';
+import { MESSAGE_EVENTS, SETTINGS_META, SchoolSettingsSchema, gradeFor, istMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type SchoolSettingsPatch, type SchoolSettingsView, type SettingsDoc } from '@tangent/contracts';
+import { REGISTRY, type TenantCtx } from '../tenancy/tenant.js';
 import { HubService } from './hub.service.js';
 
 @Injectable()
@@ -25,7 +27,56 @@ export class AuditService {
 export class SettingsService {
   private readonly cache = new Map<string, { at: number; doc: SettingsDoc }>();
 
-  // Read-only here: only the console writes a school's settings.
+  constructor(@Inject(REGISTRY) private readonly registry: Registry) {}
+
+  /** What the school's admin edits: every setting in force, Tangent's locks and the lists the editors pick from. */
+  async view(t: TenantCtx): Promise<SchoolSettingsView> {
+    const [cfg, doc, classes, heads] = await Promise.all([
+      this.effective(t), this.doc(t),
+      t.pool.query<{ id: string; name: string }>('select id, name from classes order by grade, section'),
+      t.pool.query<{ key: string; name: string }>('select key, name from fee_heads order by sort, name'),
+    ]);
+    const ent = t.info.entitlement;
+    return {
+      version: doc.version, values: cfg.settings, entitled: cfg.modules, features: cfg.features, classes: classes.rows, feeHeads: heads.rows,
+      locks: (ent.locks ?? []).map((key) => ({ key, value: ent.overrides?.[key] ?? null, note: ent.lockNotes?.[key] ?? '' })),
+    };
+  }
+
+  /**
+   * A change the school makes to its own settings: checked against who owns each one, Tangent's locks and floors, the person's
+   * permissions and the schema. A risky one becomes a request for a second person; the rest apply at once.
+   */
+  async change(t: TenantCtx, user: { id: string; name: string; permissions: readonly string[] }, patch: SchoolSettingsPatch): Promise<{ pending: true; approvalId: string } | { version: number }> {
+    if (user.id.startsWith('support:')) throw new ApiError('forbidden', 'A support session cannot change the school’s settings.');
+    const ent = t.info.entitlement;
+    const own = checkSchoolChanges(patch.changes, { locks: ent.locks ?? [], overrides: ent.overrides ?? {} }, user.permissions);
+    if (own.length) throw new ApiError('validation', own[0]!.message, { fields: Object.fromEntries(own.map((p) => [p.key, p.message])) });
+    const sets = Object.fromEntries(Object.entries(patch.changes).filter(([, v]) => v !== null));
+    const checked = validateSettingsChanges(sets, []);
+    if (!checked.ok) throw new ApiError('validation', checked.problems[0]!.message, { fields: Object.fromEntries(checked.problems.map((p) => [p.key, p.message])) });
+    const changes = { ...checked.values, ...Object.fromEntries(Object.keys(patch.changes).filter((k) => patch.changes[k] === null).map((k) => [k, null])) };
+    const risky = Object.keys(changes).filter((k) => SETTINGS_META[k as keyof typeof SETTINGS_META]?.risky);
+    if (risky.length) {
+      const id = newId('apr');
+      const labels = risky.map((k) => SETTINGS_META[k as keyof typeof SETTINGS_META].label).join(', ');
+      await t.pool.query(
+        "insert into approvals (id, kind, title, subtitle, requester_name, requested_by, payload, status) values ($1,'settings',$2,$3,$4,$5,$6,'pending')",
+        [id, `Change a setting: ${labels}`, patch.note || 'A second person confirms this change before it applies.', user.name, user.id, JSON.stringify({ changes, note: patch.note, expectedVersion: patch.expectedVersion })]);
+      return { pending: true, approvalId: id };
+    }
+    return { version: (await this.apply(t, { id: user.id, name: user.name }, changes, patch.note, patch.expectedVersion)).version };
+  }
+
+  /** Writes checked changes (the school's, or an approved request): the school's audit log, the console's history, the apps told. */
+  async apply(t: TenantCtx, actor: { id: string; name: string }, changes: Record<string, unknown>, note: string, expectedVersion?: number): Promise<{ version: number }> {
+    const after = await writeSettings(t.pool, { changes, note, expectedVersion, actorId: actor.id, actorName: actor.name })
+      .catch((e) => { throw e instanceof StaleSettings ? new ApiError('conflict', e.message) : e; });
+    this.cache.delete(t.info.slug);
+    await recordSettingsVersion(this.registry.pool, t.info.id, after, note, `${actor.name} (school)`);
+    this.registry.invalidate(t.info.slug);
+    return { version: after.version };
+  }
 
   async doc(t: TenantCtx): Promise<SettingsDoc> {
     const hit = this.cache.get(t.info.slug);
