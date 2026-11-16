@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { AppMode } from './theme.js';
 import { COUNTRIES, isCurrency, isLocale, isZone } from './locale.js';
-import { VOCAB_CONCEPTS, isLanguage, type Vocabulary } from './i18n.js';
+import { localizedLabels, VOCAB_CONCEPTS, isLanguage, type Vocabulary } from './i18n.js';
 
 
 /** Attendance marks the data model knows; a school picks which it uses (`attendance.statuses`). */
@@ -11,7 +11,7 @@ import { VOCAB_CONCEPTS, isLanguage, type Vocabulary } from './i18n.js';
  */
 export const ATTENDANCE_MARKS = ['present', 'absent', 'late', 'half_day', 'leave'] as const;
 export type AttendanceMark = (typeof ATTENDANCE_MARKS)[number];
-export const MARK_MEANING_LABELS: Record<AttendanceMark, string> = { present: 'Present', late: 'Late', half_day: 'Half day', leave: 'Away, authorised', absent: 'Absent, not authorised' };
+export const MARK_MEANING_LABELS: Record<AttendanceMark, string> = localizedLabels({ present: 'Present', late: 'Late', half_day: 'Half day', leave: 'Away, authorised', absent: 'Absent, not authorised' });
 
 /** One of the school's own attendance marks: its name, what it means, and the code it is written as (a register's letter). */
 export const AttendanceMarkDef = z.object({
@@ -39,7 +39,7 @@ export function markMeaning(marks: readonly AttendanceMarkDef[], key: string): A
 
 /** A category of notices or events: its name, and the tone (a theme colour pair) it is drawn in. */
 export const CATEGORY_TONES = ['v', 'g', 'a', 'c'] as const;
-export const CATEGORY_TONE_LABELS: Record<(typeof CATEGORY_TONES)[number], string> = { v: 'Violet', g: 'Green', a: 'Amber', c: 'Coral' };
+export const CATEGORY_TONE_LABELS: Record<(typeof CATEGORY_TONES)[number], string> = localizedLabels({ v: 'Violet', g: 'Green', a: 'Amber', c: 'Coral' });
 const CATEGORY = z.object({ key: z.string().regex(/^[a-z0-9-]{1,24}$/), name: z.string().trim().min(1).max(24), tone: z.enum(CATEGORY_TONES) });
 export type Category = z.infer<typeof CATEGORY>;
 
@@ -71,7 +71,7 @@ const seriesCheck = (v: string, ctx: z.RefinementCtx) => {
 
 /** What kind of money a payment method is: reports and reconciliation group by it, whatever the school calls the method. */
 export const PAYMENT_KINDS = ['cash', 'card', 'bank', 'cheque', 'wallet', 'online', 'other'] as const;
-export const PAYMENT_KIND_LABELS: Record<(typeof PAYMENT_KINDS)[number], string> = { cash: 'Cash', card: 'Card', bank: 'Bank transfer', cheque: 'Cheque', wallet: 'Wallet or app', online: 'Online', other: 'Other' };
+export const PAYMENT_KIND_LABELS: Record<(typeof PAYMENT_KINDS)[number], string> = localizedLabels({ cash: 'Cash', card: 'Card', bank: 'Bank transfer', cheque: 'Cheque', wallet: 'Wallet or app', online: 'Online', other: 'Other' });
 export const PaymentMethod = z.object({
   key: z.string().regex(/^[a-z0-9-]{1,24}$/),
   name: z.string().trim().min(1, 'Name the method').max(30),

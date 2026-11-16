@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MoneyOrZero } from './locale.js';
+import { localized } from './i18n.js';
 
 /** One column of an import: the template header, what people see, and an example for the template's second row. */
 export interface ImportColumn {
@@ -33,7 +34,7 @@ export interface ImportKind {
 const c = (key: string, label: string, example: string, extra: Partial<ImportColumn> = {}): ImportColumn => ({ key, label, example, ...extra });
 const req = (key: string, label: string, example: string, aliases: string[] = []): ImportColumn => ({ key, label, example, required: true, aliases });
 
-export const IMPORT_KINDS: ImportKind[] = [
+export const IMPORT_KINDS: ImportKind[] = localized([
   { key: 'years', label: 'Academic years', blurb: 'The year the school is in, and earlier ones for history.', module: 'core', matchOn: ['label'],
     columns: [req('label', 'Year', '2026-27', ['academic year', 'session']), req('starts_on', 'Starts on', '2026-04-01', ['start date', 'from']), req('ends_on', 'Ends on', '2027-03-31', ['end date', 'to']), c('current', 'Current year', 'yes', { aliases: ['is current', 'active'], options: ['yes', 'no'] })] },
   { key: 'terms', label: 'Terms', blurb: 'Terms or semesters inside a year.', module: 'core', matchOn: ['year', 'name'],
@@ -79,7 +80,7 @@ export const IMPORT_KINDS: ImportKind[] = [
       c('student', 'Child', 'Aarav Sharma', { aliases: ['child', 'student name', 'ward'] }), c('class', 'Class', '8 A', { aliases: ['class name', 'section'] })] },
   { key: 'transport', label: 'Bus routes', blurb: 'Which route each student takes.', module: 'transport', matchOn: ['admission_no'],
     columns: [req('admission_no', 'Admission number', '2019/0412', ['admission no', 'admn no', 'adm no']), req('route', 'Route', 'Route 4 · Baner', ['route name', 'bus route', 'route no'])] },
-];
+]);
 
 export function importKind(key: string): ImportKind | undefined {
   return IMPORT_KINDS.find((k) => k.key === key);
@@ -148,11 +149,11 @@ export type UploadCreate = z.infer<typeof UploadCreate>;
 export interface UploadRow { id: string; fileName: string; note: string; rows: number; uploadedBy: string; at: string; status: 'new' | 'imported' | 'set_aside'; batchId: string | null; setAsideReason: string }
 
 /** What the school edits itself in Classes and calendar: the same kinds and columns as the importers, behind a console lock each. */
-export const SETUP_KINDS = [
+export const SETUP_KINDS = localized([
   { key: 'years', lock: 'calendar.schoolEdits' }, { key: 'terms', lock: 'calendar.schoolEdits' }, { key: 'holidays', lock: 'calendar.schoolEdits' },
   { key: 'classes', lock: 'classes.schoolEdits' }, { key: 'subjects', lock: 'classes.schoolEdits' }, { key: 'periods', lock: 'classes.schoolEdits' },
   { key: 'fee_structures', lock: 'feeStructures.schoolEdits' },
-] as const;
+] as const);
 
 /** One kind's rows in the template's columns, plus the row id for removing it. */
 export interface SetupSection { kind: string; label: string; locked: boolean; columns: ImportColumn[]; rows: (Record<string, string> & { id: string })[] }

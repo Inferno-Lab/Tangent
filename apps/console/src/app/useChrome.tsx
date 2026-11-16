@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouterState } from '@tanstack/react-router';
-import { CONSOLE_ROLE_INFO, type ConsoleRole } from '@tangent/contracts';
+import { tx, CONSOLE_ROLE_INFO, type ConsoleRole } from '@tangent/contracts';
 import { Dialog, Dock, Field, MoreSheet, Presence, SearchDialog, Sidebar, WorkspaceHeader, tintFor, useShake, useTheme, type DockTab, type PaletteHit, Icon, t as tr } from '@tangent/web-ui';
 import { PAGES, SCHOOL_TABS, activeNav, consoleNav, shortcutTargets } from './nav';
 import { HttpError } from '@tangent/api-client';
@@ -129,7 +129,7 @@ export function useChrome() {
       <MoreSheet title={tr('console.use_chrome.menu')} onClose={() => setMore(false)}>
         {groups.map((g) => (
           <div key={g.name}>
-            <div className="sl">{g.name}</div>
+            <div className="sl">{tx(g.name)}</div>
             {g.items.map((n) => (
               <a key={n.id} className={`nvm ${n.id === active ? 'on' : ''}`} href={n.href} onClick={(e) => { e.preventDefault(); setMore(false); goRef.current(path(n.href)); }}>
                 <Icon name={n.icon} />{n.label}

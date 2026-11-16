@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { nextNumber, commitImport, newId, previewImport } from '@tangent/db';
-import { schoolInstant, addDays, dayLabel, initials, schoolToday, latestSchoolDay, schoolDaysEnding, type AssignFee, type AttendanceStatus, type ContactReveal, type FeeStatus, type ImportResult, type MessageRequest, type GuardianRow, type GuardiansPut, type Paged, type StudentCreate, type StudentDetail, type StudentPatch, type StudentQuery, type StudentRow, type StudentSummary, type StudentViews } from '@tangent/contracts';
+import { schoolInstant, addDays, dayLabel, initials, schoolToday, latestSchoolDay, schoolDaysEnding, type AssignFee, type AttendanceStatus, type ContactReveal, type FeeStatus, type ImportResult, type MessageRequest, type GuardianRow, type GuardiansPut, type Paged, type StudentCreate, type StudentDetail, type StudentPatch, type StudentQuery, type StudentRow, type StudentSummary, type StudentViews, tx } from '@tangent/contracts';
 import { maskPhone } from '@tangent/security';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
@@ -276,7 +276,7 @@ export class StudentsService {
     if (!cls.rows[0]) throw new ApiError('validation', 'Choose a class from the list.', { fields: { classId: 'Choose a class from the list.' } });
     const limit = t.info.entitlement.limits.students;
     const count = Number((await t.pool.query<{ n: string }>('select count(*) n from students')).rows[0]!.n);
-    if (count >= limit) throw new ApiError('locked', `Your plan allows ${limit} students. Ask Tangent to raise the limit.`);
+    if (count >= limit) throw new ApiError('locked', tx('Your plan allows {limit} students. Ask Tangent to raise the limit.', { limit }));
     // The school's own admission numbers (People → Settings) when the office does not type one.
     const pattern = await this.settings.value<string>(t, 'people.admissionNumber', '{yyyy}/{seq:4}');
     const start = await this.settings.value<number>(t, 'people.admissionStart', 1);
@@ -392,10 +392,10 @@ export class StudentsService {
   async importCsv(t: TenantCtx, csv: string, user: { id: string; name: string }): Promise<ImportResult> {
     const input = { kind: 'students', csv, fileName: 'Students page' };
     const p = await previewImport(t.pool, input);
-    if (p.missing.length) throw new ApiError('validation', `The first row must name the columns. Nothing is matched to ${p.missing.join(', ')}.`);
+    if (p.missing.length) throw new ApiError('validation', tx('The first row must name the columns. Nothing is matched to {p0}.', { p0: p.missing.join(', ') }));
     const limit = t.info.entitlement.limits.students;
     const count = Number((await t.pool.query<{ n: string }>('select count(*) n from students')).rows[0]!.n);
-    if (count + p.counts.create > limit) throw new ApiError('locked', `Your plan allows ${limit} students and this sheet would make ${count + p.counts.create}. Ask Tangent to raise the limit.`);
+    if (count + p.counts.create > limit) throw new ApiError('locked', tx('Your plan allows {limit} students and this sheet would make {p1}. Ask Tangent to raise the limit.', { limit, p1: count + p.counts.create }));
     const errors = p.rows.filter((r) => r.errors.length).map((r) => ({ line: r.line, message: r.errors.join(' ') }));
     if (p.counts.create + p.counts.update === 0) return { created: 0, updated: 0, skipped: errors.length, errors };
     const batch = await commitImport(t.pool, input, user.name);

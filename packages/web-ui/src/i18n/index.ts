@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { languageDir, makeT, type Catalogue, type Params, type Vocabulary } from '@tangent/contracts';
+import { languageDir, makeT, setTextSource, wordsFor, type Catalogue, type Params, type Vocabulary } from '@tangent/contracts';
 import ui from './en.json';
 
 /**
@@ -15,6 +15,9 @@ const SAVED = 'tangent.language';
 let lang = 'en';
 let words: Vocabulary | undefined;
 let current = makeT('en', {}, english);
+// Shared text (setting labels, module names, server-made lines): English is the key; packages/contracts/i18n holds the rest.
+let text: { lang: string; cat: Catalogue; words: Record<string, string> } | undefined;
+setTextSource(() => text);
 
 export function t(key: string, params?: Params): string {
   return current(key, params);
@@ -29,10 +32,14 @@ export function addCatalogue(en: Catalogue, load?: Loader): void {
 
 /** Sets the language and the school's words; resolves once the catalogues are in. A language without one reads in English. */
 export async function setLanguage(next: string, vocab?: Vocabulary): Promise<void> {
-  const own = next === 'en' ? {} : Object.assign({}, ...(await Promise.all(loaders.map((l) => l(next).catch(() => ({})))))) as Catalogue;
+  const [own, shared] = next === 'en' ? [{}, {}] : await Promise.all([
+    Promise.all(loaders.map((l) => l(next).catch(() => ({})))).then((parts) => Object.assign({}, ...parts) as Catalogue),
+    import(`../../../contracts/i18n/${next}.json`).then((m: { default: Catalogue }) => m.default).catch(() => ({})),
+  ]);
   lang = next;
   words = vocab;
   current = makeT(next, own, english, vocab);
+  text = { lang: next, cat: shared, words: wordsFor(next, vocab, own) };
   if (typeof document !== 'undefined') {
     document.documentElement.lang = next;
     document.documentElement.dir = languageDir(next);

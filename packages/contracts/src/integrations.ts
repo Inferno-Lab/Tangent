@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { localized, localizedLabels } from './i18n.js';
 
 /**
  * What a connection does. Every third party the platform talks to is one of these, from messages to families to the services
@@ -11,11 +12,11 @@ export const CAPABILITIES = [
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
-export const CAPABILITY_LABELS: Record<Capability, string> = {
+export const CAPABILITY_LABELS: Record<Capability, string> = localizedLabels({
   sms: 'Text messages', whatsapp: 'WhatsApp', email: 'Email', push: 'Phone notifications', payments: 'Payments', storage: 'File storage',
   maps: 'Maps', tracking: 'Bus trackers', scanning: 'Virus scanning', webhook: 'Events to other systems',
   alerts: 'Alerts to the Tangent team', builds: 'App builds', stores: 'App stores', databases: 'School databases', hosting: 'Hosting and domains',
-};
+});
 
 /** Capabilities Tangent itself uses (never a school's own connection). */
 export const PLATFORM_CAPABILITIES: Capability[] = ['alerts', 'builds', 'stores', 'databases', 'hosting', 'scanning'];
@@ -68,7 +69,7 @@ const DLT_STEPS = [
   'Register a content template for every message: open Templates here, press “Copy for DLT” on each message and paste it into the portal. Note each template ID.',
 ];
 
-export const INTEGRATION_PROVIDERS: ProviderDef[] = [
+export const INTEGRATION_PROVIDERS: ProviderDef[] = localized([
   { key: 'sandbox', name: 'Test inbox', capabilities: ['sms', 'whatsapp', 'email', 'push', 'payments', 'storage', 'maps'], fields: [], steps: [],
     testAction: 'Files a test message in the console’s Test inbox.', docs: '' },
   // Text messages
@@ -222,7 +223,7 @@ export const INTEGRATION_PROVIDERS: ProviderDef[] = [
   { key: 'webhook', name: 'Webhook', capabilities: ['webhook'], testAction: 'Posts a test event to the address.', docs: '',
     steps: ['In the other system, make an address that accepts JSON posts.', 'Choose a signing secret and give it to that system: each event carries X-Tangent-Signature: sha256=<HMAC of the body>.', 'Fill in the form and Test.'],
     fields: [f('url', 'Address', 'url', { pattern: '^https://\\S+$', patternHint: 'An https:// address.' }), f('secret', 'Signing secret', 'secret', { help: 'Each event carries X-Tangent-Signature: sha256 of the body with this secret.' })] },
-];
+]);
 
 // What a message costs, for billing and the console's totals: set on every paid messaging connection.
 for (const p of INTEGRATION_PROVIDERS) {

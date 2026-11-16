@@ -1,5 +1,8 @@
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { setLocaleSource, setZoneSource, type EntitlementDoc } from '@tangent/contracts';
+import { setLocaleSource, setZoneSource, type EntitlementDoc, setTextSource, isLanguage, type Catalogue } from '@tangent/contracts';
 import { pg } from '@tangent/db';
 import { schools } from '@tangent/db/registry';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -189,9 +192,37 @@ export class PoolManager {
  * (docs/one-shot-plan.md §3.3). A request runs inside one context (the API's onRequest hook) that the tenant guard fills in;
  * a job runs inside `withSchool`. Code that serves two schools at once passes their zones explicitly.
  */
-export const schoolContext = new AsyncLocalStorage<{ zone?: string; locale?: string; currency?: string; country?: string }>();
+export const schoolContext = new AsyncLocalStorage<{ zone?: string; locale?: string; currency?: string; country?: string; lang?: string }>();
 setZoneSource(() => schoolContext.getStore()?.zone);
 setLocaleSource(() => schoolContext.getStore());
+// Server text (errors, labels, PDFs) in the reader's language: the request's Accept-Language, catalogues from contracts/i18n.
+setTextSource(() => {
+  const lang = schoolContext.getStore()?.lang;
+  return lang && lang !== 'en' ? { lang, cat: serverCatalogue(lang) } : undefined;
+});
+
+const catalogues = new Map<string, Catalogue>();
+const I18N_DIR = path.join(path.dirname(createRequire(import.meta.url).resolve('@tangent/contracts/package.json')), 'i18n');
+/** The shared-text catalogue of a language (packages/contracts/i18n/<lang>.json); none yet means English. */
+export function serverCatalogue(lang: string): Catalogue {
+  let c = catalogues.get(lang);
+  if (!c) {
+    try { c = JSON.parse(readFileSync(path.join(I18N_DIR, `${lang}.json`), 'utf8')) as Catalogue; } catch { c = {}; }
+    catalogues.set(lang, c);
+  }
+  return c;
+}
+
+/** The first language of an Accept-Language header that Tangent knows ("fr-CA,fr;q=0.9" → "fr"), else English. */
+export function requestLanguage(header: string | string[] | undefined): string {
+  const tags = (Array.isArray(header) ? header.join(',') : header ?? '').split(',').map((x) => x.split(';')[0]!.trim().toLowerCase()).filter(Boolean);
+  for (const tag of tags) {
+    if (isLanguage(tag)) return tag;
+    const base = tag.split('-')[0]!;
+    if (isLanguage(base)) return base;
+  }
+  return 'en';
+}
 
 export function enterSchool(info: Pick<TenantInfo, 'timezone' | 'locale' | 'currency' | 'country'>): void {
   const store = schoolContext.getStore();

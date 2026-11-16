@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { IsoDate } from './common.js';
 import { Permission } from './permissions.js';
 import type { FeeStatus } from './school.js';
+import { localized } from './i18n.js';
 
 // Homework
 
@@ -425,7 +426,7 @@ export interface MessageEvent {
   opens?: string;
 }
 
-export const MESSAGE_EVENTS: MessageEvent[] = [
+export const MESSAGE_EVENTS: MessageEvent[] = localized([
   { key: 'attendance.absent', label: 'Child marked absent or late', to: 'families', vars: ['student', 'status', 'school'], text: '{student} was marked {status} today at {school}.', defaults: { push: true, sms: true, email: false }, urgent: true, opens: '/attendance', needs: 'attendance.parentAlerts' },
   { key: 'attendance.reminder', label: 'Teacher has not marked attendance', to: 'staff', vars: ['teacher'], text: 'Hi {teacher}, please mark attendance for your class today.', defaults: { push: true, sms: true, email: false }, opens: '/teacher/attendance', needs: 'attendance' },
   { key: 'fees.reminder', label: 'Fee reminder', to: 'families', vars: ['student', 'school'], text: 'Reminder: fees for {student} are due. Pay in the Tangent app to get an instant receipt.', defaults: { push: true, sms: true, email: false }, opens: '/fees', needs: 'fees.reminders' },
@@ -453,4 +454,4 @@ export const MESSAGE_EVENTS: MessageEvent[] = [
   { key: 'library.overdue', label: 'Library book overdue', to: 'families', vars: ['student', 'title', 'days', 'fine'], text: '{title}, borrowed by {student}, is {days} days late. Fine so far: {fine}.', defaults: { push: true, sms: false, email: false }, opens: '/library', needs: 'library' },
   { key: 'bus.late', label: 'Bus running late or stopped', to: 'families', vars: ['route', 'minutes', 'reason'], text: 'The {route} bus is running about {minutes} minutes late: {reason}.', defaults: { push: true, sms: true, email: false }, urgent: true, opens: '/transport', needs: 'transport.liveBus' },
   { key: 'bus.dropped', label: 'Child got on or off the bus', to: 'families', vars: ['student', 'stop', 'event', 'time'], text: '{student} {event} the bus at {stop}, {time}.', defaults: { push: true, sms: false, email: false }, urgent: true, opens: '/transport', needs: 'transport.liveBus' },
-];
+]);

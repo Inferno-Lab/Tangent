@@ -1,4 +1,5 @@
 import type { GradingScale, PaymentMethod } from './config.js';
+import { localized } from './i18n.js';
 
 /**
  * Starter packs (docs/one-shot-plan.md §3.2): what a new school starts with, from its country and its curriculum, so it
@@ -15,7 +16,7 @@ export interface Curriculum {
 
 const scale = (...rows: [string, number][]): GradingScale => rows.map(([grade, minPct]) => ({ grade, minPct }));
 
-export const CURRICULA: Curriculum[] = [
+export const CURRICULA: Curriculum[] = localized([
   { key: 'CBSE', name: 'CBSE', countries: ['IN'], settings: { 'grading.scale': scale(['A1', 91], ['A2', 81], ['B1', 71], ['B2', 61], ['C1', 51], ['C2', 41], ['D', 33], ['E', 0]), 'grading.passPct': 33 } },
   { key: 'ICSE', name: 'CISCE (ICSE and ISC)', countries: ['IN'], settings: { 'grading.scale': scale(['A+', 90], ['A', 75], ['B', 60], ['C', 45], ['D', 33], ['E', 0]), 'grading.passPct': 33 } },
   { key: 'State', name: 'State board', countries: ['IN'], settings: { 'grading.scale': scale(['A+', 90], ['A', 75], ['B', 60], ['C', 45], ['D', 35], ['E', 0]), 'grading.passPct': 35 } },
@@ -25,7 +26,7 @@ export const CURRICULA: Curriculum[] = [
   { key: 'American', name: 'American (letter grades)', countries: null, settings: { 'grading.scale': scale(['A', 90], ['B', 80], ['C', 70], ['D', 60], ['F', 0]), 'grading.passPct': 60 } },
   { key: 'International', name: 'Other international', countries: null, settings: {} },
   { key: 'Other', name: 'Other', countries: null, settings: {} },
-];
+]);
 
 const method = (key: string, name: string, kind: PaymentMethod['kind']): PaymentMethod => ({ key, name, kind });
 

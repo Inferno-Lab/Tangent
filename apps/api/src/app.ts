@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { registerHttp } from '@tangent/nest-kit';
-import { schoolContext, type PoolManager, type Registry } from '@tangent/tenancy';
+import type { PoolManager, Registry } from '@tangent/tenancy';
 import { AppModule } from './app.module.js';
 import { loadEnv, type Env } from './env.js';
 
@@ -14,8 +14,6 @@ export async function createApp(env: Env = loadEnv(), shared?: { registry: Regis
     { logger: env.NODE_ENV === 'test' ? ['error'] : ['error', 'warn', 'log'], rawBody: true },
   );
   await registerHttp(app, env);
-  // Each request runs in its own school context; the tenant guard fills in the school's zone, locale and currency.
-  app.getHttpAdapter().getInstance().addHook('onRequest', (_req: unknown, _reply: unknown, done: () => void) => schoolContext.run({}, done));
   app.enableShutdownHooks();
   return app;
 }

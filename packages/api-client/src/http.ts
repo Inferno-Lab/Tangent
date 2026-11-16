@@ -112,6 +112,8 @@ export function createHttp(opts: HttpOptions): Http {
     const headers: Record<string, string> = {
       ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
       ...(token && !path.includes('/auth/login') && !path.includes('/auth/verify') && !path.includes('/auth/refresh') ? { authorization: `Bearer ${token}` } : {}),
+      // The reader's language (web-ui i18n sets it on <html>), so the server answers in it.
+      ...(typeof document !== 'undefined' && document.documentElement.lang ? { 'accept-language': document.documentElement.lang } : {}),
       ...opts.headers?.(),
     };
     if (opts.cookieRefresh && (path.includes('/auth/refresh') || path.includes('/auth/logout'))) {

@@ -4,6 +4,7 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { CSRF_HEADER } from './cookies.js';
+import { requestLanguage, schoolContext } from '@tangent/tenancy';
 
 /** Routes that take a school's files (a whole student list, a year of attendance as CSV): everything else keeps the small limit. */
 const BIG_BODIES = /^\/v1\/(students\/import|moving-in\/uploads)$|^\/console\/v1\/schools\/:id\/(import\/(preview|commit)|logo)$|^\/hooks\/sandbox-storage\/:token$/;
@@ -37,6 +38,8 @@ export async function registerHttp(app: NestFastifyApplication, env: HttpEnv): P
     permittedCrossDomainPolicies: false,
     crossOriginEmbedderPolicy: false,
   });
+  // Each request runs in its own school context, in the reader's language; the tenant guard adds the school's zone and money.
+  fastify.addHook('onRequest', (req, _reply, done) => schoolContext.run({ lang: requestLanguage(req.headers['accept-language']) }, done));
   fastify.addHook('onRequest', async (_req, reply) => {
     reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()');
   });

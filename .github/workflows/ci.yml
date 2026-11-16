@@ -26,6 +26,8 @@ jobs:
       - run: node tools/check-migrations.mjs origin/main
       - run: pnpm install --frozen-lockfile
       - run: CONSOLE_BASE=/console/ pnpm build
+      # Every shared English text (labels, errors, form checks) is in the catalogue languages are translated from.
+      - run: node tools/i18n-text.mjs --check
       - run: pnpm typecheck
       - run: pnpm test
 

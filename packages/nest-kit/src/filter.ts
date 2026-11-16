@@ -2,6 +2,7 @@ import { Catch, HttpException, Logger, type ArgumentsHost, type ExceptionFilter 
 import type { ApiErrorBody, ErrorCode } from '@tangent/contracts';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { errorSink } from './error-reports.js';
+import { tx } from '@tangent/contracts';
 
 const BY_STATUS: Record<number, ErrorCode> = {
   400: 'validation', 401: 'unauthenticated', 403: 'forbidden', 404: 'not_found', 409: 'conflict', 423: 'locked', 429: 'rate_limited', 503: 'school_unavailable',
@@ -40,6 +41,8 @@ export class ApiExceptionFilter implements ExceptionFilter {
         message: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : null, url: `${req.method} ${req.url.split('?')[0]}`,
       });
     }
+    // In the reader's language (the English is the key; a message made with values was already put in it with tx()).
+    body = { ...body, message: tx(body.message), ...(body.fields ? { fields: Object.fromEntries(Object.entries(body.fields).map(([k, v]) => [k, tx(v)])) } : {}) };
     body.requestId = req.id;
     if (body.retryAfter) void reply.header('retry-after', String(body.retryAfter));
     void reply.status(status).send(body);

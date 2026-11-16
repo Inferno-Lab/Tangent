@@ -1,4 +1,4 @@
-import { SETTINGS_META, schoolToday, settingOwner, type ApprovalKind, type EntitlementDoc, type Permission } from '@tangent/contracts';
+import { localizedLabels, localized, SETTINGS_META, schoolToday, settingOwner, type ApprovalKind, type EntitlementDoc, type Permission } from '@tangent/contracts';
 
 /** The admin menu's groups, in order (docs/product-map.md §3). A group shows once a page in it does. */
 export const ADMIN_GROUPS = ['Home', 'People', 'Teach', 'Care', 'Money', 'Reach', 'Campus', 'School'] as const;
@@ -36,7 +36,7 @@ export interface AdminPage {
 /** Who uses the app. Each role is switched on or off per school in the console (`app.roles`). */
 export const APP_ROLES = ['parent', 'student', 'teacher', 'driver'] as const;
 export type AppRole = (typeof APP_ROLES)[number];
-export const APP_ROLE_LABELS: Record<AppRole, string> = { parent: 'Parents', student: 'Students', teacher: 'Teachers', driver: 'Bus drivers' };
+export const APP_ROLE_LABELS: Record<AppRole, string> = localizedLabels({ parent: 'Parents', student: 'Students', teacher: 'Teachers', driver: 'Bus drivers' });
 
 /** Something a module offers the app: a bottom tab, a Home card or a quick button, for the roles it suits. */
 export interface AppPiece {
@@ -113,7 +113,7 @@ const FAMILY: AppRole[] = ['parent', 'student'];
 const EVERYONE: AppRole[] = ['parent', 'student', 'teacher', 'driver'];
 
 /** One manifest per product module. Within a menu group, pages keep this order. */
-export const MODULES: ModuleManifest[] = [
+export const MODULES: ModuleManifest[] = localized([
   {
     key: 'school', state: 'live', addOnPerStudentYear: 0, core: true, requires: [], backend: true,
     name: 'School', blurb: 'The dashboard, approvals, reports, the academic year, the school profile and its records.',
@@ -360,7 +360,7 @@ export const MODULES: ModuleManifest[] = [
   planned('campuses', 'Multi-campus view', 'One view across a trust’s schools.'),
   planned('canteen', 'Canteen wallet', 'Cashless canteen with a prepaid wallet.'),
   planned('assistant', 'AI assistant', 'At-risk alerts, report-card comment drafts and smart reminders.'),
-];
+]);
 
 const BY_KEY = new Map(MODULES.map((m) => [m.key, m]));
 
@@ -384,7 +384,7 @@ export function closeModules(keys: readonly string[]): string[] {
   return MODULES.filter((m) => want.has(m.key)).map((m) => m.key);
 }
 
-const FEATURES = new Map(MODULES.flatMap((m) => m.features.map((f) => [f.key, { ...f, module: m.key }] as const)));
+const FEATURES = new Map(MODULES.flatMap((m) => m.features.map((f) => [f.key, localized({ ...f, module: m.key })] as const)));
 
 export function featureByKey(key: string): (FeatureDef & { module: string }) | undefined {
   return FEATURES.get(key);
@@ -417,7 +417,7 @@ export const hasKey = (has: { modules: readonly string[]; features: readonly str
 const pieces = (slot: AppPiece['slot']) => MODULES.flatMap((m) => m.app.filter((p) => p.slot === slot).map((p) => ({ ...p, module: m.key })));
 
 /** What the app can put in its dock, on its home screen and in its quick buttons, with the module and roles of each: built from MODULES. */
-export const APP_CATALOG: Record<AppPiece['slot'], (AppPiece & { module: string })[]> = { dock: pieces('dock'), home: pieces('home'), quick: pieces('quick') };
+export const APP_CATALOG: Record<AppPiece['slot'], (AppPiece & { module: string })[]> = localized({ dock: pieces('dock'), home: pieces('home'), quick: pieces('quick') });
 
 /** The settings each page shows: its own list, or, for a module's first page, what no other page of the module names. */
 function pageSettings(m: ModuleManifest, p: AdminPage): string[] {
@@ -431,13 +431,13 @@ function pageSettings(m: ModuleManifest, p: AdminPage): string[] {
 const SETTINGS_TAB: AdminTab = { key: 'settings', label: 'Settings', anyOf: ['settings.read'] };
 
 /** Every admin page with its module, in menu order. */
-export const ADMIN_PAGES: (AdminPage & { module: string })[] = ADMIN_GROUPS.flatMap((g) => MODULES.flatMap((m) => m.pages.filter((p) => p.group === g).map((p) => {
+export const ADMIN_PAGES: (AdminPage & { module: string })[] = localized(ADMIN_GROUPS.flatMap((g) => MODULES.flatMap((m) => m.pages.filter((p) => p.group === g).map((p) => {
   const settings = pageSettings(m, p).filter((k) => k in SETTINGS_META);
   const tabbed = settings.some((k) => settingOwner(k) === 'school') && p.path !== '/profile';
   // A page without tabs gets one for itself first, so its Settings sit beside it.
   const tabs = tabbed ? [...(p.tabs?.length ? p.tabs : [{ key: 'main', label: p.label }]), SETTINGS_TAB] : p.tabs;
   return { ...p, module: m.key, settings, ...(tabs ? { tabs } : {}) };
-})));
+}))));
 
 /** The admin page a path belongs to: its own, or the closest one above it (`/students/x` is Students). */
 export function pageForPath(path: string): (AdminPage & { module: string }) | undefined {

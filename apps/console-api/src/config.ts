@@ -2,8 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, Inject, Injectable, Param, Pat
 import { activeFeatures, activeModules, resolveConfig, validateSettingsChanges } from '@tangent/config-engine';
 import {
   ConfigPatch, PERMISSIONS, RoleDefSave, SETTINGS_META, SettingLockPut,
-  type ChangeRequestRow, type ConfigTemplateRow, type ConfigVersionRow, type EffectiveConfig, type EntitlementDoc, type RoleDef, type SchoolConfig,
-} from '@tangent/contracts';
+  type ChangeRequestRow, type ConfigTemplateRow, type ConfigVersionRow, type EffectiveConfig, type EntitlementDoc, type RoleDef, type SchoolConfig, tx } from '@tangent/contracts';
 import { StaleSettings, newId, readSettings, recordSettingsVersion, writeSettings, type pg } from '@tangent/db';
 import { ApiError, ZodPipe, notFound } from '@tangent/nest-kit';
 import { z } from 'zod';
@@ -138,7 +137,7 @@ export class ConfigService implements OnModuleInit {
 
   async saveRole(schoolId: string, by: string, id: string | null, body: RoleDefSave): Promise<RoleDef[]> {
     const bad = body.permissions.find((p) => !KNOWN.has(p));
-    if (bad) throw new ApiError('validation', `There is no permission called ${bad}.`);
+    if (bad) throw new ApiError('validation', tx('There is no permission called {bad}.', { bad }));
     return this.school(schoolId, async (p) => {
       if (id) {
         const cur = (await p.query<{ locked: boolean }>('select locked from roles where id = $1', [id])).rows[0];
@@ -165,7 +164,7 @@ export class ConfigService implements OnModuleInit {
       const r = (await this.roles(p)).find((x) => x.id === id);
       if (!r) throw notFound('That role');
       if (r.locked) throw new ApiError('conflict', 'The principal role cannot be deleted.');
-      if (r.people) throw new ApiError('conflict', `${r.people} ${r.people === 1 ? 'person has' : 'people have'} this role. Move them to another role first.`);
+      if (r.people) throw new ApiError('conflict', tx('{people} {p1} this role. Move them to another role first.', { people: r.people, p1: r.people === 1 ? 'person has' : 'people have' }));
       await p.query('delete from roles where id = $1', [id]);
       await this.db.audit(by, 'role.removed', 'school', schoolId, { role: r.name });
       return this.roles(p);

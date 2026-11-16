@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Header, HttpCode, Inject, Injectable, Param, Patch, Post, type OnModuleInit } from '@nestjs/common';
 import { activeFeatures, activeModules } from '@tangent/config-engine';
-import { fmtMoney, IMPORT_KINDS, ImportInput, ReadinessMark, SampleLoad, importKind, type EntitlementDoc, type ImportBatchRow, type ImportPreview, type MigrationView, type UploadRow } from '@tangent/contracts';
+import { fmtMoney, IMPORT_KINDS, ImportInput, ReadinessMark, SampleLoad, importKind, type EntitlementDoc, type ImportBatchRow, type ImportPreview, type MigrationView, type UploadRow, tx } from '@tangent/contracts';
 import { commitImport, exportAll, listBatches, pg, previewImport, sampleSchool, templateXlsx, undoBatch } from '@tangent/db';
 import { ApiError, ZodPipe, notFound } from '@tangent/nest-kit';
 import { z } from 'zod';
@@ -58,7 +58,7 @@ export class Migration implements OnModuleInit {
   private async kindFor(id: string, kind: string): Promise<{ entitlement: EntitlementDoc }> {
     const s = await this.school(id);
     if (!importKind(kind)) throw notFound('That kind of import');
-    if (!s.kinds.includes(kind)) throw new ApiError('validation', `This school’s plan does not include ${importKind(kind)!.label.toLowerCase()}. Change it on the school’s Plan and modules tab first.`);
+    if (!s.kinds.includes(kind)) throw new ApiError('validation', tx('This school’s plan does not include {p0}. Change it on the school’s Plan and modules tab first.', { p0: importKind(kind)!.label.toLowerCase() }));
     return s;
   }
 
@@ -140,7 +140,7 @@ export class Migration implements OnModuleInit {
       if (input.kind === 'students') {
         const p = await previewImport(pool, input);
         const total = (await n(pool, 'select count(*) n from students')) + p.counts.create;
-        if (total > s.entitlement.limits.students) throw new ApiError('validation', `This takes the school to ${total} students; its plan allows ${s.entitlement.limits.students}. Raise the limit on the Plan and modules tab first.`);
+        if (total > s.entitlement.limits.students) throw new ApiError('validation', tx('This takes the school to {total} students; its plan allows {students}. Raise the limit on the Plan and modules tab first.', { total, students: s.entitlement.limits.students }));
       }
       const batch = await commitImport(pool, input, by);
       await this.db.pool.query('update schools set students_count = $2 where id = $1', [id, await n(pool, 'select count(*) n from students')]);
@@ -172,7 +172,7 @@ export class Migration implements OnModuleInit {
     if (!demosAllowed(this.env)) throw new ApiError('forbidden', 'A test school is only for the test track, never a real school.');
     return this.with(id, async (pool) => {
       if (await n(pool, 'select count(*) n from students')) throw new ApiError('conflict', 'This school already has students. A test school only goes into an empty one.');
-      if (students > s.entitlement.limits.students) throw new ApiError('validation', `The plan allows ${s.entitlement.limits.students} students. Raise the limit on the Plan and modules tab first.`);
+      if (students > s.entitlement.limits.students) throw new ApiError('validation', tx('The plan allows {students} students. Raise the limit on the Plan and modules tab first.', { students: s.entitlement.limits.students }));
       for (const f of sampleSchool(students).files.filter((f) => s.kinds.includes(f.kind))) await commitImport(pool, { kind: f.kind, csv: f.csv, fileName: f.name }, by);
       await this.db.pool.query('update schools set students_count = $2 where id = $1', [id, await n(pool, 'select count(*) n from students')]);
       await this.db.audit(by, 'import.sample_loaded', 'school', id, { students });

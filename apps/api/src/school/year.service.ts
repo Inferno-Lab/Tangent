@@ -1,5 +1,5 @@
 import { Injectable, type OnModuleInit } from '@nestjs/common';
-import { schoolToday, type LeaverInput, type NewYearInput, type PromotionInput, type PromotionPreview, type YearView } from '@tangent/contracts';
+import { schoolToday, type LeaverInput, type NewYearInput, type PromotionInput, type PromotionPreview, type YearView, tx } from '@tangent/contracts';
 import { newId, type Job } from '@tangent/db';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
@@ -48,7 +48,7 @@ export class YearService implements OnModuleInit {
     if (b.endsOn <= b.startsOn) throw new ApiError('validation', 'The year must end after it starts.', { fields: { endsOn: 'After the start.' } });
     if ((await t.pool.query("select 1 from academic_years where status = 'draft'")).rowCount) throw new ApiError('conflict', 'A new year is already drafted. Start it or change it first.');
     const cur = (await t.pool.query<{ ends_on: string }>("select ends_on::text from academic_years where status = 'current' limit 1")).rows[0];
-    if (cur && b.startsOn <= cur.ends_on) throw new ApiError('validation', 'The new year must start after the current one ends.', { fields: { startsOn: `After ${cur.ends_on}.` } });
+    if (cur && b.startsOn <= cur.ends_on) throw new ApiError('validation', 'The new year must start after the current one ends.', { fields: { startsOn: tx('After {ends_on}.', { ends_on: cur.ends_on }) } });
     const id = newId('yr');
     await t.pool.query("insert into academic_years (id, label, starts_on, ends_on, current, status) values ($1,$2,$3,$4,false,'draft')", [id, b.label, b.startsOn, b.endsOn]);
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'year.drafted', entity: 'year', entityId: id, detail: { label: b.label } });

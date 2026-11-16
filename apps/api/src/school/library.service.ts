@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { addDays, schoolToday, type BookInput, type BookRow, type GiveBack, type IssueInput, type LibraryView, type LoanRow, type ReservationRow } from '@tangent/contracts';
+import { addDays, schoolToday, type BookInput, type BookRow, type GiveBack, type IssueInput, type LibraryView, type LoanRow, type ReservationRow, tx } from '@tangent/contracts';
 import { newId } from '@tangent/db';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
@@ -66,7 +66,7 @@ export class LibraryService {
   async saveBook(t: TenantCtx, user: User, b: BookInput, id?: string): Promise<BookRow> {
     if (id) {
       const out = Number((await t.pool.query<{ n: string }>('select count(*) n from library_loans where book_id = $1 and returned_on is null', [id])).rows[0]!.n);
-      if (b.copies < out) throw new ApiError('validation', `${out} copies are out on loan, so there must be at least ${out}.`, { fields: { copies: `At least ${out}.` } });
+      if (b.copies < out) throw new ApiError('validation', tx('{out} copies are out on loan, so there must be at least {out1}.', { out, out1: out }), { fields: { copies: tx('At least {out}.', { out }) } });
       const r = await t.pool.query('update library_books set title = $2, author = $3, isbn = $4, category = $5, shelf = $6, copies = $7 where id = $1', [id, b.title, b.author, b.isbn, b.category, b.shelf, b.copies]);
       if (!r.rowCount) throw notFound('That book');
     } else {
@@ -90,7 +90,7 @@ export class LibraryService {
     const book = (await t.pool.query<{ title: string; copies: number; out: number }>(
       'select title, copies, (select count(*) from library_loans where book_id = b.id and returned_on is null)::int out from library_books b where id = $1', [b.bookId])).rows[0];
     if (!book) throw notFound('That book');
-    if (book.out >= book.copies) throw new ApiError('conflict', `All ${book.copies} copies of ${book.title} are out.`);
+    if (book.out >= book.copies) throw new ApiError('conflict', tx('All {copies} copies of {title} are out.', { copies: book.copies, title: book.title }));
     const first = (await t.pool.query<{ student_id: string }>("select student_id from library_reservations where book_id = $1 and status in ('waiting','ready') order by created_at limit 1", [b.bookId])).rows[0];
     if (first && first.student_id !== b.studentId && book.copies - book.out <= 1) throw new ApiError('conflict', 'The last copy is reserved for someone else.');
     const rules = await this.rules(t);
@@ -100,7 +100,7 @@ export class LibraryService {
     // How many books one person may have out (console: Library).
     const out = Number((await t.pool.query<{ n: string }>('select count(*) n from library_loans where returned_on is null and (student_id = $1 or staff_user_id = $2)', [b.studentId ?? '', b.staffUserId ?? ''])).rows[0]!.n);
     const most = b.studentId ? rules.maxLoans : rules.staffMaxLoans;
-    if (out >= most) throw new ApiError('conflict', `They already have ${out} ${out === 1 ? 'book' : 'books'} out, the most the school allows. A book must come back first.`);
+    if (out >= most) throw new ApiError('conflict', tx('They already have {out} {p1} out, the most the school allows. A book must come back first.', { out, p1: out === 1 ? 'book' : 'books' }));
     const today = schoolToday();
     const due = b.dueOn ?? addDays(today, rules.loanDays);
     const id = newId('lon');

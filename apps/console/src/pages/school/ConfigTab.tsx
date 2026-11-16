@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
 import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, MODULES } from '@tangent/config-engine';
-import { DEFAULT_BRAND, SETTING_GROUPS, SETTINGS_META, SchoolSettingsSchema, TIGHTEN, settingOwner, type SchoolConfig, type SettingKey, hueContrast, hueOf, hueTokens } from '@tangent/contracts';
+import { tx, DEFAULT_BRAND, SETTING_GROUPS, SETTINGS_META, SchoolSettingsSchema, TIGHTEN, settingOwner, type SchoolConfig, type SettingKey, hueContrast, hueOf, hueTokens } from '@tangent/contracts';
 import { Checkbox, Dialog, EmptyCard, ErrorLine, Field, SelectField, SettingRow, useShake, Icon, EmptyNote, t as tr } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { ago } from '../../app/format';
@@ -14,7 +14,7 @@ const dflt = (k: string): unknown => shape[k]?.safeParse(undefined).data;
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 /** The groups a school's settings sit in: the six school-wide ones, then one per module it has. */
-const groupLabel = (g: string) => (MODULES.find((m) => m.key === g) ? (g === 'school' ? tr('console.config_tab.academic_year') : MODULES.find((m) => m.key === g)!.name) : g);
+const groupLabel = (g: string) => (MODULES.find((m) => m.key === g) ? (g === 'school' ? tr('console.config_tab.academic_year') : MODULES.find((m) => m.key === g)!.name) : tx(g));
 
 /**
  * Everything Tangent sets for one school, built from SETTINGS_META: a new setting appears here without a new screen. Groups sit

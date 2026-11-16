@@ -1,5 +1,5 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
-import { toMinor, schoolCurrency, roundMoney, currencyDigits, schoolInstant, fmtMoney, addDays, schoolToday, type OnlinePaymentRow, type ReconRow, type RefundRow } from '@tangent/contracts';
+import { toMinor, schoolCurrency, roundMoney, currencyDigits, schoolInstant, fmtMoney, addDays, schoolToday, type OnlinePaymentRow, type ReconRow, type RefundRow, tx } from '@tangent/contracts';
 import { newId, type Job } from '@tangent/db';
 import type { PaymentEvent } from '@tangent/integrations';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
@@ -69,7 +69,7 @@ export class PaymentsService implements OnModuleInit {
       amountMinor: toMinor(inv.owed, t.info.currency), currency: t.info.currency, reference: `${t.info.slug}:${orderId}`, description: `${inv.title} · ${inv.student}`,
       customer: { name: inv.student, phone: inv.phone ?? undefined, email: inv.email ?? undefined }, callbackUrl: `${this.base()}/hooks/paid/${t.info.slug}/${orderId}`,
       expiresAt: new Date(Date.now() + 24 * 3600_000),
-    }).catch((e: Error) => { throw new ApiError('school_unavailable', `The payment page could not be opened: ${e.message}`); });
+    }).catch((e: Error) => { throw new ApiError('school_unavailable', tx('The payment page could not be opened: {message}', { message: e.message })); });
     await t.pool.query('insert into payment_orders (id, invoice_id, student_id, amount, provider, provider_order_id, checkout_url, created_by) values ($1,$2,$3,$4,$5,$6,$7,$8)',
       [orderId, invoiceId, studentId, inv.owed, r.conn?.provider ?? 'sandbox', link.linkId, link.url, user.id]);
     return { orderId, url: link.url, amount: inv.owed };
@@ -143,7 +143,7 @@ export class PaymentsService implements OnModuleInit {
     if (!p) throw notFound('That payment');
     if (!p.provider_payment_id) throw new ApiError('validation', 'Only payments made online can be refunded here. Cash and cheques are returned at the desk.');
     const pending = Number((await t.pool.query<{ n: string }>("select coalesce(sum(amount), 0) n from refunds where payment_id = $1 and status in ('requested','sent')", [paymentId])).rows[0]!.n);
-    if (amount > p.amount - p.refunded - pending) throw new ApiError('validation', `At most ${rupees(p.amount - p.refunded - pending)} can be refunded on this payment.`, { fields: { amount: 'That is more than can be refunded.' } });
+    if (amount > p.amount - p.refunded - pending) throw new ApiError('validation', tx('At most {p0} can be refunded on this payment.', { p0: rupees(p.amount - p.refunded - pending) }), { fields: { amount: 'That is more than can be refunded.' } });
     const id = newId('rfd');
     await t.pool.query('insert into refunds (id, payment_id, amount, reason, requested_by) values ($1,$2,$3,$4,$5)', [id, paymentId, amount, reason, user.id]);
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'refund.requested', entity: 'payment', entityId: paymentId, detail: { amount } });

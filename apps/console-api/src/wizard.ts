@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, Inject, Injectable, Param, Post, Put, Query } from '@nestjs/common';
 import { CORE_MODULES, DEFAULT_PLANS, closeModules, moduleByKey } from '@tangent/config-engine';
-import { fmtNumber, BlueprintInput, PlanSave, STEP_LABELS, WIZARD_STEPS, WizardPayload, type BlueprintRow, type PlanRow, type ProvisionRunRow, type WizardDraftRow, type WizardReview } from '@tangent/contracts';
+import { fmtNumber, BlueprintInput, PlanSave, STEP_LABELS, WIZARD_STEPS, WizardPayload, type BlueprintRow, type PlanRow, type ProvisionRunRow, type WizardDraftRow, type WizardReview, tx } from '@tangent/contracts';
 import { newId } from '@tangent/db';
 import { ApiError, ZodPipe, notFound } from '@tangent/nest-kit';
 import { Db, Me, Needs, type ConsoleUser, type reg } from './core.js';
@@ -31,7 +31,7 @@ export class Wizard {
    */
   async savePlan(me: ConsoleUser, key: string | null, body: PlanSave): Promise<PlanRow[]> {
     const unknown = body.modules.filter((m) => !moduleByKey(m));
-    if (unknown.length) throw new ApiError('validation', `There is no module called ${unknown.join(', ')}.`);
+    if (unknown.length) throw new ApiError('validation', tx('There is no module called {p0}.', { p0: unknown.join(', ') }));
     const modules = closeModules(body.modules).filter((m) => !CORE_MODULES.includes(m) || body.modules.includes(m));
     const was = key ? (await this.db.pool.query('select 1 from plans where key = $1', [key])).rowCount : 0;
     if (key && !was) throw notFound('That plan');
@@ -49,7 +49,7 @@ export class Wizard {
   async removePlan(me: ConsoleUser, key: string): Promise<PlanRow[]> {
     const p = (await this.plans()).find((x) => x.key === key);
     if (!p) throw notFound('That plan');
-    if (p.schools) throw new ApiError('conflict', `${p.schools} ${p.schools === 1 ? 'school is' : 'schools are'} on ${p.name}. Move them to another plan first.`);
+    if (p.schools) throw new ApiError('conflict', tx('{schools} {p1} on {name}. Move them to another plan first.', { schools: p.schools, p1: p.schools === 1 ? 'school is' : 'schools are', name: p.name }));
     await this.db.pool.query('delete from plans where key = $1', [key]);
     await this.db.audit(me.email, 'plan.removed', 'plan', key, { name: p.name });
     return this.plans();

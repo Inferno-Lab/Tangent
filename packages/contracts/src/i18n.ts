@@ -195,3 +195,53 @@ export function readingLocale(lang: string, schoolLocale: string, country: strin
   const regional = `${lang}-${country}`;
   try { return Intl.DateTimeFormat.supportedLocalesOf([regional]).length ? regional : lang; } catch { return lang; }
 }
+
+/**
+ * Text that lives in shared data and server code (setting labels, module names, error messages): the English is the key,
+ * gettext-style, so it reads in the reader's language wherever it is shown. The web apps and the server each say where the
+ * reader's language and its catalogue come from (`setTextSource`); without one, the English shows.
+ */
+type TextSource = () => { lang: string; cat: Catalogue; words?: Record<string, string> } | undefined;
+let textSource: TextSource = () => undefined;
+export function setTextSource(fn: TextSource): void {
+  textSource = fn;
+}
+export function tx(english: string, params?: Params): string {
+  const s = textSource();
+  if (!s) return params ? formatMessage(english, params) : english;
+  return formatMessage(s.cat[english] ?? english, params, s.cat[english] === undefined ? 'en' : s.lang, s.words);
+}
+
+/** Fields of shared data that people read: these come back in the reader's language (`localized`). */
+const TEXT_FIELDS = new Set(['label', 'name', 'help', 'blurb', 'description', 'hint', 'note', 'title', 'what', 'why', 'sub', 'stepLabel']);
+const RAW = Symbol('raw');
+const proxies = new WeakMap<object, object>();
+
+/**
+ * Shared data whose labels read in the reader's language: `label`, `help`… (and `[value, label]` options) are translated as
+ * they are read, so every page that shows them is covered without each one asking. Keys, groups and values stay as they are.
+ */
+export function localized<T extends object>(data: T): T {
+  const known = proxies.get(data);
+  if (known) return known as T;
+  const p = new Proxy(data, {
+    get(target, prop, recv) {
+      if (prop === RAW) return target;
+      const v = Reflect.get(target, prop, recv) as unknown;
+      if (typeof prop !== 'string') return v;
+      if (typeof v === 'string') return TEXT_FIELDS.has(prop) ? tx(v) : v;
+      if (prop === 'options' && Array.isArray(v) && v.every((o) => Array.isArray(o) && typeof o[1] === 'string')) return v.map(([value, label]: [string, string]) => [value, tx(label)]);
+      return v && typeof v === 'object' ? localized(v as object) : v;
+    },
+  });
+  proxies.set(data, p);
+  return p as T;
+}
+
+/** A map from a key to its label (`{ present: 'Present' }`), read in the reader's language. */
+export function localizedLabels<T extends Record<string, string>>(labels: T): T {
+  return new Proxy(labels, { get: (target, prop, recv) => { const v = Reflect.get(target, prop, recv) as unknown; return prop === RAW ? target : typeof v === 'string' ? tx(v) : v; } });
+}
+
+/** The English underneath a localized table (for the catalogue tool and tests). */
+export const rawOf = <T extends object>(data: T): T => ((data as Record<symbol, unknown>)[RAW] as T | undefined) ?? data;

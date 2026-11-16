@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { localized } from './i18n.js';
 
 /**
  * Every action a role can be allowed to do. The admin hides UI and the API refuses requests from this one list.
@@ -84,7 +85,7 @@ export function permissionAvailable(p: string, has: { modules: readonly string[]
   return !need || has.modules.includes(need) || has.features.includes(need);
 }
 
-export const PERMISSION_CATALOG: PermissionInfo[] = [
+export const PERMISSION_CATALOG: PermissionInfo[] = localized([
   { key: 'students.read', area: 'People', label: 'See students and guardians' },
   { key: 'students.write', area: 'People', label: 'Add and edit students' },
   { key: 'staff.read', area: 'People', label: 'See staff' },
@@ -128,7 +129,7 @@ export const PERMISSION_CATALOG: PermissionInfo[] = [
   { key: 'gallery.write', area: 'Gallery', label: 'Add albums and photos, publish them to families' },
   { key: 'year.manage', area: 'School setup', label: 'Promote students, start a new year and record leavers', sensitive: true },
   { key: 'setup.write', area: 'School setup', label: 'Edit classes, subjects, periods, terms, holidays and fee structures (where Tangent allows)' },
-];
+]);
 
 export interface RoleTemplate {
   key: string;

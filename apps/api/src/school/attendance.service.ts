@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { type AttendanceMarkDef, markMeaning, schoolZone, addDays, dayName, schoolToday, latestSchoolDay, schoolDaysEnding, type AttendanceDay, type AttendanceDayPut, type AttendanceWeekPoint, type PeriodMarksPut, type PeriodRoll } from '@tangent/contracts';
+import { type AttendanceMarkDef, markMeaning, schoolZone, addDays, dayName, schoolToday, latestSchoolDay, schoolDaysEnding, type AttendanceDay, type AttendanceDayPut, type AttendanceWeekPoint, type PeriodMarksPut, type PeriodRoll, tx } from '@tangent/contracts';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
@@ -51,21 +51,21 @@ export class AttendanceService {
     const lockDays = await this.settings.value<number>(t, 'attendance.lockAfterDays', 2);
     // After the window only someone who may approve changes it (console: Attendance → can be corrected for this many days).
     if (lockDays > 0 && date < addDays(today, -lockDays) && !(await this.approves(t, userId))) {
-      throw new ApiError('locked', `Attendance older than ${lockDays} days is locked. Someone who approves requests at your school can change it.`);
+      throw new ApiError('locked', tx('Attendance older than {lockDays} days is locked. Someone who approves requests at your school can change it.', { lockDays }));
     }
     // No roll call on a day the school is closed: a weekly off day or a holiday.
     const off = await this.settings.offDays(t);
     if (off.includes(new Date(`${date}T00:00:00Z`).getUTCDay())) throw new ApiError('validation', 'The school is closed every week on that day, so there is no roll call.');
     const holiday = await t.pool.query<{ name: string }>(
       "select title as name from events where kind = 'holiday' and (starts_at at time zone $2)::date <= $1 and (coalesce(ends_at, starts_at) at time zone $2)::date >= $1 limit 1", [date, schoolZone()]);
-    if (holiday.rows[0]) throw new ApiError('validation', `The school is closed that day (${holiday.rows[0].name}), so there is no roll call.`);
+    if (holiday.rows[0]) throw new ApiError('validation', tx('The school is closed that day ({name}), so there is no roll call.', { name: holiday.rows[0].name }));
   }
 
   async put(t: TenantCtx, user: { id: string; name: string }, body: AttendanceDayPut): Promise<AttendanceDay> {
     await this.markable(t, user.id, body.date);
     const used = await this.settings.value<AttendanceMarkDef[]>(t, 'attendance.statuses', []);
     const unused = body.marks.find((m) => !markMeaning(used, m.status));
-    if (unused) throw new ApiError('validation', `The school does not use the mark “${unused.status.replace('_', ' ')}”.`);
+    if (unused) throw new ApiError('validation', tx('The school does not use the mark “{p0}”.', { p0: unused.status.replace('_', ' ') }));
     // Each mark is kept by what it means (every count works on that) with the school's own mark beside it.
     const marks = body.marks.map((m) => ({ ...m, meaning: markMeaning(used, m.status)!, code: used.some((u) => u.key === m.status) && m.status !== markMeaning(used, m.status) ? m.status : null }));
     const roster = await t.pool.query<{ id: string; name: string }>("select id, name from students where class_id = $1 and status = 'active'", [body.classId]);
@@ -137,7 +137,7 @@ export class AttendanceService {
     const roll = await this.periods(t, user, body.classId, body.date);
     const p = roll.periods.find((x) => x.period === body.period);
     if (!p) throw new ApiError('validation', 'The class has no lesson in that period that day.');
-    if (!p.mine) throw forbidden(`${p.teacherName} marks this period.`);
+    if (!p.mine) throw forbidden(tx('{teacherName} marks this period.', { teacherName: p.teacherName }));
     const ids = new Set(roll.students.map((s) => s.studentId));
     if (body.marks.some((m) => !ids.has(m.studentId))) throw new ApiError('validation', 'One of those students is not in this class.');
     const params: unknown[] = [body.classId, body.date, body.period, user.id];

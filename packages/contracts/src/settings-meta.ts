@@ -1,6 +1,6 @@
 import type { SettingKey } from './config.js';
 import { COUNTRIES, LOCALES, ZONES } from './locale.js';
-import { LANGUAGE_LIST, languageLabel } from './i18n.js';
+import { localized, LANGUAGE_LIST, languageLabel } from './i18n.js';
 
 const regionName = (c: string): string => {
   try {
@@ -58,7 +58,7 @@ export type SchoolWideGroup = (typeof SETTING_GROUPS)[number];
 /** The languages the apps and messages come in: the one list every page offers. */
 export const LANGUAGES: [string, string][] = LANGUAGE_LIST.map((l) => [l.code, languageLabel(l.code)]);
 
-export const SETTINGS_META: Record<SettingKey, SettingMeta> = {
+export const SETTINGS_META: Record<SettingKey, SettingMeta> = localized({
   'school.name': { group: 'School identity', label: 'School name', kind: 'text', help: 'On the sign-in pages, the app, receipts and report cards.' },
   'school.shortName': { group: 'School identity', label: 'Short name', kind: 'text', help: 'Where space is tight: the app’s header, messages.' },
   'school.tagline': { group: 'School identity', label: 'Tagline', kind: 'text' },
@@ -169,4 +169,4 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = {
   // Transport
   'transport.nearMinutes': { group: 'transport', label: 'Tell families the bus is near (minutes away)', kind: 'number', min: 2, max: 30 },
   'transport.familyCalls': { group: 'transport', label: 'Families call about the bus', kind: 'enum', options: [['office', 'The office'], ['attendant', 'The bus attendant'], ['none', 'Nobody: messages only']], help: 'Never the driver, who is driving.' },
-};
+});

@@ -2,11 +2,12 @@ import { z } from 'zod';
 import { COUNTRIES, isCurrency, isLocale, isZone } from './locale.js';
 import { RESERVED_SLUGS, SLUG_RE } from './common.js';
 import type { Limits, ModuleDates } from './config.js';
+import { localized, localizedLabels } from './i18n.js';
 
 export const CONSOLE_ROLES = ['super_admin', 'implementation', 'support', 'release_manager', 'finance', 'compliance', 'auditor'] as const;
 export const ConsoleRole = z.enum(CONSOLE_ROLES);
 /** What each console role is called and what it is for, kept with the roles so every page says the same. */
-export const CONSOLE_ROLE_INFO: Record<(typeof CONSOLE_ROLES)[number], { label: string; help: string }> = {
+export const CONSOLE_ROLE_INFO: Record<(typeof CONSOLE_ROLES)[number], { label: string; help: string }> = localized({
   super_admin: { label: 'Super admin', help: 'Everything, including the team and the rules for risky changes' },
   implementation: { label: 'Implementation', help: 'Set schools up: configuration, roles, imports and requests' },
   support: { label: 'Support', help: 'Look inside schools, read-only, in support sessions' },
@@ -14,7 +15,7 @@ export const CONSOLE_ROLE_INFO: Record<(typeof CONSOLE_ROLES)[number], { label: 
   finance: { label: 'Finance', help: 'Plans, prices, billing and invoices' },
   compliance: { label: 'Compliance', help: 'Agreements, breaches, erasure and data requests' },
   auditor: { label: 'Auditor', help: 'Read everything, change nothing' },
-};
+});
 export type ConsoleRole = z.infer<typeof ConsoleRole>;
 
 export const SchoolStatus = z.enum(['onboarding', 'live', 'suspended', 'moving', 'offboarding', 'archived']);
@@ -37,7 +38,7 @@ export const STEP_KEYS = ['database', 'keys-storage', 'migrate-seed', 'domain', 
 export const StepKey = z.enum(STEP_KEYS);
 
 /** What each setup step is called on screen. */
-export const STEP_LABELS: Record<(typeof STEP_KEYS)[number], string> = {
+export const STEP_LABELS: Record<(typeof STEP_KEYS)[number], string> = localizedLabels({
   database: 'Database',
   'keys-storage': 'Keys and storage',
   'migrate-seed': 'Migrations and defaults',
@@ -45,7 +46,7 @@ export const STEP_LABELS: Record<(typeof STEP_KEYS)[number], string> = {
   admin: 'First admin',
   'build-profile': 'App build profile',
   'store-checklist': 'Store checklist',
-};
+});
 export type StepKey = z.infer<typeof StepKey>;
 
 export const BlueprintStep = z.object({
@@ -307,13 +308,13 @@ export interface BuildRow {
 
 export const ACTIONS = ['school.golive', 'school.suspend', 'school.resume', 'school.erase', 'entitlements.push', 'migration.run', 'domain.set', 'build.app', 'backup.take', 'backup.restore', 'school.move', 'config.apply', 'integration.live', 'integration.mode', 'retention.erase'] as const;
 /** What each action is called on every console page (approvals, rules for risky changes, history). */
-export const ACTION_LABELS: Record<(typeof ACTIONS)[number], string> = {
+export const ACTION_LABELS: Record<(typeof ACTIONS)[number], string> = localizedLabels({
   'school.golive': 'Take a school live', 'school.suspend': 'Pause a school', 'school.resume': 'Bring a school back', 'school.erase': 'Erase a school',
   'entitlements.push': 'Change a school’s plan and modules', 'migration.run': 'Run database changes', 'domain.set': 'Change a school’s address',
   'build.app': 'Build a school’s app', 'backup.take': 'Take a backup', 'backup.restore': 'Restore a backup', 'school.move': 'Move a school to another cell',
   'config.apply': 'Change a risky setting', 'integration.live': 'Take a connection live', 'integration.mode': 'Switch the platform to live messages',
   'retention.erase': 'Erase leavers past retention',
-};
+});
 export const ActionKey = z.enum(ACTIONS);
 export type ActionKey = z.infer<typeof ActionKey>;
 

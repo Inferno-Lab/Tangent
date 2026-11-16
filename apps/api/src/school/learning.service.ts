@@ -2,8 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
 import {
   schoolToday,
-  type ExamCreate, type ExamMarksPut, type ExamMarksView, type ExamResults, type ExamRow, type HomeworkCreate, type HomeworkDetail, type HomeworkMarks, type HomeworkRow,
-} from '@tangent/contracts';
+  type ExamCreate, type ExamMarksPut, type ExamMarksView, type ExamResults, type ExamRow, type HomeworkCreate, type HomeworkDetail, type HomeworkMarks, type HomeworkRow, tx } from '@tangent/contracts';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
@@ -130,7 +129,7 @@ export class LearningService {
     const hw = (await t.pool.query<{ due_on: string; max_marks: number; class_id: string }>('select due_on::text, max_marks, class_id from homework where id = $1', [id])).rows[0];
     if (!hw) throw notFound('That homework');
     for (const m of body.marks) {
-      if (m.score != null && m.score > hw.max_marks) throw new ApiError('validation', `Marks cannot be more than ${hw.max_marks}.`, { fields: { score: `The most is ${hw.max_marks}.` } });
+      if (m.score != null && m.score > hw.max_marks) throw new ApiError('validation', tx('Marks cannot be more than {max_marks}.', { max_marks: hw.max_marks }), { fields: { score: tx('The most is {max_marks}.', { max_marks: hw.max_marks }) } });
     }
     const today = schoolToday();
     const client = await t.pool.connect();
@@ -286,7 +285,7 @@ export class LearningService {
       const cap = max.get(m.subjectId);
       if (cap === undefined) throw new ApiError('validation', 'That subject is not part of this exam.');
       if (!students.has(m.studentId)) throw new ApiError('validation', 'One of those students is not in this class.');
-      if (m.score != null && m.score > cap) throw new ApiError('validation', `Marks cannot be more than ${cap}.`, { fields: { score: `The most is ${cap}.` } });
+      if (m.score != null && m.score > cap) throw new ApiError('validation', tx('Marks cannot be more than {cap}.', { cap }), { fields: { score: tx('The most is {cap}.', { cap }) } });
     }
     const client = await t.pool.connect();
     try {
@@ -340,7 +339,7 @@ export class LearningService {
   async publishExam(t: TenantCtx, user: User, id: string): Promise<{ families: number; exam: ExamRow }> {
     const res = await this.results(t, id);
     const missing = res.exam.expected - res.exam.entered;
-    if (missing > 0) throw new ApiError('conflict', `${missing} ${missing === 1 ? 'mark is' : 'marks are'} still missing. Enter every mark, or mark the student absent, before publishing.`);
+    if (missing > 0) throw new ApiError('conflict', tx('{missing} {p1} still missing. Enter every mark, or mark the student absent, before publishing.', { missing, p1: missing === 1 ? 'mark is' : 'marks are' }));
     const client = await t.pool.connect();
     try {
       await client.query('begin');

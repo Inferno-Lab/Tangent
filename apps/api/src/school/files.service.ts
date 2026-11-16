@@ -6,6 +6,7 @@ import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import type { AuthedUser, TenantCtx } from '../tenancy/tenant.js';
 import { HubService } from './hub.service.js';
 import { SettingsService } from './support.js';
+import { tx } from '@tangent/contracts';
 
 const IMAGES = ['image/jpeg', 'image/png', 'image/webp'];
 const DOCS = [...IMAGES, 'application/pdf'];
@@ -143,8 +144,8 @@ export class FilesService implements OnModuleInit {
 
   async start(t: TenantCtx, user: AuthedUser, b: FileStart): Promise<FileUpload> {
     const rule = RULES[b.kind];
-    if (!rule.mimes.includes(b.mime)) throw new ApiError('validation', `That kind of file is not accepted here. Use ${rule.mimes.map((m) => m.split('/')[1]!.toUpperCase()).join(', ')}.`, { fields: { file: 'This type is not accepted.' } });
-    if (b.bytes > rule.max) throw new ApiError('validation', `The file is too large: at most ${rule.max / MB} MB.`, { fields: { file: 'Too large.' } });
+    if (!rule.mimes.includes(b.mime)) throw new ApiError('validation', tx('That kind of file is not accepted here. Use {p0}.', { p0: rule.mimes.map((m) => m.split('/')[1]!.toUpperCase()).join(', ') }), { fields: { file: 'This type is not accepted.' } });
+    if (b.bytes > rule.max) throw new ApiError('validation', tx('The file is too large: at most {p0} MB.', { p0: rule.max / MB }), { fields: { file: 'Too large.' } });
     await this.mayWrite(t, user, b.kind, b.ownerId);
     return this.reserve(t, user.id, b);
   }
@@ -152,7 +153,7 @@ export class FilesService implements OnModuleInit {
   /** Records an upload and returns its address. Also used by the console for the school's logo. */
   async reserve(t: TenantCtx, userId: string | null, b: FileStart): Promise<FileUpload> {
     const limitGb = t.info.entitlement.limits.storageGb;
-    if (limitGb > 0 && (await this.usage(t)) + b.bytes > limitGb * 1024 * MB) throw new ApiError('locked', `The school's ${limitGb} GB of storage is full. Tangent can raise the limit.`);
+    if (limitGb > 0 && (await this.usage(t)) + b.bytes > limitGb * 1024 * MB) throw new ApiError('locked', tx('The school\'s {limitGb} GB of storage is full. Tangent can raise the limit.', { limitGb }));
     const id = newId('fil');
     const key = `schools/${t.info.slug}/${b.kind}/${id}/${b.name.replace(/[^\w.-]+/g, '_').slice(-80)}`;
     const { s, ctx } = await this.storage(t);

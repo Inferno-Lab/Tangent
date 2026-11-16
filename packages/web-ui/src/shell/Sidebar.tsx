@@ -1,6 +1,6 @@
 import type { PageIcon } from '../Icon';
 import { Icon } from '../Icon';
-import { readableOn } from '@tangent/contracts';
+import { tx, readableOn } from '@tangent/contracts';
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
 import { Menu } from '../Menu';
 import { TangentIcon } from '../TangentIcon';
@@ -61,7 +61,7 @@ export function Sidebar({ label, collapsed, groups, active, onNavigate, header, 
       {header}
       {groups.map((g) => (
         <div key={g.name} style={{ display: 'contents' }}>
-          <div className="sl fade">{g.name}</div>
+          <div className="sl fade">{tx(g.name)}</div>
           {g.items.map((n) => (
             <a
               key={n.id}

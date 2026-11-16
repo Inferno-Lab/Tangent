@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
-import { toE164, initials, type AppRoleKey, type ClientKind, type LoginChallenge, type LoginRequest, type LoginResponse, type Permission, type SessionUser, type TokenPair } from '@tangent/contracts';
+import { toE164, initials, type AppRoleKey, type ClientKind, type LoginChallenge, type LoginRequest, type LoginResponse, type Permission, type SessionUser, type TokenPair, tx } from '@tangent/contracts';
 import { hashPassword, maskEmail, maskPhone, passwordNeedsRehash, randomCode, randomToken, sha256, signJwt, verifyPassword, constantTimeEqual } from '@tangent/security';
 import { ENV, type Env } from '../env.js';
 import { ApiError } from '@tangent/nest-kit';
@@ -72,7 +72,7 @@ export class AuthService {
     const user = await this.findUser(t, body.identifier);
     if (user?.locked_until && user.locked_until > new Date()) {
       const retryAfter = Math.ceil((user.locked_until.getTime() - Date.now()) / 1000);
-      throw new ApiError('locked', `Too many wrong attempts. Try again in ${Math.ceil(retryAfter / 60)} minutes, or reset your password by SMS.`, { retryAfter });
+      throw new ApiError('locked', tx('Too many wrong attempts. Try again in {p0} minutes, or reset your password by SMS.', { p0: Math.ceil(retryAfter / 60) }), { retryAfter });
     }
     if (user && !user.password_hash) throw new ApiError('validation', 'This account has no password. Sign in with a code sent to your phone instead.', { fields: { password: 'Sign in with a code instead.' } });
     dummyHash ??= hashPassword('not-a-real-password');
@@ -82,7 +82,7 @@ export class AuthService {
         const failed = user.failed_logins + 1;
         const lock = failed >= MAX_PASSWORD_TRIES;
         await t.pool.query('update users set failed_logins = $2, locked_until = $3 where id = $1', [user.id, lock ? 0 : failed, lock ? new Date(Date.now() + LOCK_MINUTES * 60_000) : null]);
-        if (lock) throw new ApiError('locked', `Too many wrong attempts. Try again in ${LOCK_MINUTES} minutes, or reset your password by SMS.`, { retryAfter: LOCK_MINUTES * 60 });
+        if (lock) throw new ApiError('locked', tx('Too many wrong attempts. Try again in {LOCK_MINUTES} minutes, or reset your password by SMS.', { LOCK_MINUTES }), { retryAfter: LOCK_MINUTES * 60 });
         throw new ApiError('unauthenticated', 'That password isn’t right. Check it, or reset it by SMS.', { attemptsLeft: MAX_PASSWORD_TRIES - failed, fields: { password: 'That password isn’t right.' } });
       }
       throw new ApiError('unauthenticated', 'We couldn’t find an account with those details.', { fields: { identifier: 'We couldn’t find an account with those details.' } });
@@ -139,7 +139,7 @@ export class AuthService {
     const u = (await t.pool.query<{ password_hash: string | null }>('select password_hash from users where id = $1', [user.id])).rows[0];
     if (!u?.password_hash || !(await verifyPassword(current, u.password_hash))) throw new ApiError('validation', 'That is not your current password.', { fields: { current: 'Not your current password.' } });
     const min = Number((await this.settings.doc(t)).values['security.passwordMinLength'] ?? 8);
-    if (next.length < min) throw new ApiError('validation', `Use at least ${min} characters.`, { fields: { next: `At least ${min} characters.` } });
+    if (next.length < min) throw new ApiError('validation', tx('Use at least {min} characters.', { min }), { fields: { next: tx('At least {min} characters.', { min }) } });
     if (next === current) throw new ApiError('validation', 'Choose a password you have not used here.', { fields: { next: 'The same as now.' } });
     await t.pool.query('update users set password_hash = $2 where id = $1', [user.id, await hashPassword(next)]);
     await t.pool.query('update sessions set revoked_at = now() where user_id = $1 and id <> $2 and revoked_at is null', [user.id, user.sid]);
@@ -148,7 +148,7 @@ export class AuthService {
 
   async resetFinish(t: TenantCtx, challengeId: string, code: string, password: string): Promise<void> {
     const min = Number((await this.settings.doc(t)).values['security.passwordMinLength'] ?? 8);
-    if (password.length < min) throw new ApiError('validation', `Use at least ${min} characters.`, { fields: { password: `At least ${min} characters.` } });
+    if (password.length < min) throw new ApiError('validation', tx('Use at least {min} characters.', { min }), { fields: { password: tx('At least {min} characters.', { min }) } });
     const userId = await this.useCode(t, challengeId, code, 'reset');
     await t.pool.query('update users set password_hash = $2, failed_logins = 0, locked_until = null where id = $1', [userId, await hashPassword(password)]);
     // A new password ends every session, on every device.
@@ -183,7 +183,7 @@ export class AuthService {
         `select count(*) n, min(created_at) first from otp_challenges where user_id = $1 and created_at > now() - interval '${OTP_WINDOW_MINUTES} minutes'`, [user.id]);
       if (Number(r!.n) >= OTP_SENDS) {
         const retryAfter = Math.max(60, Math.ceil((r!.first!.getTime() + OTP_WINDOW_MINUTES * 60_000 - Date.now()) / 1000));
-        throw new ApiError('rate_limited', `Too many codes sent. Try again in ${Math.ceil(retryAfter / 60)} minutes.`, { retryAfter });
+        throw new ApiError('rate_limited', tx('Too many codes sent. Try again in {p0} minutes.', { p0: Math.ceil(retryAfter / 60) }), { retryAfter });
       }
     }
     const code = demo ? DEMO_CODE : randomCode(6);

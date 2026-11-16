@@ -46,3 +46,17 @@ describe('dates for a reader', () => {
     expect([readingLocale('en', 'en-IN', 'IN'), readingLocale('ar', 'en-AE', 'AE'), readingLocale('hi', 'en-IN', 'IN')]).toEqual(['en-IN', 'ar-AE', 'hi-IN']);
   });
 });
+
+describe('shared data in the reader’s language', () => {
+  it('translates labels, help and options as they are read, and leaves keys and values alone', async () => {
+    const { localized, localizedLabels, rawOf, setTextSource, tx } = await import('./i18n.js');
+    const data = localized({ 'a.b': { group: 'People', label: 'Houses', help: 'Up to {n}', options: [['x', 'Red']] as [string, string][] } });
+    const labels = localizedLabels({ present: 'Present' });
+    setTextSource(() => ({ lang: 'fr', cat: { Houses: 'Maisons', 'Up to {n}': 'Jusqu’à {n}', Red: 'Rouge', Present: 'Présent' } }));
+    try {
+      expect([data['a.b'].label, data['a.b'].group, data['a.b'].options[0], labels.present, tx('Up to {n}', { n: 3 })]).toEqual(['Maisons', 'People', ['x', 'Rouge'], 'Présent', 'Jusqu’à 3']);
+      expect(rawOf(data)['a.b'].label).toBe('Houses');
+      expect(tx('Not translated yet')).toBe('Not translated yet');
+    } finally { setTextSource(() => undefined); }
+  });
+});

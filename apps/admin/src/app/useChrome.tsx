@@ -6,6 +6,7 @@ import { Dock, MoreSheet, Presence, SchoolHeader, SearchDialog, Sidebar, tintFor
 import type { ShellData } from '@tangent/contracts';
 import { activeNav, adminNav, shortcutTargets } from './nav';
 import { useApp } from './context';
+import { tx } from '@tangent/contracts';
 
 const COLLAPSE_KEY = 'tangent.admin.menu.collapsed';
 
@@ -113,7 +114,7 @@ export function useChrome() {
         <MoreSheet title={tr('admin.use_chrome.menu')} onClose={() => setMore(false)}>
           {groups.map((g) => (
             <div key={g.name}>
-              <div className="sl">{g.name}</div>
+              <div className="sl">{tx(g.name)}</div>
               {g.items.map((n) => (
                 <a key={n.id} className={`nvm ${n.id === active ? 'on' : ''}`} href={n.href} onClick={(e) => { e.preventDefault(); setMore(false); goRef.current(base && n.href.startsWith(base) ? n.href.slice(base.length) || '/' : n.href); }}>
                   <Icon name={n.icon} />{n.label}

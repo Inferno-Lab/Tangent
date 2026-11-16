@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Headers, HttpCode, Inject, Injectable, Param, Post } from '@nestjs/common';
 import { POOLS, REGISTRY } from './tokens.js';
 import { catalogueName, changeEntitlement, type EntitlementChange } from '@tangent/config-engine';
-import { ActionRequest, appIdFor, type ActionRow, type BuildRow, type ConsoleRole, type EntitlementDoc } from '@tangent/contracts';
+import { ActionRequest, appIdFor, type ActionRow, type BuildRow, type ConsoleRole, type EntitlementDoc, tx } from '@tangent/contracts';
 import { migrate, newId, pg, pendingMigrations } from '@tangent/db';
 import { ApiError, ZodPipe, notFound } from '@tangent/nest-kit';
 import { constantTimeEqual, randomToken, sha256, unseal } from '@tangent/security';
@@ -179,11 +179,11 @@ export class Actions {
     if (!body.schoolId && body.action !== 'integration.live' && body.action !== 'integration.mode') throw new ApiError('validation', 'Choose the school this is for.');
     const school = body.schoolId ? await this.schools.raw(body.schoolId) : null;
     const pol = await this.policy.get();
-    if (pol.freeze && body.action !== 'school.suspend') throw new ApiError('locked', `Changes are frozen${pol.freezeReason ? `: ${pol.freezeReason}` : ''}. A super admin can lift the freeze under Console settings.`);
+    if (pol.freeze && body.action !== 'school.suspend') throw new ApiError('locked', tx('Changes are frozen{p0}. A super admin can lift the freeze under Console settings.', { p0: pol.freezeReason ? `: ${pol.freezeReason}` : '' }));
     const busy = school ? await this.db.pool.query("select 1 from actions where school_id = $1 and status = 'running'", [school.id]) : { rowCount: 0 };
     if (busy.rowCount) throw new ApiError('conflict', 'Another action is already running for this school.');
     if (school && (body.action === 'school.erase' || body.action === 'retention.erase') && !body.dryRun && body.confirmCode?.trim() !== school.slug) {
-      throw new ApiError('validation', 'That does not match. Nothing was erased.', { fields: { confirmCode: `Type ${school.slug} exactly.` } });
+      throw new ApiError('validation', 'That does not match. Nothing was erased.', { fields: { confirmCode: tx('Type {slug} exactly.', { slug: school.slug }) } });
     }
     let needs = pol.approvals[body.action]?.needed && !body.dryRun;
     let summary = this.describe(body.action, school?.name ?? 'every school', body.params);

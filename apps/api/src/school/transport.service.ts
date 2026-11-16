@@ -1,5 +1,5 @@
 import { Injectable, type OnModuleInit } from '@nestjs/common';
-import { fmtDate, schoolToday, type BusPosition, type BusRouteInput, type BusRouteRow, type RiderInput, type RiderRow, type TransportView } from '@tangent/contracts';
+import { fmtDate, schoolToday, type BusPosition, type BusRouteInput, type BusRouteRow, type RiderInput, type RiderRow, type TransportView, tx } from '@tangent/contracts';
 import { enqueue, newId, type Job } from '@tangent/db';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import { TenantService, type AuthedUser, type TenantCtx } from '../tenancy/tenant.js';
@@ -110,7 +110,7 @@ export class TransportService implements OnModuleInit {
 
   async deleteRoute(t: TenantCtx, user: User, id: string): Promise<void> {
     const n = Number((await t.pool.query<{ n: string }>('select count(*) n from transport_assignments where route_id = $1', [id])).rows[0]!.n);
-    if (n) throw new ApiError('conflict', `${n} students ride this route. Move them to another route first.`);
+    if (n) throw new ApiError('conflict', tx('{n} students ride this route. Move them to another route first.', { n }));
     const r = await t.pool.query('delete from transport_routes where id = $1 returning name', [id]);
     if (!r.rowCount) throw notFound('That route');
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'transport.route.deleted', entity: 'route', entityId: id, detail: { name: r.rows[0].name } });

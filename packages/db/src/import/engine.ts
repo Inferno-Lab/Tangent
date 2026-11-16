@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import { IMPORT_KINDS, importKind, type ImportBatchRow, type ImportInput, type ImportKind, type ImportPreview, type ImportRowCheck } from '@tangent/contracts';
+import { rawOf, IMPORT_KINDS, importKind, type ImportBatchRow, type ImportInput, type ImportKind, type ImportPreview, type ImportRowCheck, tx } from '@tangent/contracts';
 import { ImportError, readTable, toCsv, xlsx, zip } from './files.js';
 import { KINDS, type Impl, type Row, type Write } from './kinds.js';
 
@@ -42,7 +42,7 @@ function autoMap(kind: ImportKind, headers: string[], source: string): Record<st
   const out: Record<string, string> = {};
   for (const h of headers) {
     const n = norm(h);
-    const hit = kind.columns.find((c) => norm(c.key) === n || norm(c.label) === n || (c.aliases ?? []).some((a) => norm(a) === n))?.key
+    const hit = kind.columns.find((c) => norm(c.key) === n || norm(c.label) === n || norm(rawOf(c).label) === n || (c.aliases ?? []).some((a) => norm(a) === n))?.key
       ?? (kind.columns.some((c) => c.key === preset[n]) ? preset[n] : undefined)
       ?? (n === 'firstname' || n === 'middlename' || n === 'lastname' ? kind.columns.find((c) => c.key === 'name')?.key : undefined);
     out[h] = hit ?? '';
@@ -57,7 +57,7 @@ interface Checked { preview: ImportPreview; valid: Row[]; impl: Impl<unknown>; l
 async function check(db: Q, input: ImportInput): Promise<Checked> {
   const kind = importKind(input.kind);
   const impl = KINDS[input.kind] as Impl<unknown> | undefined;
-  if (!kind || !impl) throw new ImportError(`There is no import for “${input.kind}”.`);
+  if (!kind || !impl) throw new ImportError(tx('There is no import for “{kind}”.', { kind: input.kind }));
   const { headers, data } = readInput(kind, input);
   const source = input.rows ? 'typed' : detectSource(kind, headers);
   const remembered = input.mapping ? null : (await db.query<{ mapping: Record<string, string> }>('select mapping from import_mappings where signature = $1', [signature(kind.key, headers)])).rows[0]?.mapping;
@@ -75,12 +75,12 @@ async function check(db: Q, input: ImportInput): Promise<Checked> {
   const checks: ImportRowCheck[] = rows.map((r, i) => {
     const line = input.rows ? i + 1 : i + 2;
     if (missing.length) return { line, values: r, action: 'skip', errors: [`Nothing is matched to ${missing.join(', ')}.`] };
-    const errors = kind.columns.filter((c) => c.required && !r[c.key]).map((c) => `${c.label} is empty.`);
+    const errors = kind.columns.filter((c) => c.required && !r[c.key]).map((c) => tx('{column} is empty.', { column: c.label }));
     const res = errors.length ? { key: '', errors: [], exists: false } : impl.check(r, lookups);
     errors.push(...res.errors);
     if (!errors.length && res.key) {
       const before = seen.get(res.key);
-      if (before) errors.push(`Same ${kind.matchOn.map((k) => kind.columns.find((c) => c.key === k)?.label.toLowerCase()).join(' and ')} as line ${before}.`);
+      if (before) errors.push(tx('Same {columns} as line {line}.', { columns: kind.matchOn.map((k) => kind.columns.find((c) => c.key === k)?.label.toLowerCase()).join(' / '), line: before }));
       else seen.set(res.key, line);
     }
     return { line, values: r, action: errors.length ? 'skip' : res.exists ? 'update' : 'create', errors };
@@ -145,7 +145,7 @@ export async function commitImport(pool: pg.Pool, input: ImportInput, byName: st
     await client.query('set local statement_timeout = 0');
     await client.query(LOCK);
     const { preview, valid, impl, lookups } = await check(client, input);
-    if (preview.missing.length) throw new ImportError(`Match a column to ${preview.missing.join(', ')} first.`);
+    if (preview.missing.length) throw new ImportError(tx('Match a column to {p0} first.', { p0: preview.missing.join(', ') }));
     if (!valid.length) throw new ImportError('Nothing to import: every row has a problem. Fix them in the grid and check again.');
     const changes: Change[] = [];
     for (const w of impl.writes(valid, lookups)) changes.push(await apply(client, w));
@@ -222,7 +222,7 @@ export async function undoBatch(pool: pg.Pool, id: string): Promise<void> {
 /** The empty template for a kind: the header row and one example row, so a school can fill it in Excel. */
 export function templateCsv(key: string): string {
   const kind = importKind(key);
-  if (!kind) throw new ImportError(`There is no import for “${key}”.`);
+  if (!kind) throw new ImportError(tx('There is no import for “{key}”.', { key }));
   return toCsv([kind.columns.map((c) => c.key), kind.columns.map((c) => c.example)]);
 }
 
@@ -232,9 +232,9 @@ export function templateCsv(key: string): string {
  */
 export function templateXlsx(key: string): Buffer {
   const kind = importKind(key);
-  if (!kind) throw new ImportError(`There is no import for “${key}”.`);
+  if (!kind) throw new ImportError(tx('There is no import for “{key}”.', { key }));
   const lists = Object.fromEntries(kind.columns.flatMap((c, i) => (c.options ? [[i, c.options]] : [])));
-  const help = [['Column', 'Needed', 'Example', 'What it takes'], ...kind.columns.map((c) => [c.label, c.required ? 'Yes' : 'No', c.example, c.options ? c.options.join(', ') : c.aliases?.length ? `Also read as: ${c.aliases.join(', ')}` : ''])];
+  const help = [[tx('Column'), tx('Needed'), tx('Example'), tx('What it takes')], ...kind.columns.map((c) => [c.label, c.required ? tx('Yes') : tx('No'), c.example, c.options ? c.options.join(', ') : c.aliases?.length ? tx('Also read as: {names}', { names: c.aliases.join(', ') }) : ''])];
   return xlsx([
     { name: kind.label, rows: [kind.columns.map((c) => c.label), kind.columns.map((c) => c.example)], lists, widths: kind.columns.map((c) => Math.max(14, c.label.length + 4)) },
     { name: 'How to fill', rows: help, widths: [26, 10, 22, 70] },
@@ -254,6 +254,6 @@ export async function exportAll(db: Q, kinds: string[] = IMPORT_KINDS.map((k) =>
 /** One kind's rows in its template columns (with the row id where the kind has one), for the school's own setup screens. */
 export async function exportRows(db: Q, key: string): Promise<Record<string, string>[]> {
   const impl = KINDS[key];
-  if (!impl) throw new ImportError(`There is no import for “${key}”.`);
+  if (!impl) throw new ImportError(tx('There is no import for “{key}”.', { key }));
   return impl.export(db);
 }

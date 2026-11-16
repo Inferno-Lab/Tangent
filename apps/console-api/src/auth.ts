@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, Inject, Injectable, Post, Req, Res, type OnModuleInit } from '@nestjs/common';
-import { LoginRequest, PasswordChange, RefreshRequest, ResetFinish, ResetStart, VerifyRequest, consolePermissions, initials, type ClientKind, type ConsoleLoginResponse, type ConsoleRole, type ConsoleTokens } from '@tangent/contracts';
+import { LoginRequest, PasswordChange, RefreshRequest, ResetFinish, ResetStart, VerifyRequest, consolePermissions, initials, type ClientKind, type ConsoleLoginResponse, type ConsoleRole, type ConsoleTokens, tx } from '@tangent/contracts';
 import { newId, scheduleJob } from '@tangent/db';
 import { ApiError, Limiter, ZodPipe } from '@tangent/nest-kit';
 import { constantTimeEqual, hashPassword, maskEmail, newTotpSecret, passwordNeedsRehash, randomToken, seal, sha256, signJwt, totpUri, unseal, verifyPassword, verifyTotp } from '@tangent/security';
@@ -47,7 +47,7 @@ export class ConsoleAuth implements OnModuleInit {
       'select id, name, email, password_hash, status, roles, totp_secret, failed_logins, locked_until from console_users where lower(email) = $1', [body.identifier.trim().toLowerCase()]);
     const u = rows[0];
     if (u?.locked_until && u.locked_until > new Date()) {
-      throw new ApiError('locked', `Too many wrong passwords. Try again in ${Math.ceil((u.locked_until.getTime() - Date.now()) / 60_000)} minutes.`);
+      throw new ApiError('locked', tx('Too many wrong passwords. Try again in {p0} minutes.', { p0: Math.ceil((u.locked_until.getTime() - Date.now()) / 60_000) }));
     }
     dummy ??= hashPassword('not-a-real-password');
     const ok = await verifyPassword(body.password, u?.password_hash ?? (await dummy));

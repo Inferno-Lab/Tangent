@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Header, HttpCode, Inject, Injectable, Logger, Param, Post, Put, Query, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
 import { POOLS } from './tokens.js';
 import { MODULES, activeModules, closeModules, moduleByKey } from '@tangent/config-engine';
-import { fmtMoney, CellCreate, CellPatch, CONSOLE_PERMISSIONS, DEPLOY_TARGET_LABELS, InvoicePaid, auditLabel, CONSOLE_ROLES, WizardPayload, type AuditRow, type DeployTarget, type ConsoleRole, type FleetSummary, type ConsoleUserRow, type FlagRow, type EntitlementDoc, type EntitlementRow, type InvoiceRowC, type SupportSessionRow, type SupportToken } from '@tangent/contracts';
+import { fmtMoney, CellCreate, CellPatch, CONSOLE_PERMISSIONS, DEPLOY_TARGET_LABELS, InvoicePaid, auditLabel, CONSOLE_ROLES, WizardPayload, type AuditRow, type DeployTarget, type ConsoleRole, type FleetSummary, type ConsoleUserRow, type FlagRow, type EntitlementDoc, type EntitlementRow, type InvoiceRowC, type SupportSessionRow, type SupportToken, tx } from '@tangent/contracts';
 import { migrate, newId, pg, scheduleJob } from '@tangent/db';
 import { topUpDemo } from '@tangent/db/seed';
 import { ApiError, ZodPipe, alert, notFound } from '@tangent/nest-kit';
@@ -162,7 +162,7 @@ export class Admin {
     if (!r) throw notFound('That invoice');
     if (r.status === 'paid') throw new ApiError('conflict', 'That invoice is paid already.');
     const s = (await this.db.pool.query<{ name: string; contact: { name: string; email: string }; gstin: string }>('select name, contact, gstin from schools where id = $1', [r.school_id])).rows[0]!;
-    if (!s.contact?.email) throw new ApiError('validation', `${s.name} has no contact email. Add one under its details first.`);
+    if (!s.contact?.email) throw new ApiError('validation', tx('{name} has no contact email. Add one under its details first.', { name: s.name }));
     // Tangent's own prices and invoices are in rupees (docs/one-shot-plan.md D13: a contract currency comes with billing per contract).
     const inr = (n: number) => fmtMoney(n, 'INR', 'en-IN');
     const body = [`Dear ${s.contact.name},`, '', `Tangent invoice for ${s.name}, ${r.period}${s.gstin ? ` (GSTIN ${s.gstin})` : ''}:`, ...r.lines.map((l) => `  ${l.label}: ${inr(l.amount)}`), `Total: ${inr(r.amount)}`, `Due by ${dueFor(r.period)}.`, '', 'Thank you.'].join('\n');
@@ -235,7 +235,7 @@ export class Admin {
   async invite(id: string, hub: PlatformHub['hub'], consoleUrl: string): Promise<{ link: string }> {
     const m = (await this.db.pool.query<{ name: string; email: string; status: string }>('select name, email, status from console_users where id = $1', [id])).rows[0];
     if (!m) throw notFound('That person');
-    if (m.status !== 'invited') throw new ApiError('conflict', `${m.name} has an account already. Change their password or authenticator instead.`);
+    if (m.status !== 'invited') throw new ApiError('conflict', tx('{name} has an account already. Change their password or authenticator instead.', { name: m.name }));
     const token = randomToken(24);
     await this.db.pool.query("update console_users set invite_hash = $2, invite_expires = now() + interval '7 days' where id = $1", [id, sha256(token)]);
     const link = `${consoleUrl.replace(/\/$/, '')}/join?token=${token}`;
@@ -431,7 +431,7 @@ export class OpsController {
   @Delete('cells/:key') @HttpCode(204) @Needs('policy.write')
   async removeCell(@Me() me: ConsoleUser, @Param('key') key: string): Promise<void> {
     const n = (await this.db.pool.query<{ n: string }>('select count(*) n from schools where cell = $1', [key])).rows[0]!.n;
-    if (Number(n)) throw new ApiError('conflict', `${n} ${n === '1' ? 'school is' : 'schools are'} on this cell (archived ones too). Move them first.`);
+    if (Number(n)) throw new ApiError('conflict', tx('{n} {p1} on this cell (archived ones too). Move them first.', { n, p1: n === '1' ? 'school is' : 'schools are' }));
     const r = await this.db.pool.query('delete from cells where key = $1', [key]);
     if (!r.rowCount) throw notFound('That cell');
     await this.db.audit(me.email, 'cell.removed', 'cell', key);
@@ -458,10 +458,10 @@ export class OpsController {
   async patchCell(@Me() me: ConsoleUser, @Param('key') key: string, @Body(new ZodPipe(CellPatch)) body: CellPatch): Promise<{ ok: true }> {
     const cur = (await this.db.pool.query<{ n: string }>('select (select count(*) from schools s where s.cell = c.key and s.deleted_at is null) n from cells c where c.key = $1', [key])).rows[0];
     if (!cur) throw notFound('That cell');
-    if (body.maxSchools !== undefined && body.maxSchools < Number(cur.n)) throw new ApiError('validation', `${cur.n} schools already run here, so the limit cannot go below that.`, { fields: { maxSchools: `At least ${cur.n}.` } });
+    if (body.maxSchools !== undefined && body.maxSchools < Number(cur.n)) throw new ApiError('validation', tx('{n} schools already run here, so the limit cannot go below that.', { n: cur.n }), { fields: { maxSchools: tx('At least {n}.', { n: cur.n }) } });
     if (body.connectionId !== undefined) {
       await this.databasesConnection(body.connectionId);
-      if (Number(cur.n) > 0) throw new ApiError('conflict', `${cur.n} schools already run on this cell’s server, so its database connection stays. Move them to another cell first.`);
+      if (Number(cur.n) > 0) throw new ApiError('conflict', tx('{n} schools already run on this cell’s server, so its database connection stays. Move them to another cell first.', { n: cur.n }));
       await this.db.pool.query('update cells set connection_id = $2 where key = $1', [key, body.connectionId]);
     }
     await this.db.pool.query('update cells set region = coalesce($2, region), max_schools = coalesce($3, max_schools), accepting = coalesce($4, accepting) where key = $1', [key, body.region ?? null, body.maxSchools ?? null, body.accepting ?? null]);

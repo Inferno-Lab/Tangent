@@ -2,8 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { commitImport, exportRows, newId, previewImport, toCsv } from '@tangent/db';
 import {
   PERMISSIONS, initials, type ImportResult,
-  type EnquiryCreate, type EnquiryEnrol, type EnquiryPatch, type EnquiryRow, type EnquiryStage, type RoleRow, type StaffCreate, type StaffPatch, type StaffRow, type StudentDetail,
-} from '@tangent/contracts';
+  type EnquiryCreate, type EnquiryEnrol, type EnquiryPatch, type EnquiryRow, type EnquiryStage, type RoleRow, type StaffCreate, type StaffPatch, type StaffRow, type StudentDetail, tx } from '@tangent/contracts';
 import { hashPassword, randomToken } from '@tangent/security';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
@@ -69,7 +68,7 @@ export class PeopleService {
     if (!role) throw new ApiError('validation', 'Choose a role from the list.', { fields: { roleId: 'Choose a role from the list.' } });
     const staffLimit = t.info.entitlement.limits.staff;
     if (staffLimit && Number((await t.pool.query<{ n: string }>("select count(*) n from users where kind = 'staff' and status = 'active'")).rows[0]!.n) >= staffLimit) {
-      throw new ApiError('locked', `Your plan allows ${staffLimit} staff accounts. Ask Tangent to raise the limit.`);
+      throw new ApiError('locked', tx('Your plan allows {staffLimit} staff accounts. Ask Tangent to raise the limit.', { staffLimit }));
     }
     const dup = await t.pool.query('select 1 from users where lower(email) = $1', [body.email]);
     if (dup.rowCount) throw new ApiError('validation', 'Someone already uses that email.', { fields: { email: 'Someone already uses that email.' } });
@@ -146,7 +145,7 @@ export class PeopleService {
       "select name, email, phone, status, last_login_at from users where id = $1 and kind = 'staff'", [id])).rows[0];
     if (!p) throw notFound('That person');
     if (p.status !== 'active') throw new ApiError('validation', 'Switch them on first.');
-    if (p.last_login_at) throw new ApiError('validation', `${p.name} has signed in already. If they forgot their password, they reset it from the sign-in page.`);
+    if (p.last_login_at) throw new ApiError('validation', tx('{name} has signed in already. If they forgot their password, they reset it from the sign-in page.', { name: p.name }));
     if (!p.email && !p.phone) throw new ApiError('validation', 'Add their email or phone first: there is nowhere to send the invite.');
     const temp = tempPassword();
     await t.pool.query('update users set password_hash = $2, invited_at = now() where id = $1', [id, await hashPassword(temp)]);
@@ -159,10 +158,10 @@ export class PeopleService {
   async importStaff(t: TenantCtx, csv: string, user: User): Promise<ImportResult> {
     const input = { kind: 'staff', csv, fileName: 'Staff page' };
     const p = await previewImport(t.pool, input);
-    if (p.missing.length) throw new ApiError('validation', `The first row must name the columns. Nothing is matched to ${p.missing.join(', ')}.`);
+    if (p.missing.length) throw new ApiError('validation', tx('The first row must name the columns. Nothing is matched to {p0}.', { p0: p.missing.join(', ') }));
     const limit = t.info.entitlement.limits.staff;
     const count = Number((await t.pool.query<{ n: string }>("select count(*) n from users where kind = 'staff' and status = 'active'")).rows[0]!.n);
-    if (limit && count + p.counts.create > limit) throw new ApiError('locked', `Your plan allows ${limit} staff accounts and this sheet would make ${count + p.counts.create}. Ask Tangent to raise the limit.`);
+    if (limit && count + p.counts.create > limit) throw new ApiError('locked', tx('Your plan allows {limit} staff accounts and this sheet would make {p1}. Ask Tangent to raise the limit.', { limit, p1: count + p.counts.create }));
     const errors = p.rows.filter((r) => r.errors.length).map((r) => ({ line: r.line, message: r.errors.join(' ') }));
     if (p.counts.create + p.counts.update === 0) return { created: 0, updated: 0, skipped: errors.length, errors };
     const batch = await commitImport(t.pool, input, user.name);

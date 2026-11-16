@@ -1,8 +1,7 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { REGISTRY } from '../tokens.js';
 import {
-  STEP_KEYS, STEP_LABELS, stepOrderProblem, type BlueprintInput, type BlueprintRow, type DeployTarget, type ProvisionRunRow, type RunStepRow, type RoleTemplate, type StepKey, type WizardPayload,
-} from '@tangent/contracts';
+  STEP_KEYS, STEP_LABELS, stepOrderProblem, type BlueprintInput, type BlueprintRow, type DeployTarget, type ProvisionRunRow, type RunStepRow, type RoleTemplate, type StepKey, type WizardPayload, tx } from '@tangent/contracts';
 import { newId } from '@tangent/db';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { Registry } from '@tangent/tenancy';
@@ -53,7 +52,7 @@ export class Blueprints {
   async pick(target: DeployTarget, plan: string): Promise<BlueprintRow> {
     const { rows } = await this.db.query<typeof reg.blueprints.$inferSelect>(
       "select * from blueprints where active and target = $1 and (plan = $2 or plan is null) order by (plan is not null) desc, version desc limit 1", [target, plan]);
-    if (!rows[0]) throw new ApiError('conflict', `There is no setup blueprint for ${target}. Add one under Blueprints.`);
+    if (!rows[0]) throw new ApiError('conflict', tx('There is no setup blueprint for {target}. Add one under Blueprints.', { target }));
     return this.row(rows[0]);
   }
 

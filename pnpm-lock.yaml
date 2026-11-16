@@ -469,6 +469,9 @@ importers:
       '@tangent/security':
         specifier: workspace:*
         version: link:../security
+      '@tangent/tenancy':
+        specifier: workspace:*
+        version: link:../tenancy
       fastify:
         specifier: ^5.12.5
         version: 5.12.7

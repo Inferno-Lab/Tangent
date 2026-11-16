@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { nextNumber, newId } from '@tangent/db';
-import { schoolCurrency, roundToCurrency, roundMoney, currencyDigits, fmtMoney, addDays, dayName, dayMonth, schoolToday, latestSchoolDay, schoolDaysEnding, type FeeHead, type FeeHeadsPut, type FeeSummary, type InvoiceDetail, type InvoiceRow, type PaymentCreate, type ReceiptCancel, type WaiverRequest } from '@tangent/contracts';
+import { schoolCurrency, roundToCurrency, roundMoney, currencyDigits, fmtMoney, addDays, dayName, dayMonth, schoolToday, latestSchoolDay, schoolDaysEnding, type FeeHead, type FeeHeadsPut, type FeeSummary, type InvoiceDetail, type InvoiceRow, type PaymentCreate, type ReceiptCancel, type WaiverRequest, tx } from '@tangent/contracts';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
@@ -101,7 +101,7 @@ export class FeesService {
     if (inv.pending) throw new ApiError('conflict', 'A request for this invoice is already waiting in Approvals.');
     const amount = b.cancel ? inv.outstanding : b.amount;
     if (amount <= 0) throw new ApiError('conflict', 'Nothing is left to waive on this invoice.');
-    if (amount > inv.outstanding) throw new ApiError('validation', `At most ${fmtMoney(inv.outstanding)} is left to pay.`, { fields: { amount: `At most ${fmtMoney(inv.outstanding)}.` } });
+    if (amount > inv.outstanding) throw new ApiError('validation', tx('At most {p0} is left to pay.', { p0: fmtMoney(inv.outstanding) }), { fields: { amount: tx('At most {p0}.', { p0: fmtMoney(inv.outstanding) }) } });
     await t.pool.query("insert into approvals (id, kind, title, subtitle, requester_name, requested_by, subject_ref, payload) values ($1,'fee_waiver',$2,$3,$4,$5,$6,$7)",
       [newId('apr'), b.cancel ? `Cancel ${inv.title} for ${inv.studentName}` : `Waive ${fmtMoney(amount)} of ${inv.title} for ${inv.studentName}`, b.reason, user.name, user.id, inv.studentId,
         JSON.stringify({ invoiceId: id, amount, cancel: b.cancel, reason: b.reason })]);
@@ -143,7 +143,7 @@ export class FeesService {
     const before = await this.heads(t);
     if (dropped.length) {
       const names = dropped.map((k) => before.find((h) => h.key === k)?.name ?? k);
-      throw new ApiError('conflict', `${names.join(', ')} ${names.length === 1 ? 'is' : 'are'} used by invoices or fee structures, so ${names.length === 1 ? 'it stays' : 'they stay'}. Rename instead.`);
+      throw new ApiError('conflict', tx('{p0} {p1} used by invoices or fee structures, so {p2}. Rename instead.', { p0: names.join(', '), p1: names.length === 1 ? 'is' : 'are', p2: names.length === 1 ? 'it stays' : 'they stay' }));
     }
     const client = await t.pool.connect();
     try {
@@ -202,7 +202,7 @@ export class FeesService {
     if (!inv) throw notFound('That invoice');
     const outstanding = roundMoney(inv.amount - inv.waived - Number(inv.paid));
     if (outstanding <= 0) throw new ApiError('conflict', 'That invoice is already paid.');
-    if (body.amount > outstanding) throw new ApiError('validation', `The most that can be paid on this invoice is ${fmtMoney(outstanding)}.`, { fields: { amount: 'That is more than is due.' } });
+    if (body.amount > outstanding) throw new ApiError('validation', tx('The most that can be paid on this invoice is {p0}.', { p0: fmtMoney(outstanding) }), { fields: { amount: 'That is more than is due.' } });
     // Receipt numbers follow the school's own series (set from the console), one at a time so two payments never share a number.
     const pattern = await this.settings.value<string>(t, 'fees.receiptPrefix', 'RCPT-{yyyy}-{seq:5}');
     const start = await this.settings.value<number>(t, 'fees.receiptStart', 1);
