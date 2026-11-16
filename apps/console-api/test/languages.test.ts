@@ -45,6 +45,12 @@ describe('languages', () => {
     expect((await h.c('POST', '/console/v1/languages/es/text/import', { token: t, body: { csv } })).json).toEqual({ saved: 1, refused: ['{column} is empty.'] });
   });
 
+  it('gives the app a script’s font, and nothing outside the fonts folder', async () => {
+    const tamil = await h.api.inject({ method: 'GET', url: '/v1/i18n/fonts/NotoSansTamil_400Regular' });
+    expect([tamil.statusCode, tamil.headers['content-type'], tamil.rawPayload.subarray(0, 4).toString('hex')]).toEqual([200, 'font/ttf', '00010000']);
+    expect((await h.s('GET', '/v1/i18n/fonts/..%2F..%2Fpackage')).status).toBe(404);
+  });
+
   it('asks for a translation provider before drafting', async () => {
     const r = await h.c('POST', '/console/v1/languages/fr/draft', { token: t, body: { surface: 'admin' } });
     expect(r.status).toBe(400);

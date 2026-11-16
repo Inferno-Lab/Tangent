@@ -48,5 +48,24 @@ const kLanguageNames = <String, String>{
   'af': 'Afrikaans',
 };
 
+/// The Noto font a language's script needs that the app does not bundle, fetched from the school's server on first use.
+const kLanguageFonts = <String, String>{
+  'bn': 'NotoSansBengali',
+  'ta': 'NotoSansTamil',
+  'te': 'NotoSansTelugu',
+  'gu': 'NotoSansGujarati',
+  'kn': 'NotoSansKannada',
+  'ml': 'NotoSansMalayalam',
+  'pa': 'NotoSansGurmukhi',
+  'or': 'NotoSansOriya',
+  'si': 'NotoSansSinhala',
+  'he': 'NotoSansHebrew',
+  'th': 'NotoSansThai',
+  'am': 'NotoSansEthiopic',
+};
+
+/// Those fonts' families, in every text role's fallback list (a family not yet loaded is skipped).
+const kScriptFonts = <String>['NotoSansBengali', 'NotoSansTamil', 'NotoSansTelugu', 'NotoSansGujarati', 'NotoSansKannada', 'NotoSansMalayalam', 'NotoSansGurmukhi', 'NotoSansOriya', 'NotoSansSinhala', 'NotoSansHebrew', 'NotoSansThai', 'NotoSansEthiopic'];
+
 /// Every language code, for the app's supported locales.
 const kAppLanguages = <String>['en', 'hi', 'mr', 'ar', 'es', 'fr', 'bn', 'ta', 'te', 'gu', 'kn', 'ml', 'pa', 'or', 'ur', 'ne', 'si', 'fa', 'he', 'tr', 'de', 'it', 'pt', 'nl', 'pl', 'ro', 'sv', 'el', 'ru', 'uk', 'zh', 'ja', 'ko', 'th', 'vi', 'id', 'ms', 'fil', 'sw', 'am', 'ha', 'yo', 'zu', 'af'];

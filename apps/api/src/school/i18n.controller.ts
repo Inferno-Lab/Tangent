@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { Controller, Get, Param, Res } from '@nestjs/common';
 import { isLanguage, type Catalogue } from '@tangent/contracts';
 import { ApiError } from '@tangent/nest-kit';
@@ -18,6 +19,15 @@ export class I18nController {
   languages(@Param('surface') surface: string): string[] {
     if (!isSurface(surface)) throw new ApiError('not_found', 'There is no catalogue for that.');
     return cataloguedLanguages(surface);
+  }
+
+  /** A script's Noto font (assets/fonts, SIL Open Font License), for the app to write a language it does not bundle. */
+  @Public() @NoTenant() @Get('fonts/:file')
+  font(@Param('file') file: string, @Res() reply: FastifyReply): void {
+    if (!/^NotoSans[A-Za-z]+_(400Regular|700Bold)$/.test(file)) throw new ApiError('not_found', 'There is no such font.');
+    let data: Buffer;
+    try { data = readFileSync(new URL(`../../assets/fonts/${file}.ttf`, import.meta.url)); } catch { throw new ApiError('not_found', 'There is no such font.'); }
+    void reply.header('cache-control', 'public, max-age=31536000, immutable').type('font/ttf').send(data);
   }
 
   @Public() @NoTenant() @Get(':surface/:lang')

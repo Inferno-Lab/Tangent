@@ -7,27 +7,41 @@ import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 
 /**
  * A4 PDFs of lines for receipts and report cards: the school's logo, its name, then the facts, over as many pages as they take.
- * Text is set in Noto Sans with Noto Sans Devanagari for Hindi and Marathi (shaped by fontkit: conjuncts, reph and matras come
- * out right), so ₹ and every family's name print as written. The fonts are vendored in assets/fonts (SIL Open Font License).
+ * Every script prints in its own Noto font (shaped by fontkit: Devanagari conjuncts, Arabic joining), so every family's name
+ * and every currency print as written; a line that starts in Arabic or Hebrew is set from the right. The fonts are vendored in
+ * assets/fonts (SIL Open Font License); only the ones a document uses are embedded.
  */
 /** A line of a document. `page` starts a new page first; `qr` draws a QR code of that text at the right, beside the lines after it. */
 export interface PdfLine { text: string; right?: string; size?: number; bold?: boolean; gap?: number; rule?: boolean; page?: boolean; qr?: string }
 
 const FONTS = new URL('../../assets/fonts/', import.meta.url);
-const files = {
-  latin: readFileSync(new URL('NotoSans_400Regular.ttf', FONTS)), latinBold: readFileSync(new URL('NotoSans_700Bold.ttf', FONTS)),
-  deva: readFileSync(new URL('NotoSansDevanagari_400Regular.ttf', FONTS)), devaBold: readFileSync(new URL('NotoSansDevanagari_700Bold.ttf', FONTS)),
-};
+/** Each script's letters and the Noto font that has them (Latin, Cyrillic and Greek are in Noto Sans itself). */
+const SCRIPTS: { key: string; file: string; re: RegExp; rtl?: true }[] = [
+  { key: 'deva', file: 'NotoSansDevanagari', re: /[\u0900-\u097F\uA8E0-\uA8FF\u1CD0-\u1CFF]/ },
+  { key: 'arabic', file: 'NotoSansArabic', re: /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/, rtl: true },
+  { key: 'hebrew', file: 'NotoSansHebrew', re: /[\u0590-\u05FF\uFB1D-\uFB4F]/, rtl: true },
+  { key: 'bengali', file: 'NotoSansBengali', re: /[\u0980-\u09FF]/ }, { key: 'gurmukhi', file: 'NotoSansGurmukhi', re: /[\u0A00-\u0A7F]/ },
+  { key: 'gujarati', file: 'NotoSansGujarati', re: /[\u0A80-\u0AFF]/ }, { key: 'oriya', file: 'NotoSansOriya', re: /[\u0B00-\u0B7F]/ },
+  { key: 'tamil', file: 'NotoSansTamil', re: /[\u0B80-\u0BFF]/ }, { key: 'telugu', file: 'NotoSansTelugu', re: /[\u0C00-\u0C7F]/ },
+  { key: 'kannada', file: 'NotoSansKannada', re: /[\u0C80-\u0CFF]/ }, { key: 'malayalam', file: 'NotoSansMalayalam', re: /[\u0D00-\u0D7F]/ },
+  { key: 'sinhala', file: 'NotoSansSinhala', re: /[\u0D80-\u0DFF]/ }, { key: 'thai', file: 'NotoSansThai', re: /[\u0E00-\u0E7F]/ },
+  { key: 'lao', file: 'NotoSansLao', re: /[\u0E80-\u0EFF]/ }, { key: 'myanmar', file: 'NotoSansMyanmar', re: /[\u1000-\u109F]/ },
+  { key: 'georgian', file: 'NotoSansGeorgian', re: /[\u10A0-\u10FF]/ }, { key: 'ethiopic', file: 'NotoSansEthiopic', re: /[\u1200-\u137F]/ },
+  { key: 'khmer', file: 'NotoSansKhmer', re: /[\u1780-\u17FF]/ }, { key: 'armenian', file: 'NotoSansArmenian', re: /[\u0530-\u058F]/ },
+];
+const RTL = new Set(SCRIPTS.filter((s) => s.rtl).map((s) => s.key));
+const files = new Map<string, Buffer>();
+const fileOf = (name: string) => files.get(name) ?? files.set(name, readFileSync(new URL(`${name}.ttf`, FONTS))).get(name)!;
+const scriptOf = (ch: string) => SCRIPTS.find((s) => s.re.test(ch))?.key ?? 'latin';
 
-const DEVANAGARI = /[ऀ-ॿ꣠-ꣿ᳐-᳿]/;
-/** Runs of text in one script (spaces and digits stay with the run they are in), so each run gets the font that has its letters. */
-function runs(text: string): { text: string; deva: boolean }[] {
-  const out: { text: string; deva: boolean }[] = [];
+/** Runs of text in one script (spaces, digits and punctuation stay with the run they are in), each to get the font with its letters. */
+function runs(text: string): { text: string; script: string }[] {
+  const out: { text: string; script: string }[] = [];
   for (const ch of text) {
-    const deva = DEVANAGARI.test(ch);
+    const script = scriptOf(ch);
     const last = out[out.length - 1];
-    if (last && (last.deva === deva || /[\s\d.,:()/-]/.test(ch))) last.text += ch;
-    else out.push({ text: ch, deva });
+    if (last && (last.script === script || /[\s\d.,:;()/'"-]/.test(ch))) last.text += ch;
+    else out.push({ text: ch, script });
   }
   return out;
 }
@@ -39,16 +53,33 @@ const HEIGHT = 842;
 export async function pdf(lines: PdfLine[], opts: { logo?: Buffer | null } = {}): Promise<Buffer> {
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
-  const f = {
-    latin: await doc.embedFont(files.latin, { subset: true }), latinBold: await doc.embedFont(files.latinBold, { subset: true }),
-    deva: await doc.embedFont(files.deva, { subset: true }), devaBold: await doc.embedFont(files.devaBold, { subset: true }),
-  };
-  const font = (deva: boolean, bold?: boolean): PDFFont => (deva ? (bold ? f.devaBold : f.deva) : bold ? f.latinBold : f.latin);
-  const width = (text: string, size: number, bold?: boolean) => runs(text).reduce((w, r) => w + font(r.deva, bold).widthOfTextAtSize(r.text, size), 0);
-  const draw = (page: PDFPage, text: string, x: number, y: number, size: number, bold?: boolean) => {
-    for (const r of runs(text)) {
-      page.drawText(r.text, { x, y, size, font: font(r.deva, bold), color: rgb(0.11, 0.11, 0.13) });
-      x += font(r.deva, bold).widthOfTextAtSize(r.text, size);
+  // Only the scripts this document has are embedded (each subset to the letters it uses).
+  const all = lines.map((l) => `${l.text} ${l.right ?? ''}`).join(' ');
+  const used = new Set(['latin', ...[...all].map(scriptOf)]);
+  const f = new Map<string, PDFFont>();
+  for (const key of used) {
+    const base = key === 'latin' ? 'NotoSans' : SCRIPTS.find((s) => s.key === key)!.file;
+    f.set(key, await doc.embedFont(fileOf(`${base}_400Regular`), { subset: true }));
+    f.set(`${key}.b`, await doc.embedFont(fileOf(`${base}_700Bold`), { subset: true }));
+  }
+  const font = (script: string, bold?: boolean): PDFFont => f.get(bold ? `${script}.b` : script)!;
+  const width = (text: string, size: number, bold?: boolean) => runs(text).reduce((w, r) => w + font(r.script, bold).widthOfTextAtSize(r.text, size), 0);
+  // A line whose first letter is Arabic or Hebrew reads right to left: its runs go from the right edge leftwards (fontkit already
+  // orders the letters inside each run). ponytail: one level of direction; a full bidi pass if mixed lines ever print wrong.
+  const draw = (page: PDFPage, text: string, x: number, y: number, size: number, bold?: boolean, edge?: number) => {
+    const rs = runs(text);
+    const first = rs.find((r) => /\p{L}/u.test(r.text));
+    if (first && RTL.has(first.script)) {
+      let at = edge ?? x + width(text, size, bold);
+      for (const r of rs) {
+        at -= font(r.script, bold).widthOfTextAtSize(r.text, size);
+        page.drawText(r.text, { x: at, y, size, font: font(r.script, bold), color: rgb(0.11, 0.11, 0.13) });
+      }
+      return;
+    }
+    for (const r of rs) {
+      page.drawText(r.text, { x, y, size, font: font(r.script, bold), color: rgb(0.11, 0.11, 0.13) });
+      x += font(r.script, bold).widthOfTextAtSize(r.text, size);
     }
   };
   // Words that do not fit beside the right-hand value wrap onto the next line.
@@ -97,7 +128,7 @@ export async function pdf(lines: PdfLine[], opts: { logo?: Buffer | null } = {})
     y -= (parts.length - 1) * size * 1.35;
   }
   const pages = doc.getPages();
-  if (pages.length > 1) pages.forEach((p, i) => p.drawText(`${i + 1} / ${pages.length}`, { x: WIDTH / 2 - 10, y: 24, size: 8, font: f.latin, color: rgb(0.5, 0.5, 0.55) }));
+  if (pages.length > 1) pages.forEach((p, i) => p.drawText(`${i + 1} / ${pages.length}`, { x: WIDTH / 2 - 10, y: 24, size: 8, font: font('latin'), color: rgb(0.5, 0.5, 0.55) }));
   return Buffer.from(await doc.save());
 }
 

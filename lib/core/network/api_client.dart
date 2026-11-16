@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
@@ -124,6 +125,21 @@ class ApiClient {
   Future<dynamic> post(String path, Map<String, dynamic> body) => _send('POST', path, body: body);
 
   Future<dynamic> patch(String path, Map<String, dynamic> body) => _send('PATCH', path, body: body);
+
+  /// A public file's bytes (a script's font): no sign-in, no cache of its own (the caller keeps it).
+  Future<Uint8List> bytes(String path) async {
+    if (_base.isEmpty) throw const AppException('errors.remote_unconfigured');
+    final client = HttpClient()..connectionTimeout = _timeout;
+    try {
+      final res = await (await client.getUrl(_uri(path, null)).timeout(_timeout)).close().timeout(_timeout);
+      if (res.statusCode != 200) throw const AppException('errors.remote_unconfigured');
+      final out = BytesBuilder(copy: false);
+      await res.forEach(out.add).timeout(const Duration(minutes: 1));
+      return out.takeBytes();
+    } finally {
+      client.close();
+    }
+  }
 
   /// Any other method (DELETE, PUT), for the few calls that need one.
   Future<dynamic> send(String method, String path, [Map<String, dynamic>? body]) => _send(method, path, body: body);

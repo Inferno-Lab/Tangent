@@ -49,6 +49,12 @@ flutter:
     - family: AnekDevanagari
       fonts:
         - asset: assets/fonts/AnekDevanagari.ttf
+    # Arabic and Urdu (SIL Open Font License); other scripts' Noto fonts come from the school's server on first use.
+    - family: NotoSansArabic
+      fonts:
+        - asset: assets/fonts/NotoSansArabic_400Regular.ttf
+        - asset: assets/fonts/NotoSansArabic_700Bold.ttf
+          weight: 700
     - family: IBMPlexMono
       fonts:
         - asset: assets/fonts/IBMPlexMono-Regular.ttf
