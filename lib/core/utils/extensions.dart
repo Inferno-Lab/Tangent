@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:tangent/core/services/theme_service.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
 import 'package:tangent/core/theme/tokens.dart';
-import 'package:tangent/core/translations/en_redesign.dart';
+import 'package:tangent/core/translations/app_translations.dart';
 
 extension AppContext on BuildContext {
   ColorScheme get colors => Theme.of(this).colorScheme;
@@ -43,11 +44,14 @@ extension SafeTranslate on String {
     return out;
   }
 
-  /// A count: `'homework.n_files'.trn(1)` is "1 file" through the key's `_one` form. A language uses its own singular,
-  /// or the English one only while its plural is still English, so a Hindi screen never shows an English word.
+  /// A count: `'homework.n_files'.trn(1)` is "1 file" through the key's `_one` form. Each language picks its own form by
+  /// its plural rules (`_zero`, `_one`, `_two`, `_few`, `_many`; the bare key is "other"): Arabic has six, Hindi two. A form
+  /// is used only while it is in the reader's language, so a Hindi screen never shows an English word.
   String trn(num n, [Map<String, String> params = const {}]) {
-    final one = '${this}_one';
-    final translated = one.tr != enRedesign[one] || tr == enRedesign[this];
-    return (n == 1 && one.tr != one && translated ? one : this).trp({'n': '$n', ...params});
+    final lang = Get.locale?.languageCode ?? 'en';
+    final form = Intl.pluralLogic(n, locale: lang, zero: '_zero', one: '_one', two: '_two', few: '_few', many: '_many', other: '');
+    final key = '$this$form';
+    final translated = key.tr != english[key] || tr == english[this];
+    return (form.isNotEmpty && key.tr != key && translated ? key : this).trp({'n': '$n', ...params});
   }
 }

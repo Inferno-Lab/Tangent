@@ -65,5 +65,8 @@ describe('translation drafts', () => {
     expect(keepsValues('Add {name} to {@class}', 'Ajouter {nom} à {@class}')).toBe(false);
     expect(keepsValues('{n, plural, one {# book} other {# books}}', '{n, plural, one {# livre} many {# livres} other {# livres}}')).toBe(true);
     expect(keepsValues('Save', '')).toBe(false);
+    // The app's own placeholders.
+    expect(keepsValues('@n files from @name', '@name के @n फ़ाइल')).toBe(true);
+    expect(keepsValues('@n files from @name', '@n फ़ाइल')).toBe(false);
   });
 });

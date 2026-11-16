@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:tangent/core/config/app_config.dart';
+import 'package:tangent/core/services/language_packs.dart';
 import 'package:tangent/core/services/storage_service.dart';
 import 'package:tangent/core/theme/app_theme.dart';
 
@@ -51,7 +52,11 @@ class ThemeService extends GetxService {
   Future<void> setLocale(Locale value) async {
     locale.value = value;
     await _storage.write(StorageKeys.locale, value.languageCode);
-    if (!Get.testMode) unawaited(Get.updateLocale(value));
+    LanguagePacks.restore(value.languageCode);
+    if (!Get.testMode) {
+      unawaited(Get.updateLocale(value));
+      unawaited(LanguagePacks.refresh(value.languageCode));
+    }
   }
 
   Future<void> setNotify({bool? homework, bool? fees}) async {

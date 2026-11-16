@@ -11,7 +11,9 @@ import type { Adapter, TranslateInput } from '../types.js';
  */
 
 /** The {value} and {@word} names of a message, in order: a translation must have the same set. */
-export const valuesOf = (s: string): string => [...s.matchAll(/\{(@?\w+)/g)].map((m) => m[1]!.toLowerCase()).filter((x) => !/^(one|other|few|many|two|zero)$/.test(x)).sort().join(',');
+// The web's {name} and {@word}, and the app's @name.
+export const valuesOf = (s: string): string => [...s.matchAll(/\{(@?\w+)|(?<![\w{])@(\w+)/g)].map((m) => (m[1] ?? `@${m[2]}`).toLowerCase())
+  .filter((x) => !/^(one|other|few|many|two|zero)$/.test(x)).sort().join(',');
 export const keepsValues = (english: string, draft: string): boolean => !!draft.trim() && valuesOf(english) === valuesOf(draft);
 
 const Drafts = z.object({ translations: z.array(z.object({ id: z.number().int(), text: z.string() })) });

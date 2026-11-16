@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:tangent/core/config/app_config.dart';
+import 'package:tangent/core/services/language_packs.dart';
 import 'package:tangent/core/services/storage_service.dart';
 import 'package:tangent/core/services/theme_service.dart';
 import 'package:tangent/core/utils/schedule.dart';
@@ -48,7 +50,7 @@ abstract final class SchoolConfig {
   static final roles = <String>[].obs;
 
   /// The languages the app offers (console: The app → Languages offered).
-  static final languages = <String>['en', 'hi', 'mr'].obs;
+  static final languages = <String>['en'].obs;
 
   /// Empty only before anything has loaded; then the modules the school has.
   static final modules = <String>[].obs;
@@ -189,13 +191,15 @@ abstract final class SchoolConfig {
     features.assignAll(List<String>.from((json['features'] as List?) ?? const []));
     roles.assignAll(List<String>.from(((json['app'] as Map?)?['roles'] as List?) ?? const []));
     applyRole(role);
-    final langs = List<String>.from((_settings['app.languages'] as List?) ?? const ['en', 'hi', 'mr']);
+    final langs = List<String>.from((_settings['app.languages'] as List?) ?? const ['en']);
     if (langs.isNotEmpty) languages.assignAll(langs);
     // Someone whose language the school does not offer gets the school's default language (or the first one offered).
     final theme = Get.find<ThemeService>();
     if (!languages.contains(theme.locale.value.languageCode)) {
       final fallback = '${(json['school'] as Map?)?['language'] ?? ''}';
       await theme.setLocale(Locale(languages.contains(fallback) ? fallback : languages.first));
+    } else if (!Get.testMode) {
+      unawaited(LanguagePacks.refresh(theme.locale.value.languageCode));
     }
     const days = {'mon': DateTime.monday, 'tue': DateTime.tuesday, 'wed': DateTime.wednesday, 'thu': DateTime.thursday, 'fri': DateTime.friday, 'sat': DateTime.saturday, 'sun': DateTime.sunday};
     weeklyOffDays

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:get/get.dart';
 import 'package:tangent/core/bindings/initial_binding.dart';
 import 'package:tangent/core/config/app_config.dart';
@@ -9,6 +10,7 @@ import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_theme.dart';
 import 'package:tangent/core/theme/tokens.dart';
 import 'package:tangent/core/translations/app_translations.dart';
+import 'package:tangent/core/translations/languages.dart';
 import 'package:tangent/core/widgets/toast.dart';
 
 class TangentApp extends StatelessWidget {
@@ -23,6 +25,9 @@ class TangentApp extends StatelessWidget {
       translations: AppTranslations(),
       locale: theme.locale.value,
       fallbackLocale: const Locale('en'),
+      // Flutter's own words (buttons, dates) and right-to-left layout come with the language: Arabic and Urdu read right to left.
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      supportedLocales: [for (final code in kAppLanguages) Locale(code)],
       initialBinding: InitialBinding(),
       initialRoute: AppRoutes.splash,
       getPages: AppPages.pages,

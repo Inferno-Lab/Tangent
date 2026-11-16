@@ -1,14 +1,15 @@
 import 'package:get/get.dart';
 import 'package:tangent/core/translations/en_redesign.dart';
 
+/// The app's English, built in. Every other language is a pack from the server (`/v1/i18n/app/<lang>`, the console's
+/// Languages page over `assets/i18n/<lang>.json`), loaded by LanguagePacks; a word it lacks reads in English.
 class AppTranslations extends Translations {
   @override
-  Map<String, Map<String, String>> get keys => {
-    'en': {..._en, ...enRedesign},
-    'hi': {..._en, ...enRedesign, ..._hi},
-    'mr': {..._en, ...enRedesign, ..._mr},
-  };
+  Map<String, Map<String, String>> get keys => {'en': english};
 }
+
+/// The built-in English words.
+final english = <String, String>{..._en, ...enRedesign};
 
 const _en = <String, String>{
   'common.retry': 'Try again',
@@ -329,76 +330,4 @@ const _en = <String, String>{
   'cat.fees': 'Fees',
   'cat.general': 'General',
   'cat.cultural': 'Cultural',
-};
-
-const _hi = <String, String>{
-  'common.retry': 'फिर कोशिश करें',
-  'common.cancel': 'रद्द करें',
-  'common.submit': 'जमा करें',
-  'common.skip': 'छोड़ें',
-  'common.next': 'आगे',
-  'common.offline': 'आप ऑफ़लाइन हैं। स्कूल का डेटा यहीं है।',
-  'common.logout': 'लॉग आउट',
-  'common.pay_now': 'अभी भुगतान करें',
-  'nav.home': 'होम',
-  'nav.academics': 'पढ़ाई',
-  'nav.fees': 'फीस',
-  'nav.chat': 'चैट',
-  'nav.profile': 'प्रोफ़ाइल',
-  'nav.classes': 'कक्षाएँ',
-  'nav.notices': 'सूचनाएँ',
-  'nav.student': 'विद्यार्थी',
-  'nav.parent': 'अभिभावक',
-  'nav.teacher': 'शिक्षक',
-  'auth.login': 'लॉग इन',
-  'auth.demo': 'डेमो लॉगिन',
-  'home.greeting_morning': 'सुप्रभात',
-  'home.greeting_afternoon': 'नमस्ते',
-  'home.greeting_evening': 'शुभ संध्या',
-  'home.attendance': 'हाजिरी',
-  'home.homework': 'होमवर्क',
-  'settings.title': 'सेटिंग्स',
-  'settings.language': 'भाषा',
-  'settings.theme': 'थीम',
-  'settings.light': 'लाइट',
-  'settings.dark': 'डार्क',
-  'menu.notices': 'सूचनाएँ',
-  'menu.events': 'कार्यक्रम',
-  'menu.library': 'पुस्तकालय',
-  'menu.help': 'सहायता',
-};
-
-const _mr = <String, String>{
-  'common.retry': 'पुन्हा प्रयत्न करा',
-  'common.cancel': 'रद्द करा',
-  'common.submit': 'सबमिट करा',
-  'common.skip': 'वगळा',
-  'common.next': 'पुढे',
-  'common.offline': 'तुम्ही ऑफलाइन आहात. शाळेचा डेटा येथे आहे.',
-  'common.logout': 'लॉग आउट',
-  'common.pay_now': 'आता भरा',
-  'nav.home': 'होम',
-  'nav.academics': 'अभ्यास',
-  'nav.fees': 'फी',
-  'nav.chat': 'चॅट',
-  'nav.profile': 'प्रोफाइल',
-  'nav.classes': 'वर्ग',
-  'nav.notices': 'सूचना',
-  'nav.student': 'विद्यार्थी',
-  'nav.parent': 'पालक',
-  'nav.teacher': 'शिक्षक',
-  'auth.login': 'लॉग इन',
-  'auth.demo': 'डेमो लॉगिन',
-  'home.greeting_morning': 'सुप्रभात',
-  'home.greeting_afternoon': 'नमस्कार',
-  'home.greeting_evening': 'शुभ संध्याकाळ',
-  'home.attendance': 'उपस्थिती',
-  'home.homework': 'गृहपाठ',
-  'settings.title': 'सेटिंग्ज',
-  'settings.language': 'भाषा',
-  'settings.theme': 'थीम',
-  'menu.notices': 'सूचना',
-  'menu.events': 'कार्यक्रम',
-  'menu.library': 'ग्रंथालय',
-  'menu.help': 'मदत',
 };

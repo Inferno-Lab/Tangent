@@ -5,6 +5,7 @@ import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/services/connectivity_service.dart';
 import 'package:tangent/core/services/error_reporter.dart';
+import 'package:tangent/core/services/language_packs.dart';
 import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/services/school_profile_service.dart';
 import 'package:tangent/core/services/session_bus.dart';
@@ -25,6 +26,8 @@ Future<void> main() async {
   Get.put(storage, permanent: true);
   final themes = ThemeService(storage)..load();
   Get.put(themes, permanent: true);
+  // The person's language from last time is in before the first frame; the newest pack follows the school's config.
+  LanguagePacks.restore(themes.locale.value.languageCode);
   final auth = AuthService(storage)..restore();
   Get.put(auth, permanent: true);
   await SchoolConfig.restore();
