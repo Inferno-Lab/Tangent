@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
 import { HttpError } from '@tangent/api-client';
 import { CURRICULA, SchoolDetailsPatch, STEP_LABELS, auditLabel, type ActionKey, type ProvisionRunRow, type SchoolDetail } from '@tangent/contracts';
-import { DateField, Dialog, EmptyCard, Field, NumberField, PageScope, Select, SelectField, useShake, useToast, EmptyNote } from '@tangent/web-ui';
+import { DateField, Dialog, EmptyCard, Field, NumberField, PageScope, Select, SelectField, useShake, useToast, EmptyNote, t as tr } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { url } from '../../app/base';
 import { useShellChrome } from '../../app/Layout';
@@ -16,15 +16,15 @@ import { IntegrationsTab } from './IntegrationsTab';
 import { PlanTab } from './PlanTab';
 import { SCHOOL_TABS } from '../../app/nav';
 
-const STATE_WORDS: Record<string, string> = { done: 'Done', waiting: 'Waiting on someone', todo: 'To do', queued: 'Queued', building: 'Building', failed: 'Failed', unavailable: 'Not set up' };
+const STATE_WORDS: Record<string, string> = { done: tr('console.school_page.done'), waiting: tr('console.school_page.waiting_on_someone'), todo: tr('console.school_page.to_do'), queued: tr('console.school_page.queued'), building: tr('console.school_page.building'), failed: tr('console.school_page.failed'), unavailable: tr('console.school_page.not_set_up') };
 const DESC: Record<string, string> = {
-  database: 'Its own database with its own role and password',
-  'keys-storage': 'Encryption key and file space',
-  'migrate-seed': 'Tables first, then roles, statuses and templates',
-  domain: 'The school’s address and certificate',
-  admin: 'Invite the first admin',
-  'build-profile': 'The app’s build file for this school',
-  'store-checklist': 'Apple and Google steps for the school',
+  database: tr('console.school_page.its_own_database_with_its'),
+  'keys-storage': tr('console.school_page.encryption_key_and_file_space'),
+  'migrate-seed': tr('console.school_page.tables_first_then_roles_statuses'),
+  domain: tr('console.school_page.the_school_s_address_and'),
+  admin: tr('console.school_page.invite_the_first_admin'),
+  'build-profile': tr('console.school_page.the_app_s_build_file'),
+  'store-checklist': tr('console.school_page.apple_and_google_steps_for'),
 };
 const clock = (iso: string) => new Date(iso).toLocaleTimeString('en-GB');
 const dur = (a: string | null, b: string | null) => (a && b ? `${Math.max(0.1, (new Date(b).getTime() - new Date(a).getTime()) / 1000).toFixed(1)}s` : '');
@@ -75,15 +75,15 @@ export function SchoolPage() {
   });
   const act = useMutation({
     mutationFn: (b: { action: ActionKey; params?: Record<string, unknown>; dryRun?: boolean; confirmCode?: string }) => app.api.actions.request({ action: b.action, schoolId: id, params: b.params ?? {}, dryRun: !!b.dryRun, confirmCode: b.confirmCode }),
-    onSuccess: (r) => { refresh(); say(r.status === 'pending_approval' ? 'Sent for a second person to approve. It is waiting under Approvals.' : r.status === 'failed' ? `That did not work: ${r.summary}` : r.summary, r.status === 'failed' ? 'bad' : 'ok'); },
+    onSuccess: (r) => { refresh(); say(r.status === 'pending_approval' ? tr('console.school_page.sent_for_a_second_person') : r.status === 'failed' ? tr('console.school_page.that_did_not_work', { summary: r.summary }) : r.summary, r.status === 'failed' ? 'bad' : 'ok'); },
     onError: (e) => say((e as Error).message, 'bad'),
   });
 
   if (school.isError && !d) {
     return (
       <PageScope page="school">
-        <main className="mn"><header className="hd"><div><h1>School</h1></div></header>
-          <div><EmptyCard error title="School" chip={{ text: 'Couldn’t load', tone: 'c' }} icon="search" heading="That school isn’t here" body={(school.error as Error).message} actions={<button className="btn pri" onClick={() => app.go('/')}>Back to the fleet</button>} /></div>
+        <main className="mn"><header className="hd"><div><h1>{tr('console.school_page.school')}</h1></div></header>
+          <div><EmptyCard error title={tr('console.school_page.school')} chip={{ text: tr('console.school_page.couldn_t_load'), tone: 'c' }} icon="search" heading={tr('console.school_page.that_school_isn_t_here')} body={(school.error as Error).message} actions={<button className="btn pri" onClick={() => app.go('/')}>{tr('console.school_page.back_to_the_fleet')}</button>} /></div>
         </main>
       </PageScope>
     );
@@ -110,7 +110,7 @@ export function SchoolPage() {
   const st = statusOf(d);
   const moving = d.status === 'live' && !d.wentLiveAt;
   const stChip = running ? 'v' : moving ? 'v' : d.status === 'live' ? 'g' : d.status === 'suspended' ? 'c' : 'a';
-  const stText = running ? 'Setting up' : moving ? 'Moving in' : d.status === 'live' ? 'Live' : st.text;
+  const stText = running ? tr('console.school_page.setting_up') : moving ? tr('console.school_page.moving_in') : d.status === 'live' ? tr('console.school_page.live') : st.text;
   // The school's own invoices from Billing: the latest one, not a date made up here.
   const last = (bills.data ?? []).filter((b) => b.schoolId === d.id).sort((a, b) => b.period.localeCompare(a.period))[0];
   const settled = d.status === 'live' && !running && failed < 0;
@@ -119,9 +119,9 @@ export function SchoolPage() {
 
   const danger = app.can('schools.danger') && d.status !== 'archived' ? (
     <div className="card s12 rise" style={{ boxShadow: 'inset 0 0 0 2px color-mix(in srgb,var(--bad) 40%,transparent)' }}>
-      <div className="ch"><h2>Danger</h2></div>
-      <div className="help">Erasing drops the school’s database, deletes its files and its key, so every backup becomes unreadable. It needs a second person.</div>
-      <div style={{ marginTop: 12 }}><button className="btn dng" onClick={() => setDlg('erase')}>Erase this school…</button></div>
+      <div className="ch"><h2>{tr('console.school_page.danger')}</h2></div>
+      <div className="help">{tr('console.school_page.erasing_drops_the_school_s')}</div>
+      <div style={{ marginTop: 12 }}><button className="btn dng" onClick={() => setDlg('erase')}>{tr('console.school_page.erase_this_school')}</button></div>
     </div>
   ) : null;
   const extra: ReactNode = tab === 'plan' ? <PlanTab key={d.entitlement.version} d={d} say={say} />
@@ -134,34 +134,34 @@ export function SchoolPage() {
 
   const v = {
     ...chrome, tab, extra, toast, golive: tab === 'overview' && (d.status === 'live' || d.status === 'onboarding') ? <GoLive d={d} say={say} onDone={refresh} /> : null,
-    name: d.name, shortName: d.shortName, color: d.color, logoText: d.logoText, subtitle: `${d.slug} · cell ${d.cell} · ${planName} plan`,
+    name: d.name, shortName: d.shortName, color: d.color, logoText: d.logoText, subtitle: tr('console.school_page.cell_plan', { slug: d.slug, cell: d.cell, planName }),
     fleetHref: url('/'), toFleet: (e: React.MouseEvent) => { e.preventDefault(); app.go('/'); },
     stChip, stText, canSupport: app.can('support.access') && d.status !== 'archived',
     openSupport: () => setDlg('support'),
     menu, setMenu, menuItems: [
-      ...(app.can('schools.write') ? [{ label: 'Edit details', run: () => setDlg('details') }] : []),
-      ...(app.can('schools.danger') && d.status === 'live' ? [{ label: 'Pause this school…', run: () => setDlg('pause') }] : []),
-      ...(app.can('schools.danger') && d.status === 'suspended' ? [{ label: 'Bring it back', run: () => act.mutate({ action: 'school.resume' }) }] : []),
-      ...(app.can('billing.read') ? [{ label: 'Open in billing', run: () => app.go(`/billing?school=${d.id}`) }] : []),
+      ...(app.can('schools.write') ? [{ label: tr('console.school_page.edit_details'), run: () => setDlg('details') }] : []),
+      ...(app.can('schools.danger') && d.status === 'live' ? [{ label: tr('console.school_page.pause_this_school'), run: () => setDlg('pause') }] : []),
+      ...(app.can('schools.danger') && d.status === 'suspended' ? [{ label: tr('console.school_page.bring_it_back'), run: () => act.mutate({ action: 'school.resume' }) }] : []),
+      ...(app.can('billing.read') ? [{ label: tr('console.school_page.open_in_billing'), run: () => app.go(`/billing?school=${d.id}`) }] : []),
     ],
     tabs: tabs.map((t) => ({ key: t.key, n: t.label })), pickTab: (k: string) => app.go(k === 'overview' ? `/schools/${d.id}` : `/schools/${d.id}/${k}`),
-    provTitle: d.status === 'onboarding' || running ? 'Setting up the school' : 'How this school was set up',
+    provTitle: d.status === 'onboarding' || running ? tr('console.school_page.setting_up_the_school') : tr('console.school_page.how_this_school_was_set'),
     // Once the school runs and nothing failed, the set-up steps fold into one line.
-    folded: settled && !steps, setupLine: run ? `Set up ${when(run.startedAt)} in ${run.steps.length} steps` : 'Set up before set-up runs were recorded', showSteps: () => setSteps(true), hideSteps: settled ? () => setSteps(false) : undefined,
+    folded: settled && !steps, setupLine: run ? tr('console.school_page.set_up_in_steps', { when: when(run.startedAt), length: run.steps.length }) : tr('console.school_page.set_up_before_set_up'), showSteps: () => setSteps(true), hideSteps: settled ? () => setSteps(false) : undefined,
     steps: (run?.steps ?? []).map((s, i) => ({
       n: STEP_LABELS[s.key] ?? s.label, num: i + 1, cls: s.status === 'running' ? 'run' : s.status === 'done' ? 'done' : s.status === 'failed' ? 'fail' : s.status === 'skipped' ? 'skip' : '',
       ok: s.status === 'done', bad: s.status === 'failed', todo: s.status === 'pending' || s.status === 'skipped',
       d: s.status === 'failed' ? (s.error ?? 'This step did not finish.') : s.status === 'skipped' ? 'Skipped for now. It can be done later.' : (s.log.at(-1)?.text ?? DESC[s.key] ?? ''),
-      t: s.status === 'skipped' ? 'Skipped' : dur(s.startedAt, s.finishedAt),
+      t: s.status === 'skipped' ? tr('console.school_page.skipped') : dur(s.startedAt, s.finishedAt),
     })),
-    log: lines.length ? lines.map((l) => ({ t: clock(l.at), m: l.text, c: l.level === 'error' ? 'bad' : l.level === 'info' ? 'ok' : '' })) : [{ t: '--:--:--', m: 'ready · nothing has run for this school yet', c: '' }],
+    log: lines.length ? lines.map((l) => ({ t: clock(l.at), m: l.text, c: l.level === 'error' ? 'bad' : l.level === 'info' ? 'ok' : '' })) : [{ t: '--:--:--', m: tr('console.school_page.ready_nothing_has_run_for'), c: '' }],
     canRetry: !!failedStep && !!run && !running && app.can('schools.write'), canSkip: !!failedStep?.optional && !running && app.can('schools.write'), failedNo: failed + 1, busy: retry.isPending || skip.isPending,
     retry: () => run && retry.mutate(run), skip: () => run && failedStep && skip.mutate({ run, step: failedStep.key }),
-    planName, invoiceLine: !app.can('billing.read') ? '' : last ? `Last invoice ${last.period}: ${rupees(last.amount)}, ${last.status}` : d.entitlement.trialUntil ? `Free until ${d.entitlement.trialUntil}` : 'No invoice yet',
-    contactLine: `Contact: ${d.contact.name} · ${d.contact.phone}`, canBilling: app.can('billing.read'), openBilling: () => app.go(`/billing?school=${d.id}`),
-    planChip: stChip, planStatus: stText, yearly: plan ? `${rupees(lim.students * plan.perStudentYear)} a year at most` : '', limitStudents: count(lim.students),
-    u1: pct(d.usage.students, lim.students), u2: pct(d.usage.storageGb, lim.storageGb), studentsText: `${count(d.usage.students)} of ${count(lim.students)}`, storageText: `${d.usage.storageGb.toFixed(1)} of ${lim.storageGb} GB`,
-    smsText: `${smsPct}% used`, sms: Array.from({ length: 20 }, (_, k) => ({ c: k < Math.round(smsPct / 5) ? 'on' : '' })),
+    planName, invoiceLine: !app.can('billing.read') ? '' : last ? tr('console.school_page.last_invoice', { period: last.period, rupees: rupees(last.amount), status: last.status }) : d.entitlement.trialUntil ? tr('console.school_page.free_until', { trialUntil: d.entitlement.trialUntil }) : tr('console.school_page.no_invoice_yet'),
+    contactLine: tr('console.school_page.contact', { name: d.contact.name, phone: d.contact.phone }), canBilling: app.can('billing.read'), openBilling: () => app.go(`/billing?school=${d.id}`),
+    planChip: stChip, planStatus: stText, yearly: plan ? tr('console.school_page.a_year_at_most', { rupees: rupees(lim.students * plan.perStudentYear) }) : '', limitStudents: count(lim.students),
+    u1: pct(d.usage.students, lim.students), u2: pct(d.usage.storageGb, lim.storageGb), studentsText: tr('console.school_page.of', { count: count(d.usage.students), count1: count(lim.students) }), storageText: tr('console.school_page.of_gb', { p0: d.usage.storageGb.toFixed(1), storageGb: lim.storageGb }),
+    smsText: tr('console.school_page.used', { smsPct }), sms: Array.from({ length: 20 }, (_, k) => ({ c: k < Math.round(smsPct / 5) ? 'on' : '' })),
     checks: d.checklist.map((c) => ({ key: c.key, n: c.label, state: c.state, cls: c.state === 'done' ? 'd' : c.state === 'waiting' ? 'w' : 'n', who: c.by ? `${STATE_WORDS[c.state]} · ${c.by} · ${when(c.at)}` : '', set: (state: 'done' | 'waiting' | 'todo') => check.mutate({ key: c.key, state }) })),
     checkOptions: (['todo', 'waiting', 'done'] as const).map((k) => ({ value: k, label: STATE_WORDS[k]! })),
     checkDone: done, checkTotal: d.checklist.length, canWrite: app.can('schools.write'),
@@ -170,15 +170,15 @@ export function SchoolPage() {
     dialog: dlg === 'support' ? (
       <SupportDialog school={d} onClose={() => setDlg(null)} onStarted={(s) => { setDlg(null); setSup(s); }} />
     ) : dlg === 'erase' ? (
-      <EraseDialog school={d} onClose={() => setDlg(null)} onSent={(done) => { setDlg(null); refresh(); if (done) app.go('/'); else say('Erasure requested. A second person has to approve it under Approvals.'); }} />
+      <EraseDialog school={d} onClose={() => setDlg(null)} onSent={(done) => { setDlg(null); refresh(); if (done) app.go('/'); else say(tr('console.school_page.erasure_requested_a_second_person')); }} />
     ) : dlg === 'details' ? (
-      <DetailsDialog d={d} onClose={() => setDlg(null)} onDone={() => { setDlg(null); refresh(); say('Details saved.'); }} />
+      <DetailsDialog d={d} onClose={() => setDlg(null)} onDone={() => { setDlg(null); refresh(); say(tr('console.school_page.details_saved')); }} />
     ) : dlg === 'pause' ? (
-      <Dialog title={`Pause ${d.name}?`} tag={{ text: 'Everyone is signed out of it', tone: 'a' }} onClose={() => setDlg(null)} width={460}>
-        <p style={{ marginTop: 0 }}>Its admin and app show a pause message and nothing can be changed; its data stays as it is. Bring it back from this menu.</p>
+      <Dialog title={tr('console.school_page.pause', { name: d.name })} tag={{ text: tr('console.school_page.everyone_is_signed_out_of'), tone: 'a' }} onClose={() => setDlg(null)} width={460}>
+        <p style={{ marginTop: 0 }}>{tr('console.school_page.its_admin_and_app_show')}</p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <button className="btn" onClick={() => setDlg(null)}>Cancel</button>
-          <button className="btn dngf" disabled={act.isPending} onClick={() => { setDlg(null); act.mutate({ action: 'school.suspend' }); }}>Pause it</button>
+          <button className="btn" onClick={() => setDlg(null)}>{tr('console.school_page.cancel')}</button>
+          <button className="btn dngf" disabled={act.isPending} onClick={() => { setDlg(null); act.mutate({ action: 'school.suspend' }); }}>{tr('console.school_page.pause_it')}</button>
         </div>
       </Dialog>
     ) : null,
@@ -209,55 +209,54 @@ function Technical({ d, onAct, busy }: { d: SchoolDetail; onAct: (a: ActionKey, 
   const st = statusOf(d);
   return (
     <section className="grid">
-      <Card title="Right now" chip={<span className={`st ${st.tone}`}><i></i>{st.text}</span>} span="s6">
-        <div className="kv">Answer time<b>{d.healthMs != null ? `${d.healthMs} ms` : 'Not measured yet'}</b></div>
-        <div className="kv">Last problem<b>{d.lastIncident ?? 'None recorded'}</b></div>
-        <div className="kv">Address<b style={{ overflowWrap: 'anywhere' }}>{d.adminUrl}</b></div>
-        <div className="help">Checked every minute; two failures in a row open an incident on Fleet.</div>
-        <div style={{ marginTop: 12 }}><button className="btn" onClick={() => probe.mutate()} disabled={probe.isPending}>{probe.isPending ? 'Checking…' : 'Check this school now'}</button></div>
+      <Card title={tr('console.school_page.right_now')} chip={<span className={`st ${st.tone}`}><i></i>{st.text}</span>} span="s6">
+        <div className="kv">{tr('console.school_page.answer_time')}<b>{d.healthMs != null ? tr('console.school_page.ms', { healthMs: d.healthMs }) : tr('console.school_page.not_measured_yet')}</b></div>
+        <div className="kv">{tr('console.school_page.last_problem')}<b>{d.lastIncident ?? tr('console.school_page.none_recorded')}</b></div>
+        <div className="kv">{tr('console.school_page.address')}<b style={{ overflowWrap: 'anywhere' }}>{d.adminUrl}</b></div>
+        <div className="help">{tr('console.school_page.checked_every_minute_two_failures')}</div>
+        <div style={{ marginTop: 12 }}><button className="btn" onClick={() => probe.mutate()} disabled={probe.isPending}>{probe.isPending ? tr('console.school_page.checking') : tr('console.school_page.check_this_school_now')}</button></div>
       </Card>
-      <Card title="Running versions" span="s6">
-        <div className="kv">School API<b>{d.versions.api}</b></div>
-        <div className="kv">Admin<b>{d.versions.admin}</b></div>
-        <div className="kv">Mobile app<b>{d.versions.app}</b></div>
-        <div className="kv">Configuration<b>{d.configVersion}</b></div>
-        <div className="kv">Placed on<b>{d.target} · cell {d.cell} · {d.region}</b></div>
+      <Card title={tr('console.school_page.running_versions')} span="s6">
+        <div className="kv">{tr('console.school_page.school_api')}<b>{d.versions.api}</b></div>
+        <div className="kv">{tr('console.school_page.admin')}<b>{d.versions.admin}</b></div>
+        <div className="kv">{tr('console.school_page.mobile_app')}<b>{d.versions.app}</b></div>
+        <div className="kv">{tr('console.school_page.configuration')}<b>{d.configVersion}</b></div>
+        <div className="kv">{tr('console.school_page.placed_on')}<b>{d.target} {tr('console.school_page.cell')}{' '}{d.cell} · {d.region}</b></div>
       </Card>
-      <Card title="Database changes" span="s12">
-        <div className="help">Applies changes to the school’s tables it has not had yet. A rehearsal reports what would run and changes nothing. Every school’s state is on <a href={url('/releases/database')} onClick={(e) => { e.preventDefault(); app.go('/releases/database'); }}>Releases → Database changes</a>.</div>
+      <Card title={tr('console.school_page.database_changes')} span="s12">
+        <div className="help">{tr('console.school_page.applies_changes_to_the_school')}{' '}<a href={url('/releases/database')} onClick={(e) => { e.preventDefault(); app.go('/releases/database'); }}>{tr('console.school_page.releases_database_changes')}</a>.</div>
         <div className="tgrow" style={{ marginTop: 12 }}>
-          <button className="btn" onClick={() => onAct('migration.run', {}, true)} disabled={busy || !app.can('schools.write')}>Rehearse</button>
-          <button className="btn pri" onClick={() => onAct('migration.run')} disabled={busy || !app.can('schools.write')}>Run database changes</button>
+          <button className="btn" onClick={() => onAct('migration.run', {}, true)} disabled={busy || !app.can('schools.write')}>{tr('console.school_page.rehearse')}</button>
+          <button className="btn pri" onClick={() => onAct('migration.run')} disabled={busy || !app.can('schools.write')}>{tr('console.school_page.run_database_changes')}</button>
         </div>
       </Card>
-      <Card title="App builds" span="s12" chip={app.can('builds.write') ? <span className="tgrow"><button className="btn sm" onClick={() => setBuild('android')} disabled={busy}>Build Android</button><button className="btn sm" onClick={() => setBuild('ios')} disabled={busy}>Build iPhone</button></span> : undefined}>
-        {d.builds.length === 0 && <EmptyNote icon="builds" title="No builds yet" body="A build packages this school’s name, colours and address into its own app, signed and sent to the store." />}
+      <Card title={tr('console.school_page.app_builds')} span="s12" chip={app.can('builds.write') ? <span className="tgrow"><button className="btn sm" onClick={() => setBuild('android')} disabled={busy}>{tr('console.school_page.build_android')}</button><button className="btn sm" onClick={() => setBuild('ios')} disabled={busy}>{tr('console.school_page.build_iphone')}</button></span> : undefined}>
+        {d.builds.length === 0 && <EmptyNote icon="builds" title={tr('console.school_page.no_builds_yet')} body={tr('console.school_page.a_build_packages_this_school')} />}
         {d.builds.map((b) => (
           <div key={b.id} className="kv">
-            <span>{b.platform === 'android' ? 'Android' : 'iPhone'} · {b.version} · {when(b.createdAt)}<br /><small style={{ color: b.status === 'failed' ? 'var(--bad)' : 'var(--ink3)' }}>{b.note}</small></span>
-            <b>{b.url ? <a href={b.url} target="_blank" rel="noreferrer" style={{ color: 'var(--brand-ink)' }}>Install</a> : <span className={`st ${b.status === 'done' ? 'g' : b.status === 'failed' ? 'c' : 'n'}`}><i></i>{STATE_WORDS[b.status] ?? b.status}</span>}</b>
+            <span>{b.platform === 'android' ? tr('console.school_page.android') : 'iPhone'} · {b.version} · {when(b.createdAt)}<br /><small style={{ color: b.status === 'failed' ? 'var(--bad)' : 'var(--ink3)' }}>{b.note}</small></span>
+            <b>{b.url ? <a href={b.url} target="_blank" rel="noreferrer" style={{ color: 'var(--brand-ink)' }}>{tr('console.school_page.install')}</a> : <span className={`st ${b.status === 'done' ? 'g' : b.status === 'failed' ? 'c' : 'n'}`}><i></i>{STATE_WORDS[b.status] ?? b.status}</span>}</b>
           </div>
         ))}
       </Card>
-      <Card title="Backups" span="s12" chip={<span className="chip">{(backups.data ?? []).length} kept</span>}>
-        <div className="help">The whole database is backed up every day; the last 14 are kept. Putting one back needs a second person and takes a backup of the data just before.</div>
+      <Card title={tr('console.school_page.backups')} span="s12" chip={<span className="chip">{(backups.data ?? []).length} {tr('console.school_page.kept')}</span>}>
+        <div className="help">{tr('console.school_page.the_whole_database_is_backed')}</div>
         {(backups.data ?? []).map((b) => (
-          <div key={b.id} className="kv">{when(b.takenAt)} · {b.kind === 'daily' ? 'daily' : `by ${b.takenBy}`}
-            <b style={{ display: 'flex', gap: 10, alignItems: 'center' }}>{Math.max(1, Math.round(b.bytes / 1024))} KB
-              {app.can('schools.write') && (restoring === b.id
-                ? <><button className="btn sm dng" disabled={busy} onClick={() => { onAct('backup.restore', { backupId: b.id }); setRestoring(null); }}>Ask to restore</button><button className="btn sm" onClick={() => setRestoring(null)}>Keep</button></>
-                : <button className="btn sm" onClick={() => setRestoring(b.id)}>Restore…</button>)}
+          <div key={b.id} className="kv">{when(b.takenAt)} · {b.kind === 'daily' ? 'daily' : tr('console.school_page.by', { takenBy: b.takenBy })}
+            <b style={{ display: 'flex', gap: 10, alignItems: 'center' }}>{Math.max(1, Math.round(b.bytes / 1024))} {tr('console.school_page.kb')}{app.can('schools.write') && (restoring === b.id
+                ? <><button className="btn sm dng" disabled={busy} onClick={() => { onAct('backup.restore', { backupId: b.id }); setRestoring(null); }}>{tr('console.school_page.ask_to_restore')}</button><button className="btn sm" onClick={() => setRestoring(null)}>{tr('console.school_page.keep')}</button></>
+                : <button className="btn sm" onClick={() => setRestoring(b.id)}>{tr('console.school_page.restore')}</button>)}
             </b>
           </div>
         ))}
-        {app.can('schools.write') && <div style={{ marginTop: 12 }}><button className="btn" disabled={busy || waitingFor != null} onClick={() => { setWaitingFor(backups.data?.length ?? 0); onAct('backup.take'); }}>{waitingFor != null ? 'Backing up…' : 'Back up now'}</button></div>}
+        {app.can('schools.write') && <div style={{ marginTop: 12 }}><button className="btn" disabled={busy || waitingFor != null} onClick={() => { setWaitingFor(backups.data?.length ?? 0); onAct('backup.take'); }}>{waitingFor != null ? tr('console.school_page.backing_up') : tr('console.school_page.back_up_now')}</button></div>}
       </Card>
       {build && (
-        <Dialog title={`Build the ${build === 'android' ? 'Android' : 'iPhone'} app?`} tag={{ text: d.shortName, tone: 'v' }} onClose={() => setBuild(null)} width={460}>
-          <p style={{ marginTop: 0 }}>It is built from the current release with this school’s name, colours and address, signed, and sent to {build === 'android' ? 'Google Play’s test track' : 'TestFlight'}. It takes about 20 minutes.</p>
+        <Dialog title={tr('console.school_page.build_the_app', { p0: build === 'android' ? 'Android' : 'iPhone' })} tag={{ text: d.shortName, tone: 'v' }} onClose={() => setBuild(null)} width={460}>
+          <p style={{ marginTop: 0 }}>{tr('console.school_page.it_is_built_from_the')}{' '}{build === 'android' ? tr('console.school_page.google_play_s_test_track') : 'TestFlight'}{tr('console.school_page.it_takes_about_20_minutes')}</p>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-            <button className="btn" onClick={() => setBuild(null)}>Cancel</button>
-            <button className="btn pri" onClick={() => { onAct('build.app', { platform: build }); setBuild(null); }}>Build</button>
+            <button className="btn" onClick={() => setBuild(null)}>{tr('console.school_page.cancel')}</button>
+            <button className="btn pri" onClick={() => { onAct('build.app', { platform: build }); setBuild(null); }}>{tr('console.school_page.build')}</button>
           </div>
         </Dialog>
       )}
@@ -273,27 +272,27 @@ function Audit({ id }: { id: string }) {
   const before = pages.at(-1);
   const q = useQuery({ queryKey: ['audit', id, f, before], queryFn: () => app.api.audit(id, { ...clean(f), before }), enabled: app.can('audit.read') });
   const team = useQuery({ queryKey: ['team'], queryFn: app.api.team.list, staleTime: 60_000, enabled: app.can('audit.read') });
-  if (!app.can('audit.read')) return <EmptyCard title="Audit" chip={{ text: 'Not for your role', tone: 'a' }} icon="lock" heading="The audit log is for auditors and admins" body="Ask a super admin if you need to see who changed what for this school." />;
+  if (!app.can('audit.read')) return <EmptyCard title={tr('console.school_page.audit')} chip={{ text: tr('console.school_page.not_for_your_role'), tone: 'a' }} icon="lock" heading={tr('console.school_page.the_audit_log_is_for')} body={tr('console.school_page.ask_a_super_admin_if')} />;
   const rows = q.data ?? [];
   const set = (k: keyof typeof f) => (v: string) => { setF({ ...f, [k]: v }); setPages([]); };
   const download = () => void app.api.auditCsv(id, clean(f)).then((csv) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' })); a.download = 'audit.csv'; a.click(); URL.revokeObjectURL(a.href); });
   return (
     <section className="card tbl rise" style={{ padding: 0 }}>
       <div className="ch" style={{ padding: '20px 20px 8px', flexWrap: 'wrap', gap: 10 }}>
-        <h2>Audit</h2>
+        <h2>{tr('console.school_page.audit')}</h2>
         <span className="grow"></span>
-        <Select compact aria-label="Who" value={f.actor} onChange={set('actor')} options={[{ value: '', label: 'Everyone' }, ...(team.data ?? []).map((p) => ({ value: p.email, label: p.name }))]} />
-        <Select compact aria-label="What" value={f.action} onChange={set('action')} options={[{ value: '', label: 'Everything' }, { value: 'config.', label: 'Settings' }, { value: 'role', label: 'Roles' }, { value: 'import.', label: 'Imports' }, { value: 'action.', label: 'Risky changes' }, { value: 'support.', label: 'Support sessions' }, { value: 'integration.', label: 'Messaging' }]} />
-        <DateField compact label="From" value={f.from} onChange={set('from')} max={f.to || undefined} />
-        <DateField compact label="To" value={f.to} onChange={set('to')} min={f.from || undefined} />
-        <button className="btn sm" onClick={download}>Export</button>
+        <Select compact aria-label={tr('console.school_page.who')} value={f.actor} onChange={set('actor')} options={[{ value: '', label: tr('console.school_page.everyone') }, ...(team.data ?? []).map((p) => ({ value: p.email, label: p.name }))]} />
+        <Select compact aria-label={tr('console.school_page.what')} value={f.action} onChange={set('action')} options={[{ value: '', label: tr('console.school_page.everything') }, { value: tr('console.school_page.config'), label: tr('console.school_page.settings') }, { value: 'role', label: tr('console.school_page.roles') }, { value: tr('console.school_page.import'), label: tr('console.school_page.imports') }, { value: tr('console.school_page.action'), label: tr('console.school_page.risky_changes') }, { value: tr('console.school_page.support'), label: tr('console.school_page.support_sessions') }, { value: tr('console.school_page.integration'), label: tr('console.school_page.messaging') }]} />
+        <DateField compact label={tr('console.school_page.from')} value={f.from} onChange={set('from')} max={f.to || undefined} />
+        <DateField compact label={tr('console.school_page.to')} value={f.to} onChange={set('to')} min={f.from || undefined} />
+        <button className="btn sm" onClick={download}>{tr('console.school_page.export')}</button>
       </div>
       {q.isLoading ? <div className="skc" style={{ height: 240, margin: 20, borderRadius: 24 }} />
-        : !rows.length ? <div style={{ padding: '0 20px 20px' }}><EmptyNote icon={pages.length || Object.values(f).some(Boolean) ? 'search' : 'audit'} title={pages.length || Object.values(f).some(Boolean) ? 'Nothing matches' : 'Nothing has happened yet'} body={pages.length || Object.values(f).some(Boolean) ? 'Clear a filter to see more.' : 'Every change made from the console is written here.'} /></div>
+        : !rows.length ? <div style={{ padding: '0 20px 20px' }}><EmptyNote icon={pages.length || Object.values(f).some(Boolean) ? 'search' : 'audit'} title={pages.length || Object.values(f).some(Boolean) ? tr('console.school_page.nothing_matches') : tr('console.school_page.nothing_has_happened_yet')} body={pages.length || Object.values(f).some(Boolean) ? tr('console.school_page.clear_a_filter_to_see') : tr('console.school_page.every_change_made_from_the')} /></div>
           : <div style={{ padding: '0 20px' }}>{rows.map((r) => <div key={r.id} className="kv"><span>{auditLabel(r.action)}<br /><small style={{ color: 'var(--ink3)' }}>{r.actor}{r.detail ? ` · ${r.detail}` : ''}</small></span><b>{when(r.at)}</b></div>)}</div>}
       <div className="tgrow" style={{ padding: '12px 20px 20px' }}>
-        <button className="btn sm" disabled={!pages.length} onClick={() => setPages(pages.slice(0, -1))}>Newer</button>
-        <button className="btn sm" disabled={rows.length < 50} onClick={() => setPages([...pages, rows.at(-1)!.at])}>Older</button>
+        <button className="btn sm" disabled={!pages.length} onClick={() => setPages(pages.slice(0, -1))}>{tr('console.school_page.newer')}</button>
+        <button className="btn sm" disabled={rows.length < 50} onClick={() => setPages([...pages, rows.at(-1)!.at])}>{tr('console.school_page.older')}</button>
       </div>
     </section>
   );
@@ -315,48 +314,48 @@ function GoLive({ d, say, onDone }: { d: SchoolDetail; say: (m: string, tone?: '
   const mark = useMutation({ mutationFn: (b: Parameters<typeof app.api.migration.mark>[1]) => app.api.migration.mark(d.id, b), onSuccess: (next) => qc.setQueryData(['migration', d.id], next), onError: (e) => say((e as Error).message, 'bad') });
   const go = useMutation({
     mutationFn: () => app.api.actions.request({ action: 'school.golive', schoolId: d.id, params: {}, dryRun: false }),
-    onSuccess: (r) => { setConfirm(false); onDone(); say(r.status === 'pending_approval' ? 'Sent for a second person to approve.' : r.status === 'failed' ? r.summary : r.summary, r.status === 'failed' ? 'bad' : 'ok'); },
+    onSuccess: (r) => { setConfirm(false); onDone(); say(r.status === 'pending_approval' ? tr('console.school_page.sent_for_a_second_person_2') : r.status === 'failed' ? r.summary : r.summary, r.status === 'failed' ? 'bad' : 'ok'); },
     onError: (e) => say((e as Error).message, 'bad'),
   });
-  if (d.wentLiveAt) return <div className="card s12 rise"><div className="ch"><h2>Live</h2><span className="chip g">Since {when(d.wentLiveAt)}</span></div><div className="help">Moving in is over: the school adds its records from each page now. Imports for it still work from the Data tab.</div></div>;
-  if (d.status !== 'live') return <div className="card s12 rise"><div className="ch"><h2>Ready to go live</h2><span className="chip v">After set-up</span></div><div className="help">The go-live checklist starts once the school’s set-up has finished.</div></div>;
+  if (d.wentLiveAt) return <div className="card s12 rise"><div className="ch"><h2>{tr('console.school_page.live')}</h2><span className="chip g">{tr('console.school_page.since')}{' '}{when(d.wentLiveAt)}</span></div><div className="help">{tr('console.school_page.moving_in_is_over_the')}</div></div>;
+  if (d.status !== 'live') return <div className="card s12 rise"><div className="ch"><h2>{tr('console.school_page.ready_to_go_live')}</h2><span className="chip v">{tr('console.school_page.after_set_up')}</span></div><div className="help">{tr('console.school_page.the_go_live_checklist_starts')}</div></div>;
   const v = q.data;
   if (!v) return <div className="skc" style={{ height: 200, borderRadius: 24 }} />;
   const open = v.readiness.filter((r) => !r.done);
   return (
     <div className="card s12 rise">
-      <div className="ch"><h2>Ready to go live</h2><span className={`chip ${open.length ? 'a' : 'g'}`}>{v.readiness.length - open.length} of {v.readiness.length}</span></div>
-      <div className="help">Worked out from the school’s own data. The school invites staff and families from its admin (Staff, Students → On the app).</div>
+      <div className="ch"><h2>{tr('console.school_page.ready_to_go_live')}</h2><span className={`chip ${open.length ? 'a' : 'g'}`}>{v.readiness.length - open.length} {tr('console.school_page.of_2')}{' '}{v.readiness.length}</span></div>
+      <div className="help">{tr('console.school_page.worked_out_from_the_school')}</div>
       <div style={{ marginTop: 10 }}>
         {v.readiness.map((r) => (
           <div key={r.key} className="grd rw" style={{ '--cols': '28px minmax(0,1fr) minmax(0,auto)', height: 'auto', padding: '10px 0' } as React.CSSProperties}>
-            <span className={`st ${r.done ? 'g' : 'a'}`} aria-label={r.done ? 'Done' : 'Not yet'}><i></i></span>
+            <span className={`st ${r.done ? 'g' : 'a'}`} aria-label={r.done ? tr('console.school_page.done') : tr('console.school_page.not_yet')}><i></i></span>
             <b style={{ font: '700 14px var(--fb)' }}>{r.label}</b>
             <span style={{ color: 'var(--ink3)', font: '600 13px var(--fb)', textAlign: 'right', display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
               {r.detail}
-              {can && r.manual && <button className="btn sm" disabled={mark.isPending} onClick={() => mark.mutate({ key: r.key as 'config_reviewed' | 'staff_trained', done: !r.done })}>{r.done ? 'Undo' : 'Mark done'}</button>}
+              {can && r.manual && <button className="btn sm" disabled={mark.isPending} onClick={() => mark.mutate({ key: r.key as 'config_reviewed' | 'staff_trained', done: !r.done })}>{r.done ? tr('console.school_page.undo') : tr('console.school_page.mark_done')}</button>}
             </span>
           </div>
         ))}
         {can && v.dues && (
           <div style={{ display: 'flex', gap: 10, alignItems: 'end', flexWrap: 'wrap', marginTop: 12 }}>
-            <div style={{ flex: '1 1 220px', maxWidth: 300 }}><NumberField label="The old system’s total dues" min={0} value={oldDues || (v.dues.oldSystem == null ? '' : String(v.dues.oldSystem))} onChange={setOldDues} hint="From its dues report: must match what is owed here." /></div>
-            <button className="btn" disabled={mark.isPending} onClick={() => mark.mutate({ key: 'old_dues', amount: oldDues === '' ? null : Math.round(Number(oldDues)) })}>Compare</button>
+            <div style={{ flex: '1 1 220px', maxWidth: 300 }}><NumberField label={tr('console.school_page.the_old_system_s_total')} min={0} value={oldDues || (v.dues.oldSystem == null ? '' : String(v.dues.oldSystem))} onChange={setOldDues} hint={tr('console.school_page.from_its_dues_report_must')} /></div>
+            <button className="btn" disabled={mark.isPending} onClick={() => mark.mutate({ key: 'old_dues', amount: oldDues === '' ? null : Math.round(Number(oldDues)) })}>{tr('console.school_page.compare')}</button>
           </div>
         )}
       </div>
       {app.can('schools.write') && (
         <div style={{ marginTop: 16, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button className="btn pri" disabled={open.length > 0 || go.isPending} onClick={() => setConfirm(true)}>Go live</button>
-          <span className="help" style={{ margin: 0 }}>{open.length ? `${open.length} ${open.length === 1 ? 'item is' : 'items are'} still open.` : 'Every item is green.'}</span>
+          <button className="btn pri" disabled={open.length > 0 || go.isPending} onClick={() => setConfirm(true)}>{tr('console.school_page.go_live')}</button>
+          <span className="help" style={{ margin: 0 }}>{open.length ? tr('console.school_page.still_open', { length: open.length, p1: open.length === 1 ? 'item is' : 'items are' }) : tr('console.school_page.every_item_is_green')}</span>
         </div>
       )}
       {confirm && (
-        <Dialog title={`Take ${d.name} live?`} tag={{ text: 'Moving in ends', tone: 'v' }} onClose={() => setConfirm(false)} width={460}>
-          <p style={{ marginTop: 0 }}>The school’s Moving in page closes and its people add records from each page from now on. Tangent can still import a file for it from the Data tab.</p>
+        <Dialog title={tr('console.school_page.take_live', { name: d.name })} tag={{ text: tr('console.school_page.moving_in_ends'), tone: 'v' }} onClose={() => setConfirm(false)} width={460}>
+          <p style={{ marginTop: 0 }}>{tr('console.school_page.the_school_s_moving_in')}</p>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-            <button className="btn" onClick={() => setConfirm(false)}>Not yet</button>
-            <button className="btn pri" disabled={go.isPending} onClick={() => go.mutate()}>Go live</button>
+            <button className="btn" onClick={() => setConfirm(false)}>{tr('console.school_page.not_yet')}</button>
+            <button className="btn pri" disabled={go.isPending} onClick={() => go.mutate()}>{tr('console.school_page.go_live')}</button>
           </div>
         </Dialog>
       )}
@@ -381,23 +380,23 @@ function DetailsDialog({ d, onClose, onDone }: { d: SchoolDetail; onClose: () =>
     },
   });
   return (
-    <Dialog title="School details" tag={{ text: d.shortName, tone: 'v' }} onClose={onClose} width={520} shake={shake.cls}>
+    <Dialog title={tr('console.school_page.school_details')} tag={{ text: d.shortName, tone: 'v' }} onClose={onClose} width={520} shake={shake.cls}>
       <div className="stack">
-        <div className="help" style={{ marginTop: 0 }}>Tangent’s contact at the school, for invoices and incidents. The school’s own name, address and colours are in its Configuration.</div>
-        <Field label="Contact name" value={f.name} onChange={set('name')} error={err.name} maxLength={80} />
+        <div className="help" style={{ marginTop: 0 }}>{tr('console.school_page.tangent_s_contact_at_the')}</div>
+        <Field label={tr('console.school_page.contact_name')} value={f.name} onChange={set('name')} error={err.name} maxLength={80} />
         <div className="two">
-          <Field label="Phone" type="tel" value={f.phone} onChange={set('phone')} error={err.phone} />
-          <Field label="Email" type="email" value={f.email} onChange={set('email')} error={err.email} />
+          <Field label={tr('console.school_page.phone')} type="tel" value={f.phone} onChange={set('phone')} error={err.phone} />
+          <Field label={tr('console.school_page.email')} type="email" value={f.email} onChange={set('email')} error={err.email} />
         </div>
         <div className="two">
-          <Field label="Tax number (GSTIN)" value={f.gstin} onChange={set('gstin')} error={err.gstin} maxLength={20} hint="On the school’s invoices." />
-          <SelectField label="Curriculum" value={f.board} onChange={set('board')} error={err.board} options={CURRICULA.map((c) => ({ value: c.key, label: c.name }))} />
+          <Field label={tr('console.school_page.tax_number_gstin')} value={f.gstin} onChange={set('gstin')} error={err.gstin} maxLength={20} hint={tr('console.school_page.on_the_school_s_invoices')} />
+          <SelectField label={tr('console.school_page.curriculum')} value={f.board} onChange={set('board')} error={err.board} options={CURRICULA.map((c) => ({ value: c.key, label: c.name }))} />
         </div>
         {err._ && <div className="emsg" role="alert">{err._}</div>}
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-        <button className="btn" onClick={onClose}>Cancel</button>
-        <button className="btn pri" disabled={save.isPending} onClick={() => save.mutate()}>Save</button>
+        <button className="btn" onClick={onClose}>{tr('console.school_page.cancel')}</button>
+        <button className="btn pri" disabled={save.isPending} onClick={() => save.mutate()}>{tr('console.school_page.save')}</button>
       </div>
     </Dialog>
   );
@@ -417,22 +416,22 @@ function SupportDialog({ school, onClose, onStarted }: { school: SchoolDetail; o
     onError: (e) => { setErr(e instanceof HttpError ? (e.fields.reason ?? e.message) : (e as Error).message); shake.hit(); },
   });
   const go = () => {
-    if (reason.trim().length < 8) { setErr('Say why in a few words, at least 8 letters. It is written to the audit log.'); shake.hit(); return; }
+    if (reason.trim().length < 8) { setErr(tr('console.school_page.say_why_in_a_few')); shake.hit(); return; }
     start.mutate();
   };
   return (
-    <Dialog title={`Look inside ${school.shortName}?`} tag={{ text: 'Read-only · 30 minutes', tone: 'v' }} onClose={onClose} width={480} shake={shake.cls}>
-      <p>You will see the school’s admin exactly as its staff do, but nothing can be changed. The session ends by itself after 30 minutes.</p>
+    <Dialog title={tr('console.school_page.look_inside', { shortName: school.shortName })} tag={{ text: tr('console.school_page.read_only_30_minutes'), tone: 'v' }} onClose={onClose} width={480} shake={shake.cls}>
+      <p>{tr('console.school_page.you_will_see_the_school')}</p>
       <div className="fld">
-        <label htmlFor="sup-r">Why do you need to look?</label>
+        <label htmlFor="sup-r">{tr('console.school_page.why_do_you_need_to')}</label>
         <div className={`inp ${err ? 'err shake' : ''}`} style={{ height: 'auto' }}>
-          <textarea id="sup-r" value={reason} onChange={(e) => { setReason(e.target.value); setErr(''); }} rows={3} placeholder="For example: principal reported attendance not sending" style={{ flex: 1, border: 0, outline: 0, background: 'none', font: '600 15px var(--fb)', color: 'var(--ink)', padding: '12px 0', resize: 'none' }} aria-invalid={!!err} />
+          <textarea id="sup-r" value={reason} onChange={(e) => { setReason(e.target.value); setErr(''); }} rows={3} placeholder={tr('console.school_page.for_example_principal_reported_attendance')} style={{ flex: 1, border: 0, outline: 0, background: 'none', font: '600 15px var(--fb)', color: 'var(--ink)', padding: '12px 0', resize: 'none' }} aria-invalid={!!err} />
         </div>
         {err && <div className="emsg" role="alert">{err}</div>}
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-        <button className="btn" onClick={onClose}>Cancel</button>
-        <button className="btn pri" onClick={go} disabled={start.isPending}>{start.isPending ? 'Opening…' : 'Start session'}</button>
+        <button className="btn" onClick={onClose}>{tr('console.school_page.cancel')}</button>
+        <button className="btn pri" onClick={go} disabled={start.isPending}>{start.isPending ? tr('console.school_page.opening') : tr('console.school_page.start_session')}</button>
       </div>
     </Dialog>
   );
@@ -449,20 +448,20 @@ function EraseDialog({ school, onClose, onSent }: { school: SchoolDetail; onClos
     onError: (e) => { setBad(e instanceof HttpError ? (e.fields.confirmCode ?? e.message) : (e as Error).message); shake.hit(); },
   });
   const go = () => {
-    if (typed.trim() !== school.slug) { setBad('That isn’t the school code. Nothing was erased.'); shake.hit(); return; }
+    if (typed.trim() !== school.slug) { setBad(tr('console.school_page.that_isn_t_the_school')); shake.hit(); return; }
     send.mutate();
   };
   return (
-    <Dialog dark title={`Erase ${school.name}?`} tag={{ text: 'Permanent · needs a second approver', tone: 'c' }} onClose={onClose} shake={shake.cls} width={480}>
-      <p>Its database is dropped, its files are deleted and its key is scheduled for deletion, so every backup becomes unreadable.</p>
+    <Dialog dark title={tr('console.school_page.erase', { name: school.name })} tag={{ text: tr('console.school_page.permanent_needs_a_second_approver'), tone: 'c' }} onClose={onClose} shake={shake.cls} width={480}>
+      <p>{tr('console.school_page.its_database_is_dropped_its')}</p>
       <div>
-        <label htmlFor="er-in">Type <b style={{ color: 'var(--on-deep)' }}>{school.slug}</b> to continue</label>
+        <label htmlFor="er-in">{tr('console.school_page.type')}{' '}<b style={{ color: 'var(--on-deep)' }}>{school.slug}</b> {tr('console.school_page.to_continue')}</label>
         <input id="er-in" className={`shake ${bad ? 'err' : ''}`} value={typed} onChange={(e) => { setTyped(e.target.value); setBad(''); }} autoComplete="off" aria-invalid={!!bad} />
       </div>
       {bad && <div className="emsg" role="alert" style={{ marginTop: 10 }}>{bad}</div>}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-        <button className="btn" style={{ background: 'transparent', color: 'var(--on-deep)', borderColor: 'color-mix(in srgb,var(--on-deep) 18%,transparent)' }} onClick={onClose}>Cancel</button>
-        <button className="btn dngf" onClick={go} disabled={send.isPending}>Request erasure</button>
+        <button className="btn" style={{ background: 'transparent', color: 'var(--on-deep)', borderColor: 'color-mix(in srgb,var(--on-deep) 18%,transparent)' }} onClick={onClose}>{tr('console.school_page.cancel')}</button>
+        <button className="btn dngf" onClick={go} disabled={send.isPending}>{tr('console.school_page.request_erasure')}</button>
       </div>
     </Dialog>
   );

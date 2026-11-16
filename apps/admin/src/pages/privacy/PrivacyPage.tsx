@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fmtDate, DATA_REQUEST_KINDS, type DataRequestRow } from '@tangent/contracts';
-import { Dialog, Field, SelectField, useShake, useToast, EmptyState } from '@tangent/web-ui';
+import { Dialog, Field, SelectField, useShake, useToast, EmptyState, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { AddBtn, AreaField, problem } from '../../app/kit';
 import { Page } from '../../app/Page';
 
-const KIND = { access: 'Copy of their data', correction: 'Correction', erasure: 'Erasure' } as const;
+const KIND = { access: t('admin.privacy_page.copy_of_their_data'), correction: t('admin.privacy_page.correction'), erasure: t('admin.privacy_page.erasure') } as const;
 const when = (iso: string) => fmtDate(iso, 'dayYear');
 
 /** Families' requests about their data: those sent from the app and those the office logs, each answered and closed once. */
@@ -21,11 +21,11 @@ export function PrivacyPage() {
   const rows = reqs.data ?? [];
   const open = rows.filter((r) => r.status === 'open').length;
   return (
-    <Page title="Privacy requests" sub={open ? `${open} waiting for an answer` : 'Requests for a copy of data, a correction or erasure'} toast={toast} loading={reqs.isLoading}
+    <Page title={t('admin.privacy_page.privacy_requests')} sub={open ? t('admin.privacy_page.waiting_for_an_answer', { open }) : t('admin.privacy_page.requests_for_a_copy_of')} toast={toast} loading={reqs.isLoading}
       error={reqs.isError && !reqs.data ? { message: (reqs.error as Error).message, retry: () => void reqs.refetch() } : null}
-      actions={<AddBtn onClick={() => setAdding(true)}>Log a request</AddBtn>}
+      actions={<AddBtn onClick={() => setAdding(true)}>{t('admin.privacy_page.log_a_request')}</AddBtn>}
       overlays={<>
-        {adding && <LogDialog onClose={() => setAdding(false)} onDone={() => { setAdding(false); refresh(); say('Request logged.'); }} />}
+        {adding && <LogDialog onClose={() => setAdding(false)} onDone={() => { setAdding(false); refresh(); say(t('admin.privacy_page.request_logged')); }} />}
         {deciding && <AnswerDialog r={deciding} onClose={() => setDeciding(null)} onDone={(m) => { setDeciding(null); refresh(); say(m); }} />}
       </>}>
       {!rows.length ? (
@@ -36,13 +36,13 @@ export function PrivacyPage() {
             <div key={r.id} className="exr" style={{ alignItems: 'flex-start', padding: '16px 20px' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <b style={{ font: '700 15px var(--fb)', display: 'block' }}>{KIND[r.kind]} · {r.subjectName}</b>
-                <small style={{ display: 'block' }}>{r.requestedBy ? `Asked by ${r.requestedBy} · ` : ''}{when(r.createdAt)}{r.fromApp ? ' · from the app' : ''}</small>
+                <small style={{ display: 'block' }}>{r.requestedBy ? t('admin.privacy_page.asked_by', { requestedBy: r.requestedBy }) : ''}{when(r.createdAt)}{r.fromApp ? t('admin.privacy_page.from_the_app') : ''}</small>
                 {r.note && <small style={{ display: 'block' }}>“{r.note}”</small>}
-                {r.answer && <small style={{ display: 'block' }}>Answer: {r.answer}</small>}
+                {r.answer && <small style={{ display: 'block' }}>{t('admin.privacy_page.answer')}{' '}{r.answer}</small>}
               </div>
               {r.status === 'open'
-                ? <button className="btn sm pri" onClick={() => setDeciding(r)}>Answer</button>
-                : <span className={`chip ${r.status === 'done' ? 'g' : ''}`}>{r.status === 'done' ? 'Done' : 'Declined'}</span>}
+                ? <button className="btn sm pri" onClick={() => setDeciding(r)}>{t('admin.privacy_page.answer_2')}</button>
+                : <span className={`chip ${r.status === 'done' ? 'g' : ''}`}>{r.status === 'done' ? t('admin.privacy_page.done') : t('admin.privacy_page.declined')}</span>}
             </div>
           ))}
         </div>
@@ -60,18 +60,18 @@ function LogDialog({ onClose, onDone }: { onClose: () => void; onDone: () => voi
     mutationFn: () => app.api.privacy.create({ kind: f.kind as 'access', subjectName: f.subjectName.trim(), requestedBy: f.requestedBy.trim(), note: f.note.trim() }),
     onSuccess: onDone, onError: (e) => { setErr(problem(e)); shake.hit(); },
   });
-  const go = () => { if (f.subjectName.trim().length < 2) { setErr({ subjectName: 'Whose data is this about?' }); shake.hit(); } else make.mutate(); };
+  const go = () => { if (f.subjectName.trim().length < 2) { setErr({ subjectName: t('admin.privacy_page.whose_data_is_this_about') }); shake.hit(); } else make.mutate(); };
   return (
-    <Dialog title="Log a data request" onClose={onClose} width={500} shake={shake.cls}>
+    <Dialog title={t('admin.privacy_page.log_a_data_request')} onClose={onClose} width={500} shake={shake.cls}>
       <div className="stack">
-        <SelectField label="What do they want" value={f.kind} onChange={(kind) => setF({ ...f, kind })} options={DATA_REQUEST_KINDS.map((k) => ({ value: k, label: KIND[k] }))} />
-        <Field label="Whose data" value={f.subjectName} onChange={(subjectName) => { setF({ ...f, subjectName }); setErr({}); }} error={err.subjectName} maxLength={80} />
-        <Field label="Asked by (optional)" value={f.requestedBy} onChange={(requestedBy) => setF({ ...f, requestedBy })} maxLength={80} />
-        <AreaField label="Details (optional)" value={f.note} onChange={(note) => setF({ ...f, note })} rows={3} maxLength={400} />
+        <SelectField label={t('admin.privacy_page.what_do_they_want')} value={f.kind} onChange={(kind) => setF({ ...f, kind })} options={DATA_REQUEST_KINDS.map((k) => ({ value: k, label: KIND[k] }))} />
+        <Field label={t('admin.privacy_page.whose_data')} value={f.subjectName} onChange={(subjectName) => { setF({ ...f, subjectName }); setErr({}); }} error={err.subjectName} maxLength={80} />
+        <Field label={t('admin.privacy_page.asked_by_optional')} value={f.requestedBy} onChange={(requestedBy) => setF({ ...f, requestedBy })} maxLength={80} />
+        <AreaField label={t('admin.privacy_page.details_optional')} value={f.note} onChange={(note) => setF({ ...f, note })} rows={3} maxLength={400} />
         {err._ && <div className="emsg" role="alert">{err._}</div>}
         <div className="tgrow" style={{ justifyContent: 'flex-end' }}>
-          <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn pri" disabled={make.isPending} onClick={go}>{make.isPending ? 'Saving…' : 'Log request'}</button>
+          <button className="btn" onClick={onClose}>{t('admin.privacy_page.cancel')}</button>
+          <button className="btn pri" disabled={make.isPending} onClick={go}>{make.isPending ? t('admin.privacy_page.saving') : t('admin.privacy_page.log_request')}</button>
         </div>
       </div>
     </Dialog>
@@ -86,18 +86,18 @@ function AnswerDialog({ r, onClose, onDone }: { r: DataRequestRow; onClose: () =
   const shake = useShake();
   const go = useMutation({
     mutationFn: (status: 'done' | 'declined') => app.api.privacy.decide(r.id, { status, note: note.trim() }),
-    onSuccess: (x) => onDone(x.status === 'done' ? `Closed as done.${r.fromApp ? ' The family is told.' : ''}` : `Declined.${r.fromApp ? ' The family is told why.' : ''}`),
+    onSuccess: (x) => onDone(x.status === 'done' ? t('admin.privacy_page.closed_as_done', { p0: r.fromApp ? ' The family is told.' : '' }) : t('admin.privacy_page.declined_2', { p0: r.fromApp ? ' The family is told why.' : '' })),
     onError: (e) => { setErr((e as Error).message); shake.hit(); },
   });
-  const decline = () => { if (!note.trim()) { setErr('Say why, so the family knows.'); shake.hit(); } else go.mutate('declined'); };
+  const decline = () => { if (!note.trim()) { setErr(t('admin.privacy_page.say_why_so_the_family')); shake.hit(); } else go.mutate('declined'); };
   return (
     <Dialog title={`${KIND[r.kind]} · ${r.subjectName}`} onClose={onClose} width={500} shake={shake.cls}>
       <div className="stack">
-        <AreaField label={r.fromApp ? 'Your answer (the family reads it in the app)' : 'What was done'} value={note} onChange={(v) => { setNote(v); setErr(''); }} error={err} rows={3} maxLength={400} />
+        <AreaField label={r.fromApp ? t('admin.privacy_page.your_answer_the_family_reads') : t('admin.privacy_page.what_was_done')} value={note} onChange={(v) => { setNote(v); setErr(''); }} error={err} rows={3} maxLength={400} />
         <div className="tgrow" style={{ justifyContent: 'flex-end' }}>
-          <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn dng" disabled={go.isPending} onClick={decline}>Decline</button>
-          <button className="btn pri" disabled={go.isPending} onClick={() => go.mutate('done')}>Mark done</button>
+          <button className="btn" onClick={onClose}>{t('admin.privacy_page.cancel')}</button>
+          <button className="btn dng" disabled={go.isPending} onClick={decline}>{t('admin.privacy_page.decline')}</button>
+          <button className="btn pri" disabled={go.isPending} onClick={() => go.mutate('done')}>{t('admin.privacy_page.mark_done')}</button>
         </div>
       </div>
     </Dialog>

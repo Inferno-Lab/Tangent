@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
 import { addDays, dayLabel, markMeaning, type AttendanceMarkDef, type AttendanceStatus } from '@tangent/contracts';
-import { DateField, EmptyCard, EmptyState, Icon, Segmented, Select } from '@tangent/web-ui';
+import { DateField, EmptyCard, EmptyState, Icon, Segmented, Select, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { useSetting } from '../../app/kit';
 import { Page, useToast } from '../../app/Page';
@@ -45,9 +45,9 @@ export function AttendancePage() {
     onSuccess: () => {
       setDraft({});
       void qc.invalidateQueries({ predicate: (q) => ['attendance-day', 'dashboard', 'shell', 'students'].includes(String(q.queryKey[0])) });
-      say('Roll call saved. Parents of absent children are told.');
+      say(t('admin.attendance_page.roll_call_saved_parents_of'));
     },
-    onError: (e) => say(e instanceof HttpError ? e.message : 'Could not save. Try again.', 'bad'),
+    onError: (e) => say(e instanceof HttpError ? e.message : t('admin.attendance_page.could_not_save_try_again'), 'bad'),
   });
 
   const canMark = app.user.permissions.includes('attendance.mark');
@@ -62,20 +62,20 @@ export function AttendancePage() {
   const err = [classes, today, day].find((q) => q.isError && !q.data);
 
   return (
-    <Page title="Attendance" sub={date ? `${dayLabel(date)} · ${cls ? `Class ${cls.name}` : ''}` : 'Roll call'} toast={toast} loading={loading} overlays={leave.overlay}
+    <Page title={t('admin.attendance_page.attendance')} sub={date ? `${dayLabel(date)} · ${cls ? t('admin.attendance_page.class', { name: cls.name }) : ''}` : t('admin.attendance_page.roll_call')} toast={toast} loading={loading} overlays={leave.overlay}
       error={err ? { message: (err.error as Error).message, retry: () => void err.refetch() } : null}
       tabs={tabs}
       filters={<>
         {tab !== 'leave' && !!classes.data?.length && (
           <>
-            {latest && <DateField compact label="Day" value={date} onChange={(d) => setPicked(d && d !== latest ? d : null)} max={latest} min={mayOld ? undefined : addDays(latest, -lockDays)} />}
-            <Select compact aria-label="Class" value={classId} onChange={setClassId} options={classes.data.map((c) => ({ value: c.id, label: `Class ${c.name}` }))} />
+            {latest && <DateField compact label={t('admin.attendance_page.day')} value={date} onChange={(d) => setPicked(d && d !== latest ? d : null)} max={latest} min={mayOld ? undefined : addDays(latest, -lockDays)} />}
+            <Select compact aria-label={t('admin.attendance_page.class_2')} value={classId} onChange={setClassId} options={classes.data.map((c) => ({ value: c.id, label: t('admin.attendance_page.class', { name: c.name }) }))} />
           </>
         )}
       </>}>
       {tab === 'leave' ? (
         <div className="stack" style={{ gap: 16 }}>
-          <Segmented label="Leave requests" value={leaveView} onChange={setLeaveView} options={[{ value: 'waiting', label: 'Waiting' }, { value: 'decided', label: 'Decided' }]} style={{ alignSelf: 'flex-start' }} />
+          <Segmented label={t('admin.attendance_page.leave_requests')} value={leaveView} onChange={setLeaveView} options={[{ value: 'waiting', label: t('admin.attendance_page.waiting') }, { value: 'decided', label: t('admin.attendance_page.decided') }]} style={{ alignSelf: 'flex-start' }} />
           {leave.list}
         </div>
       ) : classes.data?.length === 0 ? (
@@ -86,35 +86,35 @@ export function AttendancePage() {
       ) : (
         <div className="hb" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <section className="card deep" style={{ flexDirection: 'row', alignItems: 'center', gap: 40, flexWrap: 'wrap' }}>
-            <div className="vc" style={{ gap: 4 }}><span className="lbl">Present</span><span className="fig" style={{ fontSize: 44 }}>{counts.present}<small>of {marks.length}</small></span></div>
-            <div className="vc" style={{ gap: 4 }}><span className="lbl">Late</span><span className="fig" style={{ fontSize: 44, color: 'var(--warn-d)' }}>{counts.late}</span></div>
-            <div className="vc" style={{ gap: 4 }}><span className="lbl">Away</span><span className="fig" style={{ fontSize: 44, color: 'var(--bad-d)' }}>{counts.absent}</span></div>
-            <div className="vc" style={{ gap: 4 }}><span className="lbl">Not marked</span><span className="fig" style={{ fontSize: 44, color: 'var(--on-deep)' }}>{counts.none}</span></div>
+            <div className="vc" style={{ gap: 4 }}><span className="lbl">{t('admin.attendance_page.present')}</span><span className="fig" style={{ fontSize: 44 }}>{counts.present}<small>{t('admin.attendance_page.of')}{' '}{marks.length}</small></span></div>
+            <div className="vc" style={{ gap: 4 }}><span className="lbl">{t('admin.attendance_page.late')}</span><span className="fig" style={{ fontSize: 44, color: 'var(--warn-d)' }}>{counts.late}</span></div>
+            <div className="vc" style={{ gap: 4 }}><span className="lbl">{t('admin.attendance_page.away')}</span><span className="fig" style={{ fontSize: 44, color: 'var(--bad-d)' }}>{counts.absent}</span></div>
+            <div className="vc" style={{ gap: 4 }}><span className="lbl">{t('admin.attendance_page.not_marked')}</span><span className="fig" style={{ fontSize: 44, color: 'var(--on-deep)' }}>{counts.none}</span></div>
             <div className="vc grow" style={{ gap: 10, minWidth: 240 }}>
               <div className="bar" style={{ height: 14, borderRadius: 7 }} aria-hidden="true">
                 <i style={{ flex: counts.present, minWidth: 0, background: 'var(--bright)' }} /><i style={{ flex: counts.late, minWidth: 0, background: 'var(--warn-d)' }} />
                 <i style={{ flex: counts.absent, minWidth: 0, background: 'var(--bad-d)' }} /><i style={{ flex: counts.none, minWidth: 0, background: 'var(--deep3)' }} />
               </div>
-              <span style={{ fontSize: 14, lineHeight: '20px', color: 'var(--on-deep2)' }}>{!canMark ? 'You can look at attendance but not change it. Ask the school office for the roll-call permission.' : changed ? `${changed} ${changed === 1 ? 'change' : 'changes'} not saved yet.` : day.data?.submitted ? 'Submitted. Tap a letter to correct it, then save.' : counts.none ? `${counts.none} still to mark before you save.` : 'Everyone is marked. Save to send it.'}</span>
+              <span style={{ fontSize: 14, lineHeight: '20px', color: 'var(--on-deep2)' }}>{!canMark ? t('admin.attendance_page.you_can_look_at_attendance') : changed ? t('admin.attendance_page.not_saved_yet', { changed, p1: changed === 1 ? 'change' : 'changes' }) : day.data?.submitted ? t('admin.attendance_page.submitted_tap_a_letter_to') : counts.none ? t('admin.attendance_page.still_to_mark_before_you', { none: counts.none }) : t('admin.attendance_page.everyone_is_marked_save_to')}</span>
             </div>
             {canMark && (
               <div className="fx" style={{ gap: 8, flexWrap: 'wrap' }}>
-                {marks.length > 0 && <button className="btn ond" onClick={() => setDraft(Object.fromEntries(marks.filter((m) => !m.onLeave && statusOf(m.studentId, m.status) !== 'present').map((m) => [m.studentId, 'present' as const])))}><Icon name="check" className="i" />Mark all present</button>}
-                {changed > 0 && <button className="btn ond" onClick={() => setDraft({})}>Discard</button>}
-                <button className="btn bri" disabled={!changed || save.isPending} onClick={() => save.mutate()}><Icon name="check" className="i" />{save.isPending ? 'Saving…' : 'Save roll'}</button>
+                {marks.length > 0 && <button className="btn ond" onClick={() => setDraft(Object.fromEntries(marks.filter((m) => !m.onLeave && statusOf(m.studentId, m.status) !== 'present').map((m) => [m.studentId, 'present' as const])))}><Icon name="check" className="i" />{t('admin.attendance_page.mark_all_present')}</button>}
+                {changed > 0 && <button className="btn ond" onClick={() => setDraft({})}>{t('admin.attendance_page.discard')}</button>}
+                <button className="btn bri" disabled={!changed || save.isPending} onClick={() => save.mutate()}><Icon name="check" className="i" />{save.isPending ? t('admin.attendance_page.saving') : t('admin.attendance_page.save_roll')}</button>
               </div>
             )}
           </section>
           {day.isLoading && <div className="skc" style={{ height: 320, borderRadius: 16 }} />}
-          {!day.isLoading && marks.length === 0 && <EmptyCard title={`Class ${cls?.name ?? ''}`} chip={{ text: '0 students', tone: 'v' }} icon="people" heading="No students in this class" body="Students appear here once they are added to the class." />}
+          {!day.isLoading && marks.length === 0 && <EmptyCard title={t('admin.attendance_page.class_3', { p0: cls?.name ?? '' })} chip={{ text: t('admin.attendance_page.0_students'), tone: 'v' }} icon="people" heading={t('admin.attendance_page.no_students_in_this_class')} body={t('admin.attendance_page.students_appear_here_once_they')} />}
           {marks.length > 0 && (
             <div className="g" style={{ gridTemplateColumns: `repeat(auto-fill,minmax(min(${options.length > 3 ? 300 : 260}px,100%),1fr))`, gap: 8 }}>
               {marks.map((m) => {
                 const s = statusOf(m.studentId, m.status);
                 return (
                   <div className="cell" key={m.studentId}>
-                    <b className="grow cut" style={{ fontSize: 14, fontWeight: 600 }} data-tip={m.onLeave ? `${m.name}\nOn leave: the office approved it` : undefined}>{m.name}</b>
-                    <span className="fx" role="group" aria-label={`Attendance for ${m.name}`} style={{ gap: 4 }}>
+                    <b className="grow cut" style={{ fontSize: 14, fontWeight: 600 }} data-tip={m.onLeave ? t('admin.attendance_page.on_leave_the_office_approved', { name: m.name }) : undefined}>{m.name}</b>
+                    <span className="fx" role="group" aria-label={t('admin.attendance_page.attendance_for', { name: m.name })} style={{ gap: 4 }}>
                       {options.map((o) => (
                         <button key={o.value} className={`pk ${s === o.value ? o.cls : ''}`} aria-label={o.label} aria-pressed={s === o.value} data-tip={o.label} disabled={!canMark} onClick={() => setDraft({ ...draft, [m.studentId]: o.value })}>{o.key}</button>
                       ))}
@@ -124,7 +124,7 @@ export function AttendancePage() {
               })}
             </div>
           )}
-          <div className="fx t2" style={{ gap: 8, fontSize: 14 }}><Icon name="messages" className="i" />Families of absent students are told when you save. A late mark does not send a message.</div>
+          <div className="fx t2" style={{ gap: 8, fontSize: 14 }}><Icon name="messages" className="i" />{t('admin.attendance_page.families_of_absent_students_are')}</div>
         </div>
       )}
     </Page>

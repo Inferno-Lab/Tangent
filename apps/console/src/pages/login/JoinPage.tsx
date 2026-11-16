@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { HttpError } from '@tangent/api-client';
-import { Field, useShake } from '@tangent/web-ui';
+import { Field, useShake, t } from '@tangent/web-ui';
 import { makeClient } from '../../app/client';
 
 const client = makeClient(() => undefined);
@@ -16,8 +16,8 @@ export function JoinPage() {
   const shake = useShake();
   const go = async () => {
     const p: Record<string, string> = {};
-    if (f.password.length < 10) p.password = 'Use at least 10 characters.';
-    else if (f.password !== f.again) p.again = 'The two do not match.';
+    if (f.password.length < 10) p.password = t('console.join_page.use_at_least_10_characters');
+    else if (f.password !== f.again) p.again = t('console.join_page.the_two_do_not_match');
     setErr(p);
     if (Object.keys(p).length) { shake.hit(); return; }
     setBusy(true);
@@ -28,18 +28,18 @@ export function JoinPage() {
   return (
     <div className="nest" style={{ minHeight: '100dvh', padding: 16, display: 'grid', placeItems: 'center' }}>
       <div className={`card ${shake.cls}`} style={{ maxWidth: 440, width: '100%' }}>
-        <div className="ch"><h2>{done ? 'Your password is set' : 'Join the Tangent console'}</h2></div>
+        <div className="ch"><h2>{done ? t('console.join_page.your_password_is_set') : t('console.join_page.join_the_tangent_console')}</h2></div>
         {done ? (
           <>
-            <p>Sign in with {done} and your new password. The first time, the console shows a code to add to your authenticator app.</p>
-            <a className="btn pri" href={url('/login')}>Sign in</a>
+            <p>{t('console.join_page.sign_in_with')}{' '}{done} {t('console.join_page.and_your_new_password_the')}</p>
+            <a className="btn pri" href={url('/login')}>{t('console.join_page.sign_in')}</a>
           </>
-        ) : !token ? <p>This link is incomplete. Open the whole link from your invitation email, or ask for a new one.</p> : (
+        ) : !token ? <p>{t('console.join_page.this_link_is_incomplete_open')}</p> : (
           <div className="stack">
-            <Field label="Choose a password" type="password" value={f.password} onChange={(password) => { setF({ ...f, password }); setErr({}); }} error={err.password} autoComplete="new-password" hint="At least 10 characters." />
-            <Field label="The same password again" type="password" value={f.again} onChange={(again) => { setF({ ...f, again }); setErr({}); }} error={err.again} autoComplete="new-password" />
+            <Field label={t('console.join_page.choose_a_password')} type="password" value={f.password} onChange={(password) => { setF({ ...f, password }); setErr({}); }} error={err.password} autoComplete="new-password" hint={t('console.join_page.at_least_10_characters')} />
+            <Field label={t('console.join_page.the_same_password_again')} type="password" value={f.again} onChange={(again) => { setF({ ...f, again }); setErr({}); }} error={err.again} autoComplete="new-password" />
             {err._ && <div className="emsg" role="alert">{err._}</div>}
-            <button className="btn pri" disabled={busy} onClick={() => void go()}>{busy ? 'Saving…' : 'Set my password'}</button>
+            <button className="btn pri" disabled={busy} onClick={() => void go()}>{busy ? t('console.join_page.saving') : t('console.join_page.set_my_password')}</button>
           </div>
         )}
       </div>

@@ -1,19 +1,24 @@
 import { Icon } from './Icon';
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { addDays, schoolToday } from '@tangent/contracts';
+import { addDays, fmtDate, schoolLocale, schoolToday } from '@tangent/contracts';
 import { ErrorLine } from './forms';
 import { Pop } from './Menu';
 import { Select } from './Select';
+import { t as tr } from './i18n';
 
 // ── dates ───────────────────────────────────────────────────────────────────
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+// Month names people may type: English always, and the reader's own (parseDay).
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 const pad = (n: number) => String(n).padStart(2, '0');
 const lastDay = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate();
 const dow = (iso: string) => new Date(`${iso}T00:00:00Z`).getUTCDay();
 
 /** "12 Nov 2026" for 2026-11-12, the way every date in the admin and console reads. */
-export const formatDay = (iso: string) => (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${Number(iso.slice(8))} ${MONTHS[Number(iso.slice(5, 7)) - 1]} ${iso.slice(0, 4)}` : '');
+export const formatDay = (iso: string) => (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? fmtDate(iso, 'dayYear') : '');
+/** "November 2026" for 2026-11, in the reader's language. */
+const monthLabel = (ym: string) => fmtDate(`${ym.slice(0, 7)}-01`, 'month');
+/** Monday to Sunday, short, in the reader's language (2026-11-16 was a Monday). */
+const weekdays = () => Array.from({ length: 7 }, (_, i) => new Intl.DateTimeFormat(schoolLocale(), { weekday: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, 10, 16 + i))));
 
 /** A date as people type it: 2026-11-12, 12/11/2026, 12-11-26, 12.11.2026, 12 Nov 2026 or 12 Nov (this year). */
 export function parseDay(text: string, year = Number(schoolToday().slice(0, 4))): string | null {
@@ -23,7 +28,8 @@ export function parseDay(text: string, year = Number(schoolToday().slice(0, 4)))
   if (x) [y, m, d] = [Number(x[1]), Number(x[2]), Number(x[3])];
   else if ((x = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})$/.exec(t))) [d, m, y] = [Number(x[1]), Number(x[2]), Number(x[3]!.length === 2 ? `20${x[3]}` : x[3])];
   else if ((x = /^(\d{1,2})\s+([a-z]{3,})\.?,?(?:\s+(\d{4}))?$/.exec(t))) {
-    const mi = MONTHS.findIndex((n) => x![2]!.startsWith(n.toLowerCase()));
+    const own = Array.from({ length: 12 }, (_, i) => fmtDate(`2026-${pad(i + 1)}-01`, 'month').split(' ')[0]!.toLowerCase());
+    const mi = [MONTHS.findIndex((n) => x![2]!.startsWith(n)), own.findIndex((n) => n.startsWith(x![2]!))].find((i) => i >= 0) ?? -1;
     if (mi < 0) return null;
     [d, m, y] = [Number(x[1]), mi + 1, x[3] ? Number(x[3]) : year];
   } else return null;
@@ -62,15 +68,15 @@ export function Calendar({ value, min, max, onPick }: { value: string; min?: str
     };
     if (step[e.key]) { e.preventDefault(); go(step[e.key]!()); }
   };
-  const month = `${LONG[Number(at.slice(5, 7)) - 1]} ${at.slice(0, 4)}`;
+  const month = monthLabel(at);
   return (
     <div className="dpk">
       <div className="dpkh">
-        <button type="button" className="mini" aria-label="Previous month" onClick={() => go(addMonths(at, -1))}><Icon name="caretLeft" size={16} /></button>
+        <button type="button" className="mini" aria-label={tr('ui.fields.previous_month')} onClick={() => go(addMonths(at, -1))}><Icon name="caretLeft" size={16} /></button>
         <b aria-live="polite">{month}</b>
-        <button type="button" className="mini" aria-label="Next month" onClick={() => go(addMonths(at, 1))}><Icon name="caretRight" size={16} /></button>
+        <button type="button" className="mini" aria-label={tr('ui.fields.next_month')} onClick={() => go(addMonths(at, 1))}><Icon name="caretRight" size={16} /></button>
       </div>
-      <div className="dpkw" aria-hidden="true">{['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((w) => <span key={w}>{w}</span>)}</div>
+      <div className="dpkw" aria-hidden="true">{weekdays().map((w) => <span key={w}>{w}</span>)}</div>
       <div className="dpkd" role="grid" aria-label={month} ref={grid} onKeyDown={key}>
         {days.map((d) => (
           <button key={d} type="button" data-day={d} tabIndex={d === at ? 0 : -1} disabled={off(d)} aria-pressed={d === value} aria-label={formatDay(d)}
@@ -130,12 +136,12 @@ export function DateField({ label, value, onChange, error, hint, disabled, min, 
   const inner = (
     <>
       <input id={id} aria-label={compact ? label : undefined} value={t.text} onChange={(e) => t.setText(e.target.value)} onFocus={t.editing} onBlur={t.commit} disabled={disabled} autoComplete="off"
-        placeholder="e.g. 12 Nov 2026" aria-invalid={!!error} aria-describedby={error || hint ? `${id}-m` : undefined}
+        placeholder={tr('ui.fields.e_g_12_nov_2026')} aria-invalid={!!error} aria-describedby={error || hint ? `${id}-m` : undefined}
         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); t.commit(); } else if (e.key === 'ArrowDown' && e.altKey) { e.preventDefault(); setOpen(true); } }} />
-      <button ref={btn} type="button" className="fic" aria-label="Choose from a calendar" aria-haspopup="dialog" aria-expanded={open} disabled={disabled} onClick={() => setOpen((o) => !o)}>
+      <button ref={btn} type="button" className="fic" aria-label={tr('ui.fields.choose_from_a_calendar')} aria-haspopup="dialog" aria-expanded={open} disabled={disabled} onClick={() => setOpen((o) => !o)}>
         <Icon name={CAL} />
       </button>
-      <Pop open={open} anchor={box} returnTo={btn} onClose={() => setOpen(false)} label="Calendar" minWidth={0} focus="[tabindex='0']">
+      <Pop open={open} anchor={box} returnTo={btn} onClose={() => setOpen(false)} label={tr('ui.fields.calendar')} minWidth={0} focus="[tabindex='0']">
         <Calendar value={value} min={min} max={max} onPick={(d) => { onChange(d); setOpen(false); btn.current?.focus(); }} />
       </Pop>
     </>
@@ -170,7 +176,7 @@ export function TimeField({ label, value, onChange, error, hint, disabled }: Fie
       <input id={id} value={t.text} onChange={(e) => t.setText(e.target.value)} onFocus={t.editing} onBlur={t.commit} disabled={disabled} autoComplete="off" inputMode="numeric"
         placeholder="e.g. 08:30" aria-invalid={!!error} aria-describedby={error || hint ? `${id}-m` : undefined}
         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); t.commit(); } else if (e.key === 'ArrowDown' && e.altKey) { e.preventDefault(); setOpen(true); } }} />
-      <button ref={btn} type="button" className="fic" aria-label="Choose a time" aria-haspopup="listbox" aria-expanded={open} disabled={disabled} onClick={() => setOpen((o) => !o)}>
+      <button ref={btn} type="button" className="fic" aria-label={tr('ui.fields.choose_a_time')} aria-haspopup="listbox" aria-expanded={open} disabled={disabled} onClick={() => setOpen((o) => !o)}>
         <Icon name={CLOCK} />
       </button>
       <Pop open={open} anchor={box} returnTo={btn} onClose={() => setOpen(false)} role="listbox" label={label} className="popm" minWidth={0} focus={`[data-t="${near}"]`}>
@@ -184,7 +190,7 @@ export function TimeField({ label, value, onChange, error, hint, disabled }: Fie
 /** A month (YYYY-MM) from the last two years and the next one. */
 export function MonthField({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
   const now = schoolToday();
-  const options = Array.from({ length: 36 }, (_, i) => addMonths(now, 12 - i).slice(0, 7)).map((m) => ({ value: m, label: `${LONG[Number(m.slice(5)) - 1]} ${m.slice(0, 4)}` }));
+  const options = Array.from({ length: 36 }, (_, i) => addMonths(now, 12 - i).slice(0, 7)).map((m) => ({ value: m, label: monthLabel(m) }));
   return <Select value={value} onChange={onChange} options={options} aria-label={label} compact />;
 }
 
@@ -212,8 +218,8 @@ export function NumberField({ label, value, onChange, error, hint, disabled, min
   return (
     <Frame id={id} label={label} error={error} hint={hint}>
       <NumberInput id={id} className="" value={value} onChange={onChange} min={min} max={max} step={step} decimals={decimals} disabled={disabled} aria-invalid={!!error} aria-describedby={error || hint ? `${id}-m` : undefined} />
-      <button type="button" className="fic" aria-label="Decrease" disabled={disabled || (min !== undefined && Number(value) <= min)} onClick={() => bump(-1)}><Icon name="minus" /></button>
-      <button type="button" className="fic" aria-label="Increase" disabled={disabled || (max !== undefined && Number(value) >= max)} onClick={() => bump(1)}><Icon name="plus" /></button>
+      <button type="button" className="fic" aria-label={tr('ui.fields.decrease')} disabled={disabled || (min !== undefined && Number(value) <= min)} onClick={() => bump(-1)}><Icon name="minus" /></button>
+      <button type="button" className="fic" aria-label={tr('ui.fields.increase')} disabled={disabled || (max !== undefined && Number(value) >= max)} onClick={() => bump(1)}><Icon name="plus" /></button>
     </Frame>
   );
 }

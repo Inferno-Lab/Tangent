@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { GENDERS, schoolToday, type ClassInfo, type GuardianRow, type StudentDetail } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, ErrorLine, Field, SelectField, useShake } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, ErrorLine, Field, SelectField, useShake, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { AreaField, problem, useSetting } from '../../app/kit';
 
 export type Rec = { gender: string; house: string; admissionNo: string; bloodGroup: string; address: string };
 export const emptyRec: Rec = { gender: '', house: '', admissionNo: '', bloodGroup: '', address: '' };
-const GENDER_LABEL: Record<string, string> = { female: 'Female', male: 'Male', other: 'Other' };
+const GENDER_LABEL: Record<string, string> = { female: t('admin.student_record.female'), male: t('admin.student_record.male'), other: t('admin.student_record.other') };
 
 /**
  * The parts of a student's record beyond name, class and birth date. Which of them the school must fill is the console's
@@ -15,18 +15,18 @@ const GENDER_LABEL: Record<string, string> = { female: 'Female', male: 'Male', o
 export function RecordFields({ f, set, err, adding }: { f: Rec; set: (k: keyof Rec) => (v: string) => void; err: Record<string, string>; adding?: boolean }) {
   const need = useSetting<string[]>('students.required', []);
   const houses = useSetting<{ key: string; name: string }[]>('people.houses', []);
-  const opt = (k: keyof Rec, label: string) => (need.includes(k) ? label : `${label} (optional)`);
+  const opt = (k: keyof Rec, label: string) => (need.includes(k) ? label : t('admin.student_record.optional', { label }));
   return (
     <>
       <div className="two">
-        <SelectField label={opt('gender', 'Gender')} value={f.gender} onChange={set('gender')} error={err.gender} options={[{ value: '', label: 'Not given' }, ...GENDERS.map((g) => ({ value: g, label: GENDER_LABEL[g]! }))]} />
-        {houses.length > 0 && <SelectField label={opt('house', 'House')} value={f.house} onChange={set('house')} error={err.house} options={[{ value: '', label: 'No house' }, ...houses.map((h) => ({ value: h.name, label: h.name }))]} />}
+        <SelectField label={opt('gender', t('admin.student_record.gender'))} value={f.gender} onChange={set('gender')} error={err.gender} options={[{ value: '', label: t('admin.student_record.not_given') }, ...GENDERS.map((g) => ({ value: g, label: GENDER_LABEL[g]! }))]} />
+        {houses.length > 0 && <SelectField label={opt('house', t('admin.student_record.house'))} value={f.house} onChange={set('house')} error={err.house} options={[{ value: '', label: t('admin.student_record.no_house') }, ...houses.map((h) => ({ value: h.name, label: h.name }))]} />}
       </div>
       <div className="two">
-        <Field label={adding && !need.includes('admissionNo') ? 'Admission number (blank: Tangent numbers it)' : opt('admissionNo', 'Admission number')} value={f.admissionNo} onChange={set('admissionNo')} error={err.admissionNo} maxLength={30} />
-        <Field label={opt('bloodGroup', 'Blood group')} value={f.bloodGroup} onChange={set('bloodGroup')} error={err.bloodGroup} maxLength={4} placeholder="B+" />
+        <Field label={adding && !need.includes('admissionNo') ? t('admin.student_record.admission_number_blank_tangent_numbers') : opt('admissionNo', t('admin.student_record.admission_number'))} value={f.admissionNo} onChange={set('admissionNo')} error={err.admissionNo} maxLength={30} />
+        <Field label={opt('bloodGroup', t('admin.student_record.blood_group'))} value={f.bloodGroup} onChange={set('bloodGroup')} error={err.bloodGroup} maxLength={4} placeholder="B+" />
       </div>
-      <Field label={opt('address', 'Address')} value={f.address} onChange={set('address')} error={err.address} maxLength={200} />
+      <Field label={opt('address', t('admin.student_record.address'))} value={f.address} onChange={set('address')} error={err.address} maxLength={200} />
     </>
   );
 }
@@ -40,27 +40,27 @@ export function EditStudentDialog({ s, classes, onClose, onDone }: { s: StudentD
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof f) => (v: string) => { setF((x) => ({ ...x, [k]: v })); setErr((e) => ({ ...e, [k]: '' })); };
   const save = async () => {
-    if (f.name.trim().length < 2) { setErr({ name: 'Enter the full name.' }); shake.hit(); return; }
+    if (f.name.trim().length < 2) { setErr({ name: t('admin.student_record.enter_the_full_name') }); shake.hit(); return; }
     setBusy(true);
     try {
       const next = await api.students.update(s.id, { ...f, gender: (f.gender || undefined) as StudentDetail['gender'] & string | undefined });
-      onDone(next.className !== s.className ? `${next.name} moved to ${next.className}. Their marks and attendance stay with them.` : `${next.name}’s record was saved.`);
+      onDone(next.className !== s.className ? t('admin.student_record.moved_to_their_marks_and', { name: next.name, className: next.className }) : t('admin.student_record.s_record_was_saved', { name: next.name }));
     } catch (e) { setBusy(false); setErr(problem(e)); shake.hit(); }
   };
   return (
-    <Dialog title={`Edit ${s.name}`} onClose={onClose} width={560} shake={shake.cls}>
+    <Dialog title={t('admin.student_record.edit', { name: s.name })} onClose={onClose} width={560} shake={shake.cls}>
       <div className="stack">
-        <Field label="Full name" value={f.name} onChange={set('name')} error={err.name} maxLength={80} />
+        <Field label={t('admin.student_record.full_name')} value={f.name} onChange={set('name')} error={err.name} maxLength={80} />
         <div className="two">
-          <SelectField label="Class" value={f.classId} onChange={set('classId')} error={err.classId} options={classes.map((c) => ({ value: c.id, label: c.name }))} />
-          <Field label="Roll number" value={f.rollNo} onChange={set('rollNo')} error={err.rollNo} maxLength={10} />
+          <SelectField label={t('admin.student_record.class')} value={f.classId} onChange={set('classId')} error={err.classId} options={classes.map((c) => ({ value: c.id, label: c.name }))} />
+          <Field label={t('admin.student_record.roll_number')} value={f.rollNo} onChange={set('rollNo')} error={err.rollNo} maxLength={10} />
         </div>
-        <DateField label="Date of birth" value={f.dob} onChange={set('dob')} error={err.dob} max={schoolToday()} />
+        <DateField label={t('admin.student_record.date_of_birth')} value={f.dob} onChange={set('dob')} error={err.dob} max={schoolToday()} />
         <RecordFields f={f} set={set} err={err} />
         {err._ && <ErrorLine>{err._}</ErrorLine>}
         <div className="tgrow" style={{ justifyContent: 'flex-end' }}>
-          <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn pri" disabled={busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Save'}</button>
+          <button className="btn" onClick={onClose}>{t('admin.student_record.cancel')}</button>
+          <button className="btn pri" disabled={busy} onClick={() => void save()}>{busy ? t('admin.student_record.saving') : t('admin.student_record.save')}</button>
         </div>
       </div>
     </Dialog>
@@ -81,36 +81,36 @@ export function GuardiansDialog({ s, onClose, onDone }: { s: StudentDetail; onCl
     setBusy(true);
     try {
       await api.students.setGuardians(s.id, { guardians: list.map(({ key: _k, ...g }) => ({ ...g, id: g.id || undefined })) });
-      onDone(`${s.name}’s guardians were saved.`);
+      onDone(t('admin.student_record.s_guardians_were_saved', { name: s.name }));
     } catch (e) { setBusy(false); setErr(problem(e)); shake.hit(); }
   };
   return (
-    <Dialog title={`Guardians of ${s.name}`} onClose={onClose} width={620} shake={shake.cls}>
+    <Dialog title={t('admin.student_record.guardians_of', { name: s.name })} onClose={onClose} width={620} shake={shake.cls}>
       <div className="stack">
-        <p className="help" style={{ margin: 0 }}>Each guardian signs in to the app with their own phone. A brother’s or sister’s guardian with the same phone is joined, not added twice.</p>
+        <p className="help" style={{ margin: 0 }}>{t('admin.student_record.each_guardian_signs_in_to')}</p>
         {list.map((g, i) => (
           <div key={g.key} className="card" style={{ padding: 16, display: 'grid', gap: 10 }}>
             <div className="two">
-              <Field label="Name" value={g.name} onChange={(name) => upd(i, { name })} maxLength={80} />
-              <Field label="Relation" value={g.relation} onChange={(relation) => upd(i, { relation })} maxLength={30} placeholder="Mother" />
+              <Field label={t('admin.student_record.name')} value={g.name} onChange={(name) => upd(i, { name })} maxLength={80} />
+              <Field label={t('admin.student_record.relation')} value={g.relation} onChange={(relation) => upd(i, { relation })} maxLength={30} placeholder={t('admin.student_record.mother')} />
             </div>
             <div className="two">
-              <Field label="Phone" type="tel" value={g.phone} onChange={(phone) => upd(i, { phone })} maxLength={20} hint={g.id ? 'Shown hidden; type a new number to change it.' : undefined} />
-              <Field label="Email (optional)" type="email" value={g.email} onChange={(email) => upd(i, { email })} maxLength={120} />
+              <Field label={t('admin.student_record.phone')} type="tel" value={g.phone} onChange={(phone) => upd(i, { phone })} maxLength={20} hint={g.id ? t('admin.student_record.shown_hidden_type_a_new') : undefined} />
+              <Field label={t('admin.student_record.email_optional')} type="email" value={g.email} onChange={(email) => upd(i, { email })} maxLength={120} />
             </div>
             <div className="tgrow">
-              <Checkbox checked={g.isPrimary} onChange={(c) => c && upd(i, { isPrimary: true })} label="Contact first" />
-              <Checkbox checked={g.canCollect} onChange={(canCollect) => upd(i, { canCollect })} label="May collect from school" />
+              <Checkbox checked={g.isPrimary} onChange={(c) => c && upd(i, { isPrimary: true })} label={t('admin.student_record.contact_first')} />
+              <Checkbox checked={g.canCollect} onChange={(canCollect) => upd(i, { canCollect })} label={t('admin.student_record.may_collect_from_school')} />
               <span className="grow"></span>
-              <button className="btn sm" disabled={list.length === 1} onClick={() => { const n = list.filter((_, j) => j !== i); if (g.isPrimary && n[0]) n[0] = { ...n[0], isPrimary: true }; setList(n); }}>Remove</button>
+              <button className="btn sm" disabled={list.length === 1} onClick={() => { const n = list.filter((_, j) => j !== i); if (g.isPrimary && n[0]) n[0] = { ...n[0], isPrimary: true }; setList(n); }}>{t('admin.student_record.remove')}</button>
             </div>
           </div>
         ))}
-        {list.length < 4 && <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => setList([...list, { key: `new-${Date.now()}`, id: '', name: '', phone: '', email: '', relation: '', canCollect: true, isPrimary: false }])}>Add a guardian</button>}
+        {list.length < 4 && <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => setList([...list, { key: `new-${Date.now()}`, id: '', name: '', phone: '', email: '', relation: '', canCollect: true, isPrimary: false }])}>{t('admin.student_record.add_a_guardian')}</button>}
         {Object.values(err)[0] && <ErrorLine>{Object.values(err)[0]}</ErrorLine>}
         <div className="tgrow" style={{ justifyContent: 'flex-end' }}>
-          <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn pri" disabled={busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Save guardians'}</button>
+          <button className="btn" onClick={onClose}>{t('admin.student_record.cancel')}</button>
+          <button className="btn pri" disabled={busy} onClick={() => void save()}>{busy ? t('admin.student_record.saving') : t('admin.student_record.save_guardians')}</button>
         </div>
       </div>
     </Dialog>
@@ -125,20 +125,20 @@ export function LeaveDialog({ s, onClose, onDone }: { s: StudentDetail; onClose:
   const [err, setErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const save = async () => {
-    if (f.reason.trim().length < 2) { setErr({ reason: 'Say why, for the record.' }); shake.hit(); return; }
+    if (f.reason.trim().length < 2) { setErr({ reason: t('admin.student_record.say_why_for_the_record') }); shake.hit(); return; }
     setBusy(true);
-    try { await api.year.leaver({ studentId: s.id, leftOn: f.leftOn, reason: f.reason.trim() }); onDone(`${s.name} is recorded as left. Academic year → Year-end can bring them back.`); }
+    try { await api.year.leaver({ studentId: s.id, leftOn: f.leftOn, reason: f.reason.trim() }); onDone(t('admin.student_record.is_recorded_as_left_academic', { name: s.name })); }
     catch (e) { setBusy(false); setErr(problem(e)); shake.hit(); }
   };
   return (
-    <Dialog title={`${s.name} is leaving`} onClose={onClose} width={480} shake={shake.cls}>
+    <Dialog title={t('admin.student_record.is_leaving', { name: s.name })} onClose={onClose} width={480} shake={shake.cls}>
       <div className="stack">
-        <DateField label="Last day" value={f.leftOn} onChange={(leftOn) => setF({ ...f, leftOn })} error={err.leftOn} />
-        <AreaField label="Why" value={f.reason} onChange={(reason) => { setF({ ...f, reason }); setErr({}); }} error={err.reason} rows={3} maxLength={200} placeholder="Moved to another city" />
+        <DateField label={t('admin.student_record.last_day')} value={f.leftOn} onChange={(leftOn) => setF({ ...f, leftOn })} error={err.leftOn} />
+        <AreaField label={t('admin.student_record.why')} value={f.reason} onChange={(reason) => { setF({ ...f, reason }); setErr({}); }} error={err.reason} rows={3} maxLength={200} placeholder={t('admin.student_record.moved_to_another_city')} />
         {err._ && <ErrorLine>{err._}</ErrorLine>}
         <div className="tgrow" style={{ justifyContent: 'flex-end' }}>
-          <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn dng" disabled={busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Record as left'}</button>
+          <button className="btn" onClick={onClose}>{t('admin.student_record.cancel')}</button>
+          <button className="btn dng" disabled={busy} onClick={() => void save()}>{busy ? t('admin.student_record.saving') : t('admin.student_record.record_as_left')}</button>
         </div>
       </div>
     </Dialog>

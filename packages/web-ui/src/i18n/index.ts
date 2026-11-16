@@ -39,9 +39,20 @@ export async function setLanguage(next: string, vocab?: Vocabulary): Promise<voi
   }
 }
 
-const saved = (): { lang: string; vocab?: Vocabulary } | null => {
-  try { return JSON.parse(localStorage.getItem(SAVED) ?? 'null') as { lang: string; vocab?: Vocabulary } | null; } catch { return null; }
+/** The languages the web apps have catalogues for (the others read in English until translated). */
+export const CATALOGUE_LANGUAGES = ['en'];
+
+type Saved = { lang: string; vocab?: Vocabulary; chosen?: boolean };
+const saved = (): Saved | null => {
+  try { return JSON.parse(localStorage.getItem(SAVED) ?? 'null') as Saved | null; } catch { return null; }
 };
+const keep = (s: Saved): boolean => { try { localStorage.setItem(SAVED, JSON.stringify(s)); return true; } catch { return false; } };
+
+/** The person picks a language (the sign-in page, their profile): it wins over the school's default on this browser. */
+export function chooseLanguage(next: string): void {
+  // ponytail: kept per browser; an account preference on the server comes with the people's-language step (plan §3.5.6).
+  if (next !== lang && keep({ lang: next, vocab: words, chosen: true })) window.location.reload();
+}
 
 /** Before the pages load: the language this browser last read the school in (English the first time). */
 export function startLanguage(): Promise<void> {
@@ -56,9 +67,12 @@ export function startLanguage(): Promise<void> {
 export function useLanguage(next: string | undefined, vocab: Vocabulary | undefined): void {
   const key = next ? JSON.stringify({ lang: next, vocab: vocab ?? {} }) : '';
   useEffect(() => {
-    if (!key || key === JSON.stringify({ lang, vocab: words ?? {} })) return;
-    try { localStorage.setItem(SAVED, key); } catch { return; } // ponytail: without storage the page stays in the language it has, rather than reloading forever.
-    window.location.reload();
+    if (!next) return;
+    const s = saved();
+    const want = s?.chosen ? s.lang : next;
+    if (want === lang && JSON.stringify(vocab ?? {}) === JSON.stringify(words ?? {})) return;
+    // Without storage the page stays in the language it has, rather than reloading forever.
+    if (keep({ lang: want, vocab, chosen: s?.chosen })) window.location.reload();
   }, [key]);
 }
 

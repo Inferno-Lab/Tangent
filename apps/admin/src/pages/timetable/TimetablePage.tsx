@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
 import { fmtNumber, addDays, dayLabel, dayMonth, dayName, schoolMinutes, schoolToday, weekday, type SlotRow, type TimetableView as TT, subjectColour } from '@tangent/contracts';
-import { Dialog, EmptyCard, PageScope, tintFor, useToast, EmptyState } from '@tangent/web-ui';
+import { Dialog, EmptyCard, PageScope, tintFor, useToast, EmptyState, t as tr } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { useShellChrome } from '../../app/Layout';
 import { useSetting } from '../../app/kit';
 import { TimetableView } from './timetable.view';
 import { ChangeDialog, PlaceDialog, WeekDialog } from './TimetableTools';
 
-const VIEWS = ['Week', 'Day', 'List'];
+const VIEWS = [tr('admin.timetable_page.week'), tr('admin.timetable_page.day'), tr('admin.timetable_page.list')];
 const WEEK = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6, sun: 7 } as const;
 const toMin = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3));
 
@@ -44,8 +44,8 @@ export function TimetablePage() {
   });
   const publish = useMutation({
     mutationFn: () => app.api.timetable.publish(),
-    onSuccess: (r) => { say(`Published · ${fmtNumber(r.families)} families and ${r.teachers} teachers notified`); refresh(); },
-    onError: (e) => say(e instanceof HttpError ? e.message : 'Could not publish. Try again.', 'bad'),
+    onSuccess: (r) => { say(tr('admin.timetable_page.published_families_and_teachers_notified', { fmtNumber: fmtNumber(r.families), teachers: r.teachers })); refresh(); },
+    onError: (e) => say(e instanceof HttpError ? e.message : tr('admin.timetable_page.could_not_publish_try_again'), 'bad'),
   });
 
   const data: TT | undefined = tt.data;
@@ -54,8 +54,8 @@ export function TimetablePage() {
   if (tt.isError && !data) {
     return (
       <PageScope page="timetable">
-        <main className="mn"><header className="hd"><div><h1>Timetable</h1></div></header>
-          <div><EmptyCard error title="Timetable" chip={{ text: 'Couldn’t load', tone: 'c' }} icon="warning" heading="That didn’t load" body={(tt.error as Error).message} actions={<button className="btn pri" onClick={() => void tt.refetch()}>Try again</button>} /></div>
+        <main className="mn"><header className="hd"><div><h1>{tr('admin.timetable_page.timetable')}</h1></div></header>
+          <div><EmptyCard error title={tr('admin.timetable_page.timetable')} chip={{ text: tr('admin.timetable_page.couldn_t_load'), tone: 'c' }} icon="warning" heading={tr('admin.timetable_page.that_didn_t_load')} body={(tt.error as Error).message} actions={<button className="btn pri" onClick={() => void tt.refetch()}>{tr('admin.timetable_page.try_again')}</button>} /></div>
         </main>
       </PageScope>
     );
@@ -63,7 +63,7 @@ export function TimetablePage() {
   if (classes.isSuccess && classList.length === 0) {
     return (
       <PageScope page="timetable">
-        <main className="mn"><header className="hd"><div><h1>Timetable</h1><p>No classes yet</p></div></header>
+        <main className="mn"><header className="hd"><div><h1>{tr('admin.timetable_page.timetable')}</h1><p>{tr('admin.timetable_page.no_classes_yet')}</p></div></header>
           <div><EmptyState scene="timetable" onAction={() => app.go('/year/classes')} /></div>
         </main>
       </PageScope>
@@ -72,7 +72,7 @@ export function TimetablePage() {
   if (!data) {
     return (
       <PageScope page="timetable">
-        <main className="mn" aria-busy="true"><header className="hd"><div><h1>Timetable</h1><p>&nbsp;</p></div></header>
+        <main className="mn" aria-busy="true"><header className="hd"><div><h1>{tr('admin.timetable_page.timetable')}</h1><p>&nbsp;</p></div></header>
           <div className="skc" style={{ height: 620, borderRadius: 28 }} />
         </main>
       </PageScope>
@@ -88,7 +88,7 @@ export function TimetablePage() {
   const periodDef = (idx: number) => data.periods.find((p) => p.idx === idx);
   const now = schoolMinutes();
   // A subject's spectrum colour (contracts subjectColour), the same in the admin and the app.
-  const subjectKey = (s: Pick<SlotRow, 'subjectName' | 'subjectColor'>) => `sub sp-${subjectColour(s.subjectName, s.subjectColor)}`;
+  const subjectKey = (s: Pick<SlotRow, 'subjectName' | 'subjectColor'>) => tr('admin.timetable_page.sub_sp', { subjectColour: subjectColour(s.subjectName, s.subjectColor) });
   const running = data.periods.find((p) => p.kind === 'period' && now >= toMin(p.starts) && now < toMin(p.ends)) ?? data.periods.find((p) => p.kind === 'period');
   const at = { day: DAYS.includes(sel.day) ? sel.day : DAYS[0] ?? 1, period: sel.period || running?.idx || 0 };
   const cellOf = (day: number, p: { idx: number; starts: string; ends: string }, ri: number) => {
@@ -96,13 +96,13 @@ export function TimetablePage() {
     const live = dateOf(day) === today && now >= toMin(p.starts) && now < toMin(p.ends);
     const on = at.day === day && at.period === p.idx;
     const base = { sel: on ? 'sel' : '', pressed: on ? 'true' : 'false', d: (ri * 0.04 + day * 0.03).toFixed(2), pg: live ? Math.round(((now - toMin(p.starts)) / (toMin(p.ends) - toMin(p.starts))) * 100) : 0, now: live ? 'now' : '', pick: () => setSel({ day, period: p.idx }) };
-    if (!s) return { ...base, k: 'n', n: 'Free', t: 'Not placed', r: '', tip: undefined, bad: '', isBad: false, isFixed: false };
+    if (!s) return { ...base, k: 'n', n: tr('admin.timetable_page.free'), t: tr('admin.timetable_page.not_placed'), r: '', tip: undefined, bad: '', isBad: false, isFixed: false };
     const bad = badIds.has(s.id) && !s.substituteId;
     return { ...base, k: bad ? '' : subjectKey(s), n: s.subjectName, t: s.substituteName ?? s.teacherName, r: s.room ?? '', tip: [s.subjectName, s.substituteName ?? s.teacherName, s.room].filter(Boolean).join('\n'), bad: bad ? 'bad' : '', isBad: bad, isFixed: !!s.substituteId };
   };
   const rows = data.periods.map((p, ri) => (p.kind === 'period'
     ? { brk: false, per: true, l: p.label, t: p.starts, cells: shownDays.map((d) => cellOf(d, p, ri)) }
-    : { brk: true, per: false, l: '', t: '', name: `${p.label} · ${p.starts} to ${p.ends}` }));
+    : { brk: true, per: false, l: '', t: '', name: tr('admin.timetable_page.to', { label: p.label, starts: p.starts, ends: p.ends }) }));
 
   const cur = slotAt(at.day, at.period);
   const curDef = periodDef(at.period);
@@ -119,45 +119,45 @@ export function TimetablePage() {
 
   const v = {
     ...chrome,
-    className: data.className, term: chrome.shell?.term.name || 'This year', version: data.version, isDraft: data.draftChanges > 0, draftChanges: data.draftChanges,
-    clsOpen: clsOpen ? 'open' : '', clsExp: clsOpen ? 'true' : 'false', clsLabel: `Class ${data.className}`,
+    className: data.className, term: chrome.shell?.term.name || tr('admin.timetable_page.this_year'), version: data.version, isDraft: data.draftChanges > 0, draftChanges: data.draftChanges,
+    clsOpen: clsOpen ? 'open' : '', clsExp: clsOpen ? 'true' : 'false', clsLabel: tr('admin.timetable_page.class', { className: data.className }),
     toggleCls: (e: React.MouseEvent) => { e.stopPropagation(); setClsOpen((o) => !o); },
-    classes: classList.map((c, i) => ({ n: `Class ${c.name}`, on: c.id === classId, sel: c.id === classId ? 'true' : 'false', d: 40 + Math.min(i, 8) * 30, pick: () => { setClassId(c.id); setClsOpen(false); } })),
+    classes: classList.map((c, i) => ({ n: tr('admin.timetable_page.class_2', { name: c.name }), on: c.id === classId, sel: c.id === classId ? 'true' : 'false', d: 40 + Math.min(i, 8) * 30, pick: () => { setClassId(c.id); setClsOpen(false); } })),
     views: VIEWS.map((x, i) => ({ n: x, on: i === mode ? 'on' : '', sel: i === mode ? 'true' : 'false', pick: () => setMode(i) })),
     mode: ['week', 'day', 'list'][mode],
     // One column per teaching day: a school that teaches six or seven days gets six or seven, never a wrapped row.
     tgStyle: { '--days': String(shownDays.length) },
     publish: () => publish.mutate(),
-    weekLabel: `Every week · shown for ${dayMonth(dateOf(DAYS[0] ?? 1))} – ${dayMonth(dateOf(DAYS.at(-1) ?? 5))}`,
-    clashChip: data.clashes.length ? 'c' : 'g', clashText: data.clashes.length ? `${data.clashes.length} ${data.clashes.length === 1 ? 'clash' : 'clashes'} to fix` : 'No clashes',
+    weekLabel: tr('admin.timetable_page.every_week_shown_for', { dayMonth: dayMonth(dateOf(DAYS[0] ?? 1)), dayMonth1: dayMonth(dateOf(DAYS.at(-1) ?? 5)) }),
+    clashChip: data.clashes.length ? 'c' : 'g', clashText: data.clashes.length ? tr('admin.timetable_page.to_fix', { length: data.clashes.length, p1: data.clashes.length === 1 ? 'clash' : 'clashes' }) : tr('admin.timetable_page.no_clashes'),
     legend: subjects.map((s) => ({ k: subjectKey(s), n: s.subjectName })),
     days: shownDays.map((d) => ({ n: dayName(dateOf(d), true), d: Number(dateOf(d).slice(8)), today: dateOf(d) === today ? 'today' : '' })),
     rows,
     list: data.slots.filter(() => mode === 2).sort((a, b) => a.day - b.day || a.period - b.period).map((s) => ({
-      day: dayName(dateOf(s.day), true), n: s.subjectName, t: s.substituteName ?? s.teacherName, time: `${periodDef(s.period)?.starts} to ${periodDef(s.period)?.ends}`,
+      day: dayName(dateOf(s.day), true), n: s.subjectName, t: s.substituteName ?? s.teacherName, time: tr('admin.timetable_page.to_2', { starts: periodDef(s.period)?.starts, ends: periodDef(s.period)?.ends }),
       k: badIds.has(s.id) && !s.substituteId ? 'bad' : subjectKey(s), pick: () => { setSel({ day: s.day, period: s.period }); setMode(1); },
     })),
     sel: {
-      k: selBad ? 'c' : cur ? subjectKey(cur) : 'n', ab: (cur?.subjectName ?? 'Free').slice(0, 2), n: cur?.subjectName ?? 'Free period', t: cur ? cur.substituteName ?? cur.teacherName : '', r: cur?.room ?? '',
-      day: `${dayLabel(dateOf(at.day))}`, time: curDef ? `${curDef.starts} to ${curDef.ends}` : '', len: curDef ? `${toMin(curDef.ends) - toMin(curDef.starts)} min` : '',
-      bad: selBad, fixedNow, fine: !!cur && !selBad && !fixedNow, other: clash ? clash.classNames.filter((n) => n !== data.className).join(', ') || 'another class' : '',
+      k: selBad ? 'c' : cur ? subjectKey(cur) : 'n', ab: (cur?.subjectName ?? tr('admin.timetable_page.free')).slice(0, 2), n: cur?.subjectName ?? tr('admin.timetable_page.free_period'), t: cur ? cur.substituteName ?? cur.teacherName : '', r: cur?.room ?? '',
+      day: `${dayLabel(dateOf(at.day))}`, time: curDef ? tr('admin.timetable_page.to_2', { starts: curDef.starts, ends: curDef.ends }) : '', len: curDef ? tr('admin.timetable_page.min', { p0: toMin(curDef.ends) - toMin(curDef.starts) }) : '',
+      bad: selBad, fixedNow, fine: !!cur && !selBad && !fixedNow, other: clash ? clash.classNames.filter((n) => n !== data.className).join(', ') || tr('admin.timetable_page.another_class') : '',
       suggest: clash?.suggestion ? clash.suggestion.teacherName.split(' ')[0] : null,
     },
     canEdit, canPublish: app.user.permissions.includes('timetable.publish'),
     openWeek: () => setTool('week'), print: () => window.print(),
     periodTools: canEdit && curDef?.kind === 'period' ? (
-      <button className="btn sm" onClick={() => setTool(cur ? 'change' : 'place')}>{cur ? 'Change subject or room' : 'Place a lesson'}</button>
+      <button className="btn sm" onClick={() => setTool(cur ? 'change' : 'place')}>{cur ? tr('admin.timetable_page.change_subject_or_room') : tr('admin.timetable_page.place_a_lesson')}</button>
     ) : null,
-    fix: () => { if (cur && clash?.suggestion) cover.mutate({ slotId: cur.id, teacherId: clash.suggestion.teacherId }, { onSuccess: () => say(`Clash fixed · ${clash.suggestion!.teacherName} covers ${dayName(dateOf(at.day), true)} ${periodDef(at.period)?.label}`) }); },
+    fix: () => { if (cur && clash?.suggestion) cover.mutate({ slotId: cur.id, teacherId: clash.suggestion.teacherId }, { onSuccess: () => say(tr('admin.timetable_page.clash_fixed_covers', { teacherName: clash.suggestion!.teacherName, dayName: dayName(dateOf(at.day), true), label: periodDef(at.period)?.label })) }); },
     change: () => setChooser(true),
     ringOff: (226 * (1 - Math.min(1, loadNow / loadMax))).toFixed(1), ringC: loadNow > loadMax * 0.9 ? 'var(--bad)' : 'var(--brand)', kLoad: loadNow, loadMax, loadName: myLoad?.name ?? cur?.teacherName ?? '',
-    loads: top.map((l) => { const c = tintFor(l.name); return { n: l.name, s: l.subjects[0] ?? 'Teacher', ini: l.name.split(' ').map((w) => w[0]).slice(0, 2).join(''), bg: c.bg, fg: c.fg, v: l.periodsPerWeek, p: Math.round((l.periodsPerWeek / l.max) * 100), hot: l.periodsPerWeek > l.max * 0.9 ? 'hot' : '' }; }),
+    loads: top.map((l) => { const c = tintFor(l.name); return { n: l.name, s: l.subjects[0] ?? tr('admin.timetable_page.teacher'), ini: l.name.split(' ').map((w) => w[0]).slice(0, 2).join(''), bg: c.bg, fg: c.fg, v: l.periodsPerWeek, p: Math.round((l.periodsPerWeek / l.max) * 100), hot: l.periodsPerWeek > l.max * 0.9 ? 'hot' : '' }; }),
     unplaced: data.unplaced,
     toast,
     dialog: tool === 'place' && curDef ? <PlaceDialog classId={classId} day={at.day} period={at.period} label={curDef.label} onClose={() => setTool(null)} onDone={(m) => { setTool(null); refresh(); say(m); }} />
       : tool === 'change' && cur ? <ChangeDialog slot={cur} onClose={() => setTool(null)} onDone={(m) => { setTool(null); refresh(); say(m); }} />
       : tool === 'week' ? <WeekDialog days={DAYS} onClose={() => setTool(null)} />
-      : chooser && cur ? <TeacherChooser slot={cur} onClose={() => setChooser(false)} onPick={(id) => { setChooser(false); app.api.timetable.patch(cur.id, { teacherId: id }).then(() => { say('Teacher changed. Publish to tell families.'); refresh(); }).catch((e) => say((e as Error).message)); }} /> : null,
+      : chooser && cur ? <TeacherChooser slot={cur} onClose={() => setChooser(false)} onPick={(id) => { setChooser(false); app.api.timetable.patch(cur.id, { teacherId: id }).then(() => { say(tr('admin.timetable_page.teacher_changed_publish_to_tell')); refresh(); }).catch((e) => say((e as Error).message)); }} /> : null,
   };
   return <TimetableView v={v} />;
 }
@@ -166,18 +166,18 @@ function TeacherChooser({ slot, onClose, onPick }: { slot: SlotRow; onClose: () 
   const { api } = useApp();
   const q = useQuery({ queryKey: ['teachers', slot.id], queryFn: () => api.timetable.teachers(slot.id) });
   return (
-    <Dialog title={`Who teaches ${slot.subjectName}?`} onClose={onClose} width={480}>
-      <p>People who are free in this period come first.</p>
+    <Dialog title={tr('admin.timetable_page.who_teaches', { subjectName: slot.subjectName })} onClose={onClose} width={480}>
+      <p>{tr('admin.timetable_page.people_who_are_free_in')}</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 340, overflow: 'auto', marginBottom: 12 }}>
         {q.isLoading && <div className="skc" style={{ height: 160 }} />}
         {(q.data ?? []).map((t) => (
           <button key={t.id} className="btn" disabled={!t.free && t.id !== slot.teacherId} onClick={() => onPick(t.id)} style={{ justifyContent: 'space-between', height: 48, borderRadius: 12, opacity: t.free ? 1 : 0.55 }}>
             <span>{t.name}<small style={{ marginLeft: 8, color: 'var(--ink3)', fontWeight: 600 }}>{t.subjects.join(', ')}</small></span>
-            <span className="chip" style={{ height: 24 }}>{t.free ? `${t.load} / ${t.max}` : 'Busy then'}</span>
+            <span className="chip" style={{ height: 24 }}>{t.free ? `${t.load} / ${t.max}` : tr('admin.timetable_page.busy_then')}</span>
           </button>
         ))}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button className="btn" onClick={onClose}>Cancel</button></div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button className="btn" onClick={onClose}>{tr('admin.timetable_page.cancel')}</button></div>
     </Dialog>
   );
 }

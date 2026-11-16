@@ -1,5 +1,5 @@
 import { useParams } from '@tanstack/react-router';
-import { Segmented } from '@tangent/web-ui';
+import { Segmented, t as tr } from '@tangent/web-ui';
 import { useApp } from './context';
 import { useShellChrome } from './Layout';
 
@@ -14,7 +14,7 @@ export function usePageTabs(path: string): { tab: string; tabs: React.ReactNode 
   const list = shell?.menu.flatMap((g) => g.pages).find((p) => p.href === path)?.tabs ?? [];
   const tab = list.find((t) => t.key === asked)?.key ?? list[0]?.key ?? asked ?? '';
   const tabs = list.length > 1
-    ? <Segmented label="Sections" value={tab} onChange={(k) => app.go(k === list[0]!.key ? path : `${path}/${k}`)} options={list.map((t) => ({ value: t.key, label: t.label }))} />
+    ? <Segmented label={tr('admin.tabs.sections')} value={tab} onChange={(k) => app.go(k === list[0]!.key ? path : `${path}/${k}`)} options={list.map((t) => ({ value: t.key, label: t.label }))} />
     : null;
   return { tab, tabs };
 }

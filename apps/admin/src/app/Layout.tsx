@@ -1,6 +1,6 @@
 import { createContext, Fragment, useContext, type ReactNode } from 'react';
-import { setLocaleSource, setZoneSource, type SchoolLocale, type ShellData } from '@tangent/contracts';
-import { Shell, useLanguage } from '@tangent/web-ui';
+import { readingLocale, setLocaleSource, setZoneSource, type SchoolLocale, type ShellData } from '@tangent/contracts';
+import { Shell, currentLanguage, useLanguage, t } from '@tangent/web-ui';
 import { useChrome } from './useChrome';
 
 interface ShellChrome { openSearch: () => void; shell: ShellData | undefined; themeCls: string }
@@ -9,7 +9,7 @@ const Chrome = createContext<ShellChrome | null>(null);
 /** What a page may need from the shell around it: the search box, the school's shell data, the theme. */
 export function useShellChrome(): ShellChrome {
   const c = useContext(Chrome);
-  if (!c) throw new Error('useShellChrome is only available inside the signed-in layout.');
+  if (!c) throw new Error(t('admin.layout.useshellchrome_is_only_available_inside'));
   return c;
 }
 
@@ -21,7 +21,9 @@ setLocaleSource(() => current);
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const v = useChrome();
-  current = v.shell?.locale;
+  const l = v.shell?.locale;
+  // Dates and numbers in the reader's language, the school's way (an Arabic reader at a UAE school reads ar-AE).
+  current = l && { ...l, locale: readingLocale(currentLanguage(), l.locale, l.country) };
   // The school's language and its own words (People → Settings); the page loads again once if they changed.
   useLanguage(v.shell?.locale.language, v.shell?.locale.vocab);
   // Pages are drawn again once if the school's locale arrives or changes, so nothing keeps a format from before.

@@ -5,6 +5,7 @@ import { Checkbox, DateField, FilePick, NumberField, TimeField } from './fields'
 import { ColourField } from './ColourPicker';
 import { ErrorLine, Field, SelectField } from './forms';
 import { Select } from './Select';
+import { t as tr } from './i18n';
 
 /** What a setting's editor picks from: the school's classes and fee heads, and what it has, so the app's choices fit its modules. */
 export interface SettingCtx {
@@ -17,7 +18,7 @@ export interface SettingCtx {
 }
 
 /** The channels a message can go through, as the Hub sends them. */
-const CHANNELS = [['push', 'App'], ['sms', 'SMS'], ['whatsapp', 'WhatsApp'], ['email', 'Email']] as const;
+const CHANNELS = [['push', tr('ui.settings.app')], ['sms', 'SMS'], ['whatsapp', 'WhatsApp'], ['email', tr('ui.settings.email')]] as const;
 const ta = { width: '100%', minHeight: 90, resize: 'vertical', border: 0, outline: 0, background: 'none', font: '400 14px/1.5 var(--fb)', color: 'var(--ink)', padding: '10px 0' } as const;
 
 /**
@@ -31,7 +32,7 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
   /** Shown under the control (the console's colour card under the brand colour). */
   after?: ReactNode;
 }) {
-  const label = <>{meta.label}{meta.risky && <span className="chip a" style={{ marginLeft: 8 }}>Needs a second person</span>}</>;
+  const label = <>{meta.label}{meta.risky && <span className="chip a" style={{ marginLeft: 8 }}>{tr('ui.settings.needs_a_second_person')}</span>}</>;
   const help = note ?? meta.help;
   const str = typeof value === 'string' ? value : '';
   const list = Array.isArray(value) ? (value as string[]) : [];
@@ -47,11 +48,11 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
     <div className="tgrow">{options.map((o) => {
       const at = list.indexOf(o.key);
       return <button key={o.key} type="button" className={`chip ${at >= 0 ? 'v' : ''}`} aria-pressed={at >= 0} disabled={disabled} onClick={() => toggle(o.key, max)} style={{ cursor: disabled ? 'default' : 'pointer' }}>{at >= 0 && meta.kind !== 'classes' && meta.kind !== 'multi' && meta.kind !== 'appRoles' ? `${at + 1}. ` : ''}{o.label}</button>;
-    })}{max && <span className="help">{list.length} of {max}</span>}</div>,
+    })}{max && <span className="help">{list.length} {tr('ui.settings.of')}{' '}{max}</span>}</div>,
   );
   switch (meta.kind) {
     case 'bool':
-      return box(<div style={{ display: 'flex', gap: 10, alignItems: 'center' }}><button type="button" className={`sw ${value === true ? 'on' : ''}`} role="switch" aria-checked={value === true} aria-label={meta.label} disabled={disabled} onClick={() => onChange(value !== true)} /><span className="help" style={{ margin: 0 }}>{value === true ? 'On' : 'Off'}</span></div>);
+      return box(<div style={{ display: 'flex', gap: 10, alignItems: 'center' }}><button type="button" className={`sw ${value === true ? 'on' : ''}`} role="switch" aria-checked={value === true} aria-label={meta.label} disabled={disabled} onClick={() => onChange(value !== true)} /><span className="help" style={{ margin: 0 }}>{value === true ? tr('ui.settings.on') : tr('ui.settings.off')}</span></div>);
     case 'enum': case 'language':
       return box(<Select value={str} onChange={onChange} disabled={disabled} aria-label={meta.label} options={(meta.options ?? []).map(([v, l]) => ({ value: v, label: l }))} />);
     case 'number':
@@ -72,7 +73,7 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
       return box(<AppLayoutEditor value={(value ?? {}) as Record<AppRole, AppLayout>} has={{ modules: ctx.entitled, features: ctx.features }} disabled={disabled} onChange={onChange} />);
     case 'classes': return pick(ctx.classes.map((c) => ({ key: c.id, label: c.name })), meta.max);
     case 'strings':
-      return box(<ListEditor items={list} max={meta.max ?? 12} disabled={disabled} placeholder="Add one" onChange={onChange} />);
+      return box(<ListEditor items={list} max={meta.max ?? 12} disabled={disabled} placeholder={tr('ui.settings.add_one')} onChange={onChange} />);
     case 'houses':
       return box(<HousesEditor value={(Array.isArray(value) ? value : []) as { key: string; name: string; color: string }[]} max={meta.max ?? 12} disabled={disabled} onChange={onChange} />);
     case 'categories':
@@ -97,7 +98,7 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
       return box(<div>{MESSAGE_EVENTS.map((e) => {
         const r = rules[e.key] ?? e.defaults;
         return (
-          <div key={e.key} className="kv" style={{ flexWrap: 'wrap', gap: 8 }}>{e.label}{e.urgent ? ' · sent in quiet hours' : ''}
+          <div key={e.key} className="kv" style={{ flexWrap: 'wrap', gap: 8 }}>{e.label}{e.urgent ? tr('ui.settings.sent_in_quiet_hours') : ''}
             <b style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>{CHANNELS.map(([ch, label]) => (
               <Checkbox key={ch} checked={!!(r as Record<string, boolean | undefined>)[ch]} disabled={disabled} onChange={(c) => set(e.key, ch, c)} label={label} />
             ))}</b>
@@ -109,8 +110,8 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
       const words = (value ?? {}) as Record<string, string>;
       return box(<div>{MESSAGE_EVENTS.map((e) => (
         <div key={e.key} style={{ marginTop: 10 }}>
-          <div className="help" style={{ margin: '0 0 4px' }}><b>{e.label}</b> · placeholders: {e.vars.map((v) => `{${v}}`).join(' ')}</div>
-          <div className="inp" style={{ height: 'auto' }}><textarea value={words[e.key] ?? ''} placeholder={e.text} maxLength={320} disabled={disabled} aria-label={`Wording: ${e.label}`} style={{ ...ta, minHeight: 56 }}
+          <div className="help" style={{ margin: '0 0 4px' }}><b>{e.label}</b> {tr('ui.settings.placeholders')}{' '}{e.vars.map((v) => `{${v}}`).join(' ')}</div>
+          <div className="inp" style={{ height: 'auto' }}><textarea value={words[e.key] ?? ''} placeholder={e.text} maxLength={320} disabled={disabled} aria-label={tr('ui.settings.wording', { label: e.label })} style={{ ...ta, minHeight: 56 }}
             onChange={(x) => { const next = { ...words, [e.key]: x.target.value }; if (!x.target.value.trim()) delete next[e.key]; onChange(next); }} /></div>
         </div>
       ))}</div>);
@@ -126,13 +127,13 @@ function LogoPick({ has, picked, disabled, onPick }: { has: boolean; picked: Fil
   return (
     <div>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-        <span className={`chip ${picked ? 'a' : has ? 'g' : ''}`}>{picked ? `${picked.name}: not saved yet` : has ? 'Logo set' : 'Letters only'}</span>
+        <span className={`chip ${picked ? 'a' : has ? 'g' : ''}`}>{picked ? tr('ui.settings.not_saved_yet', { name: picked.name }) : has ? tr('ui.settings.logo_set') : tr('ui.settings.letters_only')}</span>
         <FilePick accept="image/png,image/jpeg" disabled={disabled} className="btn sm" onPick={(f) => {
-          if (!['image/png', 'image/jpeg'].includes(f.type)) return setErr('Choose a PNG or JPEG image.');
-          if (f.size > 2 * 1024 * 1024) return setErr('The logo must be 2 MB or smaller.');
+          if (!['image/png', 'image/jpeg'].includes(f.type)) return setErr(tr('ui.settings.choose_a_png_or_jpeg'));
+          if (f.size > 2 * 1024 * 1024) return setErr(tr('ui.settings.the_logo_must_be_2'));
           setErr(''); onPick(f);
-        }}>{has || picked ? 'Choose another' : 'Choose a logo'}</FilePick>
-        {picked && <button className="btn sm" onClick={() => onPick(null)}>Keep the old one</button>}
+        }}>{has || picked ? tr('ui.settings.choose_another') : tr('ui.settings.choose_a_logo')}</FilePick>
+        {picked && <button className="btn sm" onClick={() => onPick(null)}>{tr('ui.settings.keep_the_old_one')}</button>}
       </div>
       {err && <ErrorLine>{err}</ErrorLine>}
     </div>
@@ -143,7 +144,7 @@ function LogoPick({ has, picked, disabled, onPick }: { has: boolean; picked: Fil
 function AppLayoutEditor({ value, has, disabled, onChange }: { value: Record<AppRole, AppLayout>; has: { modules: readonly string[]; features: readonly string[] }; disabled: boolean; onChange: (v: unknown) => void }) {
   const [role, setRole] = useState<AppRole>('parent');
   const cur = value[role] ?? { dock: [], home: [], quick: [] };
-  const slots = [['dock', 'Bottom tabs', 4], ['home', 'Home cards', 12], ['quick', 'Quick buttons', 6]] as const;
+  const slots = [['dock', tr('ui.settings.bottom_tabs'), 4], ['home', tr('ui.settings.home_cards'), 12], ['quick', tr('ui.settings.quick_buttons'), 6]] as const;
   const set = (slot: keyof AppLayout, key: string, max: number) => {
     const list = cur[slot];
     const next = list.includes(key) ? list.filter((x) => x !== key) : list.length >= max ? list : [...list, key];
@@ -151,16 +152,16 @@ function AppLayoutEditor({ value, has, disabled, onChange }: { value: Record<App
   };
   return (
     <div>
-      <div style={{ maxWidth: 260 }}><Select value={role} onChange={(r) => setRole(r as AppRole)} aria-label="Role" options={APP_ROLES.map((r) => ({ value: r, label: APP_ROLE_LABELS[r] }))} /></div>
+      <div style={{ maxWidth: 260 }}><Select value={role} onChange={(r) => setRole(r as AppRole)} aria-label={tr('ui.settings.role')} options={APP_ROLES.map((r) => ({ value: r, label: APP_ROLE_LABELS[r] }))} /></div>
       {slots.map(([slot, title, max]) => {
         const offered = APP_CATALOG[slot].filter((c) => c.roles.includes(role) && has.modules.includes(c.module) && hasKey(has, c.feature));
         return (
           <div key={slot} style={{ marginTop: 10 }}>
-            <div className="help" style={{ margin: '0 0 4px' }}><b>{title}</b> · {cur[slot].length} of {max}{slot === 'dock' ? ' · Profile is always last' : ''}</div>
+            <div className="help" style={{ margin: '0 0 4px' }}><b>{title}</b> · {cur[slot].length} {tr('ui.settings.of')}{' '}{max}{slot === 'dock' ? tr('ui.settings.profile_is_always_last') : ''}</div>
             <div className="tgrow">{offered.length ? offered.map((o) => {
               const at = cur[slot].indexOf(o.key);
               return <button key={o.key} type="button" className={`chip ${at >= 0 ? 'v' : ''}`} aria-pressed={at >= 0} disabled={disabled} onClick={() => set(slot, o.key, max)}>{at >= 0 ? `${at + 1}. ` : ''}{o.label}</button>;
-            }) : <span className="help" style={{ margin: 0 }}>The school’s modules offer nothing here for this role.</span>}</div>
+            }) : <span className="help" style={{ margin: 0 }}>{tr('ui.settings.the_school_s_modules_offer')}</span>}</div>
           </div>
         );
       })}
@@ -175,15 +176,15 @@ function ListEditor({ items, max, disabled, placeholder, onChange }: { items: st
   return (
     <div>
       {items.map((it, i) => (
-        <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 }}>
-          <div style={{ flex: 1 }}><Field label={`Item ${i + 1}`} value={it} maxLength={40} disabled={disabled} onChange={(v) => onChange(items.map((x, j) => (j === i ? v : x)))} /></div>
-          <button type="button" className="btn sm" disabled={disabled || items.length <= 1} onClick={() => onChange(items.filter((_, j) => j !== i))}>Remove</button>
+        <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 6 }}>
+          <div style={{ flex: 1, minWidth: 0 }}><Field label={tr('ui.settings.item', { p0: i + 1 })} value={it} maxLength={40} disabled={disabled} onChange={(v) => onChange(items.map((x, j) => (j === i ? v : x)))} /></div>
+          <button type="button" className="btn sm" disabled={disabled || items.length <= 1} onClick={() => onChange(items.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
         </div>
       ))}
       {items.length < max && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 8 }}>
-          <div style={{ flex: 1 }}><Field label="New" value={draft} maxLength={40} disabled={disabled} placeholder={placeholder} onChange={setDraft} /></div>
-          <button type="button" className="btn sm" disabled={disabled || !draft.trim()} onClick={add}>Add</button>
+          <div style={{ flex: 1, minWidth: 0 }}><Field label={tr('ui.settings.new')} value={draft} maxLength={40} disabled={disabled} placeholder={placeholder} onChange={setDraft} /></div>
+          <button type="button" className="btn sm" disabled={disabled || !draft.trim()} onClick={add}>{tr('ui.settings.add')}</button>
         </div>
       )}
     </div>
@@ -197,15 +198,15 @@ function HousesEditor({ value, max, disabled, onChange }: { value: { key: string
   const put = (i: number, patch: Partial<{ name: string; color: string }>) => onChange(value.map((h, j) => (j === i ? { ...h, ...patch, ...(patch.name !== undefined ? { key: keyOf(patch.name) } : {}) } : h)));
   return (
     <div>
-      {!value.length && <div className="help" style={{ margin: 0 }}>No houses: profiles and the roll-call grid show none.</div>}
+      {!value.length && <div className="help" style={{ margin: 0 }}>{tr('ui.settings.no_houses_profiles_and_the')}</div>}
       {value.map((h, i) => (
         <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 6, flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 160 }}><Field label="House" value={h.name} maxLength={24} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
-          <ColourField label="Colour" value={h.color} disabled={disabled} onChange={(c) => put(i, { color: c })} />
-          <button type="button" className="btn sm" disabled={disabled} onClick={() => onChange(value.filter((_, j) => j !== i))}>Remove</button>
+          <div style={{ flex: 1, minWidth: 160 }}><Field label={tr('ui.settings.house')} value={h.name} maxLength={24} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
+          <ColourField label={tr('ui.settings.colour')} value={h.color} disabled={disabled} onChange={(c) => put(i, { color: c })} />
+          <button type="button" className="btn sm" disabled={disabled} onClick={() => onChange(value.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
         </div>
       ))}
-      {value.length < max && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={() => onChange([...value, { key: `house-${value.length + 1}`, name: `House ${value.length + 1}`, color: DEFAULT_BRAND }])}>Add a house</button>}
+      {value.length < max && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={() => onChange([...value, { key: `house-${value.length + 1}`, name: tr('ui.settings.house_2', { p0: value.length + 1 }), color: DEFAULT_BRAND }])}>{tr('ui.settings.add_a_house')}</button>}
     </div>
   );
 }
@@ -217,14 +218,14 @@ function CategoriesEditor({ value, max, disabled, onChange }: { value: Category[
     <div>
       {value.map((c, i) => (
         <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 6, flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 160 }}><Field label="Category" value={c.name} maxLength={24} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
-          <div style={{ width: 160 }}><SelectField label="Colour" value={c.tone} disabled={disabled} onChange={(t) => put(i, { tone: t as Category['tone'] })} options={CATEGORY_TONES.map((t) => ({ value: t, label: CATEGORY_TONE_LABELS[t] }))} /></div>
-          <span className={`chip ${c.tone}`} style={{ marginBottom: 10 }}>{c.name || 'Category'}</span>
-          <button type="button" className="btn sm" disabled={disabled || value.length <= 1} onClick={() => onChange(value.filter((_, j) => j !== i))}>Remove</button>
+          <div style={{ flex: 1, minWidth: 160 }}><Field label={tr('ui.settings.category')} value={c.name} maxLength={24} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
+          <div style={{ width: 160 }}><SelectField label={tr('ui.settings.colour')} value={c.tone} disabled={disabled} onChange={(t) => put(i, { tone: t as Category['tone'] })} options={CATEGORY_TONES.map((t) => ({ value: t, label: CATEGORY_TONE_LABELS[t] }))} /></div>
+          <span className={`chip ${c.tone}`} style={{ marginBottom: 10 }}>{c.name || tr('ui.settings.category')}</span>
+          <button type="button" className="btn sm" disabled={disabled || value.length <= 1} onClick={() => onChange(value.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
         </div>
       ))}
-      {value.length < max && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={() => onChange([...value, { key: `cat-${Date.now().toString(36).slice(-6)}`, name: 'New category', tone: 'v' }])}>Add a category</button>}
-      <div className="help">A category’s key stays when it is renamed, so notices and events already written keep it.</div>
+      {value.length < max && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={() => onChange([...value, { key: `cat-${Date.now().toString(36).slice(-6)}`, name: tr('ui.settings.new_category'), tone: 'v' }])}>{tr('ui.settings.add_a_category')}</button>}
+      <div className="help">{tr('ui.settings.a_category_s_key_stays')}</div>
     </div>
   );
 }
@@ -237,17 +238,17 @@ function GradingEditor({ value, max, disabled, onChange }: { value: { grade: str
   return (
     <div>
       {value.map((g, i) => (
-        <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 6 }}>
-          <div style={{ width: 120 }}><Field label="Grade" value={g.grade} maxLength={4} disabled={disabled} onChange={(v) => put(i, { grade: v })} /></div>
-          <div style={{ width: 160 }}><NumberField label="From (%)" min={0} max={100} value={String(g.minPct)} disabled={disabled} onChange={(v) => put(i, { minPct: v === '' ? 0 : Number(v) })} /></div>
-          <button type="button" className="btn sm" disabled={disabled || value.length <= 1} onClick={() => onChange(value.filter((_, j) => j !== i))}>Remove</button>
+        <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 6, flexWrap: 'wrap' }}>
+          <div style={{ width: 120 }}><Field label={tr('ui.settings.grade')} value={g.grade} maxLength={4} disabled={disabled} onChange={(v) => put(i, { grade: v })} /></div>
+          <div style={{ width: 160 }}><NumberField label={tr('ui.settings.from')} min={0} max={100} value={String(g.minPct)} disabled={disabled} onChange={(v) => put(i, { minPct: v === '' ? 0 : Number(v) })} /></div>
+          <button type="button" className="btn sm" disabled={disabled || value.length <= 1} onClick={() => onChange(value.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
         </div>
       ))}
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-        {value.length < max && <button type="button" className="btn sm" disabled={disabled} onClick={() => onChange([...value, { grade: '?', minPct: 0 }])}>Add a grade</button>}
-        <button type="button" className="btn sm" disabled={disabled} onClick={() => onChange(sorted(value))}>Put in order</button>
+        {value.length < max && <button type="button" className="btn sm" disabled={disabled} onClick={() => onChange([...value, { grade: '?', minPct: 0 }])}>{tr('ui.settings.add_a_grade')}</button>}
+        <button type="button" className="btn sm" disabled={disabled} onClick={() => onChange(sorted(value))}>{tr('ui.settings.put_in_order')}</button>
       </div>
-      {lowest > 0 && <div className="help">No grade starts at 0%, so marks below {lowest}% would get no grade. Add one that starts at 0.</div>}
+      {lowest > 0 && <div className="help">{tr('ui.settings.no_grade_starts_at_0')}{' '}{lowest}{tr('ui.settings.would_get_no_grade_add')}</div>}
     </div>
   );
 }
@@ -261,18 +262,18 @@ function PaymentMethodsEditor({ value, max, disabled, onChange }: { value: Payme
     <div>
       {value.map((m, i) => (
         <div key={m.key} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 6, flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 160 }}><Field label="Method" value={m.name} maxLength={30} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
-          <div style={{ width: 180 }}><SelectField label="Kind of money" value={m.kind} disabled={disabled} onChange={(k) => put(i, { kind: k as PaymentMethod['kind'] })} options={PAYMENT_KINDS.map((k) => ({ value: k, label: PAYMENT_KIND_LABELS[k] }))} /></div>
-          <button type="button" className="btn sm" disabled={disabled || value.length <= 1} onClick={() => onChange(value.filter((_, j) => j !== i))}>Remove</button>
+          <div style={{ flex: 1, minWidth: 160 }}><Field label={tr('ui.settings.method')} value={m.name} maxLength={30} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
+          <div style={{ width: 180 }}><SelectField label={tr('ui.settings.kind_of_money')} value={m.kind} disabled={disabled} onChange={(k) => put(i, { kind: k as PaymentMethod['kind'] })} options={PAYMENT_KINDS.map((k) => ({ value: k, label: PAYMENT_KIND_LABELS[k] }))} /></div>
+          <button type="button" className="btn sm" disabled={disabled || value.length <= 1} onClick={() => onChange(value.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
         </div>
       ))}
       {value.length < max && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={() => {
-        const name = 'New method';
+        const name = tr('ui.settings.new_method');
         let key = keyOf(name);
         for (let n = 2; value.some((m) => m.key === key); n++) key = `${keyOf(name)}-${n}`;
         onChange([...value, { key, name, kind: 'other' }]);
-      }}>Add a method</button>}
-      <div className="help">A method keeps its key when it is renamed, so payments already recorded keep it.</div>
+      }}>{tr('ui.settings.add_a_method')}</button>}
+      <div className="help">{tr('ui.settings.a_method_keeps_its_key')}</div>
     </div>
   );
 }
@@ -292,11 +293,11 @@ function VocabularyEditor({ value, languages, disabled, onChange }: { value: Voc
   };
   return (
     <div>
-      {languages.length > 1 && <div style={{ maxWidth: 260 }}><SelectField label="Language" value={lang} onChange={setLang} options={languages.map((l) => ({ value: l, label: languageLabel(l) }))} /></div>}
+      {languages.length > 1 && <div style={{ maxWidth: 260 }}><SelectField label={tr('ui.settings.language')} value={lang} onChange={setLang} options={languages.map((l) => ({ value: l, label: languageLabel(l) }))} /></div>}
       {VOCAB_CONCEPTS.map((c) => (
         <div key={c.key} style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 150 }}><Field label={`For “${usual[c.key]}”`} value={own[c.key]?.one ?? ''} placeholder={usual[c.key]} maxLength={30} disabled={disabled} onChange={(x) => put(c.key, 'one', x)} /></div>
-          <div style={{ flex: 1, minWidth: 150 }}><Field label="More than one" value={own[c.key]?.many ?? ''} placeholder={own[c.key]?.one ? '' : usual[c.many]} maxLength={30} disabled={disabled} onChange={(x) => put(c.key, 'many', x)} /></div>
+          <div style={{ flex: 1, minWidth: 150 }}><Field label={tr('ui.settings.for', { p0: usual[c.key] })} value={own[c.key]?.one ?? ''} placeholder={usual[c.key]} maxLength={30} disabled={disabled} onChange={(x) => put(c.key, 'one', x)} /></div>
+          <div style={{ flex: 1, minWidth: 150 }}><Field label={tr('ui.settings.more_than_one')} value={own[c.key]?.many ?? ''} placeholder={own[c.key]?.one ? '' : usual[c.many]} maxLength={30} disabled={disabled} onChange={(x) => put(c.key, 'many', x)} /></div>
         </div>
       ))}
     </div>
@@ -310,18 +311,18 @@ function AttendanceMarksEditor({ value, max, disabled, onChange }: { value: Atte
     <div>
       {value.map((m, i) => (
         <div key={m.key} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 6, flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 150 }}><Field label="Mark" value={m.name} maxLength={30} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
-          <div style={{ width: 90 }}><Field label="Letter" value={m.code} maxLength={3} disabled={disabled} onChange={(v) => put(i, { code: v })} /></div>
-          <div style={{ width: 200 }}><SelectField label="Means" value={m.meaning} disabled={disabled} onChange={(k) => put(i, { meaning: k as AttendanceMarkDef['meaning'] })} options={ATTENDANCE_MARKS.map((k) => ({ value: k, label: MARK_MEANING_LABELS[k] }))} /></div>
-          <button type="button" className="btn sm" disabled={disabled || value.length <= 2} onClick={() => onChange(value.filter((_, j) => j !== i))}>Remove</button>
+          <div style={{ flex: 1, minWidth: 150 }}><Field label={tr('ui.settings.mark')} value={m.name} maxLength={30} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
+          <div style={{ width: 90 }}><Field label={tr('ui.settings.letter')} value={m.code} maxLength={3} disabled={disabled} onChange={(v) => put(i, { code: v })} /></div>
+          <div style={{ width: 200 }}><SelectField label={tr('ui.settings.means')} value={m.meaning} disabled={disabled} onChange={(k) => put(i, { meaning: k as AttendanceMarkDef['meaning'] })} options={ATTENDANCE_MARKS.map((k) => ({ value: k, label: MARK_MEANING_LABELS[k] }))} /></div>
+          <button type="button" className="btn sm" disabled={disabled || value.length <= 2} onClick={() => onChange(value.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
         </div>
       ))}
       {value.length < max && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={() => {
         let n = value.length + 1;
         while (value.some((m) => m.key === `mark-${n}`)) n++;
-        onChange([...value, { key: `mark-${n}`, name: 'New mark', meaning: 'leave', code: '' }]);
-      }}>Add a mark</button>}
-      <div className="help">A mark keeps its key when it is renamed, so days already marked keep it. Keep one that means present and one that means absent.</div>
+        onChange([...value, { key: `mark-${n}`, name: tr('ui.settings.new_mark'), meaning: 'leave', code: '' }]);
+      }}>{tr('ui.settings.add_a_mark')}</button>}
+      <div className="help">{tr('ui.settings.a_mark_keeps_its_key')}</div>
     </div>
   );
 }

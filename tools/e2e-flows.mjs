@@ -160,11 +160,18 @@ await flow('admin: fees page lists overdue families and opens a payment', { stor
   await p.keyboard.press('Escape');
 });
 
-await flow('admin: school setup is read-only, and a change is asked of Tangent', { storage: adminStore }, async (p) => {
+await flow('admin: the school edits its own profile, sees what Tangent sets, and asks Tangent for the rest', { storage: adminStore }, async (p) => {
   await p.goto(`${ADMIN}/s/${slug}/profile`, { waitUntil: 'networkidle' });
   await expectVisible(p.getByRole('heading', { name: 'School profile' }), 'the School profile page');
-  if (await p.getByRole('button', { name: 'Save changes' }).count()) throw new Error('the school can still save settings');
-  if (await p.locator('main input:not([type=search])').count()) throw new Error('the profile has fields the school can edit');
+  // The school's own setting: changed, saved with a note, and still there after a reload.
+  const tagline = `Learning together, ${Date.now() % 1000}`;
+  await p.getByLabel('Tagline').fill(tagline);
+  await p.getByRole('button', { name: 'Save', exact: true }).click();
+  await expectVisible(p.getByText(/^Saved\. The admin and the app follow/), 'the saved toast');
+  await p.reload({ waitUntil: 'networkidle' });
+  if ((await p.getByLabel('Tagline').inputValue()) !== tagline) throw new Error('the tagline was not kept');
+  // What Tangent keeps (the brand colour, the country) is shown with its reason, not as a field to change.
+  await expectVisible(p.getByText('Set by Tangent for your school. Ask Tangent to change it.').first(), 'a Tangent-owned setting');
   await p.getByRole('button', { name: 'Ask Tangent to change this' }).click();
   await p.getByRole('button', { name: 'Send to Tangent' }).click();
   await expectVisible(p.getByText('Say what you would like changed.'), 'the empty-request error');
@@ -444,19 +451,13 @@ await flow('admin: an event is added, shown on the calendar and removed', { stor
   await expectVisible(p.getByText(/E2E open house was removed/), 'the removed toast');
 });
 
-await flow('admin: the school profile is read-only with a way to ask Tangent, and data requests are answered', { storage: adminStore }, async (p) => {
+await flow('admin: the school sets up its roles, app and messages from its profile, and data requests are answered', { storage: adminStore }, async (p) => {
   await p.goto(A('/profile/roles'), { waitUntil: 'networkidle' });
   await expectVisible(p.getByRole('tab', { name: /Office staff/ }), 'the role list');
-  for (const name of ['New role', 'Save role', 'Delete role']) if (await p.getByRole('button', { name }).count()) throw new Error(`the school still has "${name}"`);
-  if (await p.getByRole('checkbox').count()) throw new Error('the profile should have nothing to tick');
   await p.goto(A('/profile/messages'), { waitUntil: 'networkidle' });
-  await expectVisible(p.getByText('Child marked absent or late'), 'the messages');
+  await expectVisible(p.getByText('Child marked absent or late').first(), 'the messages');
   await p.goto(A('/profile/app'), { waitUntil: 'networkidle' });
-  await expectVisible(p.getByText('Tabs along the bottom').first(), 'the layout');
-  await p.getByRole('button', { name: 'Ask Tangent to change this' }).click();
-  await p.getByRole('dialog').getByRole('button', { name: 'Send to Tangent' }).click();
-  await expectVisible(p.getByText('Say what you would like changed.'), 'the ask error');
-  await p.keyboard.press('Escape');
+  await expectVisible(p.getByText(/Tabs along the bottom|bottom tabs/i).first(), 'the app layout');
   await p.goto(A('/privacy'), { waitUntil: 'networkidle' });
   await p.getByRole('button', { name: 'Log a request' }).click();
   await p.getByRole('dialog').getByRole('button', { name: 'Log request' }).click();
@@ -509,7 +510,8 @@ await flow('console: a cell is added and managed, a school can be moved', { stor
 
 await flow('console: compliance logs a breach and shows the notice before it is sent', { storage: consoleStore }, async (p) => {
   await p.goto(`${CONSOLE}/compliance/breaches`, { waitUntil: 'networkidle' });
-  await p.getByRole('button', { name: 'Log a breach' }).click();
+  // With no breach yet, the empty page offers the same button as the page's own.
+  await p.getByRole('button', { name: 'Log a breach' }).first().click();
   await p.getByRole('dialog').getByRole('button', { name: 'Log breach' }).click();
   await expectVisible(p.getByText('Choose a school.'), 'the school error');
   await pick(p, p.getByRole('dialog'), 'School', 1);
@@ -709,8 +711,9 @@ await flow('console: go-live reconciles the dues with the old system, and a rest
   await p.goto(`${CONSOLE}/schools/${school.id}`, { waitUntil: 'networkidle' });
   const owed = p.getByText(/owed here; type the old system’s total to compare/);
   await expectVisible(owed, 'the dues waiting for the old system’s total');
-  const total = (await owed.first().textContent()).match(/₹([\d,]+)/)[1].replace(/,/g, '');
-  await p.getByLabel('The old system’s total dues (₹)').fill(total);
+  // The amount in the school's own currency and grouping: its digits are what the old system's total is typed as.
+  const total = (await owed.first().textContent()).match(/(\d[\d,.\s]*)/)[1].replace(/[,\s]/g, '');
+  await p.getByLabel('The old system’s total dues').fill(total);
   await p.getByRole('button', { name: 'Compare' }).click();
   await expectVisible(p.getByText(/the same as the old system/), 'the dues reconciled');
   const tick = p.locator('.rw', { hasText: 'The school’s staff are trained' });

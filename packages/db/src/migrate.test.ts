@@ -42,6 +42,20 @@ describe('migrations', () => {
     } finally { await pool.end(); }
   });
 
+  it('moves an existing school’s words into vocab.words and keeps the app languages it had', async () => {
+    const pool = new pg.Pool({ connectionString: await ensureDatabase(server.url, 'school_test_words'), max: 2 });
+    try {
+      await migrate(pool, 'school', { upTo: '0035_phones_e164' });
+      await pool.query(`insert into meta (key, value) values ('seeded.mode', '"demo"') on conflict (key) do nothing`);
+      await pool.query(`insert into settings (key, value, updated_by) values ('school.language', '"en"', 'x'), ('vocab.student', '"Pupil"', 'x'), ('vocab.class', '"Class"', 'x'), ('vocab.classes', '""', 'x')`);
+      await migrate(pool, 'school');
+      const v = Object.fromEntries((await pool.query<{ key: string; value: unknown }>('select key, value from settings')).rows.map((r) => [r.key, r.value]));
+      expect(v['vocab.words']).toEqual({ en: { student: { one: 'Pupil' } } });
+      expect(v['app.languages']).toEqual(['en', 'hi', 'mr']);
+      expect(Object.keys(v).filter((k) => /^vocab\.(student|class)/.test(k))).toEqual([]);
+    } finally { await pool.end(); }
+  });
+
   it('applies the registry set', async () => {
     const url = await ensureDatabase(server.url, 'registry_test');
     const pool = new pg.Pool({ connectionString: url, max: 2 });

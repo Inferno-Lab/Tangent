@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router';
-import { LoginPage } from '@tangent/web-ui';
+import { LoginPage, t as tr } from '@tangent/web-ui';
 import { makeClient, session } from '../../app/client';
 
 const client = makeClient(() => undefined);
@@ -10,7 +10,7 @@ export function LoginRoute() {
   return (
     <LoginPage
       controller={{
-        product: 'console', schoolName: 'Tangent Console', shortName: 'console', demoMode: !!import.meta.env.VITE_DEMO_LOGIN, goName: 'the console',
+        product: 'console', schoolName: tr('console.login_route.tangent_console'), shortName: 'console', demoMode: !!import.meta.env.VITE_DEMO_LOGIN, goName: tr('console.login_route.the_console'),
         initialEmail: (() => { try { return localStorage.getItem('tangent.console.email') ?? ''; } catch { return ''; } })(),
         submitCredentials: async (email, password) => {
           const res = await client.api.login({ identifier: email, password });

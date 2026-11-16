@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fmtMoneyShort, fmtMoney, type StudentDetail } from '@tangent/contracts';
-import { Dialog, EmptyState, Icon, Roll, Select, rollDigits } from '@tangent/web-ui';
+import { Dialog, EmptyState, Icon, Roll, Select, rollDigits, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { StudentPick } from '../../app/kit';
@@ -43,7 +43,7 @@ function Overview({ tabs }: { tabs: React.ReactNode }) {
   // Every overdue family, not only the page shown; how it travels is the console's rule for the fee reminder.
   const remind = useMutation({
     mutationFn: () => app.api.fees.remindOverdue(),
-    onSuccess: (r) => { setConfirmRemind(false); say(r.sent ? `Reminder sent to ${r.sent} ${r.sent === 1 ? 'family' : 'families'}.` : 'No overdue family has a phone number on record.'); },
+    onSuccess: (r) => { setConfirmRemind(false); say(r.sent ? t('admin.fees_page.reminder_sent_to', { sent: r.sent, p1: r.sent === 1 ? 'family' : 'families' }) : t('admin.fees_page.no_overdue_family_has_a')); },
     onError: (e) => say((e as Error).message, 'bad'),
   });
   const s = summary.data;
@@ -55,14 +55,14 @@ function Overview({ tabs }: { tabs: React.ReactNode }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const err = [summary, overdue].find((q) => q.isError && !q.data);
   return (
-    <Page title="Fees" sub={s ? `${s.monthLabel} · ${s.pct}% of what is due has been collected` : 'Collections and dues'} toast={toast} loading={summary.isLoading}
+    <Page title={t('admin.fees_page.fees')} sub={s ? t('admin.fees_page.of_what_is_due_has', { monthLabel: s.monthLabel, pct: s.pct }) : t('admin.fees_page.collections_and_dues')} toast={toast} loading={summary.isLoading}
       error={err ? { message: (err.error as Error).message, retry: () => void err.refetch() } : null}
-      tabs={tabs} filters={<Select compact aria-label="Period" value={period} onChange={(v) => setPeriod(v as typeof period)} options={[{ value: 'month', label: 'This month' }, { value: 'term', label: 'This term' }, { value: 'year', label: 'This year' }]} />} actions={<>{canPay && <button className="btn pri" onClick={() => setPicking(true)}>Collect a fee</button>}</>}
+      tabs={tabs} filters={<Select compact aria-label={t('admin.fees_page.period')} value={period} onChange={(v) => setPeriod(v as typeof period)} options={[{ value: 'month', label: t('admin.fees_page.this_month') }, { value: 'term', label: t('admin.fees_page.this_term') }, { value: 'year', label: t('admin.fees_page.this_year') }]} />} actions={<>{canPay && <button className="btn pri" onClick={() => setPicking(true)}>{t('admin.fees_page.collect_a_fee')}</button>}</>}
       overlays={<>
         {paying && <CollectFeeDialog student={paying} onClose={() => setPaying(null)} onDone={(m) => { setPaying(null); refresh(); say(m); }} />}
         {picking && canPay && !paying && (
-          <Dialog title="Collect a fee" onClose={() => { setPicking(false); history.replaceState(null, '', window.location.pathname); }} width={480}>
-            <StudentPick label="Whose fee" value={null} onChange={(s) => { if (s) { setPicking(false); history.replaceState(null, '', window.location.pathname); open.mutate(s.id); } }} />
+          <Dialog title={t('admin.fees_page.collect_a_fee')} onClose={() => { setPicking(false); history.replaceState(null, '', window.location.pathname); }} width={480}>
+            <StudentPick label={t('admin.fees_page.whose_fee')} value={null} onChange={(s) => { if (s) { setPicking(false); history.replaceState(null, '', window.location.pathname); open.mutate(s.id); } }} />
           </Dialog>
         )}
       </>}>
@@ -71,31 +71,31 @@ function Overview({ tabs }: { tabs: React.ReactNode }) {
         <div className="hb" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div className="g" style={{ gridTemplateColumns: 'minmax(0,1.5fr) repeat(2,minmax(0,1fr))' }}>
             <section className="card deep">
-              <span className="lbl">Collected in {s.monthLabel}</span>
+              <span className="lbl">{t('admin.fees_page.collected_in')}{' '}{s.monthLabel}</span>
               <div className="fig" style={{ fontSize: 64 }}><Roll digits={rollDigits(money(s.collected))} /></div>
               <div className="bar" style={{ height: 10, background: 'var(--deep3)' }}><i style={{ width: `${s.pct}%`, background: 'var(--bright)' }} /></div>
-              <span className="note">{s.pct}% of {money(s.due)} · {money(Math.max(0, s.due - s.collected))} still to come</span>
+              <span className="note">{s.pct}{t('admin.fees_page.of')}{' '}{money(s.due)} · {money(Math.max(0, s.due - s.collected))} {t('admin.fees_page.still_to_come')}</span>
             </section>
             <section className="card">
-              <span className="lbl">Not yet due</span>
+              <span className="lbl">{t('admin.fees_page.not_yet_due')}</span>
               <b className="d" style={{ fontSize: 40, lineHeight: '44px' }}>{money(s.pending)}</b>
-              <small className="t2" style={{ fontSize: 14 }}>falls due later {period === 'month' ? 'this month' : period === 'term' ? 'this term' : 'this year'}</small>
-              {s.collectedDelta !== 0 && <span className={`tag ${s.collectedDelta > 0 ? 'ok' : 'bad'}`} style={{ alignSelf: 'flex-start', marginTop: 'auto' }}><Icon name={s.collectedDelta > 0 ? 'upRight' : 'downRight'} size={14} className="i" />{Math.abs(s.collectedDelta)}% on last {period}</span>}
+              <small className="t2" style={{ fontSize: 14 }}>{t('admin.fees_page.falls_due_later')}{' '}{period === 'month' ? t('admin.fees_page.this_month_2') : period === 'term' ? t('admin.fees_page.this_term_2') : t('admin.fees_page.this_year_2')}</small>
+              {s.collectedDelta !== 0 && <span className={`tag ${s.collectedDelta > 0 ? 'ok' : 'bad'}`} style={{ alignSelf: 'flex-start', marginTop: 'auto' }}><Icon name={s.collectedDelta > 0 ? 'upRight' : 'downRight'} size={14} className="i" />{Math.abs(s.collectedDelta)}{t('admin.fees_page.on_last')}{' '}{period}</span>}
             </section>
             <section className="card">
-              <span className="lbl">Overdue</span>
+              <span className="lbl">{t('admin.fees_page.overdue')}</span>
               <b className="d" style={{ fontSize: 40, lineHeight: '44px', color: 'var(--bad-i)' }}>{money(s.overdue)}</b>
               <small className="t2" style={{ fontSize: 14 }}>{s.overdueFamilies} {s.overdueFamilies === 1 ? 'family' : 'families'}</small>
               {s.overdueFamilies > 0 && app.user.permissions.includes('fees.read') && (confirmRemind
-                ? <span className="fx" style={{ gap: 8, marginTop: 'auto', flexWrap: 'wrap' }}><button className="btn pri sm" disabled={remind.isPending} onClick={() => remind.mutate()}>Remind all {s.overdueFamilies}</button><button className="btn sm" onClick={() => setConfirmRemind(false)}>Not now</button></span>
-                : <button className="btn ton sm" style={{ alignSelf: 'flex-start', marginTop: 'auto' }} onClick={() => setConfirmRemind(true)}>Send reminders</button>)}
+                ? <span className="fx" style={{ gap: 8, marginTop: 'auto', flexWrap: 'wrap' }}><button className="btn pri sm" disabled={remind.isPending} onClick={() => remind.mutate()}>{t('admin.fees_page.remind_all')}{' '}{s.overdueFamilies}</button><button className="btn sm" onClick={() => setConfirmRemind(false)}>{t('admin.fees_page.not_now')}</button></span>
+                : <button className="btn ton sm" style={{ alignSelf: 'flex-start', marginTop: 'auto' }} onClick={() => setConfirmRemind(true)}>{t('admin.fees_page.send_reminders')}</button>)}
             </section>
           </div>
           <div className="g" style={{ gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)' }}>
             <section className="card">
-              <div className="ch"><h2>Collected each day</h2><small>{s.dailyTarget ? `target ${money(s.dailyTarget)} a day` : 'this period'}</small></div>
+              <div className="ch"><h2>{t('admin.fees_page.collected_each_day')}</h2><small>{s.dailyTarget ? t('admin.fees_page.target_a_day', { money: money(s.dailyTarget) }) : t('admin.fees_page.this_period')}</small></div>
               {s.daily.some((x) => x.amount > 0) ? (
-                <div className="fx" role="img" aria-label="Fees collected each day" style={{ alignItems: 'flex-end', gap: 8, height: 180 }}>
+                <div className="fx" role="img" aria-label={t('admin.fees_page.fees_collected_each_day')} style={{ alignItems: 'flex-end', gap: 8, height: 180 }}>
                   {s.daily.slice(-14).map((x) => {
                     const top = Math.max(...s.daily.map((y) => y.amount), 1);
                     return (
@@ -107,10 +107,10 @@ function Overview({ tabs }: { tabs: React.ReactNode }) {
                     );
                   })}
                 </div>
-              ) : <p className="t2" style={{ fontSize: 14 }}>Payments appear here, day by day, as fees are collected.</p>}
+              ) : <p className="t2" style={{ fontSize: 14 }}>{t('admin.fees_page.payments_appear_here_day_by')}</p>}
             </section>
             <section className="card">
-              <div className="ch"><h2>By kind of fee</h2><small>{s.monthLabel}</small></div>
+              <div className="ch"><h2>{t('admin.fees_page.by_kind_of_fee')}</h2><small>{s.monthLabel}</small></div>
               {s.byHead.length ? (
                 <>
                   <div className="bar" style={{ height: 14, borderRadius: 7, gap: 3 }} aria-hidden="true">
@@ -122,23 +122,23 @@ function Overview({ tabs }: { tabs: React.ReactNode }) {
                     ))}
                   </div>
                 </>
-              ) : <p className="t2" style={{ fontSize: 14 }}>Fees by kind appear once fees are assigned to students.</p>}
+              ) : <p className="t2" style={{ fontSize: 14 }}>{t('admin.fees_page.fees_by_kind_appear_once')}</p>}
             </section>
           </div>
           <section className="card flush">
-            <div className="ch" style={{ padding: '20px 20px 8px' }}><h2>Overdue</h2><small>{overdue.data?.total ?? 0} {overdue.data?.total === 1 ? 'family' : 'families'} · largest first</small></div>
-            {rows.length === 0 && !overdue.isLoading ? <p className="t2" style={{ fontSize: 14, padding: '0 20px 20px' }}>Nobody is overdue. Families with an unpaid fee past its due date appear here, largest first.</p> : (
+            <div className="ch" style={{ padding: '20px 20px 8px' }}><h2>{t('admin.fees_page.overdue')}</h2><small>{overdue.data?.total ?? 0} {overdue.data?.total === 1 ? 'family' : 'families'} {t('admin.fees_page.largest_first')}</small></div>
+            {rows.length === 0 && !overdue.isLoading ? <p className="t2" style={{ fontSize: 14, padding: '0 20px 20px' }}>{t('admin.fees_page.nobody_is_overdue_families_with')}</p> : (
               <div className="scroll-x" data-fill="">
                 <div style={{ minWidth: 620 }}>
-                  <div className="trow h" style={{ '--cols': 'minmax(0,1.6fr) 70px minmax(0,1.2fr) 110px 110px' } as React.CSSProperties}><span>Student</span><span>Class</span><span>Parent</span><span className="r">Amount</span><span /></div>
+                  <div className="trow h" style={{ '--cols': 'minmax(0,1.6fr) 70px minmax(0,1.2fr) 110px 110px' } as React.CSSProperties}><span>{t('admin.fees_page.student')}</span><span>{t('admin.fees_page.class')}</span><span>{t('admin.fees_page.parent')}</span><span className="r">{t('admin.fees_page.amount')}</span><span /></div>
                   {rows.map((r) => (
                     <div key={r.id} className="trow" role="button" tabIndex={0} style={{ '--cols': 'minmax(0,1.6fr) 70px minmax(0,1.2fr) 110px 110px', cursor: 'pointer' } as React.CSSProperties}
-                      onClick={() => app.go(`/students?open=${r.id}`)} onKeyDown={(e) => { if (e.key === 'Enter') app.go(`/students?open=${r.id}`); }} aria-label={`Open ${r.name}`}>
+                      onClick={() => app.go(`/students?open=${r.id}`)} onKeyDown={(e) => { if (e.key === 'Enter') app.go(`/students?open=${r.id}`); }} aria-label={t('admin.fees_page.open', { name: r.name })}>
                       <span className="fx" style={{ gap: 12, minWidth: 0 }}><span className="av sm">{r.initials}</span><b className="cut">{r.name}</b></span>
                       <span>{r.className}</span>
                       <span className="t2 cut">{r.guardianName}</span>
                       <b className="num r">{fmtMoney(r.amountDue)}</b>
-                      <span className="r">{canPay && <button className="btn ton sm" disabled={open.isPending} onClick={(e) => { e.stopPropagation(); open.mutate(r.id); }}>Collect</button>}</span>
+                      <span className="r">{canPay && <button className="btn ton sm" disabled={open.isPending} onClick={(e) => { e.stopPropagation(); open.mutate(r.id); }}>{t('admin.fees_page.collect')}</button>}</span>
                     </div>
                   ))}
                 </div>
@@ -146,8 +146,8 @@ function Overview({ tabs }: { tabs: React.ReactNode }) {
             )}
             {(overdue.data?.total ?? 0) > 25 && (
               <div className="fx" style={{ justifyContent: 'space-between', padding: '12px 20px 20px', gap: 10 }}>
-                <span className="t2" style={{ fontSize: 13 }}>{(page - 1) * 25 + 1}–{(page - 1) * 25 + rows.length} of {overdue.data!.total}</span>
-                <span className="fx" style={{ gap: 8 }}><button className="btn sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button><button className="btn sm" disabled={page * 25 >= overdue.data!.total} onClick={() => setPage(page + 1)}>Next</button></span>
+                <span className="t2" style={{ fontSize: 13 }}>{(page - 1) * 25 + 1}–{(page - 1) * 25 + rows.length} {t('admin.fees_page.of_2')}{' '}{overdue.data!.total}</span>
+                <span className="fx" style={{ gap: 8 }}><button className="btn sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>{t('admin.fees_page.previous')}</button><button className="btn sm" disabled={page * 25 >= overdue.data!.total} onClick={() => setPage(page + 1)}>{t('admin.fees_page.next')}</button></span>
               </div>
             )}
           </section>

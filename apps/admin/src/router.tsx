@@ -67,7 +67,9 @@ const page = (path: string, load: () => Promise<Record<string, unknown>>, name: 
     const Page = component;
     return tab === 'settings' ? <SettingsTab path={path} /> : <Page />;
   };
-  return path === '/' ? [at] : [at, createRoute({ getParentRoute: () => authed, path: `${path}/$tab`, component: Tabbed })];
+  // The router loads a lazy page before drawing only when it is the route's own component; Tabbed draws it inside, so the
+  // tab route waits for it (otherwise it suspends mid-render and React reports a misuse of use()).
+  return path === '/' ? [at] : [at, createRoute({ getParentRoute: () => authed, path: `${path}/$tab`, component: Tabbed, loader: () => component.preload?.() })];
 };
 
 const routeTree = root.addChildren([

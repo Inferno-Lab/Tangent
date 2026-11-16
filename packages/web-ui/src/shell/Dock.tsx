@@ -2,13 +2,14 @@ import type { IconName } from '../Icon';
 import { Icon } from '../Icon';
 import type { ReactNode } from 'react';
 import { leavingProps, useLeaving, useReturnFocus } from '../Presence';
+import { t as tr } from '../i18n';
 
 export interface DockTab { id: string; label: string; icon: IconName; onPress: () => void }
 
 /** The floating pill menu a phone uses in place of the side menu. The current tab opens to show its name. */
 export function Dock({ tabs, active }: { tabs: DockTab[]; active: string }) {
   return (
-    <nav className="dock" aria-label="Main">
+    <nav className="dock" aria-label={tr('ui.dock.main')}>
       {tabs.map((t) => (
         <button key={t.id} className={t.id === active ? 'on' : ''} onClick={t.onPress} aria-label={t.label} aria-current={t.id === active ? 'page' : undefined}>
           <Icon name={t.icon} size={24} on={t.id === active} />
@@ -28,7 +29,7 @@ export function MoreSheet({ title, onClose, children }: { title: string; onClose
       <div className="scrim" onClick={leaving ? undefined : onClose} {...leavingProps(leaving)}></div>
       <div className="sheet" role="dialog" aria-modal="true" aria-label={title} {...leavingProps(leaving)}>
         <div className="grab" aria-hidden="true"></div>
-        <div className="ch" style={{ marginBottom: 6 }}><h2 style={{ fontSize: 22 }}>{title}</h2><button className="xb" onClick={onClose} aria-label="Close"><Icon name="close" size={16} /></button></div>
+        <div className="ch" style={{ marginBottom: 6 }}><h2 style={{ fontSize: 22 }}>{title}</h2><button className="xb" onClick={onClose} aria-label={tr('ui.dock.close')}><Icon name="close" size={16} /></button></div>
         {children}
       </div>
     </>

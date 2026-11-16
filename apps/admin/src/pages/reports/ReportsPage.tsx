@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { ReportQuery } from '@tangent/contracts';
-import { DateField, Select, EmptyState, EmptyNote } from '@tangent/web-ui';
+import { DateField, Select, EmptyState, EmptyNote, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { Ico, useOpenParam } from '../../app/kit';
@@ -10,7 +10,7 @@ import { usePageTabs } from '../../app/tabs';
 const DOWNLOAD = 'download';
 const PRINT = 'print';
 /** Which reports each tab of the page (config-engine: the school module's reports page) holds, by the server's report areas. */
-const AREAS: Record<string, string> = { attendance: 'Attendance', money: 'Fees', learning: 'Learning', people: 'People' };
+const AREAS: Record<string, string> = { attendance: t('admin.reports_page.attendance'), money: t('admin.reports_page.fees'), learning: t('admin.reports_page.learning'), people: t('admin.reports_page.people') };
 /** A number in a cell ("88%", "₹1,200", 12) as a number, so columns sort by value. */
 const num = (v: string | number) => (typeof v === 'number' ? v : Number(String(v).replace(/[^\d.-]/g, '')) || 0);
 
@@ -36,10 +36,10 @@ export function ReportsPage() {
       const csv = await app.api.reports.csv(pick, q);
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }));
-      a.download = `${d?.title ?? 'Report'} - ${d?.scope ?? ''}.csv`;
+      a.download = t('admin.reports_page.csv', { p0: d?.title ?? 'Report', p1: d?.scope ?? '' });
       a.click();
       URL.revokeObjectURL(a.href);
-      say('Report downloaded.');
+      say(t('admin.reports_page.report_downloaded'));
     } catch (e) { say((e as Error).message, 'bad'); } finally { setBusy(false); }
   };
   const d = data.data;
@@ -48,19 +48,19 @@ export function ReportsPage() {
     const right = d.columns.find((c) => c.key === sort.key)?.align === 'right';
     return (right ? num(x) - num(y) : String(x).localeCompare(String(y))) * sort.dir;
   }) : d?.rows ?? [];
-  const cols = d ? `minmax(0,1.5fr) ${d.columns.slice(1).map(() => 'minmax(64px,1fr)').join(' ')}` : '';
+  const cols = d ? t('admin.reports_page.minmax_0_1_5fr', { p0: d.columns.slice(1).map(() => 'minmax(64px,1fr)').join(' ') }) : '';
   return (
-    <Page title="Reports" sub="Numbers you can read, download or print for a meeting" toast={toast} loading={all.isLoading && !all.data}
+    <Page title={t('admin.reports_page.reports')} sub={t('admin.reports_page.numbers_you_can_read_download')} toast={toast} loading={all.isLoading && !all.data}
       error={all.isError && !all.data ? { message: (all.error as Error).message, retry: () => void all.refetch() } : null}
       tabs={tabs} actions={<>{d && <>
-        <button className="btn" onClick={() => window.print()}><Ico d={PRINT} />Print</button>
-        <button className="btn" disabled={busy} onClick={() => void download()}><Ico d={DOWNLOAD} />{busy ? 'Preparing…' : 'Download CSV'}</button>
+        <button className="btn" onClick={() => window.print()}><Ico d={PRINT} />{t('admin.reports_page.print')}</button>
+        <button className="btn" disabled={busy} onClick={() => void download()}><Ico d={DOWNLOAD} />{busy ? t('admin.reports_page.preparing') : t('admin.reports_page.download_csv')}</button>
       </>}</>}>
       {(list?.length ?? 0) === 0 ? (
         <div><EmptyState scene="reports" onAction={() => app.go('/attendance')} onLink={() => app.go('/fees')} /></div>
       ) : (
         <section className="rpg">
-          <nav className="card rpl rise" aria-label="Reports">
+          <nav className="card rpl rise" aria-label={t('admin.reports_page.reports')}>
             {list!.map((r) => (
               <button key={r.id} className={`rpb ${r.id === pick ? 'on' : ''}`} aria-current={r.id === pick} onClick={() => open(r.id)}><b>{r.title}</b><small>{r.blurb}</small></button>
             ))}
@@ -71,14 +71,14 @@ export function ReportsPage() {
                 <div className="ch" style={{ padding: '24px 24px 6px', flexWrap: 'wrap', gap: 10 }}>
                   <h2 style={{ whiteSpace: 'nowrap' }}>{d.title}</h2><span className="chip v">{d.scope}</span>
                   <span className="grow"></span>
-                  {info?.filters.includes('class') && <Select compact aria-label="Class" value={q.classId ?? ''} onChange={(v) => setQ({ ...q, classId: v || undefined })} options={[{ value: '', label: 'Whole school' }, ...(classes.data ?? []).map((c) => ({ value: c.id, label: `Class ${c.name}` }))]} />}
+                  {info?.filters.includes('class') && <Select compact aria-label={t('admin.reports_page.class')} value={q.classId ?? ''} onChange={(v) => setQ({ ...q, classId: v || undefined })} options={[{ value: '', label: t('admin.reports_page.whole_school') }, ...(classes.data ?? []).map((c) => ({ value: c.id, label: t('admin.reports_page.class_2', { name: c.name }) }))]} />}
                   {info?.filters.includes('dates') && <>
-                    <DateField compact label="From" value={q.from ?? ''} onChange={(v) => setQ({ ...q, from: v || undefined })} max={q.to} />
-                    <DateField compact label="To" value={q.to ?? ''} onChange={(v) => setQ({ ...q, to: v || undefined })} min={q.from} />
+                    <DateField compact label={t('admin.reports_page.from')} value={q.from ?? ''} onChange={(v) => setQ({ ...q, from: v || undefined })} max={q.to} />
+                    <DateField compact label={t('admin.reports_page.to')} value={q.to ?? ''} onChange={(v) => setQ({ ...q, to: v || undefined })} min={q.from} />
                   </>}
                 </div>
                 <div className="tgrow" style={{ padding: '10px 24px 16px', gap: 8 }}>{d.summary.map((s) => <span className="chip" key={s.label}>{s.label}: <b style={{ color: 'var(--ink)' }}>{s.value}</b></span>)}</div>
-                {d.rows.length === 0 ? <div style={{ padding: '0 24px 24px' }}><EmptyNote icon="reports" title="Nothing to report for this yet" body="It fills in as the school uses Tangent. Try a wider date range or the whole school." /></div> : (
+                {d.rows.length === 0 ? <div style={{ padding: '0 24px 24px' }}><EmptyNote icon="reports" title={t('admin.reports_page.nothing_to_report_for_this')} body={t('admin.reports_page.it_fills_in_as_the')} /></div> : (
                   <div className="scroll-x">
                     <div style={{ minWidth: Math.max(480, d.columns.length * 96) }}>
                       <div className="grd th" style={{ '--cols': cols } as React.CSSProperties}>

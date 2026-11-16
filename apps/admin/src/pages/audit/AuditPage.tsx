@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useToast, EmptyState, useMore } from '@tangent/web-ui';
+import { useToast, EmptyState, useMore, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page } from '../../app/Page';
 import { fmtDate } from '@tangent/contracts';
@@ -13,7 +13,7 @@ export function AuditPage() {
   const rows = q.data ?? [];
   const [shown, more] = useMore(rows, 25);
   return (
-    <Page title="Audit log" sub="The latest changes made by people at your school" toast={toast} loading={q.isLoading}
+    <Page title={t('admin.audit_page.audit_log')} sub={t('admin.audit_page.the_latest_changes_made_by')} toast={toast} loading={q.isLoading}
       error={q.isError && !q.data ? { message: (q.error as Error).message, retry: () => void q.refetch() } : null}>
       {!rows.length ? (
         <EmptyState scene="audit" onAction={() => app.go('/')} />

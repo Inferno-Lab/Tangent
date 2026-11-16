@@ -1,4 +1,4 @@
-import { useToast } from '@tangent/web-ui';
+import { useToast, t } from '@tangent/web-ui';
 import { Page } from '../../app/Page';
 import { usePageTabs } from '../../app/tabs';
 import { useApprovalList, type ApprovalView } from './ApprovalList';
@@ -9,7 +9,7 @@ export function ApprovalsPage() {
   const { tab, tabs } = usePageTabs('/approvals');
   const { list, overlay } = useApprovalList((tab || 'waiting') as ApprovalView, undefined, say);
   return (
-    <Page title="Approvals" sub="Requests that need a yes or a no, and the answers given." toast={toast} tabs={tabs} overlays={overlay}>
+    <Page title={t('admin.approvals_page.approvals')} sub={t('admin.approvals_page.requests_that_need_a_yes')} toast={toast} tabs={tabs} overlays={overlay}>
       {list}
     </Page>
   );

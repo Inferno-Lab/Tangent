@@ -4,6 +4,7 @@ import { Fragment, type CSSProperties } from "react";
 import { DEFAULT_BRAND, hueOf, hueTokens } from '@tangent/contracts';
 import { MenuButton, PageScope, Presence, Select, ToastSlot, Segmented, Icon, EmptyNote } from "@tangent/web-ui";
 import "./school.css";
+import { t as tr } from '@tangent/web-ui';
 
 // The school's own deep colour, worked out from its brand colour, so its page header looks like its admin (the School board).
 const schoolColours = (colour: string) => {
@@ -24,8 +25,8 @@ export function SchoolView({ v }: { v: any }) {
               <div className="glow" aria-hidden="true"></div>
               <div className="sbar" role="status">
                 <Icon name="shield" size={16} />
-                Inside {v.shortName} · read-only<span className="c num">{v.clock} left</span>
-                <button onClick={v.endSup}>End session</button>
+                {tr('console.school.view.inside')}{' '}{v.shortName} {tr('console.school.view.read_only')}<span className="c num">{v.clock} {tr('console.school.view.left')}</span>
+                <button onClick={v.endSup}>{tr('console.school.view.end_session')}</button>
               </div>
             </>
           )}
@@ -37,8 +38,7 @@ export function SchoolView({ v }: { v: any }) {
       <main className="mn">
         <div className="crumb rise">
           <a href={v.fleetHref} onClick={v.toFleet}>
-            Fleet
-          </a>
+            {tr('console.school.view.fleet')}</a>
           <Icon name="caretRight" size={14} />
           <b style={{ color: "var(--ink)" } as CSSProperties}>{v.name}</b>
         </div>
@@ -59,11 +59,10 @@ export function SchoolView({ v }: { v: any }) {
           {v.canSupport && (
             <button className="btn" onClick={v.openSupport}>
               <Icon name="shield" />
-              Support session
-            </button>
+              {tr('console.school.view.support_session')}</button>
           )}
           {v.menuItems.length > 0 && (
-            <MenuButton label="More" chevron open={v.menu} onOpenChange={v.setMenu} menuLabel="School actions">
+            <MenuButton label={tr('console.school.view.more')} chevron open={v.menu} onOpenChange={v.setMenu} menuLabel={tr('console.school.view.school_actions')}>
               {v.menuItems.map((m: any) => (
                 <button key={m.label} role="menuitem" onClick={() => { v.setMenu(false); m.run(); }}>
                   {m.label}
@@ -73,7 +72,7 @@ export function SchoolView({ v }: { v: any }) {
           )}
           </div>
         </header>
-        <Segmented label="School" className="rise" value={v.tab} onChange={v.pickTab} options={v.tabs.map((t: any) => ({ value: t.key, label: t.n }))} style={{ "--d": ".1s", alignSelf: "flex-start", maxWidth: "100%", overflowX: "auto" } as CSSProperties} />
+        <Segmented label={tr('console.school.view.school')} className="rise" value={v.tab} onChange={v.pickTab} options={v.tabs.map((t: any) => ({ value: t.key, label: t.n }))} style={{ "--d": ".1s", alignSelf: "flex-start", maxWidth: "100%", overflowX: "auto" } as CSSProperties} />
         {v.tab !== "overview" && v.extra}
         {v.tab === "overview" && (
           <section className="grid" data-even="">
@@ -83,28 +82,25 @@ export function SchoolView({ v }: { v: any }) {
                 <h2 id="prov">{v.provTitle}</h2>
                 {v.folded && (
                   <button className="btn sm" onClick={v.showSteps}>
-                    Show the steps
-                  </button>
+                    {tr('console.school.view.show_the_steps')}</button>
                 )}
                 {!v.folded && v.hideSteps && (
                   <button className="btn sm" onClick={v.hideSteps}>
-                    Fold
-                  </button>
+                    {tr('console.school.view.fold')}</button>
                 )}
                 {v.canRetry && (
                   <button className="btn pri sm" onClick={v.retry} disabled={v.busy}>
                     <Icon name="undo" />
-                    Retry step {v.failedNo}
+                    {tr('console.school.view.retry_step')}{' '}{v.failedNo}
                   </button>
                 )}
                 {v.canSkip && (
                   <button className="btn sm" onClick={v.skip} disabled={v.busy}>
-                    Skip this step
-                  </button>
+                    {tr('console.school.view.skip_this_step')}</button>
                 )}
               </div>
-              {v.folded && <div className="help" style={{ marginTop: "12px" } as CSSProperties}>{v.setupLine}. Every step finished.</div>}
-              {!v.folded && v.steps.length === 0 && <div style={{ marginTop: "12px" } as CSSProperties}><EmptyNote icon="setup" title="No setup run recorded" body="Schools onboarded through the console keep each setup step here." /></div>}
+              {v.folded && <div className="help" style={{ marginTop: "12px" } as CSSProperties}>{v.setupLine}{tr('console.school.view.every_step_finished')}</div>}
+              {!v.folded && v.steps.length === 0 && <div style={{ marginTop: "12px" } as CSSProperties}><EmptyNote icon="setup" title={tr('console.school.view.no_setup_run_recorded')} body={tr('console.school.view.schools_onboarded_through_the_console')} /></div>}
               {!v.folded && (
               <>
               <div className="steps">
@@ -129,7 +125,7 @@ export function SchoolView({ v }: { v: any }) {
                   </Fragment>
                 ))}
               </div>
-              <div className="log" data-even-scroll="" aria-live="polite" aria-label="Setup log">
+              <div className="log" data-even-scroll="" aria-live="polite" aria-label={tr('console.school.view.setup_log')}>
                 {v.log.map((l: any, $i: number) => (
                   <Fragment key={$i}>
                     <div className="ll">
@@ -145,7 +141,7 @@ export function SchoolView({ v }: { v: any }) {
               <div className="tkt rise" style={{ "--d": ".2s" } as CSSProperties}>
                 <div className="l">
                   <div className="fd" style={{ fontSize: "22px", letterSpacing: "-.03em" } as CSSProperties}>
-                    Tangent {v.planName}
+                    {tr('console.school.view.tangent')}{' '}{v.planName}
                   </div>
                   {v.invoiceLine && (
                   <div className="tl2">
@@ -159,8 +155,7 @@ export function SchoolView({ v }: { v: any }) {
                   </div>
                   {v.canBilling && (
                     <button className="btn sm wht" style={{ alignSelf: "flex-start" } as CSSProperties} onClick={v.openBilling}>
-                      Open in billing
-                    </button>
+                      {tr('console.school.view.open_in_billing')}</button>
                   )}
                 </div>
                 <div className="r">
@@ -168,18 +163,18 @@ export function SchoolView({ v }: { v: any }) {
                     {v.planStatus}
                   </span>
                   <span>{v.yearly}</span>
-                  <span>{v.limitStudents} students</span>
+                  <span>{v.limitStudents} {tr('console.school.view.students')}</span>
                 </div>
               </div>
               <div className="card rise" style={{ "--d": ".25s" } as CSSProperties} aria-labelledby="use">
                 <div className="ch">
-                  <h2 id="use">Usage</h2>
-                  <span className="chip">now</span>
+                  <h2 id="use">{tr('console.school.view.usage')}</h2>
+                  <span className="chip">{tr('console.school.view.now')}</span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "16px" } as CSSProperties}>
                   <div className="us">
                     <div className="r">
-                      Students<b>{v.studentsText}</b>
+                      {tr('console.school.view.students_2')}<b>{v.studentsText}</b>
                     </div>
                     <div className="bar">
                       <i style={{ width: `${v.u1 ?? ""}%` } as CSSProperties}></i>
@@ -187,7 +182,7 @@ export function SchoolView({ v }: { v: any }) {
                   </div>
                   <div className="us">
                     <div className="r">
-                      File storage<b>{v.storageText}</b>
+                      {tr('console.school.view.file_storage')}<b>{v.storageText}</b>
                     </div>
                     <div className="bar">
                       <i style={{ width: `${v.u2 ?? ""}%` } as CSSProperties}></i>
@@ -195,7 +190,7 @@ export function SchoolView({ v }: { v: any }) {
                   </div>
                   <div className="us">
                     <div className="r">
-                      SMS this month<b className="num">{v.smsText}</b>
+                      {tr('console.school.view.sms_this_month')}<b className="num">{v.smsText}</b>
                     </div>
                     <div className="tk3">
                       {v.sms.map((s: any, $i: number) => (
@@ -209,13 +204,13 @@ export function SchoolView({ v }: { v: any }) {
               </div>
               <div className="card rise" style={{ "--d": ".3s" } as CSSProperties} aria-labelledby="stores">
                 <div className="ch">
-                  <h2 id="stores">App stores</h2>
+                  <h2 id="stores">{tr('console.school.view.app_stores')}</h2>
                   <span className={`chip ${v.checkDone === v.checkTotal && v.checkTotal > 0 ? "g" : "a"}`}>
-                    {v.checkDone} of {v.checkTotal}
+                    {v.checkDone} {tr('console.school.view.of')}{' '}{v.checkTotal}
                   </span>
                 </div>
                 <div style={{ marginTop: "8px" } as CSSProperties}>
-                  {v.checks.length === 0 && <div className="help">The store checklist is created with the school.</div>}
+                  {v.checks.length === 0 && <div className="help">{tr('console.school.view.the_store_checklist_is_created')}</div>}
                   {v.checks.map((c: any) => (
                     <div key={c.key} className="ck" style={{ cursor: "default", alignItems: "center", flexWrap: "wrap" } as CSSProperties}>
                       <i className={c.cls}>

@@ -185,3 +185,13 @@ export function makeT(lang: string, cat: Catalogue, en: Catalogue, vocab?: Vocab
     return msg === undefined ? key : formatMessage(msg, params, 'en', lang === 'en' ? words : wordsFor('en', vocab, en), (n) => nf.format(n));
   };
 }
+
+/**
+ * How dates and numbers are written for a reader: the school's own locale when the reader's language is its language,
+ * otherwise their language in the school's region ("ar" at a school in "AE" reads "ar-AE"), or just their language.
+ */
+export function readingLocale(lang: string, schoolLocale: string, country: string): string {
+  if (schoolLocale.split('-')[0] === lang) return schoolLocale;
+  const regional = `${lang}-${country}`;
+  try { return Intl.DateTimeFormat.supportedLocalesOf([regional]).length ? regional : lang; } catch { return lang; }
+}

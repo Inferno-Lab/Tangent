@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
 import { SETTINGS_META, TIGHTEN, settingOwner, type SettingKey } from '@tangent/contracts';
-import { EmptyNote, ErrorLine, Field, SettingRow, useShake } from '@tangent/web-ui';
+import { EmptyNote, ErrorLine, Field, SettingRow, useShake, t } from '@tangent/web-ui';
 import { useApp } from './context';
 import { useShellChrome } from './Layout';
 import { Card, Page, useToast } from './Page';
@@ -15,7 +15,7 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
  * `settings.manage` (and the module's write permission), saved together with an optional reason; a risky one goes to
  * Approvals for a second person; Tangent's own and the ones Tangent locked show read-only with the reason.
  */
-export function SettingsEditor({ keys: asked, title = 'Settings', say }: { keys: string[]; title?: string; say: (text: string, tone?: 'ok' | 'bad') => void }) {
+export function SettingsEditor({ keys: asked, title = t('admin.settings_view.settings'), say }: { keys: string[]; title?: string; say: (text: string, tone?: 'ok' | 'bad') => void }) {
   const app = useApp();
   const qc = useQueryClient();
   const shake = useShake();
@@ -36,7 +36,7 @@ export function SettingsEditor({ keys: asked, title = 'Settings', say }: { keys:
       void qc.invalidateQueries({ queryKey: ['settings-edit'] });
       void qc.invalidateQueries({ queryKey: ['config'] });
       void qc.invalidateQueries({ queryKey: ['settings'] });
-      say('pending' in r ? 'Sent for a second person to approve under Approvals. It applies when they do.' : 'Saved. The admin and the app follow within a minute.');
+      say('pending' in r ? t('admin.settings_view.sent_for_a_second_person') : t('admin.settings_view.saved_the_admin_and_the'));
     },
     onError: (e) => {
       setErr(e instanceof HttpError && Object.keys(e.fields).length ? e.fields : { _: (e as Error).message });
@@ -46,18 +46,18 @@ export function SettingsEditor({ keys: asked, title = 'Settings', say }: { keys:
   });
   const why = (k: SettingKey) => {
     const lock = locked(k);
-    if (settingOwner(k) === 'tangent') return 'Set by Tangent for your school. Ask Tangent to change it.';
-    if (lock) return `${TIGHTEN[k] ? 'Tangent sets the minimum here; you may be stricter.' : 'Set by Tangent for your school.'}${lock.note ? ` ${lock.note}` : ''}`;
+    if (settingOwner(k) === 'tangent') return t('admin.settings_view.set_by_tangent_for_your');
+    if (lock) return `${TIGHTEN[k] ? t('admin.settings_view.tangent_sets_the_minimum_here') : t('admin.settings_view.set_by_tangent_for_your_2')}${lock.note ? ` ${lock.note}` : ''}`;
     return SETTINGS_META[k].help;
   };
   if (q.isLoading && !v) return <div className="skc" style={{ height: 240, borderRadius: 24 }} />;
-  if (q.isError && !v) return <Card title={title}><ErrorLine>{(q.error as Error).message}</ErrorLine><button className="btn sm" style={{ marginTop: 8 }} onClick={() => void q.refetch()}>Try again</button></Card>;
+  if (q.isError && !v) return <Card title={title}><ErrorLine>{(q.error as Error).message}</ErrorLine><button className="btn sm" style={{ marginTop: 8 }} onClick={() => void q.refetch()}>{t('admin.settings_view.try_again')}</button></Card>;
   if (!v) return null;
   return (
     <div className={shake.cls}>
-      <Card title={title} chip={changed.length ? <span className="chip a">{changed.length} unsaved</span> : undefined}>
-        {!keys.length && <EmptyNote icon="setup" title="Nothing to set here" body="This part of the school has no settings of its own." />}
-        {!can && keys.length > 0 && <div className="help" style={{ marginTop: 0 }}>You can see these settings but not change them. Someone with the right to change settings can.</div>}
+      <Card title={title} chip={changed.length ? <span className="chip a">{changed.length} {t('admin.settings_view.unsaved')}</span> : undefined}>
+        {!keys.length && <EmptyNote icon="setup" title={t('admin.settings_view.nothing_to_set_here')} body={t('admin.settings_view.this_part_of_the_school')} />}
+        {!can && keys.length > 0 && <div className="help" style={{ marginTop: 0 }}>{t('admin.settings_view.you_can_see_these_settings')}</div>}
         {keys.map((k) => {
           // A floor (security, privacy) still lets the school be stricter, so it stays editable.
           const readOnly = !can || settingOwner(k) === 'tangent' || (!!locked(k) && !TIGHTEN[k]);
@@ -67,9 +67,9 @@ export function SettingsEditor({ keys: asked, title = 'Settings', say }: { keys:
           <div style={{ marginTop: 16 }}>
             {err._ && <ErrorLine>{err._}</ErrorLine>}
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: 220 }}><Field label="Why (optional, kept in the history)" value={note} onChange={setNote} maxLength={200} placeholder="For example: the board changed the loan period" /></div>
-              <button className="btn" disabled={!changed.length || save.isPending} onClick={() => { setEdits({}); setErr({}); }}>Discard</button>
-              <button className="btn pri" disabled={!changed.length || save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Saving…' : changed.length > 1 ? `Save ${changed.length} changes` : 'Save'}</button>
+              <div style={{ flex: 1, minWidth: 220 }}><Field label={t('admin.settings_view.why_optional_kept_in_the')} value={note} onChange={setNote} maxLength={200} placeholder={t('admin.settings_view.for_example_the_board_changed')} /></div>
+              <button className="btn" disabled={!changed.length || save.isPending} onClick={() => { setEdits({}); setErr({}); }}>{t('admin.settings_view.discard')}</button>
+              <button className="btn pri" disabled={!changed.length || save.isPending} onClick={() => save.mutate()}>{save.isPending ? t('admin.settings_view.saving') : changed.length > 1 ? t('admin.settings_view.save_changes', { length: changed.length }) : t('admin.settings_view.save')}</button>
             </div>
           </div>
         )}
@@ -85,7 +85,7 @@ export function SettingsTab({ path }: { path: string }) {
   const { toast, say } = useToast();
   const page = shell?.menu.flatMap((g) => g.pages).find((p) => p.href === path);
   return (
-    <Page title={page?.label ?? 'Settings'} sub="How this part of the school works. Changes apply for everyone at once." toast={toast} tabs={tabs}>
+    <Page title={page?.label ?? t('admin.settings_view.settings')} sub={t('admin.settings_view.how_this_part_of_the')} toast={toast} tabs={tabs}>
       <div style={{ maxWidth: 760 }}><SettingsEditor keys={page?.settings ?? []} say={say} /></div>
     </Page>
   );

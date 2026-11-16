@@ -2,6 +2,7 @@ import { Icon } from './Icon';
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { leavingProps, useExit } from './Presence';
+import { t as tr } from './i18n';
 
 export interface SelectOption {
   value: string;
@@ -152,7 +153,7 @@ export function Select({ value, onChange, options, id, disabled, invalid, compac
           {searchable && (
             <label className="sxs">
               <Icon name="search" />
-              <input value={q} onChange={(e) => { setQ(e.target.value); setActive(0); }} placeholder="Search" aria-label="Search the list" />
+              <input value={q} onChange={(e) => { setQ(e.target.value); setActive(0); }} placeholder={tr('ui.select.search')} aria-label={tr('ui.select.search_the_list')} />
             </label>
           )}
           <div ref={list} id={listId} className="sxl" role="listbox" tabIndex={-1} style={{ maxHeight: box.maxH - (searchable ? 52 : 0) }}>
@@ -162,7 +163,7 @@ export function Select({ value, onChange, options, id, disabled, invalid, compac
                 {o.value === value && <Icon name="check" className="tick" />}
               </div>
             ))}
-            {shown.length === 0 && <div className="sxe">Nothing matches “{q}”.</div>}
+            {shown.length === 0 && <div className="sxe">{tr('ui.select.nothing_matches')}{q}”.</div>}
           </div>
         </div>,
         root,

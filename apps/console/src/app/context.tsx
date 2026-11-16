@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react';
 import type { ConsoleTokens } from '@tangent/contracts';
 import type { Client } from './client';
+import { t } from '@tangent/web-ui';
 
 export interface AppCtx {
   api: Client['api'];
@@ -14,6 +15,6 @@ export const AppContext = createContext<AppCtx | null>(null);
 
 export function useApp(): AppCtx {
   const c = useContext(AppContext);
-  if (!c) throw new Error('useApp must be used inside the signed-in console.');
+  if (!c) throw new Error(t('console.context.useapp_must_be_used_inside'));
   return c;
 }

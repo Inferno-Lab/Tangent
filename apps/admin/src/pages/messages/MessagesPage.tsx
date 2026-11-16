@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ThreadDetail, ThreadRow } from '@tangent/contracts';
-import { Checkbox, Dialog, Field, FilePick, Segmented, Select, useShake, EmptyState, EmptyNote } from '@tangent/web-ui';
+import { Checkbox, Dialog, Field, FilePick, Segmented, Select, useShake, EmptyState, EmptyNote, t as tr } from '@tangent/web-ui';
 import { uploadFile } from '@tangent/api-client';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
@@ -38,28 +38,28 @@ export function MessagesPage() {
   const unread = all.filter((t) => t.unread > 0).length;
   useEffect(() => { if (!sel && rows[0] && window.matchMedia('(min-width: 900px)').matches) setSel(rows[0].id); }, [rows, sel]);
   return (
-    <Page title="Messages" sub={all.length ? `${unread ? `${unread} waiting for a reply` : 'All caught up'} · ${all.length} conversations` : 'What families write to the school'} toast={toast} loading={list.isLoading && !list.data}
+    <Page title={tr('admin.messages_page.messages')} sub={all.length ? tr('admin.messages_page.conversations', { p0: unread ? `${unread} waiting for a reply` : 'All caught up', length: all.length }) : tr('admin.messages_page.what_families_write_to_the')} toast={toast} loading={list.isLoading && !list.data}
       error={list.isError && !list.data ? { message: (list.error as Error).message, retry: () => void list.refetch() } : null}
-      actions={canWrite ? <AddBtn onClick={() => setStarting(true)}>New message</AddBtn> : undefined}
-      overlays={starting && <Start onClose={() => setStarting(false)} onDone={(t) => { setStarting(false); refresh(qc); setFilter('open'); setSel(t.id); say('Message sent. The family gets a notification.'); }} />}>
+      actions={canWrite ? <AddBtn onClick={() => setStarting(true)}>{tr('admin.messages_page.new_message')}</AddBtn> : undefined}
+      overlays={starting && <Start onClose={() => setStarting(false)} onDone={(t) => { setStarting(false); refresh(qc); setFilter('open'); setSel(t.id); say(tr('admin.messages_page.message_sent_the_family_gets')); }} />}>
       {all.length === 0 ? (
         <div><EmptyState scene="messages" onAction={canWrite ? () => setStarting(true) : undefined} /></div>
       ) : (
         <section className={`msg ${sel ? 'has' : ''}`}>
           <div className="card msl rise" style={{ padding: 0 }}>
             <div style={{ padding: '16px 16px 10px', display: 'grid', gap: 10 }}>
-              <Segmented value={filter} onChange={(v) => { setFilter(v); setSel(null); }} label="Show" options={[{ value: 'open', label: 'Open' }, { value: 'unread', label: 'Unread', count: unread || undefined }, { value: 'closed', label: 'Closed' }]} />
-              <Field label="Search conversations" value={q} onChange={setQ} placeholder="Family, student or words" />
-              <Checkbox checked={mine} onChange={setMine} label="Only the ones with me" />
+              <Segmented value={filter} onChange={(v) => { setFilter(v); setSel(null); }} label={tr('admin.messages_page.show')} options={[{ value: 'open', label: tr('admin.messages_page.open') }, { value: 'unread', label: tr('admin.messages_page.unread'), count: unread || undefined }, { value: 'closed', label: tr('admin.messages_page.closed') }]} />
+              <Field label={tr('admin.messages_page.search_conversations')} value={q} onChange={setQ} placeholder={tr('admin.messages_page.family_student_or_words')} />
+              <Checkbox checked={mine} onChange={setMine} label={tr('admin.messages_page.only_the_ones_with_me')} />
             </div>
             <div className="lscroll" style={{ maxHeight: 'min(68dvh,640px)' }}>
-              {rows.length === 0 && <div style={{ padding: '4px 16px 16px' }}><EmptyNote icon={term ? 'search' : 'messages'} title={term || mine ? 'Nothing matches' : filter === 'unread' ? 'Nothing unread' : filter === 'closed' ? 'No closed conversations' : 'No open conversations'}
-                body={term || mine ? 'Try another name, or clear the search.' : filter === 'unread' ? 'You have read every message.' : filter === 'closed' ? 'A conversation you close moves here.' : 'A family’s message starts one here.'} /></div>}
+              {rows.length === 0 && <div style={{ padding: '4px 16px 16px' }}><EmptyNote icon={term ? 'search' : 'messages'} title={term || mine ? tr('admin.messages_page.nothing_matches') : filter === 'unread' ? tr('admin.messages_page.nothing_unread') : filter === 'closed' ? tr('admin.messages_page.no_closed_conversations') : tr('admin.messages_page.no_open_conversations')}
+                body={term || mine ? tr('admin.messages_page.try_another_name_or_clear') : filter === 'unread' ? tr('admin.messages_page.you_have_read_every_message') : filter === 'closed' ? tr('admin.messages_page.a_conversation_you_close_moves') : tr('admin.messages_page.a_family_s_message_starts')} /></div>}
               {rows.map((t) => <ThreadItem key={t.id} t={t} on={t.id === sel} onOpen={() => setSel(t.id)} />)}
             </div>
           </div>
           <div className="card mst rise" style={{ '--d': '.06s', padding: 0 } as React.CSSProperties}>
-            {sel ? <Conversation key={sel} id={sel} canWrite={canWrite} onBack={() => setSel(null)} onChanged={(m) => { refresh(qc); if (m) say(m); }} /> : <div className="help" style={{ padding: 32, textAlign: 'center' }}>Choose a conversation.</div>}
+            {sel ? <Conversation key={sel} id={sel} canWrite={canWrite} onBack={() => setSel(null)} onChanged={(m) => { refresh(qc); if (m) say(m); }} /> : <div className="help" style={{ padding: 32, textAlign: 'center' }}>{tr('admin.messages_page.choose_a_conversation')}</div>}
           </div>
         </section>
       )}
@@ -74,9 +74,9 @@ function ThreadItem({ t, on, onOpen }: { t: ThreadRow; on: boolean; onOpen: () =
       <span style={{ minWidth: 0, flex: 1 }}>
         <span style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><b data-tip={t.guardianName}>{t.guardianName}</b><small>{ago(t.lastAt)}</small></span>
         <span className="mts" data-tip={t.subject}>{t.subject}</span>
-        <span className="mtp">{t.lastFrom === 'staff' ? 'You: ' : ''}{t.lastBody}</span>
+        <span className="mtp">{t.lastFrom === 'staff' ? tr('admin.messages_page.you') : ''}{t.lastBody}</span>
       </span>
-      {t.unread > 0 && <span className="ct" aria-label={`${t.unread} unread`} style={{ alignSelf: 'center', font: '700 11px var(--fb)', background: 'var(--brand)', color: 'var(--on-brand)', borderRadius: 999, padding: '2px 8px' }}>{t.unread}</span>}
+      {t.unread > 0 && <span className="ct" aria-label={tr('admin.messages_page.unread_2', { unread: t.unread })} style={{ alignSelf: 'center', font: '700 11px var(--fb)', background: 'var(--brand)', color: 'var(--on-brand)', borderRadius: 999, padding: '2px 8px' }}>{t.unread}</span>}
     </button>
   );
 }
@@ -102,30 +102,30 @@ function Conversation({ id, canWrite, onBack, onChanged }: { id: string; canWrit
       return app.api.messages.reply(id, { body: body.trim(), fileIds });
     },
     onSuccess: (r) => { setBody(''); setFiles([]); setErr(''); qc.setQueryData(['messages', id], r); onChanged(); },
-    onError: (e) => { setErr(problem(e)._ ?? 'Could not send.'); shake.hit(); },
+    onError: (e) => { setErr(problem(e)._ ?? tr('admin.messages_page.could_not_send')); shake.hit(); },
   });
-  const patch = useMutation({ mutationFn: (b: { status?: 'open' | 'closed'; assignToMe?: boolean; assignTo?: string }) => app.api.messages.patch(id, b), onSuccess: (r, b) => { qc.setQueryData(['messages', id], r); onChanged(b.status === 'closed' ? 'Conversation closed.' : b.status === 'open' ? 'Conversation reopened.' : b.assignTo && b.assignTo !== app.user.id ? `Handed to ${r.assignedToName}.` : 'It is yours now.'); }, onError: (e) => setErr((e as Error).message) });
+  const patch = useMutation({ mutationFn: (b: { status?: 'open' | 'closed'; assignToMe?: boolean; assignTo?: string }) => app.api.messages.patch(id, b), onSuccess: (r, b) => { qc.setQueryData(['messages', id], r); onChanged(b.status === 'closed' ? tr('admin.messages_page.conversation_closed') : b.status === 'open' ? tr('admin.messages_page.conversation_reopened') : b.assignTo && b.assignTo !== app.user.id ? tr('admin.messages_page.handed_to', { assignedToName: r.assignedToName }) : tr('admin.messages_page.it_is_yours_now')); }, onError: (e) => setErr((e as Error).message) });
   if (!t) return <div className="skc" style={{ height: 360, borderRadius: 24, margin: 16 }} />;
-  const send = () => { if (body.trim() || files.length) reply.mutate(); else { setErr('Write a reply first.'); shake.hit(); } };
+  const send = () => { if (body.trim() || files.length) reply.mutate(); else { setErr(tr('admin.messages_page.write_a_reply_first')); shake.hit(); } };
   const open = (fileId: string) => void app.api.files.url(fileId, true).then((u) => window.open(u.url, '_blank', 'noopener')).catch((e: Error) => setErr(e.message));
   return (
     <div className="mcv">
       <header className="mch">
-        <button className="btn sm mback" onClick={onBack} aria-label="Back to the list"><Ico d={BACK} /></button>
+        <button className="btn sm mback" onClick={onBack} aria-label={tr('admin.messages_page.back_to_the_list')}><Ico d={BACK} /></button>
         <div style={{ minWidth: 0, flex: 1 }}>
           <b className="fd" data-tip={t.subject} style={{ display: 'block', fontSize: 17, letterSpacing: '-.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.subject}</b>
-          <small style={{ color: 'var(--ink3)', font: '600 12px var(--fb)' }}>{t.guardianName}{t.studentName ? ` · ${t.studentName}, Class ${t.className}` : ''}{t.assignedToName ? ` · with ${t.assignedToName}` : ''}</small>
+          <small style={{ color: 'var(--ink3)', font: '600 12px var(--fb)' }}>{t.guardianName}{t.studentName ? tr('admin.messages_page.class', { studentName: t.studentName, className: t.className }) : ''}{t.assignedToName ? tr('admin.messages_page.with', { assignedToName: t.assignedToName }) : ''}</small>
         </div>
         {canWrite && <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          {t.assignedToId !== app.user.id && <button className="btn sm" disabled={patch.isPending} onClick={() => patch.mutate({ assignToMe: true })}>Take it</button>}
-          {(staff.data?.length ?? 0) > 1 && <Select compact aria-label="Hand to" value="" onChange={(to) => to && patch.mutate({ assignTo: to })} options={[{ value: '', label: 'Hand to…' }, ...(staff.data ?? []).filter((s) => s.id !== t.assignedToId).map((s) => ({ value: s.id, label: s.name }))]} />}
-          <button className="btn sm" disabled={patch.isPending} onClick={() => patch.mutate({ status: t.status === 'open' ? 'closed' : 'open' })}>{t.status === 'open' ? 'Close' : 'Reopen'}</button>
+          {t.assignedToId !== app.user.id && <button className="btn sm" disabled={patch.isPending} onClick={() => patch.mutate({ assignToMe: true })}>{tr('admin.messages_page.take_it')}</button>}
+          {(staff.data?.length ?? 0) > 1 && <Select compact aria-label={tr('admin.messages_page.hand_to')} value="" onChange={(to) => to && patch.mutate({ assignTo: to })} options={[{ value: '', label: tr('admin.messages_page.hand_to_2') }, ...(staff.data ?? []).filter((s) => s.id !== t.assignedToId).map((s) => ({ value: s.id, label: s.name }))]} />}
+          <button className="btn sm" disabled={patch.isPending} onClick={() => patch.mutate({ status: t.status === 'open' ? 'closed' : 'open' })}>{t.status === 'open' ? tr('admin.messages_page.close') : tr('admin.messages_page.reopen')}</button>
         </span>}
       </header>
       <div className="mlist lscroll" style={{ ['--scbg' as string]: 'var(--s1)' }}>
         {t.messages.map((m) => (
           <div key={m.id} className={`mb ${m.from}`}>
-            <div className="mbb">{m.deleted ? <i>This message was deleted.</i> : m.body}{m.files.length > 0 && <span className="tgrow" style={{ marginTop: m.body ? 8 : 0 }}>{m.files.map((f) => <button key={f.id} type="button" className="chip" onClick={() => open(f.id)}>{f.name}</button>)}</span>}</div>
+            <div className="mbb">{m.deleted ? <i>{tr('admin.messages_page.this_message_was_deleted')}</i> : m.body}{m.files.length > 0 && <span className="tgrow" style={{ marginTop: m.body ? 8 : 0 }}>{m.files.map((f) => <button key={f.id} type="button" className="chip" onClick={() => open(f.id)}>{f.name}</button>)}</span>}</div>
             <small>{m.sender} · {stamp(m.at)}</small>
           </div>
         ))}
@@ -133,17 +133,17 @@ function Conversation({ id, canWrite, onBack, onChanged }: { id: string; canWrit
       </div>
       {canWrite ? (
         <footer className={`mcm ${shake.cls}`}>
-          <AreaField label="Your reply" value={body} onChange={(v) => { setBody(v); setErr(''); }} rows={2} maxLength={1000} error={err} />
+          <AreaField label={tr('admin.messages_page.your_reply')} value={body} onChange={(v) => { setBody(v); setErr(''); }} rows={2} maxLength={1000} error={err} />
           <div className="tgrow">
-            <FilePick className="btn sm" accept="application/pdf,image/jpeg,image/png,image/webp" disabled={files.length >= 5} onPick={(f) => setFiles([...files, f])}>Attach a file</FilePick>
-            {files.map((f, i) => <button key={`${f.name}-${i}`} type="button" className="chip v" data-tip="Remove" onClick={() => setFiles(files.filter((_, j) => j !== i))}>{f.name} ×</button>)}
+            <FilePick className="btn sm" accept="application/pdf,image/jpeg,image/png,image/webp" disabled={files.length >= 5} onPick={(f) => setFiles([...files, f])}>{tr('admin.messages_page.attach_a_file')}</FilePick>
+            {files.map((f, i) => <button key={`${f.name}-${i}`} type="button" className="chip v" data-tip={tr('admin.messages_page.remove')} onClick={() => setFiles(files.filter((_, j) => j !== i))}>{f.name} ×</button>)}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <span className="help">The family sees this in their app and gets a notification.{t.status === 'closed' ? ' Replying reopens the conversation.' : ''}</span>
-            <button className="btn pri" disabled={reply.isPending} onClick={send}><Ico d={SEND} />{reply.isPending ? 'Sending…' : 'Send reply'}</button>
+            <span className="help">{tr('admin.messages_page.the_family_sees_this_in')}{t.status === 'closed' ? tr('admin.messages_page.replying_reopens_the_conversation') : ''}</span>
+            <button className="btn pri" disabled={reply.isPending} onClick={send}><Ico d={SEND} />{reply.isPending ? tr('admin.messages_page.sending') : tr('admin.messages_page.send_reply')}</button>
           </div>
         </footer>
-      ) : <footer className="mcm"><div className="help">You can read messages but not reply.</div></footer>}
+      ) : <footer className="mcm"><div className="help">{tr('admin.messages_page.you_can_read_messages_but')}</div></footer>}
     </div>
   );
 }
@@ -162,30 +162,30 @@ function Start({ onClose, onDone }: { onClose: () => void; onDone: (t: ThreadDet
   const make = useMutation({ mutationFn: () => app.api.messages.start({ studentId: stu!.id, subject: subject.trim(), body: body.trim() }), onSuccess: onDone, onError: (e) => { setErr(problem(e)); shake.hit(); } });
   const go = () => {
     const p: Record<string, string> = {};
-    if (!stu) p.studentId = 'Choose the student whose family you are writing to.';
-    if (subject.trim().length < 3) p.subject = 'Write a subject.';
-    if (body.trim().length < 2) p.body = 'Write a message.';
+    if (!stu) p.studentId = tr('admin.messages_page.choose_the_student_whose_family');
+    if (subject.trim().length < 3) p.subject = tr('admin.messages_page.write_a_subject');
+    if (body.trim().length < 2) p.body = tr('admin.messages_page.write_a_message');
     setErr(p);
     if (Object.keys(p).length) shake.hit(); else make.mutate();
   };
   return (
-    <Dialog title="New message" onClose={onClose} width={540} shake={shake.cls}>
+    <Dialog title={tr('admin.messages_page.new_message')} onClose={onClose} width={540} shake={shake.cls}>
       <div className="stack">
         {stu ? (
-          <div className="fld"><label>To the family of</label><div className="tgrow"><span className="chip v" style={{ height: 34, padding: '0 16px', fontSize: 13 }}>{stu.name} · Class {stu.className}</span><button className="btn sm" onClick={() => { setStu(null); setQ(''); }}>Change</button></div></div>
+          <div className="fld"><label>{tr('admin.messages_page.to_the_family_of')}</label><div className="tgrow"><span className="chip v" style={{ height: 34, padding: '0 16px', fontSize: 13 }}>{stu.name} {tr('admin.messages_page.class_2')}{' '}{stu.className}</span><button className="btn sm" onClick={() => { setStu(null); setQ(''); }}>{tr('admin.messages_page.change')}</button></div></div>
         ) : (
           <div className="fld">
-            <Field label="To the family of" value={q} onChange={(v) => { setQ(v); setErr({ ...err, studentId: '' }); }} error={err.studentId} placeholder="Type a student’s name" />
-            {found.data?.items.length ? <div className="pks">{found.data.items.map((s) => <button key={s.id} className="pk" onClick={() => setStu({ id: s.id, name: s.name, className: s.className })}><Avatar name={s.name} size={28} /><span><b>{s.name}</b><small>Class {s.className} · {s.guardianName}</small></span></button>)}</div> : term.length >= 2 && found.data ? <div className="help">No student found.</div> : null}
+            <Field label={tr('admin.messages_page.to_the_family_of')} value={q} onChange={(v) => { setQ(v); setErr({ ...err, studentId: '' }); }} error={err.studentId} placeholder={tr('admin.messages_page.type_a_student_s_name')} />
+            {found.data?.items.length ? <div className="pks">{found.data.items.map((s) => <button key={s.id} className="pk" onClick={() => setStu({ id: s.id, name: s.name, className: s.className })}><Avatar name={s.name} size={28} /><span><b>{s.name}</b><small>{tr('admin.messages_page.class_3')}{' '}{s.className} · {s.guardianName}</small></span></button>)}</div> : term.length >= 2 && found.data ? <div className="help">{tr('admin.messages_page.no_student_found')}</div> : null}
           </div>
         )}
-        <Field label="Subject" value={subject} onChange={(v) => { setSubject(v); setErr({ ...err, subject: '' }); }} error={err.subject} maxLength={100} />
-        <AreaField label="Message" value={body} onChange={(v) => { setBody(v); setErr({ ...err, body: '' }); }} error={err.body} rows={4} maxLength={1000} />
+        <Field label={tr('admin.messages_page.subject')} value={subject} onChange={(v) => { setSubject(v); setErr({ ...err, subject: '' }); }} error={err.subject} maxLength={100} />
+        <AreaField label={tr('admin.messages_page.message')} value={body} onChange={(v) => { setBody(v); setErr({ ...err, body: '' }); }} error={err.body} rows={4} maxLength={1000} />
         {err._ && <div className="emsg" role="alert">{err._}</div>}
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
-        <button className="btn" onClick={onClose}>Cancel</button>
-        <button className="btn pri" disabled={make.isPending} onClick={go}>{make.isPending ? 'Sending…' : 'Send message'}</button>
+        <button className="btn" onClick={onClose}>{tr('admin.messages_page.cancel')}</button>
+        <button className="btn pri" disabled={make.isPending} onClick={go}>{make.isPending ? tr('admin.messages_page.sending') : tr('admin.messages_page.send_message')}</button>
       </div>
     </Dialog>
   );

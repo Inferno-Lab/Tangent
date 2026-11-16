@@ -1,5 +1,6 @@
 import { createHttp, schoolApi, type Tokens } from '@tangent/api-client';
 import type { SessionUser } from '@tangent/contracts';
+import { t as tr } from '@tangent/web-ui';
 
 const API = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
@@ -51,7 +52,7 @@ export function readSupportHash(slug: string): boolean {
   const m = /[#&]support=([^&]+)/.exec(window.location.hash);
   if (!m) return false;
   const payload = JSON.parse(atob(m[1]!.split('.')[1]!.replace(/-/g, '+').replace(/_/g, '/'))) as { name: string; exp: number; perms: string[] };
-  session.write(slug, { support: { until: payload.exp * 1000 }, user: { id: 'support', name: payload.name, email: null, phone: null, initials: 'GS', roles: ['support'], roleNames: ['Tangent support'], permissions: payload.perms as SessionUser['permissions'] } });
+  session.write(slug, { support: { until: payload.exp * 1000 }, user: { id: 'support', name: payload.name, email: null, phone: null, initials: 'GS', roles: ['support'], roleNames: [tr('admin.client.tangent_support')], permissions: payload.perms as SessionUser['permissions'] } });
   session.setAccess(slug, m[1]!);
   try { sessionStorage.setItem(supportKey(slug), JSON.stringify({ ...session.read(slug), accessToken: m[1]! })); } catch { /* ignore */ }
   history.replaceState(null, '', window.location.pathname + window.location.search);

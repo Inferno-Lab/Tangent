@@ -3,6 +3,7 @@ import { Icon } from './Icon';
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { leavingProps, useExit } from './Presence';
+import { t } from './i18n';
 
 const GAP = 6;
 const EDGE = 12;
@@ -15,7 +16,7 @@ export function placeBy(anchor: HTMLElement, side: 'auto' | 'right', min = 220):
   const r = anchor.getBoundingClientRect();
   // Beside the whole menu rail, not just the button, so the popup never sits over the rail.
   const rail = anchor.closest('.sb')?.getBoundingClientRect().right ?? r.right;
-  if (side === 'right') return { left: Math.max(r.right, rail) + 12, minWidth: min, bottom: window.innerHeight - r.bottom, maxH: r.bottom - EDGE, origin: 'left bottom' };
+  if (side === 'right') return { left: Math.max(r.right, rail) + 12, minWidth: min, bottom: window.innerHeight - r.bottom, maxH: r.bottom - EDGE, origin: t('ui.menu.left_bottom') };
   const below = window.innerHeight - r.bottom - EDGE;
   const above = r.top - EDGE;
   const up = below < 240 && above > below;
@@ -25,7 +26,7 @@ export function placeBy(anchor: HTMLElement, side: 'auto' | 'right', min = 220):
   const fromRight = r.left + minWidth > window.innerWidth - EDGE;
   const edge = fromRight ? { right: Math.max(EDGE, window.innerWidth - r.right) } : { left: Math.max(EDGE, r.left) };
   const x = fromRight ? 'right' : 'left';
-  return up ? { ...edge, minWidth, bottom: window.innerHeight - r.top + GAP, maxH, origin: `bottom ${x}` } : { ...edge, minWidth, top: r.bottom + GAP, maxH, origin: `top ${x}` };
+  return up ? { ...edge, minWidth, bottom: window.innerHeight - r.top + GAP, maxH, origin: t('ui.menu.bottom', { x }) } : { ...edge, minWidth, top: r.bottom + GAP, maxH, origin: t('ui.menu.top', { x }) };
 }
 
 export interface PopProps {

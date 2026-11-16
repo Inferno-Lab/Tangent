@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { dashboardPieces } from '@tangent/config-engine';
 import { useRouterState } from '@tanstack/react-router';
-import { Dock, MoreSheet, Presence, SchoolHeader, SearchDialog, Sidebar, tintFor, useTheme, useHue, type DockTab, type PaletteHit, Icon } from '@tangent/web-ui';
+import { Dock, MoreSheet, Presence, SchoolHeader, SearchDialog, Sidebar, tintFor, useTheme, useHue, type DockTab, type PaletteHit, Icon, t as tr } from '@tangent/web-ui';
 import type { ShellData } from '@tangent/contracts';
 import { activeNav, adminNav, shortcutTargets } from './nav';
 import { useApp } from './context';
@@ -75,31 +75,32 @@ export function useChrome() {
   const t = tintFor(user.name);
   const has = (id: string) => groups.some((g) => g.items.some((i) => i.id === id));
   // The phone dock: Home, then the first page of the person's own work (a teacher's Teach group before People and Money), then More.
+  // Menu group names as the module definitions give them (matched, not shown).
   const DOCK_GROUPS = ['Teach', 'People', 'Money', 'Care', 'Reach', 'Campus'];
   const picks = DOCK_GROUPS.map((n) => groups.find((g) => g.name === n)).filter((g) => !!g && g.items.length).slice(0, 2).map((g) => ({ group: g!, item: g!.items[0]! }));
   const dockTabs: DockTab[] = [
-    { id: 'home', label: 'Dashboard', icon: 'home', onPress: () => goRef.current('/') },
+    { id: 'home', label: tr('admin.use_chrome.dashboard'), icon: 'home', onPress: () => goRef.current('/') },
     ...picks.map(({ group, item }) => ({ id: group.name, label: item.label, icon: item.icon, onPress: () => goRef.current(item.href.replace(base, '') || '/') })),
-    { id: 'more', label: 'More', icon: 'more', onPress: () => setMore(true) },
+    { id: 'more', label: tr('admin.use_chrome.more'), icon: 'more', onPress: () => setMore(true) },
   ];
   const dockActive = active === 'dash' ? 'home' : picks.find((p) => p.group.items.some((i) => i.id === active))?.group.name ?? 'more';
 
   const aside: ReactNode = (
     <>
     <Sidebar
-      label="Main menu" collapsed={collapsed} groups={groups} active={active}
+      label={tr('admin.use_chrome.main_menu')} collapsed={collapsed} groups={groups} active={active}
       onNavigate={(href) => goRef.current(base && href.startsWith(base) ? href.slice(base.length) || '/' : href)}
       header={<SchoolHeader logo={data?.school.logoText ?? ''} logoUrl={data?.school.logoUrl} name={data?.school.shortName ?? ''} place={data?.school.place ?? ''} color={data?.school.color} collapsed={collapsed} onToggle={() => setCollapsed((c) => { try { localStorage.setItem(COLLAPSE_KEY, c ? '0' : '1'); } catch { /* ignore */ } return !c; })} />}
       promo={data && has('ex') && data.term.daysToGo !== null && (
         <div className="sbc">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, font: '700 12px var(--fb)', color: 'var(--ink2)' }}>{data.term.name && <span className="chip a">{data.term.name}</span>}{data.term.examsLabel}</div>
-          <div className="fd" style={{ fontSize: 22, letterSpacing: '-.03em' }}>{data.term.daysToGo === 0 ? 'Starts today' : `${data.term.daysToGo} ${data.term.daysToGo === 1 ? 'day' : 'days'} to go`}</div>
+          <div className="fd" style={{ fontSize: 22, letterSpacing: '-.03em' }}>{data.term.daysToGo === 0 ? tr('admin.use_chrome.starts_today') : tr('admin.use_chrome.to_go', { daysToGo: data.term.daysToGo, p1: data.term.daysToGo === 1 ? 'day' : 'days' })}</div>
           <div style={{ height: 10, borderRadius: 7, background: 'var(--s2)' }}><div style={{ width: `${data.term.progress}%`, height: '100%', borderRadius: 7, background: 'var(--brand)' }} /></div>
-          {has('ex') && <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => goRef.current('/exams')}>See the exam schedule<Icon name="next" /></button>}
+          {has('ex') && <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => goRef.current('/exams')}>{tr('admin.use_chrome.see_the_exam_schedule')}<Icon name="next" /></button>}
         </div>
       )}
       me={{ initials: user.initials, name: user.name, role: user.roleNames.length > 1 ? `${user.roleNames[0]} and ${user.roleNames.length - 1} more` : user.roleNames[0] ?? 'Staff', bg: t.bg, fg: t.fg }}
-      meMenu={[{ label: 'My account', onPress: () => goRef.current('/account') }, { label: theme.theme === 'dark' ? 'Switch to light' : 'Switch to dark', onPress: theme.toggle }, { label: 'Sign out', onPress: signOut }]}
+      meMenu={[{ label: tr('admin.use_chrome.my_account'), onPress: () => goRef.current('/account') }, { label: theme.theme === 'dark' ? tr('admin.use_chrome.switch_to_light') : tr('admin.use_chrome.switch_to_dark'), onPress: theme.toggle }, { label: tr('admin.use_chrome.sign_out'), onPress: signOut }]}
     />
     <Dock tabs={dockTabs} active={dockActive} />
     </>
@@ -107,9 +108,9 @@ export function useChrome() {
 
   const overlays: ReactNode = (
     <>
-      <Presence>{open && <SearchDialog hits={hits.data ?? []} query={q} onQuery={setQ} onPick={pick} onClose={close} empty={`No matches for “${q}”. Try part of a name, an admission number or a class.`} />}</Presence>
+      <Presence>{open && <SearchDialog hits={hits.data ?? []} query={q} onQuery={setQ} onPick={pick} onClose={close} empty={tr('admin.use_chrome.no_matches_for_try_part', { q })} />}</Presence>
       <Presence>{more && (
-        <MoreSheet title="Menu" onClose={() => setMore(false)}>
+        <MoreSheet title={tr('admin.use_chrome.menu')} onClose={() => setMore(false)}>
           {groups.map((g) => (
             <div key={g.name}>
               <div className="sl">{g.name}</div>
@@ -120,10 +121,10 @@ export function useChrome() {
               ))}
             </div>
           ))}
-          <div className="sl">You</div>
-          <a className={`nvm ${pathname.endsWith('/account') ? 'on' : ''}`} href={`${base}/account`} onClick={(e) => { e.preventDefault(); setMore(false); goRef.current('/account'); }}>My account</a>
-          <button className="btn" style={{ width: '100%', marginTop: 12 }} onClick={theme.toggle}>{theme.theme === 'dark' ? 'Switch to light' : 'Switch to dark'}</button>
-          <button className="btn" style={{ width: '100%', marginTop: 8 }} onClick={() => { setMore(false); signOut(); }}>Sign out</button>
+          <div className="sl">{tr('admin.use_chrome.you')}</div>
+          <a className={`nvm ${pathname.endsWith('/account') ? 'on' : ''}`} href={`${base}/account`} onClick={(e) => { e.preventDefault(); setMore(false); goRef.current('/account'); }}>{tr('admin.use_chrome.my_account')}</a>
+          <button className="btn" style={{ width: '100%', marginTop: 12 }} onClick={theme.toggle}>{theme.theme === 'dark' ? tr('admin.use_chrome.switch_to_light') : tr('admin.use_chrome.switch_to_dark')}</button>
+          <button className="btn" style={{ width: '100%', marginTop: 8 }} onClick={() => { setMore(false); signOut(); }}>{tr('admin.use_chrome.sign_out')}</button>
         </MoreSheet>
       )}</Presence>
     </>

@@ -3,6 +3,7 @@
 import { Fragment, type CSSProperties } from "react";
 import { Select, PageScope, ToastSlot, Segmented, Icon, EmptyNote } from "@tangent/web-ui";
 import "./timetable.css";
+import { t } from '@tangent/web-ui';
 
 export function TimetableView({ v }: { v: any }) {
   return (
@@ -15,26 +16,25 @@ export function TimetableView({ v }: { v: any }) {
       <main className="mn">
         <header className="hd rise">
           <div className="ht">
-            <h1>Timetable</h1>
+            <h1>{t('admin.timetable.view.timetable')}</h1>
             <p>
-              Class {v.className} · {v.term} · version {v.version},{" "}
+              {t('admin.timetable.view.class')}{' '}{v.className} · {v.term} {t('admin.timetable.view.version')}{' '}{v.version},{" "}
               <span style={{ color: v.isDraft ? "var(--warn-i)" : "var(--ok-i)", fontWeight: "700" } as CSSProperties}>{v.isDraft ? "draft" : "published"}</span>
             </p>
           </div>
           <div className="ha">
-          <button className="btn" onClick={v.openWeek}>A teacher’s or room’s week</button>
-          <button className="btn" onClick={v.print}>Print</button>
+          <button className="btn" onClick={v.openWeek}>{t('admin.timetable.view.a_teacher_s_or_room')}</button>
+          <button className="btn" onClick={v.print}>{t('admin.timetable.view.print')}</button>
           {v.canPublish && (
           <button className="btn pri" onClick={v.publish}>
             <Icon name="send" />
-            Publish
-          </button>
+            {t('admin.timetable.view.publish')}</button>
           )}
           </div>
         </header>
         <div className="wk rise" style={{ "--d": ".05s" } as CSSProperties}>
-          <Select compact aria-label="Class" value={String(Math.max(0, v.classes.findIndex((c: any) => c.on)))} onChange={(i) => v.classes[Number(i)]?.pick()} options={v.classes.map((c: any, i: number) => ({ value: String(i), label: c.n }))} />
-          <Segmented label="Timetable view" value={String(v.views.findIndex((x: any) => x.on))} onChange={(i: string) => v.views[Number(i)].pick()} options={v.views.map((x: any, i: number) => ({ value: String(i), label: x.n }))} />
+          <Select compact aria-label={t('admin.timetable.view.class')} value={String(Math.max(0, v.classes.findIndex((c: any) => c.on)))} onChange={(i) => v.classes[Number(i)]?.pick()} options={v.classes.map((c: any, i: number) => ({ value: String(i), label: c.n }))} />
+          <Segmented label={t('admin.timetable.view.timetable_view')} value={String(v.views.findIndex((x: any) => x.on))} onChange={(i: string) => v.views[Number(i)].pick()} options={v.views.map((x: any, i: number) => ({ value: String(i), label: x.n }))} />
           <div className="wkp">
             <span>
               <Icon name="calendar" size={16} />
@@ -45,7 +45,7 @@ export function TimetableView({ v }: { v: any }) {
           <span className={`chip ${v.clashChip ?? ""}`}>{v.clashText}</span>
           {v.draftChanges > 0 && (
             <span className="chip v">
-              {v.draftChanges} unpublished {v.draftChanges === 1 ? "change" : "changes"}
+              {v.draftChanges} {t('admin.timetable.view.unpublished')}{' '}{v.draftChanges === 1 ? "change" : "changes"}
             </span>
           )}
           <span className="lgd" style={{ display: "flex", gap: "10px", flexWrap: "wrap" } as CSSProperties}>
@@ -57,7 +57,7 @@ export function TimetableView({ v }: { v: any }) {
           </span>
         </div>
         <div className="bd" data-even="">
-          <section className="tg rise" style={{ "--d": ".1s", ...v.tgStyle } as CSSProperties} aria-label="Week grid">
+          <section className="tg rise" style={{ "--d": ".1s", ...v.tgStyle } as CSSProperties} aria-label={t('admin.timetable.view.week_grid')}>
             <div className="trow">
               <span></span>
               {v.days.map((d: any, $i: number) => (
@@ -98,7 +98,7 @@ export function TimetableView({ v }: { v: any }) {
                             >
                               {c.isBad && (
                                 <>
-                                  <span className="alert" aria-label="Clash">
+                                  <span className="alert" aria-label={t('admin.timetable.view.clash')}>
                                     <Icon name="alert" size={14} />
                                   </span>
                                 </>
@@ -136,7 +136,7 @@ export function TimetableView({ v }: { v: any }) {
           </section>
           {v.dialog}
           <aside className="side">
-            <section className="det" aria-live="polite" aria-label="Selected period">
+            <section className="det" aria-live="polite" aria-label={t('admin.timetable.view.selected_period')}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px" } as CSSProperties}>
                 <span className={`sw1 chip ${v.sel.k ?? ""}`} style={{ padding: "0" } as CSSProperties}>
                   {v.sel.ab}
@@ -152,7 +152,7 @@ export function TimetableView({ v }: { v: any }) {
               </div>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" } as CSSProperties}>
                 {v.sel.t && <span className="chip">{v.sel.t}</span>}
-                {v.sel.r && <span className="chip">Room {v.sel.r}</span>}
+                {v.sel.r && <span className="chip">{t('admin.timetable.view.room')}{' '}{v.sel.r}</span>}
                 <span className="chip">{v.sel.len}</span>
               </div>
               {v.sel.bad && (
@@ -160,8 +160,7 @@ export function TimetableView({ v }: { v: any }) {
                   <div className="call" role="alert">
                     <Icon name="warning" />
                     <div>
-                      <b>Clash with {v.sel.other}.</b> {v.sel.t} is also teaching {v.sel.other} at this time. Pick a fix; nothing changes until you publish.
-                    </div>
+                      <b>{t('admin.timetable.view.clash_with')}{' '}{v.sel.other}.</b> {v.sel.t} {t('admin.timetable.view.is_also_teaching')}{' '}{v.sel.other} {t('admin.timetable.view.at_this_time_pick_a')}</div>
                   </div>
                 </>
               )}
@@ -170,8 +169,7 @@ export function TimetableView({ v }: { v: any }) {
                   <div className="call ok">
                     <Icon name="check" />
                     <div>
-                      <b>Clash fixed.</b> {v.sel.t} covers this period. Both classes are clear.
-                    </div>
+                      <b>{t('admin.timetable.view.clash_fixed')}</b> {v.sel.t} {t('admin.timetable.view.covers_this_period_both_classes')}</div>
                   </div>
                 </>
               )}
@@ -181,20 +179,17 @@ export function TimetableView({ v }: { v: any }) {
                     {v.sel.suggest && (
                       <button className="btn pri sm" onClick={v.fix}>
                         <Icon name="bolt" />
-                        Ask {v.sel.suggest} to cover
-                      </button>
+                        {t('admin.timetable.view.ask')}{' '}{v.sel.suggest} {t('admin.timetable.view.to_cover')}</button>
                     )}
                     <button className="btn sm" onClick={v.change}>
-                      Choose someone else
-                    </button>
+                      {t('admin.timetable.view.choose_someone_else')}</button>
                   </>
                 )}
                 {v.sel.fine && (
                   <>
                     {v.canEdit && (
                       <button className="btn sm" onClick={v.change}>
-                        Change teacher
-                      </button>
+                        {t('admin.timetable.view.change_teacher')}</button>
                     )}
                   </>
                 )}
@@ -204,9 +199,8 @@ export function TimetableView({ v }: { v: any }) {
             <section className="card" aria-labelledby="load">
               <div className="ch">
                 <h2 id="load" style={{ fontSize: "17px" } as CSSProperties}>
-                  Teacher load
-                </h2>
-                <span className="chip">this week</span>
+                  {t('admin.timetable.view.teacher_load')}</h2>
+                <span className="chip">{t('admin.timetable.view.this_week')}</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "16px", margin: "12px 0 6px" } as CSSProperties}>
                 <svg className="ring" viewBox="0 0 84 84" aria-hidden="true">
@@ -222,14 +216,14 @@ export function TimetableView({ v }: { v: any }) {
                     </span>
                   </div>
                   <div className="help" style={{ marginTop: "4px" } as CSSProperties}>
-                    {v.loadName ? `${v.loadName}, periods` : "Pick a lesson to see its teacher's week"}
+                    {v.loadName ? t('admin.timetable.view.periods', { loadName: v.loadName }) : t('admin.timetable.view.pick_a_lesson_to_see')}
                   </div>
                 </div>
               </div>
               <div className="lscroll" data-even-scroll="" style={{ maxHeight: "232px" } as CSSProperties}>
               {v.loads.map((l: any, $i: number) => (
                 <Fragment key={$i}>
-                  <div className="lr" data-tip={`${l.n}\n${l.v} periods this week`}>
+                  <div className="lr" data-tip={t('admin.timetable.view.periods_this_week', { n: l.n, v: l.v })}>
                     <span className="av" style={{ width: "32px", height: "32px", fontSize: "11px", background: l.bg, color: l.fg, boxShadow: "none" } as CSSProperties}>
                       {l.ini}
                     </span>
@@ -251,12 +245,11 @@ export function TimetableView({ v }: { v: any }) {
             <section className="card" aria-labelledby="unp">
               <div className="ch">
                 <h2 id="unp" style={{ fontSize: "17px" } as CSSProperties}>
-                  Not placed yet
-                </h2>
+                  {t('admin.timetable.view.not_placed_yet')}</h2>
                 {v.unplaced.length > 0 && <span className="chip a">{v.unplaced.length}</span>}
               </div>
               <div className="lscroll" data-even-scroll="" style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px", maxHeight: "176px" } as CSSProperties}>
-                {v.unplaced.length === 0 && <EmptyNote icon="checkCircle" title="Everything has a place" body="Every period this class needs is on the timetable." />}
+                {v.unplaced.length === 0 && <EmptyNote icon="checkCircle" title={t('admin.timetable.view.everything_has_a_place')} body={t('admin.timetable.view.every_period_this_class_needs')} />}
                 {v.unplaced.map((u: any, $i: number) => (
                   <div className="un" key={$i}>
                     <Icon name="drag" size={16} style={{ color: "var(--ink3)" }} />

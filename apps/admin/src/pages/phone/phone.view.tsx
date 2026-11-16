@@ -4,6 +4,7 @@
 import { Fragment, type CSSProperties } from "react";
 import { PageScope, ToastSlot, Icon } from "@tangent/web-ui";
 import "./phone.css";
+import { t } from '@tangent/web-ui';
 
 export function PhoneView({ v }: { v: any }) {
   return (
@@ -17,7 +18,7 @@ export function PhoneView({ v }: { v: any }) {
             <small>{v.dayLine}</small>
             <h1>{v.greeting}</h1>
           </div>
-          <button className="mini bell" aria-label={v.pending ? `${v.pending} things need you` : "Notifications"} onClick={v.openApprovals}>
+          <button className="mini bell" aria-label={v.pending ? t('admin.phone.view.things_need_you', { pending: v.pending }) : t('admin.phone.view.notifications')} onClick={v.openApprovals}>
             <Icon name="notifications" />
             {v.pending > 0 && <i></i>}
           </button>
@@ -25,8 +26,8 @@ export function PhoneView({ v }: { v: any }) {
         <div className="sc">
           <div className="two">
             {v.has.attendance && (
-            <button type="button" className="bt a" aria-label="Open attendance" onClick={() => v.goto("/attendance")} style={{ "--d": ".02s", border: "0", textAlign: "left", font: "inherit", color: "inherit", cursor: "pointer", width: "100%" } as CSSProperties}>
-              <small>Present today</small>
+            <button type="button" className="bt a" aria-label={t('admin.phone.view.open_attendance')} onClick={() => v.goto("/attendance")} style={{ "--d": ".02s", border: "0", textAlign: "left", font: "inherit", color: "inherit", cursor: "pointer", width: "100%" } as CSSProperties}>
+              <small>{t('admin.phone.view.present_today')}</small>
               <div className="n num">
                 {v.present}
                 <span style={{ fontSize: "17px", opacity: ".6" } as CSSProperties}>/{v.total}</span>
@@ -34,8 +35,8 @@ export function PhoneView({ v }: { v: any }) {
             </button>
             )}
             {v.has.fees && (
-            <button type="button" className="bt v" aria-label="Open fees" onClick={() => v.goto("/fees")} style={{ "--d": ".06s", border: "0", textAlign: "left", font: "inherit", color: "inherit", cursor: "pointer", width: "100%" } as CSSProperties}>
-              <small>Fees in {v.feeMonth}</small>
+            <button type="button" className="bt v" aria-label={t('admin.phone.view.open_fees')} onClick={() => v.goto("/fees")} style={{ "--d": ".06s", border: "0", textAlign: "left", font: "inherit", color: "inherit", cursor: "pointer", width: "100%" } as CSSProperties}>
+              <small>{t('admin.phone.view.fees_in')}{' '}{v.feeMonth}</small>
               <div className="n num">{v.fees}</div>
             </button>
             )}
@@ -52,11 +53,9 @@ export function PhoneView({ v }: { v: any }) {
           <div className="bt w" style={{ "--d": ".14s" } as CSSProperties}>
             <div style={{ display: "flex", alignItems: "center", marginBottom: "4px" } as CSSProperties}>
               <b className="fd" style={{ fontSize: "17px", letterSpacing: "-.02em" } as CSSProperties}>
-                Needs you
-              </b>
+                {t('admin.phone.view.needs_you')}</b>
               <span className="chip a" style={{ marginLeft: "auto" } as CSSProperties}>
-                {v.left} left
-              </span>
+                {v.left} {t('admin.phone.view.left')}</span>
             </div>
             {v.items.map((it: any) => (
               <Fragment key={it.id}>
@@ -80,16 +79,15 @@ export function PhoneView({ v }: { v: any }) {
                   <span className="itile"><Icon name="checkCircle" size={24} /></span>
                 </div>
                 <b className="fd" style={{ fontSize: "17px" } as CSSProperties}>
-                  All caught up
-                </b>
+                  {t('admin.phone.view.all_caught_up')}</b>
               </div>
             )}
           </div>
           {v.has.fees && (
-          <button type="button" className="bt k" aria-label="Open fees" onClick={() => v.goto("/fees")} style={{ "--d": ".18s", border: "0", textAlign: "left", font: "inherit", color: "inherit", cursor: "pointer", width: "100%" } as CSSProperties}>
+          <button type="button" className="bt k" aria-label={t('admin.phone.view.open_fees')} onClick={() => v.goto("/fees")} style={{ "--d": ".18s", border: "0", textAlign: "left", font: "inherit", color: "inherit", cursor: "pointer", width: "100%" } as CSSProperties}>
             <small>{v.barsTitle}</small>
             {v.barsEmpty ? (
-              <p style={{ margin: "12px 0 0", font: "400 13px/1.45 var(--fb)", opacity: ".75" } as CSSProperties}>Payments show up here as fees are collected.</p>
+              <p style={{ margin: "12px 0 0", font: "400 13px/1.45 var(--fb)", opacity: ".75" } as CSSProperties}>{t('admin.phone.view.payments_show_up_here_as')}</p>
             ) : (
               <div className="bars" role="img" aria-label={v.barsAlt}>
                 {v.bars.map((h: any, $i: number) => (

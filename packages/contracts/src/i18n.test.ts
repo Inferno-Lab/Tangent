@@ -39,3 +39,10 @@ describe('messages in any language', () => {
     expect(['ar', 'ur', 'he', 'en', 'hi'].map(languageDir)).toEqual(['rtl', 'rtl', 'rtl', 'ltr', 'ltr']);
   });
 });
+
+describe('dates for a reader', () => {
+  it('uses the school’s locale in its own language, the reader’s language in the school’s region otherwise', async () => {
+    const { readingLocale } = await import('./i18n.js');
+    expect([readingLocale('en', 'en-IN', 'IN'), readingLocale('ar', 'en-AE', 'AE'), readingLocale('hi', 'en-IN', 'IN')]).toEqual(['en-IN', 'ar-AE', 'hi-IN']);
+  });
+});

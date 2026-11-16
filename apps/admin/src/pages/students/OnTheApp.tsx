@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useToast, EmptyState } from '@tangent/web-ui';
+import { useToast, EmptyState, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page } from '../../app/Page';
 import { useSchoolConfig } from '../../app/kit';
@@ -19,7 +19,7 @@ export function OnTheApp({ tabs }: { tabs: React.ReactNode }) {
   const may = app.user.permissions.includes('students.write');
   const invite = useMutation({
     mutationFn: (b: { classId?: string; remind: boolean }) => app.api.movingIn.inviteFamilies(b.classId, b.remind),
-    onSuccess: (r, b) => { void qc.invalidateQueries({ queryKey: ['activation'] }); say(r.sent ? `${b.remind ? 'Reminded' : 'Invited'} ${r.sent} ${r.sent === 1 ? 'family' : 'families'}.` : b.remind ? 'Everyone invited has signed in.' : 'No family is left to invite.'); },
+    onSuccess: (r, b) => { void qc.invalidateQueries({ queryKey: ['activation'] }); say(r.sent ? `${b.remind ? t('admin.on_the_app.reminded') : t('admin.on_the_app.invited')} ${r.sent} ${r.sent === 1 ? 'family' : 'families'}.` : b.remind ? t('admin.on_the_app.everyone_invited_has_signed_in') : t('admin.on_the_app.no_family_is_left_to')); },
     onError: (e) => say((e as Error).message, 'bad'),
   });
   // The letters are a PDF from the server, one page each, with the code that opens the school's app.
@@ -30,28 +30,28 @@ export function OnTheApp({ tabs }: { tabs: React.ReactNode }) {
   const students = !!cfg?.app.roles.includes('student');
   const a = act.data;
   return (
-    <Page title="Students" sub="Families on the school’s app" toast={toast} tabs={tabs} loading={act.isLoading && !a}
+    <Page title={t('admin.on_the_app.students')} sub={t('admin.on_the_app.families_on_the_school_s')} toast={toast} tabs={tabs} loading={act.isLoading && !a}
       error={act.isError && !a ? { message: (act.error as Error).message, retry: () => void act.refetch() } : null}>
       {a && (a.classes.length === 0 ? (
         <EmptyState scene="onapp" onAction={() => app.go('/students?import=1')} onLink={() => app.go('/students?add=1')} />
       ) : (
-        <Card title="Families on the app" chip={<span className="chip g">{a.families.signedIn} of {a.families.total} signed in</span>}>
-          <p className="help" style={{ marginTop: 0 }}>Invite a class at a time; the letters to send home say the same. Families sign in with their phone and a code: there is no password. Remind those who were invited but have not signed in yet.</p>
+        <Card title={t('admin.on_the_app.families_on_the_app')} chip={<span className="chip g">{a.families.signedIn} {t('admin.on_the_app.of')}{' '}{a.families.total} {t('admin.on_the_app.signed_in')}</span>}>
+          <p className="help" style={{ marginTop: 0 }}>{t('admin.on_the_app.invite_a_class_at_a')}</p>
           <div className="scroll-x lscroll">
             <div style={{ minWidth: 760 }}>
-              <div className="grd th" style={{ '--cols': 'minmax(0,1fr) 80px 80px minmax(0,1.3fr) 90px 260px' } as React.CSSProperties}><span>Class</span><span>Families</span><span>Invited</span><span>Signed in</span><span data-tip="Agreed to the school’s privacy notice in the app">Consented</span><span></span></div>
+              <div className="grd th" style={{ '--cols': 'minmax(0,1fr) 80px 80px minmax(0,1.3fr) 90px 260px' } as React.CSSProperties}><span>{t('admin.on_the_app.class')}</span><span>{t('admin.on_the_app.families')}</span><span>{t('admin.on_the_app.invited')}</span><span>{t('admin.on_the_app.signed_in_2')}</span><span data-tip={t('admin.on_the_app.agreed_to_the_school_s')}>{t('admin.on_the_app.consented')}</span><span></span></div>
               {a.classes.map((c) => (
                 <div key={c.classId} className="grd rw" style={{ '--cols': 'minmax(0,1fr) 80px 80px minmax(0,1.3fr) 90px 260px' } as React.CSSProperties}>
                   <b style={{ font: '700 14px var(--fb)' }}>{c.className}</b>
                   <span>{c.families}</span>
                   <span>{c.invited}</span>
-                  <span className="us" style={{ gap: 4 }}><div className="bar" style={{ height: 10 }}><i style={{ width: `${pct(c.signedIn, c.families)}%` }}></i></div><small style={{ font: '700 11px var(--fb)', color: 'var(--ink3)' }}>{c.signedIn} of {c.families}</small></span>
+                  <span className="us" style={{ gap: 4 }}><div className="bar" style={{ height: 10 }}><i style={{ width: `${pct(c.signedIn, c.families)}%` }}></i></div><small style={{ font: '700 11px var(--fb)', color: 'var(--ink3)' }}>{c.signedIn} {t('admin.on_the_app.of')}{' '}{c.families}</small></span>
                   <span>{c.consented}</span>
                   <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                    {may && c.invited < c.families && <button className="btn sm" disabled={invite.isPending} onClick={() => invite.mutate({ classId: c.classId, remind: false })}>Invite</button>}
-                    {may && c.invited > c.signedIn && <button className="btn sm" disabled={invite.isPending} onClick={() => invite.mutate({ classId: c.classId, remind: true })}>Remind</button>}
-                    <button className="btn sm" disabled={!c.students} onClick={() => letters(c.classId, 'family')}>Letters</button>
-                    {students && <button className="btn sm" disabled={!c.students} onClick={() => letters(c.classId, 'student')}>Student letters</button>}
+                    {may && c.invited < c.families && <button className="btn sm" disabled={invite.isPending} onClick={() => invite.mutate({ classId: c.classId, remind: false })}>{t('admin.on_the_app.invite')}</button>}
+                    {may && c.invited > c.signedIn && <button className="btn sm" disabled={invite.isPending} onClick={() => invite.mutate({ classId: c.classId, remind: true })}>{t('admin.on_the_app.remind')}</button>}
+                    <button className="btn sm" disabled={!c.students} onClick={() => letters(c.classId, 'family')}>{t('admin.on_the_app.letters')}</button>
+                    {students && <button className="btn sm" disabled={!c.students} onClick={() => letters(c.classId, 'student')}>{t('admin.on_the_app.student_letters')}</button>}
                   </span>
                 </div>
               ))}
@@ -59,8 +59,8 @@ export function OnTheApp({ tabs }: { tabs: React.ReactNode }) {
           </div>
           {may && (
             <div className="tgrow" style={{ marginTop: 16 }}>
-              {a.families.invited < a.families.total && <button className="btn pri" disabled={invite.isPending} onClick={() => invite.mutate({ remind: false })}>Invite every family not yet invited</button>}
-              {a.families.invited > a.families.signedIn && <button className="btn" disabled={invite.isPending} onClick={() => invite.mutate({ remind: true })}>Remind everyone not signed in</button>}
+              {a.families.invited < a.families.total && <button className="btn pri" disabled={invite.isPending} onClick={() => invite.mutate({ remind: false })}>{t('admin.on_the_app.invite_every_family_not_yet')}</button>}
+              {a.families.invited > a.families.signedIn && <button className="btn" disabled={invite.isPending} onClick={() => invite.mutate({ remind: true })}>{t('admin.on_the_app.remind_everyone_not_signed_in')}</button>}
             </div>
           )}
         </Card>
