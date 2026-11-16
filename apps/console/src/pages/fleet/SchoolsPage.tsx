@@ -9,7 +9,7 @@ import { count, initials, statusOf } from '../../app/format';
 
 const SEARCH = 'search';
 const PAGE = 25;
-const COLS = tr('console.schools_page.minmax_0_2fr_110px_70px');
+const COLS = 'minmax(0,2fr) 110px 70px 100px 90px 130px 80px';
 type Sort = 'name' | 'newest' | 'students' | 'p95';
 
 /** Every school, the list every other page links to: search, filters by state, cell and plan, sorting and pages. */

@@ -53,7 +53,7 @@ export function PhoneDashboard() { const app = useApp();
     subline: d.modules.includes('attendance') ? t('admin.phone_dashboard.not_marked_present', { absent, examsLabel: d.term.examsLabel }) : d.term.examsLabel,
     left, items, clear: items.length === 0 || left === 0,
     barsTitle: t('admin.phone_dashboard.fees_collected_each_day'), barsEmpty: peak === 0, barsAlt: t('admin.phone_dashboard.fees_collected_over_the_last', { length: pts.length }),
-    bars: pts.map((p) => ({ h: Math.max(8, (p.amount / max) * 100), n: p.label.slice(0, 1), c: p.amount === peak && peak > 0 ? 'var(--brand)' : t('admin.phone_dashboard.color_mix_in_srgb_var') })),
+    bars: pts.map((p) => ({ h: Math.max(8, (p.amount / max) * 100), n: p.label.slice(0, 1), c: p.amount === peak && peak > 0 ? 'var(--brand)' : 'color-mix(in srgb,var(--on-deep) 34%,transparent)' })),
     toast };
   return <PhoneView v={v} />;
 }

@@ -48,7 +48,7 @@ export function ReportsPage() {
     const right = d.columns.find((c) => c.key === sort.key)?.align === 'right';
     return (right ? num(x) - num(y) : String(x).localeCompare(String(y))) * sort.dir;
   }) : d?.rows ?? [];
-  const cols = d ? t('admin.reports_page.minmax_0_1_5fr', { p0: d.columns.slice(1).map(() => 'minmax(64px,1fr)').join(' ') }) : '';
+  const cols = d ? `minmax(0,1.5fr) ${d.columns.slice(1).map(() => 'minmax(64px,1fr)').join(' ')}` : '';
   return (
     <Page title={t('admin.reports_page.reports')} sub={t('admin.reports_page.numbers_you_can_read_download')} toast={toast} loading={all.isLoading && !all.data}
       error={all.isError && !all.data ? { message: (all.error as Error).message, retry: () => void all.refetch() } : null}

@@ -9,7 +9,7 @@ import { count, rupees, when } from '../../app/format';
 
 const TONE: Record<InvoiceRowC['status'], string> = { draft: 'n', sent: 'v', paid: 'g', overdue: 'c' };
 const WORDS: Record<InvoiceRowC['status'], string> = { draft: tr('console.billing_page.not_sent'), sent: tr('console.billing_page.sent'), paid: tr('console.billing_page.paid'), overdue: tr('console.billing_page.overdue') };
-const COLS = tr('console.billing_page.minmax_0_2fr_100px_120px');
+const COLS = 'minmax(0,2fr) 100px 120px 120px 110px';
 const esc = (v: string) => v.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 /** One invoice per live school each month: students times the plan's yearly price, divided by twelve, plus modules added on top. */

@@ -9,7 +9,7 @@ import { ago } from '../../app/format';
 
 const TONE: Record<BuildRow['status'], string> = { queued: 'v', building: 'v', done: 'g', failed: 'c', unavailable: 'a' };
 const LABEL: Record<BuildRow['status'], string> = { queued: t('console.builds_page.queued'), building: t('console.builds_page.building'), done: t('console.builds_page.ready'), failed: t('console.builds_page.failed'), unavailable: t('console.builds_page.not_set_up') };
-const COLS = t('console.builds_page.minmax_0_2fr_90px_100px');
+const COLS = 'minmax(0,2fr) 90px 100px 130px 110px';
 
 /** Every school's app builds. A build is started from the school's Technical tab, where its own builds are. */
 export function BuildsPage() {

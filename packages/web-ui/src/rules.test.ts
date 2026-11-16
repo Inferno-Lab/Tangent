@@ -145,6 +145,12 @@ describe('every word in a language catalogue', () => {
     expect(englishInCode(), 'use one message with {n, plural, …} or select, and listOf() for lists (node tools/i18n-english.mjs)').toEqual([]);
   });
 
+  it('keeps code out of the catalogues (CSS, class names)', () => {
+    const code = catalogues.flatMap((d) => Object.entries(JSON.parse(read(path.join(root, d, 'en.json'))) as Record<string, string>)
+      .filter(([, v]) => /minmax\(|var\(--|\d(px|fr)\b|\bsp-\{|!important/.test(v)).map(([k]) => `${d}/en.json ${k}`));
+    expect(code, 'put the CSS back in the code: only words a person reads belong in a catalogue').toEqual([]);
+  });
+
   it('keeps every other language to English’s keys and {values}', () => {
     const problems = catalogues.flatMap((d) => readdirSync(path.join(root, d)).filter((f) => f.endsWith('.json') && f !== 'en.json').flatMap((f) => {
       const own = JSON.parse(read(path.join(root, d, f))) as Record<string, string>;

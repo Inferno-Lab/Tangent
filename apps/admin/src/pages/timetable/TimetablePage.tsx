@@ -80,7 +80,7 @@ export function TimetablePage() { const app = useApp();
   const periodDef = (idx: number) => data.periods.find((p) => p.idx === idx);
   const now = schoolMinutes();
   // A subject's spectrum colour (contracts subjectColour), the same in the admin and the app.
-  const subjectKey = (s: Pick<SlotRow, 'subjectName' | 'subjectColor'>) => tr('admin.timetable_page.sub_sp', { subjectColour: subjectColour(s.subjectName, s.subjectColor) });
+  const subjectKey = (s: Pick<SlotRow, 'subjectName' | 'subjectColor'>) => `sub sp-${subjectColour(s.subjectName, s.subjectColor)}`;
   const running = data.periods.find((p) => p.kind === 'period' && now >= toMin(p.starts) && now < toMin(p.ends)) ?? data.periods.find((p) => p.kind === 'period');
   const at = { day: DAYS.includes(sel.day) ? sel.day : DAYS[0] ?? 1, period: sel.period || running?.idx || 0 };
   const cellOf = (day: number, p: { idx: number; starts: string; ends: string }, ri: number) => { const s = slotAt(day, p.idx);
