@@ -1,6 +1,6 @@
 /* The admin and console stylesheet: the Nest look (the owner's choice, 14 November 2026) in Tangent Hue's tokens and layouts. */
 .nest{--sh1:0 1px 2px color-mix(in srgb,var(--ink) 5%,transparent);--sh2:0 8px 20px -12px color-mix(in srgb,var(--ink) 22%,transparent);--sh3:0 18px 44px -20px color-mix(in srgb,var(--ink) 34%,transparent);
---fb:'Manrope','Noto Sans Devanagari',system-ui,sans-serif;--fd:'Bricolage Grotesque','Manrope','Noto Sans Devanagari',sans-serif;--fm:ui-monospace,'SF Mono',Consolas,monospace;--e:cubic-bezier(.22,1,.36,1);--ei:cubic-bezier(.4,0,1,1);
+--fb:'Manrope',var(--fs,'Noto Sans Devanagari'),system-ui,sans-serif;--fd:'Bricolage Grotesque','Manrope',var(--fs,'Noto Sans Devanagari'),sans-serif;--fm:ui-monospace,'SF Mono',Consolas,monospace;--e:cubic-bezier(.22,1,.36,1);--ei:cubic-bezier(.4,0,1,1);
 /* Every timing in the admin and console: press and toggle, popups and menus, dialogs and page changes. Leaving uses the next one down. */
 --t1:120ms;--t2:200ms;--t3:300ms;
 font-family:var(--fb);color:var(--ink);background:var(--bd);-webkit-font-smoothing:antialiased;letter-spacing:-.005em;position:relative;box-sizing:border-box}

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { languageDir, makeT, setTextSource, wordsFor, type Catalogue, type Params, type Vocabulary } from '@tangent/contracts';
+import { languageDir, makeT, scriptFont, setTextSource, wordsFor, type Catalogue, type Params, type Vocabulary } from '@tangent/contracts';
 import ui from './en.json';
 
 /**
@@ -47,7 +47,22 @@ export async function setLanguage(next: string, vocab?: Vocabulary): Promise<voi
   if (typeof document !== 'undefined') {
     document.documentElement.lang = next;
     document.documentElement.dir = languageDir(next);
+    loadScriptFont(next);
   }
+}
+
+/** The font that writes the language's script, loaded from Google Fonts like the design's own, and put first in the stacks (--fs). */
+function loadScriptFont(code: string): void {
+  const family = scriptFont(code);
+  if (!family || family === 'Noto Sans Devanagari') return;
+  const href = `https://fonts.googleapis.com/css2?family=${family.replace(/ /g, '+')}:wght@400;500;600;700&display=swap`;
+  if (!document.querySelector(`link[href="${href}"]`)) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    document.head.append(link);
+  }
+  document.documentElement.style.setProperty('--fs', `'${family}','Noto Sans Devanagari'`);
 }
 
 /** The languages this app has words in (English always), for the sign-in page's picker. */

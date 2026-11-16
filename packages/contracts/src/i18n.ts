@@ -41,6 +41,20 @@ export const LANGUAGE_LIST: Language[] = [
 ];
 
 const BY_CODE = new Map(LANGUAGE_LIST.map((l) => [l.code, l]));
+
+/** The Noto family that writes a language's script (Google Fonts), where Latin fonts do not; null for Latin, Cyrillic and Greek. */
+export function scriptFont(code: string): string | null {
+  const l = BY_CODE.get(code);
+  if (!l) return null;
+  if (l.script === 'cjk') return code === 'ja' ? 'Noto Sans JP' : 'Noto Sans SC';
+  const fonts: Partial<Record<Script, string>> = {
+    devanagari: 'Noto Sans Devanagari', arabic: code === 'ur' ? 'Noto Nastaliq Urdu' : 'Noto Sans Arabic', bengali: 'Noto Sans Bengali', tamil: 'Noto Sans Tamil',
+    telugu: 'Noto Sans Telugu', gujarati: 'Noto Sans Gujarati', gurmukhi: 'Noto Sans Gurmukhi', kannada: 'Noto Sans Kannada', malayalam: 'Noto Sans Malayalam',
+    odia: 'Noto Sans Oriya', sinhala: 'Noto Sans Sinhala', thai: 'Noto Sans Thai', hangul: 'Noto Sans KR', hebrew: 'Noto Sans Hebrew', ethiopic: 'Noto Sans Ethiopic',
+    khmer: 'Noto Sans Khmer', myanmar: 'Noto Sans Myanmar', georgian: 'Noto Sans Georgian', armenian: 'Noto Sans Armenian', lao: 'Noto Sans Lao',
+  };
+  return fonts[l.script] ?? null;
+}
 export const isLanguage = (code: string): boolean => BY_CODE.has(code);
 export const languageOf = (code: string): Language => BY_CODE.get(code) ?? BY_CODE.get('en')!;
 export const languageDir = (code: string): 'ltr' | 'rtl' => languageOf(code).dir;
