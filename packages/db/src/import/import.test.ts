@@ -150,9 +150,15 @@ describe('moving a school in', () => {
     const first = await commitImport(pool, { kind: 'students', csv, fileName: 'new.csv' }, 'Office');
     expect(first.created).toBe(1);
     const no = (await pool.query<{ admission_no: string }>("select admission_no from students where name = 'New Child'")).rows[0]!.admission_no;
-    expect(no).toMatch(/^\d{4}\/0501$/);
+    expect(no).toMatch(/^\d{4}\/0001$/);
     const again = await previewImport(pool, { kind: 'students', csv, fileName: 'new.csv' });
     expect(again.counts).toMatchObject({ create: 0, update: 1 });
+    // The school's own series, as the office set it.
+    await pool.query(`insert into settings (key, value) values ('people.admissionNumber', '"ADM-{yy}-{seq:3}"'), ('people.admissionStart', '40')`);
+    try {
+      await commitImport(pool, { kind: 'students', csv: 'name,class,dob,guardian\nOther Child,4 A,19/04/2017,Ravi Other\n', fileName: 'other.csv' }, 'Office');
+      expect((await pool.query<{ admission_no: string }>("select admission_no from students where name = 'Other Child'")).rows[0]!.admission_no).toMatch(/^ADM-\d{2}-040$/);
+    } finally { await pool.query("delete from settings where key in ('people.admissionNumber', 'people.admissionStart')"); }
   }, 60_000);
 
   it('gives every kind an Excel template that reads back as itself, with a dropdown wherever the values are fixed', async () => {

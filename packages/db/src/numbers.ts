@@ -1,5 +1,7 @@
 import type pg from 'pg';
 
+import { SchoolSettingsSchema, type SchoolSettings } from '@tangent/contracts';
+
 export { seriesProblem } from '@tangent/contracts';
 
 type Q = pg.Pool | pg.PoolClient;
@@ -31,8 +33,11 @@ export function renderSeries(pattern: string, day: string, ay = ''): { before: s
   return { before: fill(p.slice(0, m.index)), width: Math.min(12, Number(m[1] ?? 0)), after: fill(p.slice(m.index + m[0].length)) };
 }
 
-/** The next number in a series, inside the caller's transaction (it takes a lock so two never share a number). */
-export async function nextNumber(q: Q, s: SeriesInput): Promise<string> {
+/**
+ * Where a series stands, inside the caller's transaction (it takes a lock so two never share a number): `take()` gives the
+ * next number each time it is called, for a batch such as an import.
+ */
+export async function seriesFrom(q: Q, s: SeriesInput): Promise<{ take: () => string }> {
   const { before, width, after } = renderSeries(s.pattern, s.day, s.ay);
   await q.query('select pg_advisory_xact_lock(hashtext($1))', [`series:${s.table}.${s.column}`]);
   const last = (await q.query<{ n: string | null }>(
@@ -40,6 +45,19 @@ export async function nextNumber(q: Q, s: SeriesInput): Promise<string> {
      from ${s.table} where starts_with(${s.column}, $1) and right(${s.column}, char_length($2)) = $2
        and substring(${s.column} from char_length($1) + 1 for char_length(${s.column}) - char_length($1) - char_length($2)) ~ '^[0-9]{1,15}$'`,
     [before, after])).rows[0]!.n;
-  const n = Math.max(s.start, last === null ? s.start : Number(last) + 1);
-  return `${before}${String(n).padStart(width, '0')}${after}`;
+  let n = Math.max(s.start, last === null ? s.start : Number(last) + 1);
+  return { take: () => `${before}${String(n++).padStart(width, '0')}${after}` };
+}
+
+/** The next number in a series, inside the caller's transaction. */
+export async function nextNumber(q: Q, s: SeriesInput): Promise<string> {
+  return (await seriesFrom(q, s)).take();
+}
+
+/** A school's saved setting, read through its schema (the default when it was never changed). */
+export async function savedSetting<K extends keyof SchoolSettings>(q: Q, key: K): Promise<SchoolSettings[K]> {
+  const v = (await q.query<{ value: unknown }>('select value from settings where key = $1', [key])).rows[0]?.value;
+  const field = SchoolSettingsSchema.shape[key];
+  const read = field.safeParse(v);
+  return (read.success ? read.data : field.parse(undefined)) as SchoolSettings[K];
 }
