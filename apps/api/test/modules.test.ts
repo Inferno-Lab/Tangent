@@ -1,3 +1,4 @@
+import { refreshTranslations } from '@tangent/tenancy';
 import { addDays, schoolToday } from '@tangent/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startHarness, type Harness } from './harness.js';
@@ -275,6 +276,19 @@ describe('privacy and templates', () => {
     const rows = (await h.registry.query("select channel, body from sandbox_messages where school_slug = 'greenfield' order by created_at desc limit 1")).rows;
     expect(rows[0]).toMatchObject({ channel: 'sms', body: 'Hello! Anika Rao has a fee waiting. Please pay soon. Greenfield' });
     expect(Number((await h.registry.query("select count(*) n from sandbox_messages where school_slug = 'greenfield'")).rows[0].n)).toBe(before + 1);
+    // A parent who reads Hindi (set on their record by the office) gets it in Hindi: the school's Hindi wording, else the usual one translated.
+    const to = (await h.registry.query("select to_addr from sandbox_messages where school_slug = 'greenfield' order by created_at desc limit 1")).rows[0].to_addr;
+    await h.schoolSql("update guardians set language = 'hi' where phone = $1", [to]);
+    const last = async () => (await h.registry.query("select body from sandbox_messages where school_slug = 'greenfield' order by created_at desc limit 1")).rows[0].body;
+    await h.setSettings({ 'templates.messages': { 'fees.reminder': { en: 'Hello! {student} has a fee waiting.', hi: 'नमस्ते! {student} की फ़ीस बाकी है। {school}' } } });
+    await send('POST', '/v1/fees/reminders', { ids: [stu.id] });
+    expect(await last()).toBe('नमस्ते! Anika Rao की फ़ीस बाकी है। Greenfield');
+    await h.registry.query(`insert into translations (lang, surface, key, text, updated_by) values ('hi', 'text', 'Reminder: fees for {student} are due. Pay in the Tangent app to get an instant receipt.', '{student} की फ़ीस देय है। तुरंत रसीद के लिए Tangent ऐप में भुगतान करें।', 'test')`);
+    await refreshTranslations(h.registry);
+    await h.setSettings({ 'templates.messages': {} });
+    await send('POST', '/v1/fees/reminders', { ids: [stu.id] });
+    expect(await last()).toBe('Anika Rao की फ़ीस देय है। तुरंत रसीद के लिए Tangent ऐप में भुगतान करें।');
+    await h.schoolSql('update guardians set language = null where phone = $1', [to]);
   });
   it('puts each role’s app layout and the console flags into the config the apps fetch', async () => {
     await h.setSettings({ 'app.layout': { parent: { dock: ['home', 'fees', 'nonsense', 'trips'], home: [], quick: ['payFees'] }, student: { dock: [], home: [], quick: [] }, teacher: { dock: ['home', 'classes'], home: [], quick: [] }, driver: { dock: [], home: [], quick: [] } } });

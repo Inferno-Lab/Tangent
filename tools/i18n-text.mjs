@@ -30,6 +30,8 @@ for (const t of [C.SETTINGS_META, C.IMPORT_KINDS, C.SETUP_KINDS, C.INTEGRATION_P
   E.MODULES, E.ADMIN_PAGES, E.APP_CATALOG]) walk(t, '');
 for (const r of [C.MARK_MEANING_LABELS, C.CATEGORY_TONE_LABELS, C.PAYMENT_KIND_LABELS, C.STEP_LABELS, C.ACTION_LABELS, C.CAPABILITY_LABELS, E.APP_ROLE_LABELS]) Object.values(C.rawOf(r)).forEach(add);
 for (const g of [...C.SETTING_GROUPS, ...E.ADMIN_GROUPS]) add(g);
+// The usual wording of each message to families and staff (sent in each person's language).
+for (const e of C.rawOf(C.MESSAGE_EVENTS)) add(e.text);
 
 // 2. Server code and contracts: error messages, field problems, form checks (zod messages) and tx() calls.
 const DIRS = ['apps/api/src', 'apps/console-api/src', 'packages/contracts/src', 'packages/config-engine/src', 'packages/db/src', 'packages/nest-kit/src',

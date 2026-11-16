@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:tangent/core/config/app_config.dart';
+import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/services/storage_service.dart';
 import 'package:tangent/data/datasources/remote_datasource.dart';
 
@@ -35,6 +36,16 @@ abstract final class LanguagePacks {
       if (Get.locale?.languageCode == lang) await Get.forceAppUpdate();
     } on Object {
       // Offline, or no pack for this language yet: the kept one (or English) stays.
+    }
+  }
+
+  /// The school learns the person's language, so its messages reach them in it (a signed-in account on a real school only).
+  static Future<void> remember(String lang) async {
+    if (AppConfig.useMockData || !Get.isRegistered<RemoteDataSource>() || !Get.isRegistered<AuthService>() || !Get.find<AuthService>().isLoggedIn) return;
+    try {
+      await Get.find<RemoteDataSource>().client.send('PUT', '/v1/auth/me/prefs', {'key': 'language', 'value': lang});
+    } on Object {
+      // Offline: the next start says it again.
     }
   }
 

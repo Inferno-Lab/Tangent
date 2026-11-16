@@ -27,6 +27,8 @@ export interface Harness {
   addSchool: (slug: string, o: { plan: string; data: 'demo' | 'empty'; demoMode?: boolean; status?: string }) => Promise<void>;
   /** Changes a school's entitlement in the registry as the console does (fields given replace the stored ones) and drops the API's cached copy. */
   entitle: (patch: Record<string, unknown>, slug?: string) => Promise<void>;
+  /** Runs one query in a school's own database (for state no route sets, like a family's saved language). */
+  schoolSql: (sql: string, params?: unknown[], slug?: string) => Promise<any[]>;
 }
 
 export async function startHarness(port?: number): Promise<Harness> {
@@ -96,6 +98,11 @@ export async function startHarness(port?: number): Promise<Harness> {
     const step2 = await call('POST', '/v1/auth/verify', { body: { challengeId: step1.json.challenge.challengeId, code: '424242' } });
     return step2.json.accessToken as string;
   };
+  const schoolSql: Harness['schoolSql'] = async (sql, params = [], school = slug) => {
+    const dbName = (await registry.query<{ db_name: string }>('select db_name from schools where slug = $1', [school])).rows[0]!.db_name;
+    const pool = new pg.Pool({ connectionString: await ensureDatabase(server.url, dbName), max: 1 });
+    try { return (await pool.query(sql, params)).rows; } finally { await pool.end(); }
+  };
   const setSettings: Harness['setSettings'] = async (changes, school = slug) => {
     const dbName = (await registry.query<{ db_name: string }>('select db_name from schools where slug = $1', [school])).rows[0]!.db_name;
     const pool = new pg.Pool({ connectionString: await ensureDatabase(server.url, dbName), max: 1 });
@@ -115,7 +122,7 @@ export async function startHarness(port?: number): Promise<Harness> {
     app.get<{ invalidate: (s?: string) => void }>(REGISTRY).invalidate(school);
   };
   return {
-    app, server, registry, slug, call, login, addSchool, setSettings, setDemo, entitle,
+    app, server, registry, slug, call, login, addSchool, setSettings, setDemo, entitle, schoolSql,
     close: async () => { await app.close(); await registry.end(); await server.stop(); },
   };
 }

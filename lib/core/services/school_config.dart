@@ -200,6 +200,7 @@ abstract final class SchoolConfig {
       await theme.setLocale(Locale(languages.contains(fallback) ? fallback : languages.first));
     } else if (!Get.testMode) {
       unawaited(LanguagePacks.refresh(theme.locale.value.languageCode));
+      unawaited(LanguagePacks.remember(theme.locale.value.languageCode));
     }
     const days = {'mon': DateTime.monday, 'tue': DateTime.tuesday, 'wed': DateTime.wednesday, 'thu': DateTime.thursday, 'fri': DateTime.friday, 'sat': DateTime.saturday, 'sun': DateTime.sunday};
     weeklyOffDays

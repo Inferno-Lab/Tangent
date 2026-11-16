@@ -213,7 +213,8 @@ export const SchoolSettingsSchema = z.object({
   'notify.quietFrom': z.string().regex(/^\d{2}:\d{2}$/, 'Use a time like 21:00').default('21:00'),
   'notify.quietTo': z.string().regex(/^\d{2}:\d{2}$/, 'Use a time like 07:00').default('07:00'),
   // Message templates by key, with {placeholders}. Empty means the built-in wording.
-  'templates.messages': z.record(z.string(), z.string().max(320)).default({}),
+  // The school's own wording of a message: one text (in its default language) or one per language (`{ hi: '…', en: '…' }`).
+  'templates.messages': z.record(z.string(), z.union([z.string().max(320), z.record(z.string().refine(isLanguage), z.string().max(320))])).default({}),
   // Privacy and consent.
   'privacy.notice': z.string().max(4000).default(''),
   'privacy.officerName': z.string().max(80).default(''),
@@ -323,6 +324,8 @@ export const USER_PREFS = {
   'dashboard.widgets': z.array(z.string().max(40)).max(12),
   /** Messages this person turned off in the app (message keys; urgent ones cannot be). */
   'notify.off': z.array(z.string().max(60)).max(60),
+  /** The language this person reads (the app's picker): messages reach them in it. */
+  language: z.string().refine(isLanguage, 'Pick a language from the list'),
   /** The app's welcome after the first sign-in has been seen. */
   'welcome.seen': z.boolean(),
 } as const;

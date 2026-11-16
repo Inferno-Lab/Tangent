@@ -1,5 +1,5 @@
 import { ATTENDANCE_MARKS, type MenuGroup } from './config.js';
-import type { Vocabulary } from './i18n.js';
+import { isLanguage, type Vocabulary } from './i18n.js';
 import { z } from 'zod';
 import { Money } from './locale.js';
 import { IsoDate } from './common.js';
@@ -171,10 +171,11 @@ export const GuardiansPut = z.object({
   guardians: z.array(z.object({
     id: z.string().optional(), name: z.string().trim().min(2, 'Enter the name').max(80), phone: z.string().trim().min(1, 'Enter the phone number').max(24),
     email: z.string().trim().email('Check the email').max(120).or(z.literal('')).optional(), relation: z.string().trim().min(2).max(30), canCollect: z.boolean(), isPrimary: z.boolean(),
+    language: z.string().refine((l) => !l || isLanguage(l), 'Pick a language from the list').optional(),
   })).min(1, 'A student needs at least one guardian').max(4),
 }).refine((b) => b.guardians.filter((g) => g.isPrimary).length === 1, { message: 'Choose one guardian to contact first.', path: ['guardians'] });
 export type GuardiansPut = z.infer<typeof GuardiansPut>;
-export interface GuardianRow { id: string; name: string; phone: string; email: string; relation: string; canCollect: boolean; isPrimary: boolean; hasApp: boolean }
+export interface GuardianRow { id: string; name: string; phone: string; email: string; relation: string; canCollect: boolean; isPrimary: boolean; hasApp: boolean; /** The language they read; '' for the school's own. */ language: string }
 
 export const BulkStudentAction = z.object({
   ids: z.array(z.string()).min(1).max(500),

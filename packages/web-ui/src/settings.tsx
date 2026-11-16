@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, hasKey, type AppRole } from '@tangent/config-engine';
-import { VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
+import { rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
 import { Checkbox, DateField, FilePick, NumberField, TimeField } from './fields';
 import { ColourField } from './ColourPicker';
 import { ErrorLine, Field, SelectField } from './forms';
@@ -107,14 +107,10 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
       })}</div>);
     }
     case 'templates': {
-      const words = (value ?? {}) as Record<string, string>;
-      return box(<div>{MESSAGE_EVENTS.map((e) => (
-        <div key={e.key} style={{ marginTop: 10 }}>
-          <div className="help" style={{ margin: '0 0 4px' }}><b>{e.label}</b> {tr('ui.settings.placeholders')}{' '}{e.vars.map((v) => `{${v}}`).join(' ')}</div>
-          <div className="inp" style={{ height: 'auto' }}><textarea value={words[e.key] ?? ''} placeholder={e.text} maxLength={320} disabled={disabled} aria-label={tr('ui.settings.wording', { label: e.label })} style={{ ...ta, minHeight: 56 }}
-            onChange={(x) => { const next = { ...words, [e.key]: x.target.value }; if (!x.target.value.trim()) delete next[e.key]; onChange(next); }} /></div>
-        </div>
-      ))}</div>);
+      const v = ctx.values ?? {};
+      const school = String(v['school.language'] ?? 'en');
+      const langs = [...new Set([school, ...(Array.isArray(v['app.languages']) ? (v['app.languages'] as string[]) : [])])];
+      return box(<TemplatesEditor value={(value ?? {}) as Record<string, string | Record<string, string>>} school={school} languages={langs} disabled={disabled} onChange={onChange} />);
     }
     default:
       return <div style={{ marginTop: 12 }}><Field label={meta.label} value={str} onChange={onChange} disabled={disabled} error={error} hint={typeof help === 'string' ? help || undefined : undefined} /></div>;
@@ -274,6 +270,32 @@ function PaymentMethodsEditor({ value, max, disabled, onChange }: { value: Payme
         onChange([...value, { key, name, kind: 'other' }]);
       }}>{tr('ui.settings.add_a_method')}</button>}
       <div className="help">{tr('ui.settings.a_method_keeps_its_key')}</div>
+    </div>
+  );
+}
+
+/** The school's wording of each message, per language it offers; empty keeps the usual wording (translated for each reader). */
+function TemplatesEditor({ value, school, languages, disabled, onChange }: { value: Record<string, string | Record<string, string>>; school: string; languages: string[]; disabled: boolean; onChange: (v: unknown) => void }) {
+  const [lang, setLang] = useState(school);
+  const textOf = (k: string) => { const c = value[k]; return typeof c === 'string' ? (lang === school ? c : '') : c?.[lang] ?? ''; };
+  const put = (k: string, text: string) => {
+    const c = value[k];
+    const own = { ...(typeof c === 'string' ? (c.trim() ? { [school]: c } : {}) : c ?? {}), [lang]: text };
+    if (!text.trim()) delete own[lang];
+    const next = { ...value, [k]: own };
+    if (!Object.keys(own).length) delete next[k];
+    onChange(next);
+  };
+  return (
+    <div>
+      {languages.length > 1 && <div style={{ maxWidth: 260 }}><SelectField label={tr('ui.settings.language')} value={lang} onChange={setLang} options={languages.map((l) => ({ value: l, label: languageLabel(l) }))} /></div>}
+      {MESSAGE_EVENTS.map((e) => (
+        <div key={e.key} style={{ marginTop: 10 }}>
+          <div className="help" style={{ margin: '0 0 4px' }}><b>{e.label}</b> {tr('ui.settings.placeholders')}{' '}{e.vars.map((x) => `{${x}}`).join(' ')}</div>
+          <div className="inp" style={{ height: 'auto' }}><textarea value={textOf(e.key)} placeholder={tx(rawOf(e).text)} maxLength={320} disabled={disabled} aria-label={tr('ui.settings.wording', { label: e.label })} style={{ ...ta, minHeight: 56 }}
+            onChange={(x) => put(e.key, x.target.value)} /></div>
+        </div>
+      ))}
     </div>
   );
 }

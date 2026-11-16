@@ -3,9 +3,10 @@ import { StaleSettings, newId, recordSettingsVersion, writeSettings } from '@tan
 import { checkSchoolChanges, resolveConfig, validateSettingsChanges } from '@tangent/config-engine';
 import { ApiError } from '@tangent/nest-kit';
 import type { Registry } from '@tangent/tenancy';
-import { toE164, phoneProblem, MESSAGE_EVENTS, SETTINGS_META, gradeFor, schoolMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type SchoolSettingsPatch, type SchoolSettingsView, type SettingsDoc } from '@tangent/contracts';
+import { rawOf, toE164, phoneProblem, MESSAGE_EVENTS, SETTINGS_META, gradeFor, schoolMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type SchoolSettingsPatch, type SchoolSettingsView, type SettingsDoc } from '@tangent/contracts';
 import { REGISTRY, type TenantCtx } from '../tenancy/tenant.js';
 import { HubService } from './hub.service.js';
+import { serverCatalogue } from '@tangent/tenancy';
 
 @Injectable()
 export class AuditService {
@@ -221,8 +222,16 @@ export class Messenger {
     }
     const doc = (await this.settings.doc(t)).values;
     const rule: { push: boolean; sms: boolean; email: boolean; whatsapp?: boolean } = ((doc['notify.rules'] as Record<string, { push: boolean; sms: boolean; email: boolean; whatsapp?: boolean }> | undefined) ?? {})[key] ?? ev.defaults;
-    const custom = ((doc['templates.messages'] as Record<string, string> | undefined) ?? {})[key];
-    const text = custom?.trim() ? custom : ev.text;
+    // Each person reads the message in their own language: the school's wording in it, else the usual wording translated, else
+    // the school's wording as written, else English.
+    const custom = ((doc['templates.messages'] as Record<string, string | Record<string, string>> | undefined) ?? {})[key];
+    const schoolLang = String(doc['school.language'] ?? 'en');
+    const english = rawOf(ev);
+    const textIn = (lang: string) => {
+      const own = typeof custom === 'string' ? (lang === schoolLang ? custom : '') : custom?.[lang] ?? '';
+      const anyOwn = typeof custom === 'string' ? custom : custom?.[schoolLang] ?? '';
+      return own.trim() || (lang !== 'en' && serverCatalogue(lang)[english.text]) || anyOwn.trim() || english.text;
+    };
     const [qf, qt] = [String(doc['notify.quietFrom'] ?? '21:00'), String(doc['notify.quietTo'] ?? '07:00')];
     const mins = (hm: string) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5));
     const now = schoolMinutes();
@@ -235,17 +244,24 @@ export class Messenger {
        where p.value ? $1 and u.phone is not null`, [key])).rows.map((r) => r.phone));
     // Phones are kept in international form, so the same number compares equal however it reached here.
     const digits = (s: string) => toE164(s, t.info.country) ?? s;
+    const langs = !who.length ? new Map<string, string>() : new Map((await t.pool.query<{ phone: string; lang: string }>(
+      // The family's own choice in the app first, else what the office set on the guardian's record.
+      `select g.phone, coalesce(p.value #>> '{}', g.language) lang from guardians g left join user_prefs p on p.user_id = g.user_id and p.key = 'language'
+        where g.phone = any($1) and coalesce(p.value #>> '{}', g.language) is not null
+       union all select u.phone, p.value #>> '{}' from users u join user_prefs p on p.user_id = u.id and p.key = 'language' where u.phone = any($1)`,
+      [who.map((w) => digits(w.to))])).rows.map((r) => [r.phone, r.lang]));
     let reached = 0;
     const out: OutMsg[] = [];
     for (const w of who.filter((x) => !off.has(digits(x.to)))) {
+      const lang = langs.get(digits(w.to)) ?? schoolLang;
       const vars = Object.fromEntries(Object.entries({ ...w.vars, school: w.vars.school ?? school }).map(([k, v]) => [k, String(v)]));
-      const body = text.replace(/\{(\w+)\}/g, (_, k: string) => vars[k] ?? '');
+      const body = textIn(lang).replace(/\{(\w+)\}/g, (_, k: string) => vars[k] ?? '');
       const m = { key, vars, body, sendAfter };
       const before = out.length;
       if (rule.push) out.push({ ...m, channel: 'push', to: w.to, subject: school });
       if (rule.sms) out.push({ ...m, channel: 'sms', to: w.to });
       if (rule.whatsapp) out.push({ ...m, channel: 'whatsapp', to: w.to });
-      if (rule.email && w.email) out.push({ ...m, channel: 'email', to: w.email, subject: ev.label });
+      if (rule.email && w.email) out.push({ ...m, channel: 'email', to: w.email, subject: (lang !== 'en' && serverCatalogue(lang)[english.label]) || english.label });
       if (out.length > before) reached++;
     }
     await this.sendMany(t, out);

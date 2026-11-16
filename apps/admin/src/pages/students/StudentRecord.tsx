@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GENDERS, schoolToday, type ClassInfo, type GuardianRow, type StudentDetail } from '@tangent/contracts';
+import { languageLabel, LANGUAGE_LIST, GENDERS, schoolToday, type ClassInfo, type GuardianRow, type StudentDetail } from '@tangent/contracts';
 import { Checkbox, DateField, Dialog, ErrorLine, Field, SelectField, useShake, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { AreaField, problem, useSetting } from '../../app/kit';
@@ -98,6 +98,8 @@ export function GuardiansDialog({ s, onClose, onDone }: { s: StudentDetail; onCl
               <Field label={t('admin.student_record.phone')} type="tel" value={g.phone} onChange={(phone) => upd(i, { phone })} maxLength={20} hint={g.id ? t('admin.student_record.shown_hidden_type_a_new') : undefined} />
               <Field label={t('admin.student_record.email_optional')} type="email" value={g.email} onChange={(email) => upd(i, { email })} maxLength={120} />
             </div>
+            <SelectField label={t('admin.student_record.reads_messages_in')} value={g.language} onChange={(language) => upd(i, { language })}
+              options={[{ value: '', label: t('admin.student_record.the_school_s_language') }, ...LANGUAGE_LIST.map((l) => ({ value: l.code, label: languageLabel(l.code) }))]} />
             <div className="tgrow">
               <Checkbox checked={g.isPrimary} onChange={(c) => c && upd(i, { isPrimary: true })} label={t('admin.student_record.contact_first')} />
               <Checkbox checked={g.canCollect} onChange={(canCollect) => upd(i, { canCollect })} label={t('admin.student_record.may_collect_from_school')} />
@@ -106,7 +108,7 @@ export function GuardiansDialog({ s, onClose, onDone }: { s: StudentDetail; onCl
             </div>
           </div>
         ))}
-        {list.length < 4 && <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => setList([...list, { key: `new-${Date.now()}`, id: '', name: '', phone: '', email: '', relation: '', canCollect: true, isPrimary: false }])}>{t('admin.student_record.add_a_guardian')}</button>}
+        {list.length < 4 && <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => setList([...list, { key: `new-${Date.now()}`, id: '', name: '', phone: '', email: '', relation: '', canCollect: true, isPrimary: false, language: '' }])}>{t('admin.student_record.add_a_guardian')}</button>}
         {Object.values(err)[0] && <ErrorLine>{Object.values(err)[0]}</ErrorLine>}
         <div className="tgrow" style={{ justifyContent: 'flex-end' }}>
           <button className="btn" onClick={onClose}>{t('admin.student_record.cancel')}</button>

@@ -56,6 +56,7 @@ class ThemeService extends GetxService {
     if (!Get.testMode) {
       unawaited(Get.updateLocale(value));
       unawaited(LanguagePacks.refresh(value.languageCode));
+      unawaited(LanguagePacks.remember(value.languageCode));
     }
   }
 

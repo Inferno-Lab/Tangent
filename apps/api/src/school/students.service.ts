@@ -337,10 +337,10 @@ export class StudentsService {
   }
 
   async guardians(t: TenantCtx, studentId: string): Promise<GuardianRow[]> {
-    const { rows } = await t.pool.query<{ id: string; name: string; phone: string | null; email: string | null; relation: string | null; can_collect: boolean; is_primary: boolean; user_id: string | null; login: Date | null }>(
-      `select g.id, g.name, g.phone, g.email, g.relation, sg.can_collect, sg.is_primary, g.user_id, u.last_login_at login from student_guardians sg join guardians g on g.id = sg.guardian_id
+    const { rows } = await t.pool.query<{ id: string; name: string; phone: string | null; email: string | null; relation: string | null; language: string | null; can_collect: boolean; is_primary: boolean; user_id: string | null; login: Date | null }>(
+      `select g.id, g.name, g.phone, g.email, g.relation, g.language, sg.can_collect, sg.is_primary, g.user_id, u.last_login_at login from student_guardians sg join guardians g on g.id = sg.guardian_id
        left join users u on u.id = g.user_id where sg.student_id = $1 order by sg.is_primary desc, g.name`, [studentId]);
-    return rows.map((r) => ({ id: r.id, name: r.name, phone: r.phone ? maskPhone(r.phone) : '', email: r.email ?? '', relation: r.relation ?? 'Parent', canCollect: r.can_collect, isPrimary: r.is_primary, hasApp: !!r.login }));
+    return rows.map((r) => ({ id: r.id, name: r.name, phone: r.phone ? maskPhone(r.phone) : '', email: r.email ?? '', relation: r.relation ?? 'Parent', language: r.language ?? '', canCollect: r.can_collect, isPrimary: r.is_primary, hasApp: !!r.login }));
   }
 
   /**
@@ -360,10 +360,10 @@ export class StudentsService {
         const phone = known && /[^\d\s+()-]/.test(g.phone) ? known.phone ?? '' : this.settings.phone(t, g.phone);
         const digits = phone;
         let id = known?.id ?? (await client.query<{ id: string }>(`select id from guardians where ${byPhone} limit 1`, [digits])).rows[0]?.id;
-        if (id) await client.query('update guardians set name = $2, phone = $3, email = $4, relation = $5 where id = $1', [id, g.name, phone, g.email || null, g.relation]);
+        if (id) await client.query('update guardians set name = $2, phone = $3, email = $4, relation = $5, language = case when $7 then $6 else language end where id = $1', [id, g.name, phone, g.email || null, g.relation, g.language || null, g.language !== undefined]);
         else {
           id = newId('gdn');
-          await client.query('insert into guardians (id, name, phone, email, relation) values ($1,$2,$3,$4,$5)', [id, g.name, phone, g.email || null, g.relation]);
+          await client.query('insert into guardians (id, name, phone, email, relation, language) values ($1,$2,$3,$4,$5,$6)', [id, g.name, phone, g.email || null, g.relation, g.language || null]);
         }
         const d = digits;
         const has = (await client.query<{ user_id: string | null }>('select user_id from guardians where id = $1', [id])).rows[0]?.user_id;
