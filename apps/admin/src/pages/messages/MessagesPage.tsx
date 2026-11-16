@@ -38,7 +38,7 @@ export function MessagesPage() {
   const unread = all.filter((t) => t.unread > 0).length;
   useEffect(() => { if (!sel && rows[0] && window.matchMedia('(min-width: 900px)').matches) setSel(rows[0].id); }, [rows, sel]);
   return (
-    <Page title={tr('admin.messages_page.messages')} sub={all.length ? tr('admin.messages_page.conversations', { p0: unread ? `${unread} waiting for a reply` : 'All caught up', length: all.length }) : tr('admin.messages_page.what_families_write_to_the')} toast={toast} loading={list.isLoading && !list.data}
+    <Page title={tr('admin.messages_page.messages')} sub={all.length ? tr('admin.messages_page.conversations', { p0: unread ? tr('admin.messages_page.n_waiting_for_a_reply', { n: unread }) : tr('admin.messages_page.all_caught_up'), length: all.length }) : tr('admin.messages_page.what_families_write_to_the')} toast={toast} loading={list.isLoading && !list.data}
       error={list.isError && !list.data ? { message: (list.error as Error).message, retry: () => void list.refetch() } : null}
       actions={canWrite ? <AddBtn onClick={() => setStarting(true)}>{tr('admin.messages_page.new_message')}</AddBtn> : undefined}
       overlays={starting && <Start onClose={() => setStarting(false)} onDone={(t) => { setStarting(false); refresh(qc); setFilter('open'); setSel(t.id); say(tr('admin.messages_page.message_sent_the_family_gets')); }} />}>

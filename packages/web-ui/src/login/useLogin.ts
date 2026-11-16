@@ -158,7 +158,7 @@ export function useLogin(c: LoginController, themeCls: string) {
     emailPh: cons ? 'you@tangent.app' : tr('ui.use_login.your_email_or_phone_number'),
     pw, onPw: (e: { target: { value: string } }) => { setPw(e.target.value); setPwErr(false); },
     pwType: show ? 'text' : 'password', eyeD: show ? EYE_OFF : EYE_ON, eyeLabel: show ? tr('ui.use_login.hide_password') : tr('ui.use_login.show_password'), toggleEye: () => setShow((s) => !s),
-    emCls: emErr ? tr('ui.use_login.err_shake') : '', emInv: emErr ? 'true' : 'false', emErr: !!emErr, emMsg: emErr, pwCls: pwErr ? tr('ui.use_login.err_shake') : '', pwInv: pwErr ? 'true' : 'false', pwErr, pwMsg,
+    emCls: emErr ? 'err shake' : '', emInv: emErr ? 'true' : 'false', emErr: !!emErr, emMsg: emErr, pwCls: pwErr ? 'err shake' : '', pwInv: pwErr ? 'true' : 'false', pwErr, pwMsg,
     showDemo: c.demoMode, fillDemo: () => { setPw('nest2026'); setPwErr(false); },
     forgot: () => void forgot(), forgotNote, isReset: resetting, newPw, onNewPw: (e: { target: { value: string } }) => { setNewPw(e.target.value); setOtpErr(false); }, npCls: '',
     idLabel: cons ? tr('ui.use_login.tangent_email') : tr('ui.use_login.email_or_phone_number'), idType: cons ? 'email' : 'text',
@@ -171,7 +171,7 @@ export function useLogin(c: LoginController, themeCls: string) {
         ? tr('ui.use_login.type_the_6_digit_code_2')
         : tr('ui.use_login.we_sent_a_6_digit', { p0: challenge?.channel === 'sms' ? 'text message' : 'email', p1: (challenge?.maskedTo ?? email).replace(/ /g, '\u00a0'), p2: Math.max(1, Math.round((challenge?.expiresInSeconds ?? 600) / 60)), p3: resetting ? ' Type it with your new password.' : '' }),
     enroll: challenge?.enroll ?? null, back: () => { setStep('cred'); setCode(''); setOtpErr(false); setResetting(false); },
-    boxes, code, otpBad: otpErr ? tr('ui.use_login.bad_shake') : '', otpErr, otpMsg, tries,
+    boxes, code, otpBad: otpErr ? 'bad shake' : '', otpErr, otpMsg, tries,
     onCode: (e: { target: { value: string } }) => {
       const v = e.target.value.replace(/\D/g, '').slice(0, 6);
       setCode(v); setOtpErr(false);

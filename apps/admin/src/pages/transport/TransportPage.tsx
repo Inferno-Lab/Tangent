@@ -247,7 +247,7 @@ function BillDialog({ route, onClose, onDone }: { route: BusRouteRow; onClose: (
   const [err, setErr] = useState<Record<string, string>>({});
   const bill = useMutation({
     mutationFn: () => app.api.transport.bill(route.id, { title: title.trim(), dueOn }),
-    onSuccess: (r) => onDone(tr('admin.transport_page.billed', { created: r.created, p1: r.created === 1 ? 'family was' : 'families were', rupees: rupees(route.fee), p3: r.skipped ? ` ${r.skipped} already had it.` : '' })),
+    onSuccess: (r) => onDone(tr('admin.transport_page.billed', { created: r.created, rupees: rupees(route.fee), p3: r.skipped ? tr('admin.transport_page.n_already_had_it', { n: r.skipped }) : '' })),
     onError: (e) => { setErr(problem(e)); shake.hit(); },
   });
   return (

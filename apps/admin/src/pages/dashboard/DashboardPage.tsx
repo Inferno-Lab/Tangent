@@ -174,7 +174,7 @@ function DashboardDesktop() {
       rolls: d.classRolls.map((r) => ({
         n: r.name, pct: r.unmarked === r.size ? tr('admin.dashboard_page.not_yet') : `${r.pct}%`,
         segs: [{ k: 'p', n: r.present }, { k: 'l', n: r.late }, { k: 'a', n: r.absent }, { k: 'u', n: r.unmarked }].filter((s) => s.n > 0),
-        aria: tr('admin.dashboard_page.present_late_absent', { name: r.name, present: r.present, late: r.late, absent: r.absent, p4: r.unmarked ? `, ${r.unmarked} not marked` : '' }),
+        aria: tr('admin.dashboard_page.present_late_absent', { name: r.name, present: r.present, late: r.late, absent: r.absent, p4: r.unmarked ? tr('admin.dashboard_page.n_not_marked', { n: r.unmarked }) : '' }),
       })),
       heads: d.feeHeads.map((h) => ({ n: h.label, pct: h.pct, fill: h.due ? Math.max(h.pct, 2) : 0, amt: h.due ? tr('admin.dashboard_page.of', { money: money(h.collected), money1: money(h.due) }) : tr('admin.dashboard_page.nothing_due') })),
       nowLabel: d.day.isToday ? tr('admin.dashboard_page.now', { clock: d.day.clock }) : tr('admin.dashboard_page.earlier'), prog: d.timelineProgress,

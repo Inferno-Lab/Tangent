@@ -28,12 +28,12 @@ export function LanguagesPage() {
   const refresh = () => void qc.invalidateQueries({ queryKey: ['languages'] });
   const draft = useMutation({
     mutationFn: () => app.api.languages.draft(lang, { surface, limit: 200 }),
-    onSuccess: (r) => { refresh(); say(t('console.languages_page.drafted_for_review_still_to', { drafted: r.drafted, p1: r.skipped ? `, ${r.skipped} left for a person (a value was lost)` : '', left: r.left })); },
+    onSuccess: (r) => { refresh(); say(t('console.languages_page.drafted_for_review_still_to', { drafted: r.drafted, p1: r.skipped ? t('console.languages_page.n_left_for_a_person', { n: r.skipped }) : '', left: r.left })); },
     onError: (e) => say((e as Error).message, 'bad'),
   });
   const bring = useMutation({
     mutationFn: (csv: string) => app.api.languages.importCsv(lang, surface, csv),
-    onSuccess: (r) => { refresh(); say(t('console.languages_page.texts_saved', { saved: r.saved, p1: r.refused.length ? `; ${r.refused.length} refused because a {value} changed` : '' })); },
+    onSuccess: (r) => { refresh(); say(t('console.languages_page.texts_saved', { saved: r.saved, p1: r.refused.length ? t('console.languages_page.n_refused', { n: r.refused.length }) : '' })); },
     onError: (e) => say((e as Error).message, 'bad'),
   });
   const download = () => void app.api.languages.exportCsv(lang, surface).then(({ csv }) => {

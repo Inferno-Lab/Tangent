@@ -20,7 +20,7 @@ const when = (e: EventRow) => {
   const day = fmtDate(s, 'weekday');
   const t = (d: Date) => fmtDate(d, 'time');
   if (e.kind === 'holiday' || e.kind === 'exam') return e.endsAt ? tr('admin.events_page.to', { day, fmtDate: fmtDate(e.endsAt, 'day') }) : day;
-  return tr('admin.events_page.text', { day, t: t(s), p2: e.endsAt ? ` to ${t(new Date(e.endsAt))}` : '' });
+  return tr('admin.events_page.text', { day, t: t(s), p2: e.endsAt ? tr('admin.events_page.to_time', { time: t(new Date(e.endsAt)) }) : '' });
 };
 /** Exams shown on the calendar as the weeks they run (opened in Exams, not edited here). */
 const examEvents = (exams: ExamRow[]): EventRow[] => exams.map((x) => ({
@@ -170,7 +170,7 @@ function EventDialog({ event, defaultDay, onClose, onDone }: { event: EventRow |
             <button className="btn sm" onClick={() => setShowReplies((x) => !x)}>{showReplies ? tr('admin.events_page.hide_who') : tr('admin.events_page.see_who')}</button></div>
           {showReplies && (
             <div className="lscroll" style={{ maxHeight: 220, marginTop: 8, border: '1px solid var(--line)', borderRadius: 12, padding: '4px 12px' }}>
-              {(replies.data ?? []).map((r, i) => <div key={i} className="kv"><span>{r.studentName} {tr('admin.events_page.class_3')}{' '}{r.className}<small style={{ display: 'block', color: 'var(--ink3)' }}>{r.guardianName}</small></span><b>{r.status === 'going' ? tr('admin.events_page.going_2', { p0: r.adults ? ` · ${r.adults} adults` : '' }) : r.status === 'maybe' ? tr('admin.events_page.maybe_2') : tr('admin.events_page.cannot_come_2')}</b></div>)}
+              {(replies.data ?? []).map((r, i) => <div key={i} className="kv"><span>{r.studentName} {tr('admin.events_page.class_3')}{' '}{r.className}<small style={{ display: 'block', color: 'var(--ink3)' }}>{r.guardianName}</small></span><b>{r.status === 'going' ? tr('admin.events_page.going_2', { adults: r.adults ? tr('admin.events_page.n_adults', { n: r.adults }) : '' }) : r.status === 'maybe' ? tr('admin.events_page.maybe_2') : tr('admin.events_page.cannot_come_2')}</b></div>)}
             </div>
           )}
         </div>
