@@ -1,17 +1,6 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { RouterProvider } from '@tanstack/react-router';
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
-import './console.css';
-import { makeRouter } from './router';
+import { addCatalogue, startLanguage } from '@tangent/web-ui';
+import en from './i18n/en.json';
 
-const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 15_000, retry: 1, refetchOnWindowFocus: false } } });
-const router = makeRouter();
-
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
-  </StrictMode>,
-);
+// The person's language is in before any page loads, so every label (constants too) is drawn in it (web-ui i18n).
+addCatalogue(en, (lang) => import(`./i18n/${lang}.json`).then((m: { default: Record<string, string> }) => m.default));
+void startLanguage().then(() => import('./boot'));

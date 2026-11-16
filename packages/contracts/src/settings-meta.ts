@@ -1,5 +1,6 @@
 import type { SettingKey } from './config.js';
 import { COUNTRIES, LOCALES, ZONES } from './locale.js';
+import { LANGUAGE_LIST, languageLabel } from './i18n.js';
 
 const regionName = (c: string): string => {
   try {
@@ -13,7 +14,7 @@ const regionName = (c: string): string => {
 export type SettingKind =
   | 'text' | 'textarea' | 'number' | 'bool' | 'enum' | 'color' | 'time' | 'date' | 'language'
   | 'multi' | 'appRoles' | 'appLayout' | 'notifyRules' | 'templates' | 'classes' | 'logo'
-  | 'houses' | 'categories' | 'strings' | 'gradingScale' | 'paymentMethods' | 'attendanceMarks';
+  | 'houses' | 'categories' | 'strings' | 'gradingScale' | 'paymentMethods' | 'attendanceMarks' | 'vocabulary';
 
 export interface SettingMeta {
   /** One of the school-wide groups, or the key of the module that owns the setting (config-engine's MODULES lists it there too). */
@@ -55,7 +56,7 @@ export const SETTING_GROUPS = ['School identity', 'Look', 'The app', 'Sign-in an
 export type SchoolWideGroup = (typeof SETTING_GROUPS)[number];
 
 /** The languages the apps and messages come in: the one list every page offers. */
-export const LANGUAGES: [string, string][] = [['en', 'English'], ['hi', 'हिन्दी (Hindi)'], ['mr', 'मराठी (Marathi)']];
+export const LANGUAGES: [string, string][] = LANGUAGE_LIST.map((l) => [l.code, languageLabel(l.code)]);
 
 export const SETTINGS_META: Record<SettingKey, SettingMeta> = {
   'school.name': { group: 'School identity', label: 'School name', kind: 'text', help: 'On the sign-in pages, the app, receipts and report cards.' },
@@ -100,10 +101,7 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = {
   'dashboard.rollClasses': { group: 'school', label: 'Classes on the dashboard’s roll-call card', kind: 'classes', max: 8 },
 
   // People
-  'vocab.student': { group: 'people', label: 'What the school calls a student', kind: 'text', help: 'The admin menu, the Students page and the app use it.' },
-  'vocab.students': { group: 'people', label: '…and more than one', kind: 'text', help: 'Leave empty for the usual ending (“Pupil” → “Pupils”); fill in when it differs (“Children”).' },
-  'vocab.class': { group: 'people', label: 'What the school calls a class', kind: 'text', help: 'The admin and the app use it.' },
-  'vocab.classes': { group: 'people', label: '…and more than one', kind: 'text', help: 'Leave empty for the usual ending.' },
+  'vocab.words': { group: 'people', label: 'The school’s words', kind: 'vocabulary', help: 'What the school calls a student, a parent, a class, a term… in each language it uses. Every page, the app and messages use them. Leave a word empty to keep the usual one.' },
   'letters.family': { group: 'people', label: 'Letter to families about the app', kind: 'textarea', help: 'Printed for each family from Students → On the app, with a code that opens the app. Use {school}, {student}, {class}, {guardian}, {phoneEnd} and {link}.' },
   'letters.student': { group: 'people', label: 'Letter to students about the app', kind: 'textarea', help: 'Printed for each student when the school uses the app for students. Use {school}, {student}, {class} and {link}.' },
   'students.required': { group: 'people', label: 'Fields the office must fill for a student', kind: 'multi', options: [['gender', 'Gender'], ['house', 'House'], ['admissionNo', 'Admission number (otherwise Tangent numbers them)'], ['bloodGroup', 'Blood group'], ['address', 'Address']], help: 'Name, class, date of birth and a guardian are always needed. These become required too when adding or editing a student.' },

@@ -164,7 +164,6 @@ async function run(db: PoolClient, input: SeedInput): Promise<Omit<SeedReport, '
     ['approvals.notice', 'required'], ['attendance.notifyParents', true], ['attendance.lockAfterDays', 2],
     ['fees.lateFeePct', 0], ['fees.remindDaysBefore', 3], ['fees.dailyTarget', 150000], ['attendance.goalPct', 95],
     ['homework.goalPct', 85], ['dashboard.rollClasses', ['cls_8a', 'cls_8b', 'cls_9a', 'cls_9b', 'cls_10a', 'cls_10b']], ['security.twoFactor', true],
-    ['vocab.student', 'Student'], ['vocab.class', 'Class'],
   ];
   // Its country's and curriculum's starter pack, so a new school has nothing to set up (docs/one-shot-plan.md §3.2).
   const seen = new Set(settings.map(([k]) => k));

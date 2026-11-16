@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { schoolZone, DEFAULT_BRAND, addDays, dayLabel, hueOf, dayMonth, dayName, schoolMinutes, schoolNow, schoolToday, latestSchoolDay, schoolDaysEnding, type DashboardData, type FeeSummary, type SearchHit, type ShellData } from '@tangent/contracts';
+import { schoolZone, DEFAULT_BRAND, addDays, dayLabel, hueOf, dayMonth, dayName, schoolMinutes, schoolNow, schoolToday, latestSchoolDay, schoolDaysEnding, type DashboardData, type Vocabulary, type FeeSummary, type SearchHit, type ShellData } from '@tangent/contracts';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { ApprovalsService } from './approvals.service.js';
 import { AttendanceService } from './attendance.service.js';
@@ -146,13 +146,14 @@ export class DashboardService {
     const term = await this.term(t, schoolToday(), modules.includes('exams'));
     return {
       school: { name: String(v['school.name'] ?? t.info.name), shortName: String(v['school.shortName'] ?? t.info.shortName), logoText: String(v['brand.logoText'] ?? '') || String(v['school.shortName'] ?? t.info.shortName).slice(0, 1).toUpperCase(), logoUrl: await this.files.logoUrl(t), place: String(v['school.place'] ?? ''),
-        color: String(v['brand.color'] ?? ''), address: String(v['school.address'] ?? ''), phone: String(v['school.phone'] ?? ''), receiptNote: String(v['fees.receiptNote'] ?? ''), studentWord: String(v['vocab.student'] ?? '').trim() || 'Student', classWord: String(v['vocab.class'] ?? '').trim() || 'Class',
+        color: String(v['brand.color'] ?? ''), address: String(v['school.address'] ?? ''), phone: String(v['school.phone'] ?? ''), receiptNote: String(v['fees.receiptNote'] ?? ''),
         paymentMethods: (await this.settings.effective(t)).settings['fees.paymentMethods'] as { key: string; name: string; kind: string }[] },
       term,
       badges: { attendance: unmarked.length, admissions: counts.admissions, messages: counts.messages }, modules, features,
       menu: (await this.settings.effective(t, [...perms])).menu,
       hue: hueOf(String(v['brand.color'] ?? '') || DEFAULT_BRAND),
-      locale: { country: String(v['school.country'] ?? t.info.country), zone: String(v['school.timezone'] ?? t.info.timezone), locale: String(v['school.locale'] ?? t.info.locale), currency: String(v['school.currency'] ?? t.info.currency) },
+      locale: { country: String(v['school.country'] ?? t.info.country), zone: String(v['school.timezone'] ?? t.info.timezone), locale: String(v['school.locale'] ?? t.info.locale), currency: String(v['school.currency'] ?? t.info.currency),
+        language: String(v['school.language'] ?? 'en'), vocab: (v['vocab.words'] ?? {}) as Vocabulary },
     };
   }
 

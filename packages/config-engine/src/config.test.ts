@@ -53,9 +53,10 @@ describe('resolveConfig', () => {
     expect(cfg.app.layout.parent).toEqual({ dock: ['home', 'fees'], home: [], quick: ['payFees'] });
     expect(cfg.app.layout.driver.dock).toEqual([]);
   });
-  it('words: plurals from the console, or the usual English ending', () => {
-    expect(resolveConfig({ settings: { ...settings, values: { ...settings.values, 'vocab.student': 'Child', 'vocab.students': 'Children' } }, entitlement: entitlement([]) }).vocabulary)
-      .toEqual({ student: 'Child', students: 'Children', class: 'Class', classes: 'Classes' });
+  it('words: the school’s own, with the usual English ending when only one is given', () => {
+    const cfg = resolveConfig({ settings: { ...settings, values: { ...settings.values, 'vocab.words': { en: { student: { one: 'Child', many: 'Children' }, class: { one: 'Form' } } } } }, entitlement: entitlement(['people']) });
+    expect(cfg.vocabulary).toMatchObject({ student: 'Child', students: 'Children', class: 'Form', classes: 'Forms', guardian: 'parent' });
+    expect(cfg.menu.flatMap((g) => g.pages.map((p) => p.label))).toContain('Children');
   });
   it('platform locks beat school values', () => {
     const cfg = resolveConfig({ settings, entitlement: entitlement(['fees'], ['brand.color'], { 'brand.color': '#ABCDEF' }) });

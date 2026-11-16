@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, hasKey, type AppRole } from '@tangent/config-engine';
-import { ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
+import { VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
 import { Checkbox, DateField, FilePick, NumberField, TimeField } from './fields';
 import { ColourField } from './ColourPicker';
 import { ErrorLine, Field, SelectField } from './forms';
@@ -12,6 +12,8 @@ export interface SettingCtx {
   feeHeads: { key: string; name: string }[];
   entitled: readonly string[];
   features: readonly string[];
+  /** The settings as they apply now: the words editor offers the school's languages. */
+  values?: Record<string, unknown>;
 }
 
 /** The channels a message can go through, as the Hub sends them. */
@@ -79,6 +81,11 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
       return box(<AttendanceMarksEditor value={(Array.isArray(value) ? value : []) as AttendanceMarkDef[]} max={meta.max ?? 20} disabled={disabled} onChange={onChange} />);
     case 'paymentMethods':
       return box(<PaymentMethodsEditor value={(Array.isArray(value) ? value : []) as PaymentMethod[]} max={meta.max ?? 16} disabled={disabled} onChange={onChange} />);
+    case 'vocabulary': {
+      const v = ctx.values ?? {};
+      const langs = [...new Set([String(v['school.language'] ?? 'en'), ...(Array.isArray(v['app.languages']) ? (v['app.languages'] as string[]) : [])])];
+      return box(<VocabularyEditor value={(value ?? {}) as Vocabulary} languages={langs} disabled={disabled} onChange={onChange} />);
+    }
     case 'gradingScale':
       return box(<GradingEditor value={(Array.isArray(value) ? value : []) as { grade: string; minPct: number }[]} max={meta.max ?? 12} disabled={disabled} onChange={onChange} />);
     case 'notifyRules': {
@@ -266,6 +273,32 @@ function PaymentMethodsEditor({ value, max, disabled, onChange }: { value: Payme
         onChange([...value, { key, name, kind: 'other' }]);
       }}>Add a method</button>}
       <div className="help">A method keeps its key when it is renamed, so payments already recorded keep it.</div>
+    </div>
+  );
+}
+
+/** The school's words, per language it uses: one and many, the usual word showing until it is changed. */
+function VocabularyEditor({ value, languages, disabled, onChange }: { value: Vocabulary; languages: string[]; disabled: boolean; onChange: (v: unknown) => void }) {
+  const [lang, setLang] = useState(languages[0] ?? 'en');
+  const own = value[lang] ?? {};
+  const usual = wordsFor(lang, undefined);
+  const put = (concept: VocabConcept, part: 'one' | 'many', text: string) => {
+    const word = { ...own[concept], [part]: text } as Word;
+    const words = { ...own, [concept]: word };
+    if (!word.one?.trim() && !word.many?.trim()) delete words[concept];
+    const next = { ...value, [lang]: words };
+    if (!Object.keys(words).length) delete next[lang];
+    onChange(next);
+  };
+  return (
+    <div>
+      {languages.length > 1 && <div style={{ maxWidth: 260 }}><SelectField label="Language" value={lang} onChange={setLang} options={languages.map((l) => ({ value: l, label: languageLabel(l) }))} /></div>}
+      {VOCAB_CONCEPTS.map((c) => (
+        <div key={c.key} style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 150 }}><Field label={`For “${usual[c.key]}”`} value={own[c.key]?.one ?? ''} placeholder={usual[c.key]} maxLength={30} disabled={disabled} onChange={(x) => put(c.key, 'one', x)} /></div>
+          <div style={{ flex: 1, minWidth: 150 }}><Field label="More than one" value={own[c.key]?.many ?? ''} placeholder={own[c.key]?.one ? '' : usual[c.many]} maxLength={30} disabled={disabled} onChange={(x) => put(c.key, 'many', x)} /></div>
+        </div>
+      ))}
     </div>
   );
 }

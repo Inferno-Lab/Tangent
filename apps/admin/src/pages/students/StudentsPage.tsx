@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fmtNumber, fmtMoney, fmtDate, dayLabel, schoolToday, plural, type StudentRow } from '@tangent/contracts';
+import { fmtNumber, fmtMoney, fmtDate, dayLabel, schoolToday, type StudentRow } from '@tangent/contracts';
 import { EmptyCard, Menu, PageScope, Select, ToastSlot, rollDigits, tintFor, useToast, Icon, type IconName } from '@tangent/web-ui';
 import type { StudentListQuery } from '@tangent/api-client';
 import { useApp } from '../../app/context';
@@ -144,8 +144,8 @@ function StudentList({ tabs }: { tabs: React.ReactNode }) {
   const shownViews = allViews.filter((x) => (has.fees || x.i !== 2) && (x.i !== 4 || (views.data?.left ?? 0) > 0));
   const vals = {
     ...chrome, has, tabs,
-    // What the school calls its students (console: People), "Pupils" for "Pupil".
-    heading: plural(chrome.shell?.school.studentWord ?? 'Student'),
+    // What the school calls its students (People → Settings): "Pupils" for "Pupil".
+    heading: 'Students',
     subtitle: `${fmtNumber(allCount)} enrolled across ${classes.data?.length ?? 0} sections`,
     openImport: () => setDialog({ kind: 'import' }), exportAll: () => void download(), openAdd: () => setDialog({ kind: 'add' }),
     views: shownViews.map((x) => ({ ...x, on: x.i === active ? 'on' : '', sel: x.i === active ? 'true' : 'false', pick: () => { setView(x.i); setClassId(null); setHouse(''); setFee(''); setAtt(''); setPage(1); } })),

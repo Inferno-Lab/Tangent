@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { AppMode } from './theme.js';
 import { COUNTRIES, isCurrency, isLocale, isZone } from './locale.js';
+import { VOCAB_CONCEPTS, isLanguage, type Vocabulary } from './i18n.js';
 
 
 /** Attendance marks the data model knows; a school picks which it uses (`attendance.statuses`). */
@@ -96,7 +97,7 @@ export const SchoolSettingsSchema = z.object({
   'school.phone': z.string().max(24).default(''),
   'school.email': z.string().max(120).default(''),
   'school.address': z.string().max(240).default(''),
-  'school.language': z.enum(['en', 'hi', 'mr']).default('en'),
+  'school.language': z.string().refine(isLanguage, 'Pick a language from the list').default('en'),
   // Where the school is and how it writes dates, numbers and money (locale.ts). The wizard sets them from the country.
   'school.country': z.string().trim().refine((c) => c === '' || COUNTRIES.includes(c), 'Choose a country from the list').default(''),
   'school.timezone': z.string().refine(isZone, 'Choose a time zone from the list').default('UTC'),
@@ -157,11 +158,9 @@ export const SchoolSettingsSchema = z.object({
   // Families are told the bus is near when it is this many minutes from their stop.
   'transport.nearMinutes': z.number().int().min(2).max(30).default(10),
   'fees.paymentMethods': PaymentMethods.default(DEFAULT_PAYMENT_METHODS),
-  'vocab.student': z.string().max(24).default('Student'),
-  'vocab.class': z.string().max(24).default('Class'),
-  // Plurals, for words that do not take an "s" ("Children"); empty means the singular with the usual English ending.
-  'vocab.students': z.string().max(24).default(''),
-  'vocab.classes': z.string().max(24).default(''),
+  // The school's own words per language (student or pupil, class or form): `{ en: { student: { one: 'Pupil' } } }`.
+  'vocab.words': z.record(z.string().refine(isLanguage), z.object(Object.fromEntries(VOCAB_CONCEPTS.map((c) => [c.key, z.object({ one: z.string().trim().max(30), many: z.string().trim().max(30).optional() }).optional()]))))
+    .default({}) as unknown as z.ZodDefault<z.ZodType<Vocabulary>>,
   // Where enquiries come from, as the school counts them (Admissions and its reports).
   'admissions.sources': z.array(z.string().trim().min(1).max(40)).min(1).max(16).default(['Walk-in', 'Phone', 'Website', 'Referral', 'Event']),
   // The stages between enquiry and enrolment the school uses (some have no entrance test).
@@ -208,7 +207,7 @@ export const SchoolSettingsSchema = z.object({
   'app.roles': z.array(z.enum(APP_ROLE_KEYS)).default(['parent', 'teacher']),
   'app.layout': z.object({ parent: APP_LAYOUT, student: APP_LAYOUT, teacher: APP_LAYOUT, driver: APP_LAYOUT }).default(DEFAULT_APP_LAYOUT),
   // Which languages the app offers; the school's default language comes first.
-  'app.languages': z.array(z.enum(['en', 'hi', 'mr'])).min(1).default(['en', 'hi', 'mr']),
+  'app.languages': z.array(z.string().refine(isLanguage, 'Pick languages from the list')).min(1).max(12).default(['en']),
   // Notifications: which message goes out on which channel, and when families are left in peace.
   'notify.rules': z.record(z.string(), z.object({ push: z.boolean(), sms: z.boolean(), email: z.boolean(), whatsapp: z.boolean().default(false) })).default({}),
   'notify.quietFrom': z.string().regex(/^\d{2}:\d{2}$/, 'Use a time like 21:00').default('21:00'),
@@ -304,7 +303,10 @@ export interface EffectiveConfig {
   /** The admin menu for this audience, built from the module definitions: groups of pages, each with its tabs. */
   menu: MenuGroup[];
   settings: Record<string, unknown>;
+  /** The school's words in its default language (`student`, `students`…). */
   vocabulary: Record<string, string>;
+  /** Its words per language, for apps that show another language. */
+  vocab: Vocabulary;
   limits: EntitlementDoc['limits'];
   /** The app: which roles may sign in, and each role's dock, Home cards and quick buttons, already limited to what the school has. */
   app: { roles: AppRoleKey[]; layout: Record<AppRoleKey, AppLayout> };

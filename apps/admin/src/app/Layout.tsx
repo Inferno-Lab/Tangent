@@ -1,6 +1,6 @@
 import { createContext, Fragment, useContext, type ReactNode } from 'react';
 import { setLocaleSource, setZoneSource, type SchoolLocale, type ShellData } from '@tangent/contracts';
-import { Shell } from '@tangent/web-ui';
+import { Shell, useLanguage } from '@tangent/web-ui';
 import { useChrome } from './useChrome';
 
 interface ShellChrome { openSearch: () => void; shell: ShellData | undefined; themeCls: string }
@@ -22,6 +22,8 @@ setLocaleSource(() => current);
 export function AppLayout({ children }: { children: ReactNode }) {
   const v = useChrome();
   current = v.shell?.locale;
+  // The school's language and its own words (People → Settings); the page loads again once if they changed.
+  useLanguage(v.shell?.locale.language, v.shell?.locale.vocab);
   // Pages are drawn again once if the school's locale arrives or changes, so nothing keeps a format from before.
   const key = current ? `${current.zone}|${current.locale}|${current.currency}` : '';
   return (

@@ -356,11 +356,11 @@ describe('what the console sets reaches families and the office', () => {
     }
   });
   it('names students the school’s way in the admin menu', async () => {
-    await h.setSettings({ 'vocab.student': 'Pupil' });
+    await h.setSettings({ 'vocab.words': { en: { student: { one: 'Pupil' } } } });
     try {
       expect((await h.call('GET', '/v1/config', { token: admin })).json.menu.flatMap((g: { pages: { label: string }[] }) => g.pages.map((p) => p.label))).toContain('Pupils');
     } finally {
-      await h.setSettings({ 'vocab.student': 'Student' });
+      await h.setSettings({ 'vocab.words': {} });
     }
   });
 });

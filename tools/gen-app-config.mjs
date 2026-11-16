@@ -4,6 +4,7 @@
 //   pnpm --filter @tangent/contracts --filter @tangent/config-engine build && node tools/gen-app-config.mjs
 import { readFileSync, writeFileSync } from 'node:fs';
 import { MODULES, resolveConfig } from '../packages/config-engine/dist/index.js';
+import { packSettings } from '../packages/contracts/dist/index.js';
 
 const info = JSON.parse(readFileSync(new URL('../assets/mock/school_info.json', import.meta.url), 'utf8'));
 const settings = {
@@ -11,8 +12,10 @@ const settings = {
   locked: [],
   updatedAt: null,
   values: {
+    // The sample school starts from its country's and curriculum's starter pack, as a new school does.
+    ...packSettings('IN', 'CBSE'),
     'school.name': info.name, 'school.shortName': 'Greenfield', 'school.tagline': info.tagline, 'school.place': 'Pune', 'school.address': info.address,
-    'school.phone': info.phone, 'school.email': info.email, 'brand.color': '#6A4CF5', 'brand.logoText': 'G',
+    'school.phone': info.phone, 'school.email': info.email, 'fees.dailyTarget': 150000, 'brand.color': '#6A4CF5', 'brand.logoText': 'G',
     // The sample school is in India; a school anywhere else has its own (wizard: country, zone, locale, currency).
     'school.country': 'IN', 'school.timezone': 'Asia/Kolkata', 'school.locale': 'en-IN', 'school.currency': 'INR',
     // The sample school shows every role, so each can be tried from the demo card.

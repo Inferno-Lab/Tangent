@@ -90,10 +90,11 @@ abstract final class SchoolConfig {
   static String get schoolPhone => '${(_json['school'] as Map?)?['phone'] ?? ''}';
   static String get schoolEmail => '${(_json['school'] as Map?)?['email'] ?? ''}';
 
-  /// What the school calls a class; empty means the app's own (translated) word.
+  /// What the school calls a class in the app's language; empty means the app's own (translated) word.
   static String get classWord {
-    final word = '${(_json['vocabulary'] as Map?)?['class'] ?? ''}'.trim();
-    return word == 'Class' ? '' : word;
+    final lang = Get.find<ThemeService>().locale.value.languageCode;
+    final word = '${(((_json['vocab'] as Map?)?[lang] as Map?)?['class'] as Map?)?['one'] ?? ''}'.trim();
+    return word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1);
   }
 
   static String get privacyNotice => '${(_json['privacy'] as Map?)?['notice'] ?? ''}';
@@ -119,8 +120,6 @@ abstract final class SchoolConfig {
     return houses.firstWhereOrNull((h) => h.key == k || h.name.toLowerCase() == k);
   }
 
-  /// The attendance marks the school uses (present and absent always).
-  static List<String> get attendanceStatuses => List<String>.from(_s<List<dynamic>>('attendance.statuses', const ['present', 'absent', 'late', 'leave']));
   static List<String> get leaveReasons => List<String>.from(_s<List<dynamic>>('leave.reasons', const ['Other']));
 
   /// The first weekday of every week grid: [DateTime.monday] or [DateTime.sunday].

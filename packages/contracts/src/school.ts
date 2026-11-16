@@ -1,4 +1,5 @@
 import { ATTENDANCE_MARKS, type MenuGroup } from './config.js';
+import type { Vocabulary } from './i18n.js';
 import { z } from 'zod';
 import { Money } from './locale.js';
 import { IsoDate } from './common.js';
@@ -458,7 +459,7 @@ export interface DashboardData {
 
 /** What the menu needs on every page: who the school is, the term card, and the counts beside menu items. */
 export interface ShellData {
-  school: { name: string; shortName: string; logoText: string; logoUrl: string | null; place: string; color: string; address: string; phone: string; receiptNote: string; studentWord: string; classWord: string; paymentMethods: { key: string; name: string; kind: string }[] };
+  school: { name: string; shortName: string; logoText: string; logoUrl: string | null; place: string; color: string; address: string; phone: string; receiptNote: string; paymentMethods: { key: string; name: string; kind: string }[] };
   term: DashboardData['term'];
   badges: DashboardData['badges'];
   modules: string[];
@@ -472,7 +473,11 @@ export interface ShellData {
   locale: SchoolLocale;
 }
 
-export interface SchoolLocale { country: string; zone: string; locale: string; currency: string }
+export interface SchoolLocale {
+  country: string; zone: string; locale: string; currency: string;
+  /** The school's language (the person's own choice comes first once they make one) and its own words (i18n.ts). */
+  language?: string; vocab?: Vocabulary;
+}
 
 // Search (command palette)
 export interface SearchHit {

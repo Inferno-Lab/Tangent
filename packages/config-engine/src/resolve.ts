@@ -2,12 +2,14 @@ import {
   SETTINGS_META,
   SchoolSettingsSchema,
   TIGHTEN,
-  plural,
+  formatMessage,
+  wordsFor,
   settingOwner,
   type AppLayout,
   type EffectiveConfig,
   type EntitlementDoc,
   type SettingsDoc,
+  type Vocabulary,
 } from '@tangent/contracts';
 import { APP_CATALOG, APP_ROLES, activeFeatures, activeModules, adminMenu, hasKey, type AppRole } from './modules.js';
 
@@ -53,14 +55,15 @@ export function resolveConfig({ settings, entitlement, audience, flags, live = t
   const features = activeFeatures(entitlement, enabled);
   const has = { modules: enabled, features };
   const str = (k: string, fallback = '') => (typeof merged[k] === 'string' ? (merged[k] as string) : fallback);
+  const lang = str('school.language', 'en');
   const words = vocabulary(merged);
 
   const menu: EffectiveConfig['menu'] = adminMenu(has, audience ? audience.permissions : null, live).map((g) => ({
     group: g.group,
     pages: g.pages.map((p) => ({
       id: p.id, module: p.module, icon: p.icon, keys: p.keys, href: p.path,
-      label: p.id === 'stu' ? words.students : p.label,
-      tabs: (p.tabs ?? []).map((t) => ({ key: t.key, label: t.key === 'classes' ? words.classes : t.label, href: `${p.path === '/' ? '' : p.path}/${t.key}` })),
+      label: p.id === 'stu' ? formatMessage('{@Students}', {}, lang, words) : p.label,
+      tabs: (p.tabs ?? []).map((t) => ({ key: t.key, label: t.key === 'classes' ? formatMessage('{@Classes}', {}, lang, words) : t.label, href: `${p.path === '/' ? '' : p.path}/${t.key}` })),
       settings: p.settings ?? [],
     })),
   }));
@@ -94,6 +97,7 @@ export function resolveConfig({ settings, entitlement, audience, flags, live = t
     menu,
     settings: merged,
     vocabulary: words,
+    vocab: (merged['vocab.words'] ?? {}) as Vocabulary,
     limits: entitlement.limits,
     app: { roles, layout },
     privacy: { notice: str('privacy.notice'), officerName: str('privacy.officerName'), officerEmail: str('privacy.officerEmail'), officerPhone: str('privacy.officerPhone') },
@@ -141,12 +145,9 @@ export function checkSchoolChanges(changes: Record<string, unknown>, entitlement
   return problems;
 }
 
-/** What the school calls a student and a class, one and many. */
-export function vocabulary(values: Record<string, unknown>): { student: string; students: string; class: string; classes: string } {
-  const word = (k: string, fallback: string) => (typeof values[k] === 'string' && (values[k] as string).trim() ? (values[k] as string).trim() : fallback);
-  const student = word('vocab.student', 'Student');
-  const cls = word('vocab.class', 'Class');
-  return { student, students: word('vocab.students', plural(student)), class: cls, classes: word('vocab.classes', plural(cls)) };
+/** What the school calls a student, a class… in its default language, one and many. */
+export function vocabulary(values: Record<string, unknown>): Record<string, string> {
+  return wordsFor(String(values['school.language'] ?? 'en'), values['vocab.words'] as Vocabulary | undefined);
 }
 
 export interface SettingsProblem {

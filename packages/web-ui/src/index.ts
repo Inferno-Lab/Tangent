@@ -36,3 +36,4 @@ export * from './useMedia';
 export * from './reportErrors';
 export * from './empty/EmptyState';
 export * from './settings';
+export * from './i18n';

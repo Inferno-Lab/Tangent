@@ -82,8 +82,10 @@
     "calendar.schoolEdits": true,
     "calendar.weeklyOff": [],
     "feeStructures.schoolEdits": true,
-    "fees.receiptPrefix": "RCPT-{year}-",
-    "fees.receiptStart": 9001,
+    "fees.receiptPrefix": "RCPT-{yyyy}-{seq:5}",
+    "fees.receiptStart": 1,
+    "people.admissionNumber": "{yyyy}/{seq:4}",
+    "people.admissionStart": 1,
     "fees.receiptNote": "",
     "fees.gstin": "",
     "fees.gstSac": "999293",
@@ -98,16 +100,33 @@
     "library.staffMaxLoans": 5,
     "transport.nearMinutes": 10,
     "fees.paymentMethods": [
-      "cash",
-      "upi",
-      "card",
-      "netbanking",
-      "cheque"
+      {
+        "key": "cash",
+        "name": "Cash",
+        "kind": "cash"
+      },
+      {
+        "key": "upi",
+        "name": "UPI",
+        "kind": "wallet"
+      },
+      {
+        "key": "card",
+        "name": "Card",
+        "kind": "card"
+      },
+      {
+        "key": "netbanking",
+        "name": "Net banking",
+        "kind": "bank"
+      },
+      {
+        "key": "cheque",
+        "name": "Cheque",
+        "kind": "cheque"
+      }
     ],
-    "vocab.student": "Student",
-    "vocab.class": "Class",
-    "vocab.students": "",
-    "vocab.classes": "",
+    "vocab.words": {},
     "admissions.sources": [
       "Walk-in",
       "Phone",
@@ -147,10 +166,30 @@
     ],
     "calendar.weekStarts": "mon",
     "attendance.statuses": [
-      "present",
-      "absent",
-      "late",
-      "leave"
+      {
+        "key": "present",
+        "name": "Present",
+        "meaning": "present",
+        "code": "P"
+      },
+      {
+        "key": "absent",
+        "name": "Absent",
+        "meaning": "absent",
+        "code": "A"
+      },
+      {
+        "key": "late",
+        "name": "Late",
+        "meaning": "late",
+        "code": "L"
+      },
+      {
+        "key": "leave",
+        "name": "On leave",
+        "meaning": "leave",
+        "code": "V"
+      }
     ],
     "leave.reasons": [
       "Unwell",
@@ -362,11 +401,36 @@
     "brand.color": "#6A4CF5"
   },
   "vocabulary": {
-    "student": "Student",
-    "students": "Students",
-    "class": "Class",
-    "classes": "Classes"
+    "student": "student",
+    "students": "students",
+    "guardian": "parent",
+    "guardians": "parents",
+    "teacher": "teacher",
+    "teachers": "teachers",
+    "class": "class",
+    "classes": "classes",
+    "section": "section",
+    "sections": "sections",
+    "house": "house",
+    "houses": "houses",
+    "term": "term",
+    "terms": "terms",
+    "period": "period",
+    "periods": "periods",
+    "rollNumber": "roll number",
+    "rollNumbers": "roll numbers",
+    "admissionNumber": "admission number",
+    "admissionNumbers": "admission numbers",
+    "reportCard": "report card",
+    "reportCards": "report cards",
+    "homework": "homework",
+    "homeworks": "homework",
+    "principal": "principal",
+    "principals": "principals",
+    "fees": "fees",
+    "feesMany": "fees"
   },
+  "vocab": {},
   "limits": {
     "students": 5000,
     "storageGb": 100,
