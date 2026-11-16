@@ -55,7 +55,7 @@ export function NoticesPage() {
                   <span className={`st ${TONE[n.status]}`}><i></i>{LABEL[n.status]}{n.status === 'scheduled' ? ` · ${when(n.publishAt)}` : ''}</span>
                   {cat && <span className={`chip ${cat.tone}`}>{cat.name}</span>}
                   <span className="chip">{n.audience === 'class' ? t('admin.notices_page.class', { p0: n.className ?? '' }) : AUDIENCE[n.audience] ?? n.audience}</span>
-                  <span style={{ marginLeft: 'auto', font: '600 12px var(--fb)', color: 'var(--ink3)' }}>{n.author} · {when(n.publishedAt ?? n.createdAt)}{n.editedAt ? t('admin.notices_page.edited') : ''}</span>
+                  <span style={{ marginInlineStart: 'auto', font: '600 12px var(--fb)', color: 'var(--ink3)' }}>{n.author} · {when(n.publishedAt ?? n.createdAt)}{n.editedAt ? t('admin.notices_page.edited') : ''}</span>
                 </div>
                 <p>{n.body}</p>
                 {n.files.length > 0 && <div className="help" style={{ margin: 0 }}>{t('admin.notices_page.attached')}{' '}{n.files.map((f) => f.name).join(', ')}</div>}

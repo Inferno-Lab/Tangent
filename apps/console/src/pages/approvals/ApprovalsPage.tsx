@@ -59,7 +59,7 @@ export function ApprovalsPage() {
                     {r.changes.map((c) => (
                       <div key={c.key} className="kv" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
                         <span>{SETTINGS_META[c.key as keyof typeof SETTINGS_META]?.label ?? c.key}</span>
-                        <b style={{ textAlign: 'right' }}><span style={{ color: 'var(--ink3)', textDecoration: 'line-through' }}>{shown(c.before)}</span> → {shown(c.after)}</b>
+                        <b style={{ textAlign: 'end' }}><span style={{ color: 'var(--ink3)', textDecoration: 'line-through' }}>{shown(c.before)}</span> → {shown(c.after)}</b>
                       </div>
                     ))}
                   </div>

@@ -279,7 +279,7 @@ export function StudentsView({ v }: { v: any }) {
                 </div>
               </div>
               <div>
-                <h3 style={{ display: "flex", alignItems: "center", gap: "8px" } as CSSProperties}>{tr('admin.students.view.guardians')}{v.may.edit && <button className="btn sm" style={{ marginLeft: "auto" } as CSSProperties} onClick={v.editGuardians}>{tr('admin.students.view.change')}</button>}</h3>
+                <h3 style={{ display: "flex", alignItems: "center", gap: "8px" } as CSSProperties}>{tr('admin.students.view.guardians')}{v.may.edit && <button className="btn sm" style={{ marginInlineStart: "auto" } as CSSProperties} onClick={v.editGuardians}>{tr('admin.students.view.change')}</button>}</h3>
                 {v.guardians.map((g: any, $i: number) => (
                 <div className="g" key={$i} style={{ marginTop: $i ? "8px" : "0" } as CSSProperties}>
                   <span className="av" style={{ background: "var(--s1)", color: "var(--ink2)", boxShadow: "none" } as CSSProperties}>

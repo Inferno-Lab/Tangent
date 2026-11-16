@@ -47,7 +47,7 @@ export function OnboardingPage() {
                 <a key={s.id} className="kv" href={url(`/schools/${s.id}`)} onClick={(e) => { e.preventDefault(); app.go(`/schools/${s.id}`); }} style={{ color: 'inherit', textDecoration: 'none', alignItems: 'center' }}>
                   <span style={{ display: 'flex', gap: 12, alignItems: 'center', minWidth: 0 }}>
                     <span className="av" style={{ width: 34, height: 34, fontSize: 11, background: t.bg, color: t.fg, boxShadow: 'none' }}>{initials(s.name)}</span>
-                    <span style={{ minWidth: 0 }}><b style={{ display: 'block', textAlign: 'left' }}>{s.name}</b><small style={{ color: 'var(--ink3)' }}>{s.slug} {tr('console.onboarding_page.cell')}{' '}{s.cell} {tr('console.onboarding_page.started')}{' '}{ago(s.createdAt)}</small></span>
+                    <span style={{ minWidth: 0 }}><b style={{ display: 'block', textAlign: 'start' }}>{s.name}</b><small style={{ color: 'var(--ink3)' }}>{s.slug} {tr('console.onboarding_page.cell')}{' '}{s.cell} {tr('console.onboarding_page.started')}{' '}{ago(s.createdAt)}</small></span>
                   </span>
                   <span style={{ width: 150, flex: 'none' }}><span className="us"><span className="r"><span>{s.onboarding.done} {tr('console.onboarding_page.of')}{' '}{s.onboarding.total} {tr('console.onboarding_page.steps')}</span></span><span className="bar"><i style={{ width: `${s.onboarding.total ? (s.onboarding.done / s.onboarding.total) * 100 : 0}%` }}></i></span></span></span>
                 </a>

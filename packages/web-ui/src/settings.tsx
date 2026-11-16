@@ -32,7 +32,7 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
   /** Shown under the control (the console's colour card under the brand colour). */
   after?: ReactNode;
 }) {
-  const label = <>{meta.label}{meta.risky && <span className="chip a" style={{ marginLeft: 8 }}>{tr('ui.settings.needs_a_second_person')}</span>}</>;
+  const label = <>{meta.label}{meta.risky && <span className="chip a" style={{ marginInlineStart: 8 }}>{tr('ui.settings.needs_a_second_person')}</span>}</>;
   const help = note ?? meta.help;
   const str = typeof value === 'string' ? value : '';
   const list = Array.isArray(value) ? (value as string[]) : [];

@@ -114,7 +114,7 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
                 <button className="btn sm" onClick={() => setAsideFor(null)}>{tr('console.data_tab.cancel')}</button>
               </span>
             )}
-            <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', marginLeft: 'auto' }}>
+            <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', marginInlineStart: 'auto' }}>
               {u.status === 'imported' ? <span className="chip g">{tr('console.data_tab.imported')}</span> : <>
                 {can && /\.(csv|txt|xlsx)$/i.test(u.fileName) && <button className="btn sm" disabled={open.isPending} onClick={() => open.mutate(u.id)}>{tr('console.data_tab.open')}</button>}
                 {can && <button className="btn sm" disabled={aside.isPending} onClick={() => (u.status === 'set_aside' ? aside.mutate({ id: u.id, reason: '' }) : setAsideFor(u.id))}>{u.status === 'set_aside' ? tr('console.data_tab.bring_back') : tr('console.data_tab.set_aside_2')}</button>}
@@ -221,7 +221,7 @@ function PreviewPanel({ kind, src, preview: p, loading, error, onMap, onRows, on
                   {shown.map((r) => (
                     <div key={r.i} className="grd rw" style={{ ...grid, height: 'auto', padding: '6px 0', gap: 6 }}>
                       <span style={{ font: '700 12px var(--fb)', color: 'var(--ink3)' }}>{r.line}</span>
-                      {kind.columns.map((c) => <input key={c.key} className={`hws ${r.errors.length && c.required && !r.values[c.key] ? 'bad' : ''}`} style={{ width: '100%', textAlign: 'left' }} aria-label={tr('console.data_tab.line_2', { line: r.line, label: c.label })} placeholder={c.example} defaultValue={r.values[c.key] ?? ''}
+                      {kind.columns.map((c) => <input key={c.key} className={`hws ${r.errors.length && c.required && !r.values[c.key] ? 'bad' : ''}`} style={{ width: '100%', textAlign: 'start' }} aria-label={tr('console.data_tab.line_2', { line: r.line, label: c.label })} placeholder={c.example} defaultValue={r.values[c.key] ?? ''}
                         onBlur={(e) => { if (e.target.value !== (r.values[c.key] ?? '')) edit(r.i, c.key, e.target.value); }} />)}
                       <span style={{ font: '600 12px var(--fb)', color: r.errors.length ? 'var(--bad)' : 'var(--ok)' }}>{r.errors.length ? r.errors.join(' ') : r.action === 'update' ? tr('console.data_tab.updates_what_is_there') : tr('console.data_tab.new')}</span>
                     </div>

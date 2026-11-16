@@ -70,15 +70,15 @@ export function InvoicesPage({ view, tabs }: { view: 'invoices' | 'receipts'; ta
               <>
                 <div className="scroll-x lscroll" data-fill="">
                   <div className="inw" style={{ minWidth: 820 }}>
-                    <div className="grd th inv" style={{ '--cols': 'minmax(0,1.6fr) minmax(0,1.3fr) 90px 100px 100px 100px 90px' } as React.CSSProperties}><span>{tr('admin.invoices_page.student')}</span><span className="hs">{tr('admin.invoices_page.fee')}</span><span className="hs">{tr('admin.invoices_page.due')}</span><span style={{ textAlign: 'right' }}>{tr('admin.invoices_page.billed')}</span><span className="hs" style={{ textAlign: 'right' }}>{tr('admin.invoices_page.paid')}</span><span>{tr('admin.invoices_page.status')}</span><span></span></div>
+                    <div className="grd th inv" style={{ '--cols': 'minmax(0,1.6fr) minmax(0,1.3fr) 90px 100px 100px 100px 90px' } as React.CSSProperties}><span>{tr('admin.invoices_page.student')}</span><span className="hs">{tr('admin.invoices_page.fee')}</span><span className="hs">{tr('admin.invoices_page.due')}</span><span style={{ textAlign: 'end' }}>{tr('admin.invoices_page.billed')}</span><span className="hs" style={{ textAlign: 'end' }}>{tr('admin.invoices_page.paid')}</span><span>{tr('admin.invoices_page.status')}</span><span></span></div>
                     {inv.data!.items.map((r) => (
                       <div className="grd rw inv" key={r.id} role="button" tabIndex={0} aria-label={tr('admin.invoices_page.open_for', { title: r.title, studentName: r.studentName })} onClick={() => setOpened(r.id)} onKeyDown={(e) => { if (e.key === 'Enter') setOpened(r.id); }}
                         style={{ '--cols': 'minmax(0,1.6fr) minmax(0,1.3fr) 90px 100px 100px 100px 90px', cursor: 'pointer' } as React.CSSProperties}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}><Avatar name={r.studentName} size={30} /><span style={{ minWidth: 0 }}><b data-tip={r.studentName} style={{ font: '700 14px var(--fb)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.studentName}</b><small style={{ color: 'var(--ink3)', font: '600 12px var(--fb)' }}>{tr('admin.invoices_page.class')}{' '}{r.className}</small></span></span>
                         <span className="hs" data-tip={r.title} style={{ font: '600 13px var(--fb)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.title}</span>
                         <span className="hs" style={{ font: '600 13px var(--fb)', color: 'var(--ink2)' }}>{dateLabel(r.dueOn)}</span>
-                        <b className="num" style={{ font: '700 13px var(--fb)', textAlign: 'right' }}>{fmtMoney(r.amount - r.waived)}</b>
-                        <span className="num hs" style={{ font: '600 13px var(--fb)', textAlign: 'right', color: 'var(--ink2)' }}>{fmtMoney(r.paid)}</span>
+                        <b className="num" style={{ font: '700 13px var(--fb)', textAlign: 'end' }}>{fmtMoney(r.amount - r.waived)}</b>
+                        <span className="num hs" style={{ font: '600 13px var(--fb)', textAlign: 'end', color: 'var(--ink2)' }}>{fmtMoney(r.paid)}</span>
                         <span className={`st ${STATUS[r.status]!.tone}`}><i></i>{STATUS[r.status]!.label}</span>
                         <span>{canPay && r.outstanding > 0 && <button className="btn sm" disabled={open.isPending} onClick={(e) => { e.stopPropagation(); open.mutate(r.studentId); }}>{tr('admin.invoices_page.collect')}</button>}</span>
                       </div>
@@ -105,7 +105,7 @@ export function InvoicesPage({ view, tabs }: { view: 'invoices' | 'receipts'; ta
                       <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}><Avatar name={r.studentName} size={28} /><b data-tip={r.studentName} style={{ font: '700 14px var(--fb)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.studentName}</b></span>
                       <span className="hs" data-tip={r.title} style={{ font: '600 13px var(--fb)', color: 'var(--ink2)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.title}</span>
                       <span style={{ font: '600 13px var(--fb)', color: 'var(--ink3)' }}>{dateLabel(r.paidOn)}</span>
-                      <b className="num" style={{ font: '700 14px var(--fb)', textAlign: 'right', textDecoration: r.cancelled ? 'line-through' : undefined }} data-tip={r.cancelled ? tr('admin.invoices_page.cancelled', { cancelReason: r.cancelReason }) : undefined}>{fmtMoney(r.amount)}</b>
+                      <b className="num" style={{ font: '700 14px var(--fb)', textAlign: 'end', textDecoration: r.cancelled ? 'line-through' : undefined }} data-tip={r.cancelled ? tr('admin.invoices_page.cancelled', { cancelReason: r.cancelReason }) : undefined}>{fmtMoney(r.amount)}</b>
                     </div>
                   </button>
                 ))}

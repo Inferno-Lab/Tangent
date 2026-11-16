@@ -85,7 +85,7 @@ export function EventsPage() {
                 </button>
               ) : <span key={`b${i}`}></span>)}
             </div>
-            <div className="tgrow" style={{ marginTop: 12, gap: 12 }}>{(['event', 'ptm', 'exam', 'holiday'] as EventKind[]).map((k) => <span key={k} className="lgd"><i className={`k-${k}`} style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', marginRight: 6 }}></i>{KIND[k].label}</span>)}</div>
+            <div className="tgrow" style={{ marginTop: 12, gap: 12 }}>{(['event', 'ptm', 'exam', 'holiday'] as EventKind[]).map((k) => <span key={k} className="lgd"><i className={`k-${k}`} style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', marginInlineEnd: 6 }}></i>{KIND[k].label}</span>)}</div>
           </div>
           </div>
           <div className="card rise evl" style={{ '--d': '.06s' } as React.CSSProperties}>
@@ -107,7 +107,7 @@ function EventItem({ e, canWrite, onOpen, dim }: { e: EventRow; canWrite: boolea
   return (
     <button className="evi" style={{ opacity: dim ? 0.6 : 1 }} onClick={onOpen} aria-label={`${canWrite ? tr('admin.events_page.edit') : tr('admin.events_page.open')} ${e.title}`}>
       <span className={`evk k-${e.kind}`}></span>
-      <span style={{ minWidth: 0, flex: 1, textAlign: 'left' }}>
+      <span style={{ minWidth: 0, flex: 1, textAlign: 'start' }}>
         <b data-tip={e.title}>{e.title}</b>
         <small>{when(e)}{e.venue ? ` · ${e.venue}` : ''}</small>
         {e.note && <small className="evn">{e.note}</small>}

@@ -173,8 +173,8 @@ function RouteDialog({ route, onClose, onDone }: { route: BusRouteRow | null; on
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
         {route && (sure
-          ? <button className="btn dng" style={{ marginRight: 'auto' }} disabled={del.isPending} onClick={() => del.mutate()}>{tr('admin.transport_page.remove')}{' '}{route.name} {tr('admin.transport_page.and_unassign_its')}{' '}{route.riders} {tr('admin.transport_page.riders_2')}</button>
-          : <button className="btn" style={{ marginRight: 'auto' }} onClick={() => setSure(true)}>{tr('admin.transport_page.remove_route')}</button>)}
+          ? <button className="btn dng" style={{ marginInlineEnd: 'auto' }} disabled={del.isPending} onClick={() => del.mutate()}>{tr('admin.transport_page.remove')}{' '}{route.name} {tr('admin.transport_page.and_unassign_its')}{' '}{route.riders} {tr('admin.transport_page.riders_2')}</button>
+          : <button className="btn" style={{ marginInlineEnd: 'auto' }} onClick={() => setSure(true)}>{tr('admin.transport_page.remove_route')}</button>)}
         <button className="btn" onClick={onClose}>{tr('admin.transport_page.cancel')}</button>
         <button className="btn pri" disabled={save.isPending || !f.name.trim()} onClick={() => save.mutate()}>{save.isPending ? tr('admin.transport_page.saving') : tr('admin.transport_page.save_route')}</button>
       </div>

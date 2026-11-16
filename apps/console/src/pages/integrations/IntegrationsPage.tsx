@@ -283,7 +283,7 @@ function ConnectionDialog({ c: initial, schools, onClose, onDone }: { c?: Connec
       <div className="grid" style={{ gap: 20 }}>
         <div className="s5" style={{ minWidth: 0 }}>
           <div className="lbl">{tr('console.integrations_page.how_to_get_these_from')}{' '}{def?.name}</div>
-          <ol style={{ margin: '8px 0 0', paddingLeft: 20, display: 'grid', gap: 8, font: '400 13px/1.5 var(--fb)', color: 'var(--ink2)' }}>
+          <ol style={{ margin: '8px 0 0', paddingInlineStart: 20, display: 'grid', gap: 8, font: '400 13px/1.5 var(--fb)', color: 'var(--ink2)' }}>
             {def?.steps.map((s, i) => <li key={i}>{s}</li>)}
           </ol>
           {def?.docs && <div className="help" style={{ marginTop: 10 }}><a href={def.docs} target="_blank" rel="noreferrer">{def.name} {tr('console.integrations_page.documentation')}</a></div>}
@@ -407,7 +407,7 @@ function RouteDialog({ view, schools, capability, schoolId, route, onClose, onDo
         </div>
       )}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
-        {route && <button className="btn" style={{ marginRight: 'auto' }} disabled={unroute.isPending} onClick={() => unroute.mutate()}>{schoolId ? tr('console.integrations_page.use_the_tangent_default') : tr('console.integrations_page.remove_route')}</button>}
+        {route && <button className="btn" style={{ marginInlineEnd: 'auto' }} disabled={unroute.isPending} onClick={() => unroute.mutate()}>{schoolId ? tr('console.integrations_page.use_the_tangent_default') : tr('console.integrations_page.remove_route')}</button>}
         <button className="btn" onClick={onClose}>{tr('console.integrations_page.cancel')}</button>
         {fit.length > 0 && <button className="btn pri" disabled={save.isPending || !conn} onClick={() => save.mutate()}>{save.isPending ? tr('console.integrations_page.saving') : tr('console.integrations_page.save_route')}</button>}
       </div>
@@ -485,7 +485,7 @@ function TemplateDialog({ connectionId, messageKey, t, onClose, onDone }: { conn
         {err._ && <div className="emsg" role="alert">{err._}</div>}
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
-        {t && <button className="btn" style={{ marginRight: 'auto' }} disabled={unmap.isPending} onClick={() => unmap.mutate()}>{tr('console.integrations_page.unmap')}</button>}
+        {t && <button className="btn" style={{ marginInlineEnd: 'auto' }} disabled={unmap.isPending} onClick={() => unmap.mutate()}>{tr('console.integrations_page.unmap')}</button>}
         <button className="btn" onClick={onClose}>{tr('console.integrations_page.cancel')}</button>
         <button className="btn pri" disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? tr('console.integrations_page.saving') : tr('console.integrations_page.save')}</button>
       </div>
@@ -613,7 +613,7 @@ function TestInbox({ schools }: { schools: SchoolRow[] }) {
                   <Icon name={ICON[m.channel] ?? ICON.sms} size={16} />
                 </span>
                 <span style={{ minWidth: 0 }}>
-                  <b style={{ display: 'block', textAlign: 'left' }}>{m.subject ?? m.to}</b>
+                  <b style={{ display: 'block', textAlign: 'start' }}>{m.subject ?? m.to}</b>
                   <span style={{ color: 'var(--ink2)', overflowWrap: 'anywhere' }}>{m.body}</span><br />
                   <small style={{ color: 'var(--ink3)' }}>{CAPABILITY_LABELS[m.channel as Capability] ?? m.channel} {tr('console.integrations_page.to_2')}{' '}{m.to} · {m.schoolSlug}</small>
                 </span>

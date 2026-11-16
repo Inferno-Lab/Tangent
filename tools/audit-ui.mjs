@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Opens every page of the admin and the console at four widths in light and dark, and reports console errors, failed API calls,
 // horizontal overflow and anything clipped or pushed outside the window. Exits non-zero when it finds something.
-// Usage: node tools/audit-ui.mjs [--only admin|console] [--shots dir] [--full] [--quick] [--light|--dark] [--sizes 1440x900,390x844]
+// Usage: node tools/audit-ui.mjs [--only admin|console] [--shots dir] [--full] [--quick] [--light|--dark] [--rtl] [--sizes 1440x900,390x844]
 import { chromium } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { auditPage } from './lib/audit.mjs';
@@ -11,6 +11,8 @@ const args = process.argv.slice(2);
 const val = (n) => (args.includes(n) ? args[args.indexOf(n) + 1] : undefined);
 const only = val('--only');
 const shots = val('--shots');
+// --rtl: every page in a right-to-left language (Arabic), to catch layouts that do not mirror (docs/one-shot-plan.md §3.5.7).
+const rtl = args.includes('--rtl');
 if (shots) mkdirSync(shots, { recursive: true });
 const API = process.env.API ?? 'http://localhost:4000';
 const ADMIN = process.env.ADMIN ?? 'http://127.0.0.1:5173';
@@ -54,6 +56,7 @@ for (const dark of args.includes('--light') ? [false] : args.includes('--dark') 
   for (const [w, h] of SIZES) {
     for (const f of fresh) await f();
     const ctx = await browser.newContext({ viewport: { width: w, height: h }, colorScheme: dark ? 'dark' : 'light', reducedMotion: 'reduce' });
+    if (rtl) await ctx.addInitScript(() => { try { localStorage.setItem('tangent.language', JSON.stringify({ lang: 'ar', chosen: true })); } catch {} });
     const page = await ctx.newPage();
     for (const j of jobs) {
       const errors = [];

@@ -118,7 +118,7 @@ function Overview({ tabs }: { tabs: React.ReactNode }) {
                   </div>
                   <div className="vc" style={{ gap: 2 }}>
                     {s.byHead.map((h, i) => (
-                      <div key={h.head} className="kv"><span className="fx" style={{ gap: 8 }}><i className={`dot sp-${HEAD_COLOURS[i % HEAD_COLOURS.length]}`} />{h.label}</span><b>{h.pct}%</b><span className="t2 num" style={{ minWidth: 92, textAlign: 'right' }}>{money(h.collected)}</span></div>
+                      <div key={h.head} className="kv"><span className="fx" style={{ gap: 8 }}><i className={`dot sp-${HEAD_COLOURS[i % HEAD_COLOURS.length]}`} />{h.label}</span><b>{h.pct}%</b><span className="t2 num" style={{ minWidth: 92, textAlign: 'end' }}>{money(h.collected)}</span></div>
                     ))}
                   </div>
                 </>

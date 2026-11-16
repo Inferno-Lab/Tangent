@@ -90,7 +90,7 @@ export function TodayView({ v, d }: { v: V; d: DashboardData }) {
                 {v.needs.map((n: V, i: number) => (
                   <div key={i} className="row" style={{ opacity: n.open ? 1 : 0.55 }}>
                     <span className={`ht ${d.needsYou[i]?.kind === 'attendance' ? 'warn' : ''}`}><Icon name={NEED_ICON[d.needsYou[i]?.kind ?? ''] ?? 'approvals'} className="i" /></span>
-                    <button className="grow" style={{ textAlign: 'left', minWidth: 0 }} onClick={n.view} data-tip={n.tip}><b>{n.t}</b><small>{n.s}</small></button>
+                    <button className="grow" style={{ textAlign: 'start', minWidth: 0 }} onClick={n.view} data-tip={n.tip}><b>{n.t}</b><small>{n.s}</small></button>
                     {n.open ? <button className="btn ton sm" onClick={n.act}>{n.a}</button> : <span className="tag ok"><Icon name="check" size={14} className="i" />{tr('admin.today_view.done')}</span>}
                   </div>
                 ))}

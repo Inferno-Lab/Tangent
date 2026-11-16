@@ -328,7 +328,7 @@ function PlanDialog({ plan, onClose, onDone }: { plan: PlanRow | null; onClose: 
                   <button type="button" className={`sw ${on ? 'on' : ''}`} role="switch" aria-checked={on} aria-label={m.name} onClick={() => { const n = new Set(mods); if (on) n.delete(m.key); else n.add(m.key); setMods(n); setErr((x) => ({ ...x, modules: '' })); }} />{m.name}
                 </label>
                 {on && m.features.some((x) => x.state !== 'planned') && (
-                  <div className="tgrow" style={{ marginTop: 6, paddingLeft: 56 }}>
+                  <div className="tgrow" style={{ marginTop: 6, paddingInlineStart: 56 }}>
                     {m.features.filter((x) => x.state !== 'planned').map((x) => {
                       const has = off[x.key] !== false;
                       return <button key={x.key} type="button" className={`fp ${has ? 'on' : ''}`} aria-pressed={has} onClick={() => setOff({ ...off, [x.key]: !has ? true : false })}>{x.name}</button>;

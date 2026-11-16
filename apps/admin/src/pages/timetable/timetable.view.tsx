@@ -234,7 +234,7 @@ export function TimetableView({ v }: { v: any }) {
                     <div className="lb">
                       <i className={l.hot} style={{ width: `${l.p ?? ""}%` } as CSSProperties}></i>
                     </div>
-                    <span className="num" style={{ font: "700 12px var(--fb)", width: "28px", textAlign: "right" } as CSSProperties}>
+                    <span className="num" style={{ font: "700 12px var(--fb)", width: "28px", textAlign: 'end' } as CSSProperties}>
                       {l.v}
                     </span>
                   </div>

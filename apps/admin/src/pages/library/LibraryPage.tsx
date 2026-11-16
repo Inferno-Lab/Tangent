@@ -75,7 +75,7 @@ export function LibraryPage() {
                     <span style={{ minWidth: 0 }}><b style={{ font: '700 14px/1.3 var(--fb)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} data-tip={b.title}>{b.title}</b><small className="help">{b.author || tr('admin.library_page.author_not_given')}{b.isbn ? ` · ${b.isbn}` : ''}</small></span>
                     <span className="help" style={{ margin: 0 }}>{b.category}</span>
                     <span className="help" style={{ margin: 0 }}>{b.shelf || '–'}</span>
-                    <span><span className={`chip ${b.copies - b.out > 0 ? 'g' : 'a'}`}>{b.copies - b.out} {tr('admin.library_page.of')}{' '}{b.copies}</span>{b.waiting > 0 && <span className="chip v" style={{ marginLeft: 4 }} data-tip={tr('admin.library_page.families_waiting')}>{b.waiting} {tr('admin.library_page.waiting')}</span>}</span>
+                    <span><span className={`chip ${b.copies - b.out > 0 ? 'g' : 'a'}`}>{b.copies - b.out} {tr('admin.library_page.of')}{' '}{b.copies}</span>{b.waiting > 0 && <span className="chip v" style={{ marginInlineStart: 4 }} data-tip={tr('admin.library_page.families_waiting')}>{b.waiting} {tr('admin.library_page.waiting')}</span>}</span>
                     <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                       {canWrite && <button className="btn sm" disabled={b.copies - b.out <= 0} onClick={() => setDlg({ kind: 'issue', book: b })}>{tr('admin.library_page.issue')}</button>}
                       {canWrite && <button className="btn sm" onClick={() => setDlg({ kind: 'book', book: b })}>{tr('admin.library_page.edit')}</button>}
@@ -157,8 +157,8 @@ function BookDialog({ book, categories, onClose, onDone }: { book: BookRow | nul
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
         {book && (confirm
-          ? <span style={{ marginRight: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}><span className="help">{book.out ? tr('admin.library_page.out_take_them_back_first', { out: book.out, p1: book.out === 1 ? 'copy is' : 'copies are' }) : tr('admin.library_page.take_it_out_of_the')}</span>{!book.out && <button className="btn sm dngf" disabled={del.isPending} onClick={() => del.mutate()}>{tr('admin.library_page.yes_remove')}</button>}<button className="btn sm" onClick={() => setConfirm(false)}>{tr('admin.library_page.keep')}</button></span>
-          : <button className="btn dng" style={{ marginRight: 'auto' }} onClick={() => setConfirm(true)}>{tr('admin.library_page.remove_from_catalogue')}</button>)}
+          ? <span style={{ marginInlineEnd: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}><span className="help">{book.out ? tr('admin.library_page.out_take_them_back_first', { out: book.out, p1: book.out === 1 ? 'copy is' : 'copies are' }) : tr('admin.library_page.take_it_out_of_the')}</span>{!book.out && <button className="btn sm dngf" disabled={del.isPending} onClick={() => del.mutate()}>{tr('admin.library_page.yes_remove')}</button>}<button className="btn sm" onClick={() => setConfirm(false)}>{tr('admin.library_page.keep')}</button></span>
+          : <button className="btn dng" style={{ marginInlineEnd: 'auto' }} onClick={() => setConfirm(true)}>{tr('admin.library_page.remove_from_catalogue')}</button>)}
         <button className="btn" onClick={onClose}>{tr('admin.library_page.cancel')}</button>
         <button className="btn pri" disabled={save.isPending || !f.title.trim()} onClick={() => save.mutate()}>{save.isPending ? tr('admin.library_page.saving') : book ? tr('admin.library_page.save') : tr('admin.library_page.add_book')}</button>
       </div>

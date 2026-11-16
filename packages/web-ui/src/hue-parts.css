@@ -15,11 +15,11 @@
 .nest .hb .cut{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nest .hb .d,.nest .hb .fig,.nest .hb .top h1,.nest .hb .ch h2,.nest .hb .ws b{font-family:var(--fd);font-weight:700;letter-spacing:-0.03em}
 .nest .hb .fig{font-size:64px;line-height:1;letter-spacing:-0.035em}
-.nest .hb .fig small{font:600 15px/22px var(--fb);letter-spacing:0;color:var(--ink2);margin-left:8px}
+.nest .hb .fig small{font:600 15px/22px var(--fb);letter-spacing:0;color:var(--ink2);margin-inline-start:8px}
 .nest .hb .lbl{font:700 11px/16px var(--fb);letter-spacing:.07em;text-transform:uppercase;color:var(--ink3)}
 .nest .hb .note{font:500 13px/18px var(--fb);color:var(--ink2)}
 .nest .hb .card.deep .note{color:var(--on-deep2)}
-.nest .hb .shell, .nest .hb.shell,.nest .hb .shell{display:grid;grid-template-columns:248px minmax(0,1fr);background:var(--deep);padding:10px 10px 10px 0;min-height:960px}
+.nest .hb .shell, .nest .hb.shell,.nest .hb .shell{display:grid;grid-template-columns:248px minmax(0,1fr);background:var(--deep);padding-block:10px 10px;padding-inline:0 10px;min-height:960px}
 .nest .hb .side, .nest .hb.side,.nest .hb .side{background:var(--deep);color:var(--on-deep);padding:10px 12px 4px;display:flex;flex-direction:column;gap:16px;min-height:100%;height:100%}
 .nest .hb .ws{display:flex;align-items:center;gap:10px;padding:4px 8px 6px}
 .nest .hb .crest{width:40px;height:40px;border-radius:14px;background:var(--brand);color:var(--on-brand);display:grid;place-items:center;font:700 18px/1 var(--fd);flex:none}
@@ -29,7 +29,7 @@
 .nest .hb .ng>span{font:600 12px/16px var(--fb);color:var(--on-deep2);padding:0 10px 5px;opacity:.85}
 .nest .hb .nv{display:flex;align-items:center;gap:10px;height:34px;padding:0 10px;border-radius:10px;font:500 14px/20px var(--fb);color:var(--on-deep)}
 .nest .hb .nv .i{color:var(--on-deep2)}
-.nest .hb .nv em{margin-left:auto;font:650 12px/1 var(--fb);min-width:22px;height:20px;padding:0 6px;border-radius:10px;background:var(--deep2);display:grid;place-items:center}
+.nest .hb .nv em{margin-inline-start:auto;font:650 12px/1 var(--fb);min-width:22px;height:20px;padding:0 6px;border-radius:10px;background:var(--deep2);display:grid;place-items:center}
 .nest .hb .nv.on{background:var(--bright);color:var(--on-bright);font-weight:650}
 .nest .hb .nv.on .i{color:var(--on-bright)}
 .nest .hb .nv.on em{background:var(--on-bright);color:var(--bright)}
@@ -40,8 +40,8 @@
 .nest .hb .top{display:flex;align-items:center;gap:10px;min-height:56px}
 .nest .hb .top h1{font-size:34px;line-height:38px;letter-spacing:-0.035em}
 .nest .hb .top p{color:var(--ink2);font-size:15px;line-height:22px;font-weight:500;margin-top:6px}
-.nest .hb .search{display:flex;align-items:center;gap:10px;height:42px;width:300px;padding:0 8px 0 16px;border-radius:999px;background:var(--s1);color:var(--ink3);font-size:14px;font-weight:600;box-shadow:inset 0 0 0 1.5px var(--field)}
-.nest .hb kbd{margin-left:auto;font:700 11px/1 var(--fb);padding:6px 10px;border-radius:999px;background:var(--s2);color:var(--ink2)}
+.nest .hb .search{display:flex;align-items:center;gap:10px;height:42px;width:300px;padding-block:0 0;padding-inline:16px 8px;border-radius:999px;background:var(--s1);color:var(--ink3);font-size:14px;font-weight:600;box-shadow:inset 0 0 0 1.5px var(--field)}
+.nest .hb kbd{margin-inline-start:auto;font:700 11px/1 var(--fb);padding:6px 10px;border-radius:999px;background:var(--s2);color:var(--ink2)}
 .nest .hb .g{display:grid;gap:20px;align-items:stretch}
 .nest .hb .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:42px;padding:0 20px;border-radius:999px;font:700 14px/1 var(--fb);white-space:nowrap;background:var(--s1);color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--line2);flex:none}
 .nest .hb .btn .i{width:17px;height:17px}
@@ -55,7 +55,7 @@
 .nest .hb .btn.lg{height:48px;border-radius:999px;font-size:15px;padding:0 24px}
 .nest .hb .btn.off{background:var(--s3);color:var(--ink3);box-shadow:none}
 .nest .hb .ib{width:42px;height:42px;border-radius:50%;background:var(--s1);box-shadow:inset 0 0 0 1.5px var(--line2);display:grid;place-items:center;position:relative;flex:none;color:var(--ink)}
-.nest .hb .pip{position:absolute;top:9px;right:10px;width:8px;height:8px;border-radius:50%;background:var(--bad);box-shadow:0 0 0 2px var(--s1)}
+.nest .hb .pip{position:absolute;top:9px;inset-inline-end:10px;width:8px;height:8px;border-radius:50%;background:var(--bad);box-shadow:0 0 0 2px var(--s1)}
 .nest .hb .card{background:var(--s1);border-radius:24px;padding:24px;display:flex;flex-direction:column;gap:16px;min-width:0;box-shadow:inset 0 0 0 1px var(--line),0 1px 2px color-mix(in srgb,var(--ink) 5%,transparent)}
 .nest .hb .card.deep{background:var(--hero);color:var(--on-deep);border-radius:24px;padding:24px;box-shadow:none}
 .nest .hb .card.deep .lbl,.nest .hb .card.deep .fig small{color:var(--on-deep2)}
@@ -64,7 +64,7 @@
 .nest .hb .ch{display:flex;align-items:center;gap:8px;min-height:28px}
 .nest .hb .ch h2{font-size:17px;line-height:22px;letter-spacing:-0.02em}
 .nest .hb .ch small{color:var(--ink3);font-size:13px;line-height:18px}
-.nest .hb .ch a{margin-left:auto;font:600 13px/18px var(--fb);color:var(--brand-ink);display:inline-flex;align-items:center;gap:4px}
+.nest .hb .ch a{margin-inline-start:auto;font:600 13px/18px var(--fb);color:var(--brand-ink);display:inline-flex;align-items:center;gap:4px}
 .nest .hb .ch a .i{width:14px;height:14px}
 .nest .hb .tag{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 10px;border-radius:999px;font:700 12px/1 var(--fb);background:var(--s2);color:var(--ink2);white-space:nowrap;flex:none}
 .nest .hb .tag .i{width:14px;height:14px}
@@ -89,7 +89,7 @@
 .nest .hb .trow.sel{background:var(--brand-soft);box-shadow:inset 3px 0 0 var(--brand)}
 .nest .hb .trow b{font-weight:600}
 .nest .hb .trow small{display:block;color:var(--ink3);font-size:12px;line-height:16px}
-.nest .hb .r{text-align:right;justify-self:end}
+.nest .hb .r{text-align:end;justify-self:end}
 .nest .hb .inp{display:flex;align-items:center;gap:10px;height:42px;padding:0 16px;border-radius:14px;background:var(--s1);box-shadow:inset 0 0 0 1.5px var(--field);font-size:14px;color:var(--ink);min-width:0}
 .nest .hb .inp .i{color:var(--ink3);width:20px;height:20px}
 .nest .hb .inp.ph{color:var(--ink3)}
@@ -104,9 +104,9 @@
 .nest .hb .seg button,.nest .hb .seg span{height:36px;padding:0 18px;border-radius:999px;font:700 13px/1 var(--fb);color:var(--ink3);display:inline-flex;align-items:center;gap:6px}
 .nest .hb .seg [aria-pressed=true],.nest .hb .seg .on{background:var(--s1);color:var(--ink);box-shadow:0 0 0 1px var(--line),0 1px 2px color-mix(in srgb,var(--ink) 6%,transparent)}
 .nest .hb .sw{width:44px;height:26px;border-radius:13px;background:var(--line2);position:relative;flex:none;display:inline-block}
-.nest .hb .sw::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--s1)}
+.nest .hb .sw::after{content:'';position:absolute;top:3px;inset-inline-start:3px;width:20px;height:20px;border-radius:50%;background:var(--s1)}
 .nest .hb .sw.on{background:var(--brand)}
-.nest .hb .sw.on::after{left:21px;background:var(--on-brand)}
+.nest .hb .sw.on::after{inset-inline-start:21px;background:var(--on-brand)}
 .nest .hb .cb{width:20px;height:20px;border-radius:6px;box-shadow:inset 0 0 0 1.5px var(--line2);display:grid;place-items:center;flex:none;color:transparent;background:var(--s1)}
 .nest .hb .cb .i{width:14px;height:14px}
 .nest .hb .cb.on{background:var(--brand);box-shadow:none;color:var(--on-brand)}
@@ -124,7 +124,7 @@
 .nest .hb .flt{background:var(--s1);border-radius:16px;box-shadow:var(--shadow)}
 .nest .hb .toast{display:inline-flex;align-items:center;gap:10px;height:48px;padding:0 16px;border-radius:14px;background:var(--ink);color:var(--bg);font:500 14px/1 var(--fb);box-shadow:var(--shadow)}
 .nest .hb .phone, .nest .hb.phone{width:390px;min-height:844px;display:flex;flex-direction:column;position:relative;font-size:16px;line-height:22px;background:var(--deep);overflow:hidden}
-.nest .hb .stat{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 28px 0 32px;font:650 15px/1 var(--fb);flex:none}
+.nest .hb .stat{height:44px;display:flex;align-items:center;justify-content:space-between;padding-block:0 0;padding-inline:32px 28px;font:650 15px/1 var(--fb);flex:none}
 .nest .hb .stat .i{width:17px;height:17px}
 .nest .hb .psheet{flex:1;background:var(--bg);border-radius:0 0 28px 28px;display:flex;flex-direction:column;min-height:0}
 .nest .hb .psheet.rise{border-radius:28px;margin-top:-28px;position:relative}
@@ -132,11 +132,11 @@
 .nest .hb .phead{background:var(--deep);color:var(--on-deep);padding:0 20px 52px;display:flex;flex-direction:column;gap:16px}
 .nest .hb .ptop{display:flex;align-items:center;gap:10px;min-height:44px}
 .nest .hb .ptop h1{font:700 26px/32px var(--fd);letter-spacing:-0.02em}
-.nest .hb .chip{display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 14px 0 6px;border-radius:22px;background:var(--s1);font:600 15px/1 var(--fb);flex:none}
+.nest .hb .chip{display:inline-flex;align-items:center;gap:8px;height:44px;padding-block:0 0;padding-inline:6px 14px;border-radius:22px;background:var(--s1);font:600 15px/1 var(--fb);flex:none}
 .nest .hb .chip.ond{background:var(--deep2);color:var(--on-deep)}
 .nest .hb .pib{width:44px;height:44px;border-radius:50%;background:var(--s1);display:grid;place-items:center;position:relative;flex:none}
 .nest .hb .pib.ond{background:var(--deep2);color:var(--on-deep)}
-.nest .hb .pib .pip{top:10px;right:11px}
+.nest .hb .pib .pip{top:10px;inset-inline-end:11px}
 .nest .hb .pib.ond .pip{box-shadow:0 0 0 2px var(--deep2);background:var(--bright)}
 .nest .hb .pcard{background:var(--s1);border-radius:24px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
 .nest .hb .pcard.deep{background:var(--hero);color:var(--on-deep)}
@@ -203,7 +203,7 @@
 .nest .hb .per.now{outline:2.5px solid var(--c);outline-offset:2px}
 .nest .hb .per.brk{grid-column:2/-1;min-height:28px;background:var(--s2);color:var(--ink3);flex-direction:row;align-items:center;font:600 12px/1 var(--fb)}
 .nest .hb .per.free{background:none;box-shadow:inset 0 0 0 1.5px var(--line);color:var(--ink3)}
-.nest .hb .cell{display:flex;align-items:center;gap:8px;height:52px;padding:0 10px 0 14px;border-radius:14px;background:var(--s1);min-width:0}
+.nest .hb .cell{display:flex;align-items:center;gap:8px;height:52px;padding-block:0 0;padding-inline:14px 10px;border-radius:14px;background:var(--s1);min-width:0}
 .nest .hb .pk{width:32px;height:32px;border-radius:9px;background:var(--s2);color:var(--ink2);font:650 13px/1 var(--fb);display:grid;place-items:center;flex:none}
 .nest .hb .pk.ok{background:var(--ok);color:var(--on-ok)}
 .nest .hb .pk.warn{background:var(--warn);color:var(--on-warn)}
@@ -235,7 +235,7 @@
 .nest .hb .crumb .i{width:14px;height:14px;color:var(--ink3)}
 .nest .hb .kv{display:flex;align-items:baseline;gap:12px;min-height:40px;padding:9px 0;border-top:1px solid var(--line);font-size:15px;line-height:22px}
 .nest .hb .kv:first-child{border-top:0}
-.nest .hb .kv b{margin-left:auto;font-weight:600;font-variant-numeric:tabular-nums}
+.nest .hb .kv b{margin-inline-start:auto;font-weight:600;font-variant-numeric:tabular-nums}
 .nest .hb .mi{display:flex;align-items:center;gap:10px;height:36px;padding:0 10px;border-radius:10px;font:500 14px/1 var(--fb)}
 .nest .hb .mi.on{background:var(--brand-soft);color:var(--brand-ink)}
 .nest .hb .mi .i{width:20px;height:20px;color:var(--ink2)}
@@ -244,7 +244,7 @@
 .nest .hb .spec:first-of-type{border-top:0}
 .nest .hb .spec>small{font:500 12px/16px var(--fb);color:var(--ink3)}
 .nest .hb .spec>small b{display:block;color:var(--ink);font-weight:600;font-size:13px}
-.nest .hb .mock{background:var(--deep);border-radius:18px;padding:8px 8px 8px 0;display:grid;grid-template-columns:54px minmax(0,1fr);min-height:216px;flex:1}
+.nest .hb .mock{background:var(--deep);border-radius:18px;padding-block:8px 8px;padding-inline:0 8px;display:grid;grid-template-columns:54px minmax(0,1fr);min-height:216px;flex:1}
 .nest .hb .mock>nav{display:flex;flex-direction:column;gap:7px;padding:6px 10px}
 .nest .hb .mock>nav i{height:10px;border-radius:5px;background:var(--deep3)}
 .nest .hb .mock>nav i.on{background:var(--bright);height:20px;border-radius:7px}

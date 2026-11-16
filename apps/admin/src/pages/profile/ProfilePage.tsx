@@ -42,7 +42,7 @@ function Rows({ doc, keys }: { doc: SettingsResponse; keys: string[] }) {
         return (
           <div key={k} className="kv" style={{ alignItems: 'flex-start', gap: 16 }}>
             <span style={{ minWidth: 0 }}>{m.label}{m.help && <small style={{ display: 'block', color: 'var(--ink3)', font: '400 12px/1.4 var(--fb)' }}>{m.help}</small>}</span>
-            <b style={{ textAlign: 'right', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>{show(m, doc.values[k] !== undefined ? doc.values[k] : dflt(k))}</b>
+            <b style={{ textAlign: 'end', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>{show(m, doc.values[k] !== undefined ? doc.values[k] : dflt(k))}</b>
           </div>
         );
       })}
@@ -136,7 +136,7 @@ function Roles({ cfg }: { cfg: EffectiveConfig }) {
       {areas.map((a) => (
         <div key={a} className="kv" style={{ alignItems: 'flex-start', gap: 16 }}>
           <span>{a}</span>
-          <b style={{ textAlign: 'right' }}>{allowed.filter((p) => p.area === a).map((p) => p.label).join(' · ')}</b>
+          <b style={{ textAlign: 'end' }}>{allowed.filter((p) => p.area === a).map((p) => p.label).join(' · ')}</b>
         </div>
       ))}
       {!areas.length && <p className="help">{t('admin.profile_page.this_role_can_sign_in')}</p>}

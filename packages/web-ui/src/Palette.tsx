@@ -60,7 +60,7 @@ export function Palette({ hits, query, onQuery, onPick, onClose, placeholder = t
         </div>
       ))}
       {hits.length === 0 && <div className="none">{empty ?? t('ui.palette.no_matches_for', { query })}</div>}
-      <div className="pf"><span>{t('ui.palette.move')}</span><span>{t('ui.palette.enter_opens')}</span><span style={{ marginLeft: 'auto' }}>{t('ui.palette.ctrl_k_anywhere')}</span></div>
+      <div className="pf"><span>{t('ui.palette.move')}</span><span>{t('ui.palette.enter_opens')}</span><span style={{ marginInlineStart: 'auto' }}>{t('ui.palette.ctrl_k_anywhere')}</span></div>
     </div>
   );
 }

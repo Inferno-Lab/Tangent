@@ -58,7 +58,7 @@ export function IntegrationsTab({ d }: { d: SchoolDetail }) {
         <div style={{ marginTop: 8 }}>
           {!(fails.data?.rows ?? []).length ? <EmptyNote icon="checkCircle" title={t('console.integrations_tab.nothing_has_failed_lately')} body={t('console.integrations_tab.a_message_to_this_school')} /> : fails.data!.rows.map((m) => (
             <div key={m.id} className="kv" style={{ alignItems: 'center' }}>
-              <span style={{ minWidth: 0 }}><b className="num">{shown.has(m.id) ? m.to : mask(m.to)}</b>{!shown.has(m.id) && <button className="btn sm" style={{ marginLeft: 8 }} onClick={() => setShown(new Set(shown).add(m.id))}>{t('console.integrations_tab.show')}</button>} · {CAPABILITY_LABELS[m.channel as keyof typeof CAPABILITY_LABELS] ?? m.channel}<br /><small style={{ color: 'var(--bad-i)', overflowWrap: 'anywhere' }}>{m.error}</small></span>
+              <span style={{ minWidth: 0 }}><b className="num">{shown.has(m.id) ? m.to : mask(m.to)}</b>{!shown.has(m.id) && <button className="btn sm" style={{ marginInlineStart: 8 }} onClick={() => setShown(new Set(shown).add(m.id))}>{t('console.integrations_tab.show')}</button>} · {CAPABILITY_LABELS[m.channel as keyof typeof CAPABILITY_LABELS] ?? m.channel}<br /><small style={{ color: 'var(--bad-i)', overflowWrap: 'anywhere' }}>{m.error}</small></span>
               <b style={{ whiteSpace: 'nowrap' }}>{ago(m.createdAt)}</b>
             </div>
           ))}

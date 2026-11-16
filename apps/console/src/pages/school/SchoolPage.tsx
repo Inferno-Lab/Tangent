@@ -331,7 +331,7 @@ function GoLive({ d, say, onDone }: { d: SchoolDetail; say: (m: string, tone?: '
           <div key={r.key} className="grd rw" style={{ '--cols': '28px minmax(0,1fr) minmax(0,auto)', height: 'auto', padding: '10px 0' } as React.CSSProperties}>
             <span className={`st ${r.done ? 'g' : 'a'}`} aria-label={r.done ? tr('console.school_page.done') : tr('console.school_page.not_yet')}><i></i></span>
             <b style={{ font: '700 14px var(--fb)' }}>{r.label}</b>
-            <span style={{ color: 'var(--ink3)', font: '600 13px var(--fb)', textAlign: 'right', display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+            <span style={{ color: 'var(--ink3)', font: '600 13px var(--fb)', textAlign: 'end', display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
               {r.detail}
               {can && r.manual && <button className="btn sm" disabled={mark.isPending} onClick={() => mark.mutate({ key: r.key as 'config_reviewed' | 'staff_trained', done: !r.done })}>{r.done ? tr('console.school_page.undo') : tr('console.school_page.mark_done')}</button>}
             </span>

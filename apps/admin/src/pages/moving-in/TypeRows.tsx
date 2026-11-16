@@ -27,7 +27,7 @@ export function TypeRows({ kind, busy, onSend, onCancel }: { kind: ImportKind; b
               <span style={{ font: '700 12px var(--fb)', color: 'var(--ink3)' }}>{i + 1}</span>
               {kind.columns.map((c) => (c.options
                 ? <Select key={c.key} compact aria-label={t('admin.type_rows.row_2', { p0: i + 1, label: c.label })} value={r[c.key]!} onChange={(v) => set(i, c.key, v)} options={[{ value: '', label: t('admin.type_rows.choose') }, ...c.options.map((o) => ({ value: o, label: o }))]} />
-                : <input key={c.key} className={`hws ${c.required && filled.includes(r) && !r[c.key]!.trim() ? 'bad' : ''}`} style={{ width: '100%', textAlign: 'left' }}
+                : <input key={c.key} className={`hws ${c.required && filled.includes(r) && !r[c.key]!.trim() ? 'bad' : ''}`} style={{ width: '100%', textAlign: 'start' }}
                   aria-label={t('admin.type_rows.row_2', { p0: i + 1, label: c.label })} placeholder={c.example} value={r[c.key]!} onChange={(e) => set(i, c.key, e.target.value)} />))}
             </div>
           ))}

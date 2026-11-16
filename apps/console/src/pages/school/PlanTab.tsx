@@ -86,7 +86,7 @@ export function PlanTab({ d, say }: { d: SchoolDetail; say: Say }) {
               <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                 <button type="button" className={`sw ${on ? 'on' : ''}`} role="switch" aria-checked={on} aria-label={m.name} disabled={!can || m.core}
                   onClick={() => { const n = new Set(mods); if (n.has(m.key)) n.delete(m.key); else n.add(m.key); setMods(n); }} />
-                <span style={{ flex: '1 1 200px', minWidth: 0 }}><b style={{ font: '700 14px var(--fb)' }}>{m.name}</b>{m.core && <span className="chip" style={{ marginLeft: 8 }}>{t('console.plan_tab.always_on')}</span>}<div className="help" style={{ margin: 0 }}>{m.blurb}</div></span>
+                <span style={{ flex: '1 1 200px', minWidth: 0 }}><b style={{ font: '700 14px var(--fb)' }}>{m.name}</b>{m.core && <span className="chip" style={{ marginInlineStart: 8 }}>{t('console.plan_tab.always_on')}</span>}<div className="help" style={{ margin: 0 }}>{m.blurb}</div></span>
                 {on && !m.core && (
                   <span style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                     <span style={{ width: 160 }}><DateField label={t('console.plan_tab.from')} value={dates[m.key]?.from ?? ''} onChange={(v) => setDate(m.key, 'from', v)} disabled={!can} /></span>
@@ -95,7 +95,7 @@ export function PlanTab({ d, say }: { d: SchoolDetail; say: Say }) {
                 )}
               </div>
               {on && m.features.length > 0 && (
-                <div className="tgrow" style={{ marginTop: 10, paddingLeft: 56 }}>
+                <div className="tgrow" style={{ marginTop: 10, paddingInlineStart: 56 }}>
                   {m.features.map((f) => f.state === 'planned'
                     ? <span key={f.key} className="chip" style={{ maxWidth: '100%' }} data-tip={t('console.plan_tab.planned_not_built_yet', { name: f.name })}><span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name} {t('console.plan_tab.planned')}</span></span>
                     : (

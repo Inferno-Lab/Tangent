@@ -32,7 +32,7 @@ export function RequestsPage() {
                 <span className="av" style={{ width: 34, height: 34, fontSize: 11, background: t.bg, color: t.fg, boxShadow: 'none', flex: 'none' }}>{initials(r.schoolName)}</span>
                 <span style={{ flex: 1, minWidth: 220 }}>
                   <a href={url(`/schools/${r.schoolId}`)} onClick={(e) => { e.preventDefault(); app.go(`/schools/${r.schoolId}`); }} style={{ font: '700 14px var(--fb)', color: 'inherit' }}>{r.schoolName}</a>
-                  <span className="chip" style={{ marginLeft: 8 }}>{r.area}</span>
+                  <span className="chip" style={{ marginInlineStart: 8 }}>{r.area}</span>
                   <p style={{ margin: '6px 0 0', font: '400 14px/1.5 var(--fb)' }}>{r.message}</p>
                   <small style={{ color: 'var(--ink3)' }}>{r.requestedBy} · {ago(r.createdAt)}{r.answer ? tr('console.requests_page.answered', { answer: r.answer }) : ''}</small>
                 </span>

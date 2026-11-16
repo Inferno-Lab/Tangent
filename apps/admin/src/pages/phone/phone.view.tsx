@@ -26,7 +26,7 @@ export function PhoneView({ v }: { v: any }) {
         <div className="sc">
           <div className="two">
             {v.has.attendance && (
-            <button type="button" className="bt a" aria-label={t('admin.phone.view.open_attendance')} onClick={() => v.goto("/attendance")} style={{ "--d": ".02s", border: "0", textAlign: "left", font: "inherit", color: "inherit", cursor: "pointer", width: "100%" } as CSSProperties}>
+            <button type="button" className="bt a" aria-label={t('admin.phone.view.open_attendance')} onClick={() => v.goto("/attendance")} style={{ "--d": ".02s", border: "0", textAlign: 'start', font: "inherit", color: "inherit", cursor: "pointer", width: "100%" } as CSSProperties}>
               <small>{t('admin.phone.view.present_today')}</small>
               <div className="n num">
                 {v.present}
@@ -35,7 +35,7 @@ export function PhoneView({ v }: { v: any }) {
             </button>
             )}
             {v.has.fees && (
-            <button type="button" className="bt v" aria-label={t('admin.phone.view.open_fees')} onClick={() => v.goto("/fees")} style={{ "--d": ".06s", border: "0", textAlign: "left", font: "inherit", color: "inherit", cursor: "pointer", width: "100%" } as CSSProperties}>
+            <button type="button" className="bt v" aria-label={t('admin.phone.view.open_fees')} onClick={() => v.goto("/fees")} style={{ "--d": ".06s", border: "0", textAlign: 'start', font: "inherit", color: "inherit", cursor: "pointer", width: "100%" } as CSSProperties}>
               <small>{t('admin.phone.view.fees_in')}{' '}{v.feeMonth}</small>
               <div className="n num">{v.fees}</div>
             </button>
@@ -54,7 +54,7 @@ export function PhoneView({ v }: { v: any }) {
             <div style={{ display: "flex", alignItems: "center", marginBottom: "4px" } as CSSProperties}>
               <b className="fd" style={{ fontSize: "17px", letterSpacing: "-.02em" } as CSSProperties}>
                 {t('admin.phone.view.needs_you')}</b>
-              <span className="chip a" style={{ marginLeft: "auto" } as CSSProperties}>
+              <span className="chip a" style={{ marginInlineStart: "auto" } as CSSProperties}>
                 {v.left} {t('admin.phone.view.left')}</span>
             </div>
             {v.items.map((it: any) => (
@@ -84,7 +84,7 @@ export function PhoneView({ v }: { v: any }) {
             )}
           </div>
           {v.has.fees && (
-          <button type="button" className="bt k" aria-label={t('admin.phone.view.open_fees')} onClick={() => v.goto("/fees")} style={{ "--d": ".18s", border: "0", textAlign: "left", font: "inherit", color: "inherit", cursor: "pointer", width: "100%" } as CSSProperties}>
+          <button type="button" className="bt k" aria-label={t('admin.phone.view.open_fees')} onClick={() => v.goto("/fees")} style={{ "--d": ".18s", border: "0", textAlign: 'start', font: "inherit", color: "inherit", cursor: "pointer", width: "100%" } as CSSProperties}>
             <small>{v.barsTitle}</small>
             {v.barsEmpty ? (
               <p style={{ margin: "12px 0 0", font: "400 13px/1.45 var(--fb)", opacity: ".75" } as CSSProperties}>{t('admin.phone.view.payments_show_up_here_as')}</p>

@@ -82,7 +82,7 @@ export function RolesTab({ schoolId, say }: { schoolId: string; say: Say }) {
                   {g.items.map((p) => (
                     <label key={p.key} className="hwc" style={{ display: 'flex', whiteSpace: 'normal', alignItems: 'flex-start', padding: '4px 0' }}>
                       <Checkbox checked={perms.has(p.key)} disabled={readOnly} onChange={(c) => { const n = new Set(perms); if (c) n.add(p.key); else n.delete(p.key); setPerms(n); }} />
-                      <span>{p.label}{p.sensitive && <span className="chip a" style={{ marginLeft: 6, height: 20, padding: '0 8px' }}>{tr('console.roles_tab.careful')}</span>}</span>
+                      <span>{p.label}{p.sensitive && <span className="chip a" style={{ marginInlineStart: 6, height: 20, padding: '0 8px' }}>{tr('console.roles_tab.careful')}</span>}</span>
                     </label>
                   ))}
                 </fieldset>

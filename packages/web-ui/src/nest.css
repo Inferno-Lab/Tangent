@@ -16,27 +16,27 @@ font-family:var(--fb);color:var(--ink);background:var(--bd);-webkit-font-smoothi
 .nest .fr{background:var(--bg);border-radius:28px;box-shadow:var(--sh3);overflow:hidden;position:relative;border:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
 .nest .app{display:grid;grid-template-columns:auto minmax(0,1fr)}
 @media (max-width:900px){.nest .app{grid-template-columns:minmax(0,1fr)}}
-.nest .sb{width:272px;transition:width var(--t3) var(--e);background:var(--bg);border-right:1px solid var(--line);padding:20px 16px 16px;display:flex;flex-direction:column;gap:2px;overflow:hidden}
+.nest .sb{width:272px;transition:width var(--t3) var(--e);background:var(--bg);border-inline-end:1px solid var(--line);padding:20px 16px 16px;display:flex;flex-direction:column;gap:2px;overflow:hidden}
 .nest .sb.col{width:88px}
 .nest .ws{display:flex;align-items:center;gap:12px;height:52px;padding:0 6px;white-space:nowrap}
 .nest .lg{width:40px;height:40px;border-radius:14px;background:var(--ink);color:var(--s1);display:grid;place-items:center;font:700 17px var(--fd);flex:none;box-shadow:none}
 .nest .lg .lgi{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}
 .nest .ws b{display:block;font:700 15px var(--fb);line-height:1.2}
 .nest .ws small{font:500 12px var(--fb);color:var(--ink3)}
-.nest .colb{margin-left:auto;width:32px;height:32px;border-radius:10px;border:0;background:none;color:var(--ink3);display:grid;place-items:center;cursor:pointer;flex:none;transition:background var(--t2),color var(--t2)}
+.nest .colb{margin-inline-start:auto;width:32px;height:32px;border-radius:10px;border:0;background:none;color:var(--ink3);display:grid;place-items:center;cursor:pointer;flex:none;transition:background var(--t2),color var(--t2)}
 .nest .colb:hover{background:var(--s2);color:var(--ink)}
-.nest .col .colb{margin-left:0}
+.nest .col .colb{margin-inline-start:0}
 .nest .fade{transition:opacity var(--t3),transform var(--t3) var(--e)}
-.nest .col .fade{opacity:0;transform:translateX(-8px);pointer-events:none}
+.nest .col .fade{opacity:0;transform:translateX(calc(-8px * var(--dir,1)));pointer-events:none}
 .nest .sl{font:600 12px var(--fb);color:var(--ink3);padding:20px 12px 6px;white-space:nowrap}
-.nest .nv{position:relative;display:flex;align-items:center;gap:12px;height:36px;padding:0 12px;border-radius:10px;border:0;background:none;color:var(--ink2);font:500 14px var(--fb);cursor:pointer;text-align:left;text-decoration:none;white-space:nowrap;transition:background var(--t2),color var(--t2),transform var(--t2) var(--e)}
+.nest .nv{position:relative;display:flex;align-items:center;gap:12px;height:36px;padding:0 12px;border-radius:10px;border:0;background:none;color:var(--ink2);font:500 14px var(--fb);cursor:pointer;text-align:start;text-decoration:none;white-space:nowrap;transition:background var(--t2),color var(--t2),transform var(--t2) var(--e)}
 .nest .nv:hover{background:var(--s2);color:var(--ink)}
 .nest .nv:active{transform:scale(.98)}
 .nest .nv.on{background:var(--ink);color:var(--s1);font-weight:600}
 .nest .nv>svg{width:20px;height:20px;flex:none}
-.nest .nv .ct{margin-left:auto;font:600 11px var(--fb);background:var(--s2);color:var(--ink2);border-radius:999px;padding:2px 8px}
+.nest .nv .ct{margin-inline-start:auto;font:600 11px var(--fb);background:var(--s2);color:var(--ink2);border-radius:999px;padding:2px 8px}
 .nest .nv.on .ct{background:color-mix(in srgb,var(--s1) 18%,transparent);color:var(--s1)}
-.nest .nv .kb{margin-left:auto;font:700 11px var(--fb);color:var(--ink3);opacity:0;transform:translateX(4px);transition:opacity var(--t2),transform var(--t3) var(--e)}
+.nest .nv .kb{margin-inline-start:auto;font:700 11px var(--fb);color:var(--ink3);opacity:0;transform:translateX(calc(4px * var(--dir,1)));transition:opacity var(--t2),transform var(--t3) var(--e)}
 .nest .nv:hover .kb{opacity:1;transform:none}
 .nest .col .nv .kb{display:none}
 .nest .sbc{margin-top:auto;border-radius:18px;background:var(--s1);border:1px solid var(--line);color:var(--ink);padding:16px;display:flex;flex-direction:column;gap:10px;white-space:nowrap;overflow:hidden;position:relative}
@@ -48,9 +48,9 @@ font-family:var(--fb);color:var(--ink);background:var(--bd);-webkit-font-smoothi
    do not fit). Tabs and filters are not verbs: they sit in the bar under the title row. */
 .nest .hd{display:flex;align-items:flex-start;gap:12px 24px;flex-wrap:wrap}
 .nest .hd>.ht{flex:1 1 280px;min-width:0}
-.nest .hd>.ha{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;max-width:100%;margin-left:auto}
+.nest .hd>.ha{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;max-width:100%;margin-inline-start:auto}
 .nest .pbar{display:flex;align-items:center;gap:10px 12px;flex-wrap:wrap}
-@media (max-width:700px){.nest .hd>.ha{margin-left:0;justify-content:flex-start}}
+@media (max-width:700px){.nest .hd>.ha{margin-inline-start:0;justify-content:flex-start}}
 .nest .hd h1{margin:0;font:700 34px/1.1 var(--fd);letter-spacing:-.035em}
 .nest .hd p{margin:6px 0 0;color:var(--ink2);font:500 15px var(--fb)}
 .nest .grow{flex:1}
@@ -74,14 +74,14 @@ font-family:var(--fb);color:var(--ink);background:var(--bd);-webkit-font-smoothi
 .nest .ibtn{position:relative;width:42px;height:42px;border-radius:50%;border:1.5px solid var(--line2);background:var(--s1);color:var(--ink2);display:grid;place-items:center;cursor:pointer;flex:none;transition:transform var(--t2) var(--e),background var(--t2),color var(--t2)}
 .nest .ibtn:hover{background:var(--s2);color:var(--ink);border-color:var(--ink3)}
 .nest .ibtn svg{width:19px;height:19px}
-.nest .pip{position:absolute;top:8px;right:9px;width:9px;height:9px;border-radius:50%;background:var(--bad);box-shadow:0 0 0 2.5px var(--s1)}
+.nest .pip{position:absolute;top:8px;inset-inline-end:9px;width:9px;height:9px;border-radius:50%;background:var(--bad);box-shadow:0 0 0 2.5px var(--s1)}
 .nest .spin{width:16px;height:16px;border-radius:50%;border:2.5px solid color-mix(in srgb,currentColor 28%,transparent);border-top-color:currentColor;animation:nSpin .7s linear infinite}
 @keyframes nSpin{to{transform:rotate(360deg)}}
 /* search, segmented, chips */
-.nest .srch{display:flex;align-items:center;gap:10px;height:42px;padding:0 8px 0 16px;min-width:280px;border-radius:999px;border:1.5px solid var(--field);background:var(--s1);color:var(--ink3);font:600 14px var(--fb);cursor:text;transition:border-color var(--t2),box-shadow var(--t3) var(--e)}
+.nest .srch{display:flex;align-items:center;gap:10px;height:42px;padding-block:0 0;padding-inline:16px 8px;min-width:280px;border-radius:999px;border:1.5px solid var(--field);background:var(--s1);color:var(--ink3);font:600 14px var(--fb);cursor:text;transition:border-color var(--t2),box-shadow var(--t3) var(--e)}
 .nest .srch:hover{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)}
 .nest .srch svg{width:18px;height:18px;flex:none}
-.nest .kbd{margin-left:auto;font:700 11px var(--fb);border-radius:999px;padding:6px 10px;background:var(--s2);color:var(--ink3)}
+.nest .kbd{margin-inline-start:auto;font:700 11px var(--fb);border-radius:999px;padding:6px 10px;background:var(--s2);color:var(--ink3)}
 .nest .seg{position:relative;display:inline-flex;padding:4px;border-radius:999px;background:var(--s2);max-width:100%;overflow-x:auto;scrollbar-width:none}
 .nest .seg[data-more-r]{mask-image:linear-gradient(90deg,var(--ink) calc(100% - 48px),transparent)}
 .nest .seg[data-more-l]{mask-image:linear-gradient(90deg,transparent,var(--ink) 48px)}
@@ -89,6 +89,7 @@ font-family:var(--fb);color:var(--ink);background:var(--bd);-webkit-font-smoothi
 .nest .seg button{position:relative;z-index:1;height:36px;padding:0 20px;border:0;background:none;border-radius:999px;font:700 13px var(--fb);color:var(--ink3);cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex:none;transition:color var(--t2)}
 .nest .seg button.on{color:var(--ink)}
 .nest .seg button svg{width:16px;height:16px}
+/* The knob moves by its measured offsetLeft, which is physical: it stays anchored at the left in either direction. */
 .nest .seg .kn{position:absolute;top:4px;bottom:4px;left:0;border-radius:999px;background:var(--s1);box-shadow:var(--sh1),0 0 0 1px var(--line);transition:transform var(--t2) var(--e),width var(--t2) var(--e)}
 .nest .chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 12px;border-radius:999px;background:var(--s2);color:var(--ink2);font:700 12px var(--fb);white-space:nowrap}
 .nest .chip svg{width:13px;height:13px}
@@ -133,8 +134,8 @@ font-family:var(--fb);color:var(--ink);background:var(--bd);-webkit-font-smoothi
 /* vibrate on error: restartable by flipping shk1 and shk2 on an ancestor */
 .nest .shk1 .shake{animation:nShkA var(--t3) linear}
 .nest .shk2 .shake{animation:nShkB var(--t3) linear}
-@keyframes nShkA{0%,100%{transform:translateX(0)}8%{transform:translateX(-9px)}16%{transform:translateX(9px)}24%{transform:translateX(-8px)}32%{transform:translateX(8px)}40%{transform:translateX(-6px)}48%{transform:translateX(6px)}58%{transform:translateX(-4px)}68%{transform:translateX(3px)}80%{transform:translateX(-1.5px)}90%{transform:translateX(1px)}}
-@keyframes nShkB{0%,100%{transform:translateX(0)}8%{transform:translateX(-9px)}16%{transform:translateX(9px)}24%{transform:translateX(-8px)}32%{transform:translateX(8px)}40%{transform:translateX(-6px)}48%{transform:translateX(6px)}58%{transform:translateX(-4px)}68%{transform:translateX(3px)}80%{transform:translateX(-1.5px)}90%{transform:translateX(1px)}}
+@keyframes nShkA{0%,100%{transform:translateX(0)}8%{transform:translateX(calc(-9px * var(--dir,1)))}16%{transform:translateX(calc(9px * var(--dir,1)))}24%{transform:translateX(calc(-8px * var(--dir,1)))}32%{transform:translateX(calc(8px * var(--dir,1)))}40%{transform:translateX(calc(-6px * var(--dir,1)))}48%{transform:translateX(calc(6px * var(--dir,1)))}58%{transform:translateX(calc(-4px * var(--dir,1)))}68%{transform:translateX(calc(3px * var(--dir,1)))}80%{transform:translateX(calc(-1.5px * var(--dir,1)))}90%{transform:translateX(calc(1px * var(--dir,1)))}}
+@keyframes nShkB{0%,100%{transform:translateX(0)}8%{transform:translateX(calc(-9px * var(--dir,1)))}16%{transform:translateX(calc(9px * var(--dir,1)))}24%{transform:translateX(calc(-8px * var(--dir,1)))}32%{transform:translateX(calc(8px * var(--dir,1)))}40%{transform:translateX(calc(-6px * var(--dir,1)))}48%{transform:translateX(calc(6px * var(--dir,1)))}58%{transform:translateX(calc(-4px * var(--dir,1)))}68%{transform:translateX(calc(3px * var(--dir,1)))}80%{transform:translateX(calc(-1.5px * var(--dir,1)))}90%{transform:translateX(calc(1px * var(--dir,1)))}}
 /* switch, checkbox */
 .nest .cb{width:22px;height:22px;border-radius:6px;border:1.8px solid var(--field);background:var(--s1);display:grid;place-items:center;color:var(--on-brand);cursor:pointer;padding:0;flex:none;transition:background var(--t2),border-color var(--t2),transform var(--t1)}
 .nest .cb:active{transform:scale(.9)}
@@ -149,7 +150,7 @@ font-family:var(--fb);color:var(--ink);background:var(--bd);-webkit-font-smoothi
 .nest .rw:last-child{border-bottom:0}
 .nest .rw:hover{background:color-mix(in srgb,var(--brand) 5%,transparent)}
 .nest .rw.sel{background:color-mix(in srgb,var(--brand-soft) 55%,var(--s1))}
-.nest .rw.sel::before{content:'';position:absolute;left:0;top:14px;bottom:14px;width:4px;border-radius:0 6px 6px 0;background:var(--brand)}
+.nest .rw.sel::before{content:'';position:absolute;inset-inline-start:0;top:14px;bottom:14px;width:4px;border-radius:0 6px 6px 0;background:var(--brand)}
 /* rolling digits */
 .nest .roll{display:inline-flex;height:1.1em;overflow:hidden;line-height:1.1}
 .nest .dg{display:inline-block;height:1.1em;width:.62em;overflow:hidden;text-align:center}
@@ -174,7 +175,7 @@ font-family:var(--fb);color:var(--ink);background:var(--bd);-webkit-font-smoothi
 .nest .btn .cv{transition:transform var(--t2) var(--e)}
 .nest .btn[aria-expanded=true] .cv{transform:rotate(180deg)}
 .nest .popm button svg{width:17px;height:17px;flex:none;opacity:.75}
-.nest .popm button .ck{margin-left:auto;color:var(--brand);opacity:1}
+.nest .popm button .ck{margin-inline-start:auto;color:var(--brand);opacity:1}
 /* overlays */
 .nest .scrim{position:fixed;inset:0;z-index:50;background:var(--scrim);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);animation:nFade var(--t3) var(--e) both}
 .nest .scrim[data-leaving]{animation:nFadeO var(--t2) var(--ei) forwards}
@@ -189,12 +190,12 @@ font-family:var(--fb);color:var(--ink);background:var(--bd);-webkit-font-smoothi
 .nest .dlg h3{margin:12px 0 6px;font:700 22px/1.15 var(--fd);letter-spacing:-.025em}
 .nest .dlg p{margin:0 0 20px;font:500 15px/1.55 var(--fb);color:var(--ink2)}
 .nest .dlg.dk p{color:color-mix(in srgb,var(--on-deep) 72%,transparent)}
-.nest .toast{display:flex;align-items:center;gap:12px;padding:16px 16px 16px 20px;border-radius:24px;background:var(--deep);color:var(--on-deep);box-shadow:var(--sh3);font:600 14px var(--fb);animation:nToast var(--t3) var(--e) both}
+.nest .toast{display:flex;align-items:center;gap:12px;padding-block:16px 16px;padding-inline:20px 16px;border-radius:24px;background:var(--deep);color:var(--on-deep);box-shadow:var(--sh3);font:600 14px var(--fb);animation:nToast var(--t3) var(--e) both}
 @keyframes nToast{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
 .nest .toast[data-leaving]{animation:nToastO var(--t2) var(--ei) forwards}
 @keyframes nToastO{to{opacity:0;transform:translateY(10px)}}
 /* One place for every toast: the bottom middle of the window, centred with margins so the animation's transform cannot move it. */
-.nest .toasts{position:fixed;left:0;right:0;bottom:calc(28px + env(safe-area-inset-bottom));z-index:80;display:flex;justify-content:center;pointer-events:none;padding:0 16px}
+.nest .toasts{position:fixed;inset-inline-start:0;inset-inline-end:0;bottom:calc(28px + env(safe-area-inset-bottom));z-index:80;display:flex;justify-content:center;pointer-events:none;padding:0 16px}
 .nest .toasts>.toast{pointer-events:auto;max-width:100%}
 @media (max-width:900px){.nest .toasts{bottom:calc(92px + env(safe-area-inset-bottom))}}
 .nest .toast .btn{height:38px}
@@ -205,15 +206,15 @@ font-family:var(--fb);color:var(--ink);background:var(--bd);-webkit-font-smoothi
 .nest .bk{white-space:nowrap;flex:none;height:38px;padding:0 16px;border-radius:999px;border:0;background:none;color:var(--on-deep);font:700 13px var(--fb);cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:background var(--t2)}
 .nest .bk:hover{background:color-mix(in srgb,var(--on-deep) 14%,transparent)}
 .nest .bk svg{width:16px;height:16px}
-.nest .drw{position:absolute;top:14px;right:14px;bottom:14px;z-index:51;width:480px;max-width:calc(100% - 28px);background:var(--s1);border-radius:28px;box-shadow:var(--sh3);display:flex;flex-direction:column;overflow:hidden;animation:nDrw var(--t3) var(--e) both;border:1px solid var(--line)}
+.nest .drw{position:absolute;top:14px;inset-inline-end:14px;bottom:14px;z-index:51;width:480px;max-width:calc(100% - 28px);background:var(--s1);border-radius:28px;box-shadow:var(--sh3);display:flex;flex-direction:column;overflow:hidden;animation:nDrw var(--t3) var(--e) both;border:1px solid var(--line)}
 .nest .drw[data-leaving]{animation:nDrwO var(--t2) var(--ei) forwards}
-@keyframes nDrw{from{transform:translateX(108%)}to{transform:none}}
-@keyframes nDrwO{to{transform:translateX(108%)}}
-.nest .save{position:absolute;left:50%;bottom:28px;z-index:20;display:flex;align-items:center;gap:12px;padding:8px 8px 8px 24px;border-radius:999px;background:var(--deep);color:var(--on-deep);box-shadow:var(--sh3);font:600 14px var(--fb);transform:translate(-50%,160%);opacity:0;transition:transform var(--t3) var(--e),opacity var(--t3)}
+@keyframes nDrw{from{transform:translateX(calc(108% * var(--dir,1)))}to{transform:none}}
+@keyframes nDrwO{to{transform:translateX(calc(108% * var(--dir,1)))}}
+.nest .save{position:absolute;left:50%;bottom:28px;z-index:20;display:flex;align-items:center;gap:12px;padding-block:8px 8px;padding-inline:24px 8px;border-radius:999px;background:var(--deep);color:var(--on-deep);box-shadow:var(--sh3);font:600 14px var(--fb);transform:translate(-50%,160%);opacity:0;transition:transform var(--t3) var(--e),opacity var(--t3)}
 .nest .save.on{transform:translate(-50%,0);opacity:1}
 .nest .skc{border-radius:14px;background:var(--s2);position:relative;overflow:hidden}
-.nest .skc::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 20%,color-mix(in srgb,var(--s1) 80%,transparent) 50%,transparent 80%);transform:translateX(-100%);animation:nSh 1.4s infinite}
-@keyframes nSh{to{transform:translateX(100%)}}
+.nest .skc::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 20%,color-mix(in srgb,var(--s1) 80%,transparent) 50%,transparent 80%);transform:translateX(calc(-100% * var(--dir,1)));animation:nSh 1.4s infinite}
+@keyframes nSh{to{transform:translateX(calc(100% * var(--dir,1)))}}
 /* reduce motion */
 .theme-swap .nest *,.theme-swap .nest *::before,.theme-swap .nest *::after,.nest.rm *,.nest.rm *::before,.nest.rm *::after{animation-duration:1ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition:none!important}
 /* transition:none, not a 1 ms duration: a duration on its own turns on `transition: all` for every element. */

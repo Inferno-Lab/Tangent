@@ -63,7 +63,7 @@ export function HomeworkPage() {
             </div>
             <div className="scroll-x lscroll" data-fill="">
               <div className="hwlw" style={{ minWidth: 640 }}>
-                <div className="grd th" style={{ '--cols': COLS } as React.CSSProperties}><span>{t('admin.homework_page.homework')}</span><span>{t('admin.homework_page.class_2')}</span><span>{t('admin.homework_page.due')}</span><span>{t('admin.homework_page.handed_in')}</span><span style={{ textAlign: 'right' }}>{t('admin.homework_page.count')}</span></div>
+                <div className="grd th" style={{ '--cols': COLS } as React.CSSProperties}><span>{t('admin.homework_page.homework')}</span><span>{t('admin.homework_page.class_2')}</span><span>{t('admin.homework_page.due')}</span><span>{t('admin.homework_page.handed_in')}</span><span style={{ textAlign: 'end' }}>{t('admin.homework_page.count')}</span></div>
                 {rows.map((r) => <Row key={r.id} r={r} today={today} onOpen={() => setOpen(r.id)} />)}
                 {rows.length === 0 && <div style={{ padding: '4px 20px 20px' }}><EmptyNote icon="filter" title={t('admin.homework_page.nothing_fits_these_filters')} body={t('admin.homework_page.try_another_class_or_status')} /></div>}
               </div>
@@ -90,7 +90,7 @@ function Row({ r, today, onOpen }: { r: HomeworkRow; today: string; onOpen: () =
         <span className="chip">{r.className}</span>
         <span className={`chip ${overdue ? 'c' : ''}`}>{t('admin.homework_page.due')}{' '}{dateLabel(r.dueOn)}</span>
         <span className="us hs" style={{ gap: 6 }}><div className="bar" style={{ height: 14 }}><i style={{ width: `${p}%` }}></i></div></span>
-        <b className="num" style={{ font: '700 13px var(--fb)', textAlign: 'right' }}>{r.handedIn} / {r.total}</b>
+        <b className="num" style={{ font: '700 13px var(--fb)', textAlign: 'end' }}>{r.handedIn} / {r.total}</b>
       </div>
     </button>
   );
@@ -197,7 +197,7 @@ function HomeworkSheet({ id, canWrite, onChange, onClose, onSaved, onRemoved }: 
                   {(x.handed || s.files.length > 0) && (
                     <div style={{ gridColumn: '2 / -1', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', paddingBottom: 6 }}>
                       <FileChips files={s.files} />
-                      <input className="hws" style={{ flex: '1 1 200px', width: 'auto', minWidth: 0, textAlign: 'left' }} aria-label={t('admin.homework_page.feedback_for', { name: s.name })} placeholder={t('admin.homework_page.a_word_of_feedback_the')} disabled={!canWrite} maxLength={300}
+                      <input className="hws" style={{ flex: '1 1 200px', width: 'auto', minWidth: 0, textAlign: 'start' }} aria-label={t('admin.homework_page.feedback_for', { name: s.name })} placeholder={t('admin.homework_page.a_word_of_feedback_the')} disabled={!canWrite} maxLength={300}
                         value={x.feedback} onChange={(e) => setDraft({ ...draft, [s.studentId]: { ...x, feedback: e.target.value } })} />
                     </div>
                   )}

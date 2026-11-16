@@ -21,7 +21,7 @@
 .pg-phone .ap b{display:block;font:700 14px var(--fb)}
 .pg-phone .ap small{font:500 12px var(--fb);color:var(--ink3)}
 .pg-phone .bell{position:relative}
-.pg-phone .bell i{position:absolute;right:8px;top:8px;width:9px;height:9px;border-radius:50%;background:var(--bad);box-shadow:0 0 0 2px var(--bg)}
+.pg-phone .bell i{position:absolute;inset-inline-end:8px;top:8px;width:9px;height:9px;border-radius:50%;background:var(--bad);box-shadow:0 0 0 2px var(--bg)}
 
 
 .pg-phone .bars{display:flex;align-items:flex-end;gap:8px;height:128px;margin-top:12px}

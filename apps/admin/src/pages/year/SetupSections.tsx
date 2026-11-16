@@ -56,7 +56,7 @@ function SectionCard({ section: s, canWrite, onOpen }: { section: SetupSection; 
     <section className="card tbl rise" style={{ padding: 0 }}>
       <div className="ch" style={{ padding: '24px 24px 16px', flexWrap: 'wrap', gap: 10 }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}><h2>{s.label}</h2><span className="chip">{s.rows.length}</span></span>
-        {edit && <span style={{ marginLeft: 'auto' }}><AddBtn onClick={() => onOpen(null)}>{t('admin.setup_sections.add')}</AddBtn></span>}
+        {edit && <span style={{ marginInlineStart: 'auto' }}><AddBtn onClick={() => onOpen(null)}>{t('admin.setup_sections.add')}</AddBtn></span>}
       </div>
       {s.locked && <div className="help" style={{ padding: '0 24px 16px' }}>{t('admin.setup_sections.tangent_keeps_these_for_your')}</div>}
       {s.rows.length === 0 && SCENE[s.kind] ? (

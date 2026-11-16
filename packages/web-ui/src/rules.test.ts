@@ -148,3 +148,16 @@ describe('every word in a language catalogue', () => {
     expect(problems).toEqual([]);
   });
 });
+
+// Right to left (docs/one-shot-plan.md §3.5.7): styles say start and end, so a page mirrors for Arabic (tools/rtl-logical.mjs).
+describe('reads right to left too', () => {
+  it('uses start and end, never left and right, in styles', () => {
+    // Allowed: centring (left: 50% with translateX(-50%)) and the segmented knob, which moves by its measured offsetLeft.
+    const allowed = (line: string) => line.replace(/\.seg \.kn\{[^}]*\}/g, '').replace(/(?<![-\w])(left|right)\s*:\s*50%/g, '');
+    const physical = /(margin|padding|border)-(left|right)\b|(?<![-\w])(left|right)\s*:|text-align\s*:\s*(left|right)|float\s*:\s*(left|right)|(top|bottom)-(left|right)-radius/;
+    const sheets = [...apps, ...ui].filter((f) => f.endsWith('.css'));
+    expect(hits(sheets, physical, (line) => !comment(line) && physical.test(allowed(line))), 'use margin-inline-start, inset-inline-end, text-align:start… (node tools/rtl-logical.mjs)').toEqual([]);
+    const inline = /\b(marginLeft|marginRight|paddingLeft|paddingRight|borderLeft|borderRight)\s*:|textAlign\s*:\s*'(left|right)'/;
+    expect(hits(allTsx, inline, (line) => !comment(line)), 'use marginInlineStart, paddingInlineEnd, textAlign: start…').toEqual([]);
+  });
+});

@@ -172,7 +172,7 @@ function TeacherChooser({ slot, onClose, onPick }: { slot: SlotRow; onClose: () 
         {q.isLoading && <div className="skc" style={{ height: 160 }} />}
         {(q.data ?? []).map((t) => (
           <button key={t.id} className="btn" disabled={!t.free && t.id !== slot.teacherId} onClick={() => onPick(t.id)} style={{ justifyContent: 'space-between', height: 48, borderRadius: 12, opacity: t.free ? 1 : 0.55 }}>
-            <span>{t.name}<small style={{ marginLeft: 8, color: 'var(--ink3)', fontWeight: 600 }}>{t.subjects.join(', ')}</small></span>
+            <span>{t.name}<small style={{ marginInlineStart: 8, color: 'var(--ink3)', fontWeight: 600 }}>{t.subjects.join(', ')}</small></span>
             <span className="chip" style={{ height: 24 }}>{t.free ? `${t.load} / ${t.max}` : tr('admin.timetable_page.busy_then')}</span>
           </button>
         ))}

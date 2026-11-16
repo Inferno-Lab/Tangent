@@ -77,7 +77,7 @@ export function FlagsPage() {
                 onClick={() => setAsk({ key: f.key, label: f.label, enabled: !f.enabled, schoolId: null, what: t('console.flags_page.for_everyone_2', { p0: f.enabled ? t('console.flags_page.switch_off') : t('console.flags_page.switch_on'), label: f.label }) })}></button>
             </div>
             {per(f.key).map((x) => (
-              <div key={x.schoolId} className="kv" style={{ paddingLeft: 24 }}>
+              <div key={x.schoolId} className="kv" style={{ paddingInlineStart: 24 }}>
                 <span>{name(x.schoolId)}<br /><small style={{ color: 'var(--ink3)' }}>{t('console.flags_page.set_on_its_own')}{' '}{ago(x.updatedAt)} {t('console.flags_page.by')}{' '}{x.updatedBy}</small></span>
                 <b style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   {canWrite && <button className="btn sm" onClick={() => remove.mutate(x)}>{t('console.flags_page.follow_everyone')}</button>}

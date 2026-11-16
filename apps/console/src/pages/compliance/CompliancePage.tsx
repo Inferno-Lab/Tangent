@@ -62,7 +62,7 @@ export function CompliancePage() {
         <Card title={t('console.compliance_page.who_else_handles_the_data')} chip={<span className="chip">{q.data?.subprocessors.length ?? 0}</span>}>
           <div className="help" style={{ marginTop: 0 }}>{t('console.compliance_page.every_provider_with_a_live')}</div>
           {(q.data?.subprocessors ?? []).length === 0 && <EmptyState scene="processors" onAction={() => app.go('/integrations')} />}
-          {(q.data?.subprocessors ?? []).map((x, i) => <div className="kv" key={`${x.name}${i}`}><span><b style={{ color: 'var(--ink)', textAlign: 'left' }}>{x.name}</b><br /><small style={{ color: 'var(--ink3)' }}>{x.purpose} · {x.serves}</small></span><b style={{ whiteSpace: 'nowrap' }}>{x.region}</b></div>)}
+          {(q.data?.subprocessors ?? []).map((x, i) => <div className="kv" key={`${x.name}${i}`}><span><b style={{ color: 'var(--ink)', textAlign: 'start' }}>{x.name}</b><br /><small style={{ color: 'var(--ink3)' }}>{x.purpose} · {x.serves}</small></span><b style={{ whiteSpace: 'nowrap' }}>{x.region}</b></div>)}
         </Card>
       )}
       {tab === 'requests' && (
@@ -89,7 +89,7 @@ function Row({ r, canWrite, busy, onTell, onClose, onSign, onFile }: { r: Compli
   return (
     <div className="kv" style={{ alignItems: 'flex-start', gap: 12 }}>
       <span style={{ minWidth: 0 }}>
-        <b style={{ color: 'var(--ink)', display: 'block', textAlign: 'left' }}>{r.title}</b>
+        <b style={{ color: 'var(--ink)', display: 'block', textAlign: 'start' }}>{r.title}</b>
         <small style={{ color: 'var(--ink3)' }}>{r.schoolName} · {KIND[r.kind]} · {ago(r.createdAt)} {t('console.compliance_page.by')}{' '}{r.createdBy}</small>
         {r.note && <small style={{ display: 'block', color: 'var(--ink2)', marginTop: 4 }}>{r.note}</small>}
         {r.signedOn && <small style={{ display: 'block', color: 'var(--ink2)', marginTop: 4 }}>{t('console.compliance_page.signed_on')}{' '}{r.signedOn} {t('console.compliance_page.by')}{' '}{r.signedBy}</small>}

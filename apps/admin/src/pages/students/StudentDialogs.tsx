@@ -85,7 +85,7 @@ export function ImportDialog({ onClose, onDone, kind = 'students' }: { onClose: 
       <Dialog title={result.created ? tr('admin.student_dialogs.added', { n: n(result.created), p1: result.created === 1 ? 'was' : 'were' }) : result.updated ? tr('admin.student_dialogs.updated', { n: n(result.updated), p1: result.updated === 1 ? 'was' : 'were' }) : tr('admin.student_dialogs.no_one_was_added')} onClose={done} width={520}>
         <p>{result.created && result.updated ? tr('admin.student_dialogs.already_here_updated', { updated: result.updated, p1: result.updated === 1 ? 'was' : 'were' }) : ''}{result.skipped ? tr('admin.student_dialogs.skipped_fix_them_and_import', { skipped: result.skipped, p1: result.skipped === 1 ? 'line was' : 'lines were' }) : tr('admin.student_dialogs.every_line_was_imported')}</p>
         {result.errors.length > 0 && (
-          <ul style={{ margin: '0 0 8px', paddingLeft: 20, font: '600 13px/1.7 var(--fb)', color: 'var(--ink2)', maxHeight: 180, overflow: 'auto' }}>
+          <ul style={{ margin: '0 0 8px', paddingInlineStart: 20, font: '600 13px/1.7 var(--fb)', color: 'var(--ink2)', maxHeight: 180, overflow: 'auto' }}>
             {result.errors.slice(0, 20).map((x) => <li key={x.line}>{tr('admin.student_dialogs.line')}{' '}{x.line}: {x.message}</li>)}
           </ul>
         )}

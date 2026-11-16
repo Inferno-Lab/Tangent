@@ -150,7 +150,7 @@ function StartingRoles({ say }: { say: (m: string, tone?: 'ok' | 'bad') => void 
                   {g.items.map((p) => (
                     <label key={p.key} className="hwc" style={{ display: 'flex', whiteSpace: 'normal', alignItems: 'flex-start', padding: '4px 0' }}>
                       <Checkbox checked={cur.permissions.includes(p.key)} disabled={!can} onChange={(c) => put({ ...cur, permissions: c ? [...cur.permissions, p.key] : cur.permissions.filter((x) => x !== p.key) })} />
-                      <span>{p.label}{p.sensitive && <span className="chip a" style={{ marginLeft: 6, height: 20, padding: '0 8px' }}>{tr('console.blueprints_page.careful')}</span>}</span>
+                      <span>{p.label}{p.sensitive && <span className="chip a" style={{ marginInlineStart: 6, height: 20, padding: '0 8px' }}>{tr('console.blueprints_page.careful')}</span>}</span>
                     </label>
                   ))}
                 </fieldset>
