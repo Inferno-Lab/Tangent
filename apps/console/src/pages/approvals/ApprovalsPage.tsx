@@ -76,7 +76,7 @@ export function ApprovalsPage() {
               <span style={{ flex: '1 1 260px', minWidth: 0 }}>
                 {name(r)}
                 <small style={{ display: 'block', color: 'var(--ink3)' }}>
-                  {r.dryRun ? t('console.approvals_page.rehearsal') : ''}{t('console.approvals_page.asked_by')}{' '}{r.requestedBy}{r.approvedBy ? t('console.approvals_page.by', { p0: r.status === 'rejected' ? 'rejected' : 'approved', approvedBy: r.approvedBy }) : ''} · {when(r.finishedAt ?? r.createdAt)}
+                  {r.dryRun ? t('console.approvals_page.rehearsal') : ''}{t('console.approvals_page.asked_by')}{' '}{r.requestedBy}{r.approvedBy ? t('console.approvals_page.by', { status: r.status === 'rejected' ? 'rejected' : 'approved', approvedBy: r.approvedBy }) : ''} · {when(r.finishedAt ?? r.createdAt)}
                 </small>
                 {(r.status === 'rejected' ? r.decisionNote : r.summary !== r.asked ? r.summary : '') && <small style={{ display: 'block', color: r.status === 'failed' ? 'var(--bad)' : 'var(--ink2)' }}>{r.status === 'rejected' ? t('console.approvals_page.why', { decisionNote: r.decisionNote }) : r.summary}</small>}
               </span>

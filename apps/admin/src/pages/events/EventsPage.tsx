@@ -149,7 +149,7 @@ function EventDialog({ event, defaultDay, onClose, onDone }: { event: EventRow |
   });
   const save = useMutation({
     mutationFn: () => (event ? app.api.events.save(event.id, body()) : app.api.events.create(body())),
-    onSuccess: (r) => onDone(event ? tr('admin.events_page.was_updated', { title: r.title }) : tr('admin.events_page.was_added', { title: r.title, p1: r.audience === 'staff' ? '' : ' Families are told.' })),
+    onSuccess: (r) => onDone(event ? tr('admin.events_page.was_updated', { title: r.title }) : tr('admin.events_page.was_added', { title: r.title, p1: r.audience === 'staff' ? '' : tr('admin.events_page.families_are_told') })),
     onError: (e) => { setErr(problem(e)); shake.hit(); },
   });
   const del = useMutation({ mutationFn: () => app.api.events.remove(event!.id), onSuccess: () => onDone(tr('admin.events_page.was_removed', { title: event!.title })), onError: (e) => { setConfirm(false); setErr(problem(e)); shake.hit(); } });

@@ -13,8 +13,7 @@ import { PeriodGrid } from './PeriodGrid';
 // The roll call's status colour for what each mark means (design/hue/src/Attendance.html); the school names its own marks.
 const TONE: Record<AttendanceStatus, string> = { present: 'ok', late: 'warn', half_day: 'warn', leave: 'info', absent: 'bad' };
 
-export function AttendancePage() {
-  const app = useApp();
+export function AttendancePage() { const app = useApp();
   const qc = useQueryClient();
   const { toast, say } = useToast();
   const { tab, tabs } = usePageTabs('/attendance');
@@ -39,16 +38,13 @@ export function AttendancePage() {
   const day = useQuery({ queryKey: ['attendance-day', classId, date], queryFn: () => app.api.attendance.day(classId, date), enabled: !!classId && !!date && tab === 'roll' });
   useEffect(() => { setDraft({}); }, [classId, date]);
 
-  const save = useMutation({
-    // The whole day is saved at once, so marks already saved go back with the changes.
+  const save = useMutation({ // The whole day is saved at once, so marks already saved go back with the changes.
     mutationFn: () => app.api.attendance.save({ classId, date, marks: marks.flatMap((m) => { const status = statusOf(m.studentId, m.status); return status ? [{ studentId: m.studentId, status }] : []; }) }),
-    onSuccess: () => {
-      setDraft({});
+    onSuccess: () => { setDraft({});
       void qc.invalidateQueries({ predicate: (q) => ['attendance-day', 'dashboard', 'shell', 'students'].includes(String(q.queryKey[0])) });
       say(t('admin.attendance_page.roll_call_saved_parents_of'));
     },
-    onError: (e) => say(e instanceof HttpError ? e.message : t('admin.attendance_page.could_not_save_try_again'), 'bad'),
-  });
+    onError: (e) => say(e instanceof HttpError ? e.message : t('admin.attendance_page.could_not_save_try_again'), 'bad') });
 
   const canMark = app.user.permissions.includes('attendance.mark');
   const marks = day.data?.marks ?? [];
@@ -95,7 +91,7 @@ export function AttendancePage() {
                 <i style={{ flex: counts.present, minWidth: 0, background: 'var(--bright)' }} /><i style={{ flex: counts.late, minWidth: 0, background: 'var(--warn-d)' }} />
                 <i style={{ flex: counts.absent, minWidth: 0, background: 'var(--bad-d)' }} /><i style={{ flex: counts.none, minWidth: 0, background: 'var(--deep3)' }} />
               </div>
-              <span style={{ fontSize: 14, lineHeight: '20px', color: 'var(--on-deep2)' }}>{!canMark ? t('admin.attendance_page.you_can_look_at_attendance') : changed ? t('admin.attendance_page.not_saved_yet', { changed, p1: changed === 1 ? 'change' : 'changes' }) : day.data?.submitted ? t('admin.attendance_page.submitted_tap_a_letter_to') : counts.none ? t('admin.attendance_page.still_to_mark_before_you', { none: counts.none }) : t('admin.attendance_page.everyone_is_marked_save_to')}</span>
+              <span style={{ fontSize: 14, lineHeight: '20px', color: 'var(--on-deep2)' }}>{!canMark ? t('admin.attendance_page.you_can_look_at_attendance') : changed ? t('admin.attendance_page.not_saved_yet', { changed }) : day.data?.submitted ? t('admin.attendance_page.submitted_tap_a_letter_to') : counts.none ? t('admin.attendance_page.still_to_mark_before_you', { none: counts.none }) : t('admin.attendance_page.everyone_is_marked_save_to')}</span>
             </div>
             {canMark && (
               <div className="fx" style={{ gap: 8, flexWrap: 'wrap' }}>
@@ -109,8 +105,7 @@ export function AttendancePage() {
           {!day.isLoading && marks.length === 0 && <EmptyCard title={t('admin.attendance_page.class_3', { p0: cls?.name ?? '' })} chip={{ text: t('admin.attendance_page.0_students'), tone: 'v' }} icon="people" heading={t('admin.attendance_page.no_students_in_this_class')} body={t('admin.attendance_page.students_appear_here_once_they')} />}
           {marks.length > 0 && (
             <div className="g" style={{ gridTemplateColumns: `repeat(auto-fill,minmax(min(${options.length > 3 ? 300 : 260}px,100%),1fr))`, gap: 8 }}>
-              {marks.map((m) => {
-                const s = statusOf(m.studentId, m.status);
+              {marks.map((m) => { const s = statusOf(m.studentId, m.status);
                 return (
                   <div className="cell" key={m.studentId}>
                     <b className="grow cut" style={{ fontSize: 14, fontWeight: 600 }} data-tip={m.onLeave ? t('admin.attendance_page.on_leave_the_office_approved', { name: m.name }) : undefined}>{m.name}</b>

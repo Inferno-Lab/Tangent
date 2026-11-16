@@ -11,8 +11,7 @@ import { useSetupSections } from '../year/SetupSections';
 type Draft = { key?: string; name: string; concession: boolean };
 
 /** The kinds of fee the school charges (fee heads) and what each class pays (fee structures). */
-export function FeeStructure({ tabs }: { tabs: React.ReactNode }) {
-  const { toast, say } = useToast();
+export function FeeStructure({ tabs }: { tabs: React.ReactNode }) { const { toast, say } = useToast();
   const setup = useSetupSections(['fee_structures'], say);
   return (
     <Page title={t('admin.fee_structure.fees')} sub={t('admin.fee_structure.the_kinds_of_fee_the')} toast={toast} tabs={tabs} overlays={setup.overlay}>
@@ -25,8 +24,7 @@ export function FeeStructure({ tabs }: { tabs: React.ReactNode }) {
   );
 }
 
-function Heads({ say }: { say: (text: string, tone?: 'bad') => void }) {
-  const app = useApp();
+function Heads({ say }: { say: (text: string, tone?: 'bad') => void }) { const app = useApp();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['fee-heads'], queryFn: app.api.fees.heads });
   // The school edits its own fee heads unless Tangent keeps them (console: Fees → the school edits its fee structures).
@@ -36,11 +34,9 @@ function Heads({ say }: { say: (text: string, tone?: 'bad') => void }) {
   const [err, setErr] = useState<Record<string, string>>({});
   const reset = (h: FeeHead[]) => { setDraft(h.map((x) => ({ key: x.key, name: x.name, concession: x.concession }))); setErr({}); };
   useEffect(() => { if (q.data) reset(q.data); }, [q.data]);
-  const save = useMutation({
-    mutationFn: () => app.api.fees.setHeads({ heads: draft.map((d) => ({ ...(d.key ? { key: d.key } : {}), name: d.name.trim(), concession: d.concession })) }),
+  const save = useMutation({ mutationFn: () => app.api.fees.setHeads({ heads: draft.map((d) => ({ ...(d.key ? { key: d.key } : {}), name: d.name.trim(), concession: d.concession })) }),
     onSuccess: (next) => { qc.setQueryData(['fee-heads'], next); void qc.invalidateQueries({ queryKey: ['fee-summary'] }); say(t('admin.fee_structure.fee_heads_saved')); },
-    onError: (e) => { const p = problem(e); setErr(p); say(Object.values(p)[0] ?? t('admin.fee_structure.could_not_save'), 'bad'); },
-  });
+    onError: (e) => { const p = problem(e); setErr(p); say(Object.values(p)[0] ?? t('admin.fee_structure.could_not_save'), 'bad'); } });
   const changed = JSON.stringify(draft) !== JSON.stringify((q.data ?? []).map((x) => ({ key: x.key, name: x.name, concession: x.concession })));
   const set = (i: number, p: Partial<Draft>) => setDraft(draft.map((d, j) => (j === i ? { ...d, ...p } : d)));
   const move = (i: number, by: -1 | 1) => { const n = [...draft]; const j = i + by; [n[i], n[j]] = [n[j]!, n[i]!]; setDraft(n); };
@@ -79,8 +75,7 @@ function Heads({ say }: { say: (text: string, tone?: 'bad') => void }) {
 }
 
 /** The rules Tangent set for the school's fees, so the office sees what families are charged and why. */
-function Rules() {
-  const { shell } = useShellChrome();
+function Rules() { const { shell } = useShellChrome();
   const late = useSetting<number>('fees.lateFeePct', 0);
   const remind = useSetting<number>('fees.remindDaysBefore', 3);
   const fines = shell?.features.includes('fees.lateFines') ?? false;
@@ -88,7 +83,7 @@ function Rules() {
   return (
     <Card title={t('admin.fee_structure.rules')}>
       <div className="kv"><span>{t('admin.fee_structure.late_fine')}</span><b>{fines && late > 0 ? t('admin.fee_structure.each_month_on_an_overdue', { late }) : t('admin.fee_structure.none')}</b></div>
-      <div className="kv"><span>{t('admin.fee_structure.reminders')}</span><b>{reminders ? t('admin.fee_structure.before_the_due_date', { remind, p1: remind === 1 ? 'day' : 'days' }) : t('admin.fee_structure.not_sent')}</b></div>
+      <div className="kv"><span>{t('admin.fee_structure.reminders')}</span><b>{reminders ? t('admin.fee_structure.before_the_due_date', { remind }) : t('admin.fee_structure.not_sent')}</b></div>
       <p className="help" style={{ marginBottom: 0 }}>{t('admin.fee_structure.tangent_sets_these_for_your')}</p>
     </Card>
   );

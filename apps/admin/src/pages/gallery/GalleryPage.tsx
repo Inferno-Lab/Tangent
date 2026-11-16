@@ -8,15 +8,13 @@ import { Page, useToast } from '../../app/Page';
 import { AddBtn, StudentPick, problem, stamp } from '../../app/kit';
 
 /** A photo shown from storage: its link is fetched when it appears and lasts a few minutes. */
-function Photo({ id, alt }: { id: string; alt: string }) {
-  const app = useApp();
+function Photo({ id, alt }: { id: string; alt: string }) { const app = useApp();
   const q = useQuery({ queryKey: ['file-url', id], queryFn: () => app.api.files.url(id), staleTime: 4 * 60_000 });
   return q.data ? <img src={q.data.url} alt={alt} loading="lazy" style={{ width: '100%', aspectRatio: '4 / 3', objectFit: 'cover', borderRadius: 12, display: 'block', background: 'var(--s2)' }} />
     : <div className="skc" style={{ width: '100%', aspectRatio: '4 / 3', borderRadius: 12 }} />;
 }
 
-export function GalleryPage() {
-  const app = useApp();
+export function GalleryPage() { const app = useApp();
   const qc = useQueryClient();
   const { toast, say } = useToast();
   const [edit, setEdit] = useState<AlbumRow | 'new' | null>(null);
@@ -51,22 +49,18 @@ export function GalleryPage() {
   );
 }
 
-function AlbumPanel({ album, canWrite, say, onEdit, onClose }: { album: AlbumRow; canWrite: boolean; say: (m: string, tone?: 'bad') => void; onEdit: () => void; onClose: () => void }) {
-  const app = useApp();
+function AlbumPanel({ album, canWrite, say, onEdit, onClose }: { album: AlbumRow; canWrite: boolean; say: (m: string, tone?: 'bad') => void; onEdit: () => void; onClose: () => void }) { const app = useApp();
   const qc = useQueryClient();
   const [tagging, setTagging] = useState<PhotoRow | null>(null);
   const photos = useQuery({ queryKey: ['gallery', album.id, 'photos'], queryFn: () => app.api.gallery.photos(album.id) });
   const refresh = () => void qc.invalidateQueries({ queryKey: ['gallery'] });
   // Many photos at once, one after the other; any that fail are named and the rest stay.
-  const add = useMutation({
-    mutationFn: async (files: File[]) => {
-      const failed: string[] = [];
+  const add = useMutation({ mutationFn: async (files: File[]) => { const failed: string[] = [];
       for (const f of files) await uploadFile(app.api, 'gallery', album.id, f).catch(() => failed.push(f.name));
       return { added: files.length - failed.length, failed };
     },
-    onSuccess: ({ added, failed }) => { refresh(); say(failed.length ? t('admin.gallery_page.added_could_not_be_added', { added, p1: failed.join(', ') }) : t('admin.gallery_page.added_tag_the_children_in', { added, p1: added === 1 ? 'photo' : 'photos' }), failed.length ? 'bad' : undefined); },
-    onError: (e) => say((e as Error).message, 'bad'),
-  });
+    onSuccess: ({ added, failed }) => { refresh(); say(failed.length ? t('admin.gallery_page.added_could_not_be_added', { added, p1: failed.join(', ') }) : t('admin.gallery_page.added_tag_the_children_in', { added }), failed.length ? 'bad' : undefined); },
+    onError: (e) => say((e as Error).message, 'bad') });
   const [removing, setRemoving] = useState<string | null>(null);
   const share = useMutation({ mutationFn: () => app.api.gallery.publish(album.id, !album.published), onSuccess: (a) => { refresh(); say(a.published ? t('admin.gallery_page.is_shared_with_families', { title: a.title }) : t('admin.gallery_page.is_hidden_from_families', { title: a.title })); }, onError: (e) => say((e as Error).message, 'bad') });
   const remove = useMutation({ mutationFn: app.api.files.remove, onSuccess: () => { setRemoving(null); refresh(); say(t('admin.gallery_page.photo_removed')); }, onError: (e) => say((e as Error).message, 'bad') });
@@ -114,8 +108,7 @@ function AlbumPanel({ album, canWrite, say, onEdit, onClose }: { album: AlbumRow
   );
 }
 
-function TagDialog({ photo, onClose, onDone }: { photo: PhotoRow; onClose: () => void; onDone: () => void }) {
-  const app = useApp();
+function TagDialog({ photo, onClose, onDone }: { photo: PhotoRow; onClose: () => void; onDone: () => void }) { const app = useApp();
   const [kids, setKids] = useState(photo.students.map((s) => ({ id: s.id, name: s.name })));
   const save = useMutation({ mutationFn: () => app.api.gallery.tag(photo.id, kids.map((k) => k.id)), onSuccess: onDone });
   return (
@@ -133,8 +126,7 @@ function TagDialog({ photo, onClose, onDone }: { photo: PhotoRow; onClose: () =>
   );
 }
 
-function AlbumDialog({ album, onClose, onDone }: { album: AlbumRow | null; onClose: () => void; onDone: (m: string) => void }) {
-  const app = useApp();
+function AlbumDialog({ album, onClose, onDone }: { album: AlbumRow | null; onClose: () => void; onDone: (m: string) => void }) { const app = useApp();
   const shake = useShake();
   const classes = useQuery({ queryKey: ['classes'], queryFn: app.api.classes });
   const [title, setTitle] = useState(album?.title ?? '');
@@ -166,16 +158,13 @@ function AlbumDialog({ album, onClose, onDone }: { album: AlbumRow | null; onClo
 }
 
 /** Photos families reported from the app, oldest first: each is kept or taken down, which closes every report of it. */
-function Reported({ say }: { say: (m: string, tone?: 'bad') => void }) {
-  const app = useApp();
+function Reported({ say }: { say: (m: string, tone?: 'bad') => void }) { const app = useApp();
   const qc = useQueryClient();
   const canWrite = app.user.permissions.includes('gallery.write');
   const q = useQuery({ queryKey: ['gallery', 'reports'], queryFn: app.api.gallery.reports });
-  const act = useMutation({
-    mutationFn: (a: { r: GalleryReportRow; remove: boolean }) => app.api.gallery.resolve(a.r.id, a.remove),
+  const act = useMutation({ mutationFn: (a: { r: GalleryReportRow; remove: boolean }) => app.api.gallery.resolve(a.r.id, a.remove),
     onSuccess: (_, a) => { void qc.invalidateQueries({ queryKey: ['gallery'] }); say(a.remove ? t('admin.gallery_page.the_photo_was_taken_down') : t('admin.gallery_page.the_photo_stays_the_report')); },
-    onError: (e) => say((e as Error).message, 'bad'),
-  });
+    onError: (e) => say((e as Error).message, 'bad') });
   const rows = q.data ?? [];
   if (!rows.length) return null;
   return (

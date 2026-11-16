@@ -8,8 +8,7 @@ import { problem, stamp, useSchoolConfig } from '../../app/kit';
 import { TypeRows } from './TypeRows';
 
 const STATUS = { new: { label: tr('admin.moving_in_page.with_tangent'), tone: 'a' }, imported: { label: tr('admin.moving_in_page.imported'), tone: 'g' }, set_aside: { label: tr('admin.moving_in_page.set_aside'), tone: '' } } as const;
-const save = (blob: Blob, name: string) => {
-  const a = document.createElement('a');
+const save = (blob: Blob, name: string) => { const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = name;
   a.click();
@@ -19,8 +18,7 @@ const save = (blob: Blob, name: string) => {
 const read = (f: File) => /\.(csv|txt)$/i.test(f.name) ? f.text() : new Promise<string>((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = () => no(new Error(tr('admin.moving_in_page.could_not_be_read', { name: f.name }))); r.readAsDataURL(f); });
 
 /** Bringing the school's records in: files for Tangent's team to import, blank sheets to fill, and what was imported. */
-export function MovingInPage() {
-  const app = useApp();
+export function MovingInPage() { const app = useApp();
   const qc = useQueryClient();
   const { toast, say } = useToast();
   const cfg = useSchoolConfig();
@@ -33,27 +31,21 @@ export function MovingInPage() {
   const [kind, setKind] = useState('students');
   const [err, setErr] = useState('');
   const fail = (e: unknown) => say(Object.values(problem(e))[0] ?? tr('admin.moving_in_page.something_went_wrong'), 'bad');
-  const send = useMutation({
-    mutationFn: async () => {
-      const big = picked.find((f) => f.size > 18_000_000);
+  const send = useMutation({ mutationFn: async () => { const big = picked.find((f) => f.size > 18_000_000);
       if (big) throw new Error(tr('admin.moving_in_page.is_over_18_mb_split', { name: big.name }));
       // One at a time, so a failure says which file and the ones before it are kept.
       let next;
       for (const f of picked) next = await app.api.movingIn.upload({ fileName: f.name, note: note.trim(), content: await read(f) });
       return next!;
     },
-    onSuccess: (next) => { qc.setQueryData(['uploads'], next); const n = picked.length; setPicked([]); setNote(''); say(tr('admin.moving_in_page.sent_to_tangent_the_team', { p0: n === 1 ? 'it' : `${n} files`, p1: n === 1 ? 'it' : 'them' })); },
-    onError: (e) => setErr(Object.values(problem(e))[0] ?? ''),
-  });
+    onSuccess: (next) => { qc.setQueryData(['uploads'], next); const n = picked.length; setPicked([]); setNote(''); say(tr('admin.moving_in_page.sent_to_tangent_the_team', { p0: n === 1 ? 'it' : `${n} files`, n: n })); },
+    onError: (e) => setErr(Object.values(problem(e))[0] ?? '') });
   const [typing, setTyping] = useState(false);
-  const typed = useMutation({
-    mutationFn: ({ csv, count }: { csv: string; count: number }) => {
-      const k = IMPORT_KINDS.find((x) => x.key === kind)!;
-      return app.api.movingIn.upload({ fileName: tr('admin.moving_in_page.typed_csv', { label: k.label }), note: tr('admin.moving_in_page.typed_in_the_admin', { count, p1: count === 1 ? 'row' : 'rows' }), content: csv });
+  const typed = useMutation({ mutationFn: ({ csv, count }: { csv: string; count: number }) => { const k = IMPORT_KINDS.find((x) => x.key === kind)!;
+      return app.api.movingIn.upload({ fileName: tr('admin.moving_in_page.typed_csv', { label: k.label }), note: tr('admin.moving_in_page.typed_in_the_admin', { count }), content: csv });
     },
     onSuccess: (next) => { qc.setQueryData(['uploads'], next); setTyping(false); say(tr('admin.moving_in_page.sent_to_tangent_the_team_2')); },
-    onError: fail,
-  });
+    onError: fail });
   // An .xlsx with the columns, an example row, dropdowns where the values are fixed, and a sheet that explains each column.
   const tpl = useMutation({ mutationFn: (k: string) => app.api.movingIn.template(k), onSuccess: (b, k) => save(b, `${k}-template.xlsx`), onError: fail });
   const template = () => tpl.mutate(kind);

@@ -15,40 +15,31 @@ type Say = (text: string, tone?: 'ok' | 'bad') => void;
 type Mod = CatalogDoc['modules'][number];
 interface Push { schoolId: string; name: string; cur: EntitlementDoc; change: EntitlementChange }
 
-export const docOf = (r: Pick<EntitlementRow, 'plan' | 'modules' | 'features' | 'dates' | 'trialUntil' | 'limits' | 'locks'>): EntitlementDoc => ({
-  plan: r.plan, modules: r.modules, features: r.features, dates: r.dates, ...(r.trialUntil ? { trialUntil: r.trialUntil } : {}), limits: r.limits, locks: r.locks, overrides: {}, version: 0,
-});
+export const docOf = (r: Pick<EntitlementRow, 'plan' | 'modules' | 'features' | 'dates' | 'trialUntil' | 'limits' | 'locks'>): EntitlementDoc => ({ plan: r.plan, modules: r.modules, features: r.features, dates: r.dates, ...(r.trialUntil ? { trialUntil: r.trialUntil } : {}), limits: r.limits, locks: r.locks, overrides: {}, version: 0 });
 
 /** What a push would change, in a form that ignores key order. */
 export const sig = (x: EntitlementDoc) => JSON.stringify([x.plan, [...x.modules].sort(), Object.entries(x.features ?? {}).sort(), Object.entries(x.dates ?? {}).sort().map(([k, v]) => [k, v.from ?? '', v.until ?? '']), x.trialUntil ?? '', x.limits]);
 
 /** Sends each push, one school at a time. Anything taken away waits in Approvals for a second person. */
-function usePush(onDone: (m: string) => void, onFail: (m: string) => void) {
-  const app = useApp();
+function usePush(onDone: (m: string) => void, onFail: (m: string) => void) { const app = useApp();
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (list: Push[]) => {
-      let done = 0;
+  return useMutation({ mutationFn: async (list: Push[]) => { let done = 0;
       let waiting = 0;
-      for (const p of list) {
-        const r = await app.api.actions.request({ action: 'entitlements.push', schoolId: p.schoolId, params: p.change as Record<string, unknown> });
+      for (const p of list) { const r = await app.api.actions.request({ action: 'entitlements.push', schoolId: p.schoolId, params: p.change as Record<string, unknown> });
         if (r.status === 'pending_approval') waiting++; else if (r.status === 'done') done++; else throw new Error(`${p.name}: ${r.summary}`);
       }
       return { done, waiting };
     },
-    onSuccess: ({ done, waiting }) => {
-      void qc.invalidateQueries({ queryKey: ['entitlements'] });
+    onSuccess: ({ done, waiting }) => { void qc.invalidateQueries({ queryKey: ['entitlements'] });
       void qc.invalidateQueries({ queryKey: ['school'] });
       void qc.invalidateQueries({ queryKey: ['actions'] });
-      onDone([done ? t('console.modules_page.updated_it_applies_within_15', { done, p1: done === 1 ? 'school' : 'schools' }) : '', waiting ? t('console.modules_page.waiting_for_a_second_person', { waiting }) : ''].filter(Boolean).join(' '));
+      onDone([done ? t('console.modules_page.updated_it_applies_within_15', { done }) : '', waiting ? t('console.modules_page.waiting_for_a_second_person', { waiting }) : ''].filter(Boolean).join(' '));
     },
-    onError: (e) => onFail((e as Error).message),
-  });
+    onError: (e) => onFail((e as Error).message) });
 }
 
 /** What each push gives and takes, before anything is sent. */
-export function ReviewDialog({ list, onClose, onDone }: { list: Push[]; onClose: () => void; onDone: (m: string) => void }) {
-  const [err, setErr] = useState('');
+export function ReviewDialog({ list, onClose, onDone }: { list: Push[]; onClose: () => void; onDone: (m: string) => void }) { const [err, setErr] = useState('');
   const push = usePush(onDone, setErr);
   const rows = list.map((p) => ({ p, r: changeEntitlement(p.cur, p.change) }));
   const problems = rows.flatMap(({ p, r }) => r.problems.map((m) => `${p.name}: ${m}`));
@@ -79,8 +70,7 @@ export function ReviewDialog({ list, onClose, onDone }: { list: Push[]; onClose:
 }
 
 // A school's module or feature as the Modules board's tile (design/hue/src/Modules.html): on, on for a while, paused, or off.
-const dot = (on: boolean, until?: string, paused?: boolean) => {
-  const say = paused ? t('console.modules_page.paused_by_tangent') : on ? (until ? t('console.modules_page.on_until', { until }) : t('console.modules_page.on')) : t('console.modules_page.off');
+const dot = (on: boolean, until?: string, paused?: boolean) => { const say = paused ? t('console.modules_page.paused_by_tangent') : on ? (until ? t('console.modules_page.on_until', { until }) : t('console.modules_page.on')) : t('console.modules_page.off');
   return (
     <span className={`mx ${paused ? 'bad' : on ? (until ? 'wait' : 'on') : ''}`} role="img" aria-label={say} data-tip={say}>
       {(on || paused) && <Icon name={paused ? 'pause' : until ? 'waiting' : 'check'} size={16} className="i" />}
@@ -91,8 +81,7 @@ const dot = (on: boolean, until?: string, paused?: boolean) => {
 const modIcon = (key: string): PageIcon => (key in IC ? key : key === 'chat' ? 'messages' : key === 'exams_results' ? 'exams' : 'modules') as PageIcon;
 
 /** Plans and modules: which school has what, the plans schools start from, and what is planned. */
-export function ModulesPage() {
-  const { tab, tabs } = usePageTabs('/modules');
+export function ModulesPage() { const { tab, tabs } = usePageTabs('/modules');
   const { toast, say } = useToast();
   return (
     <Page title={t('console.modules_page.plans_and_modules')} sub={tab === 'plans' ? t('console.modules_page.what_a_school_starts_from') : tab === 'planned' ? t('console.modules_page.modules_on_the_way') : t('console.modules_page.which_school_has_which_module')} toast={toast} tabs={tabs}>
@@ -102,8 +91,7 @@ export function ModulesPage() {
 }
 
 /** Every school against every module (or one module's features): give or take for many schools at once, reviewed first; pause a module. */
-function Schools({ say }: { say: Say }) {
-  const app = useApp();
+function Schools({ say }: { say: Say }) { const app = useApp();
   const qc = useQueryClient();
   const cat = useQuery({ queryKey: ['catalog'], queryFn: app.api.catalog, staleTime: 10 * 60_000 });
   const q = useQuery({ queryKey: ['entitlements'], queryFn: app.api.entitlements });
@@ -131,8 +119,7 @@ function Schools({ say }: { say: Say }) {
   const every = rows.length > 0 && rows.every((r) => picked.has(r.id));
   const has = (r: EntitlementRow, k: string, feature: boolean) => (feature ? r.active.includes(k.split('.')[0]!) && r.features[k] !== false : r.active.includes(k));
 
-  const planOf = (give: boolean): Push[] => all.filter((r) => picked.has(r.id)).map((r) => {
-    const cur = docOf(r);
+  const planOf = (give: boolean): Push[] => all.filter((r) => picked.has(r.id)).map((r) => { const cur = docOf(r);
     const isFeature = target.includes('.');
     const change: EntitlementChange = isFeature
       ? { features: { [target]: give } }
@@ -140,17 +127,14 @@ function Schools({ say }: { say: Say }) {
     return { schoolId: r.id, name: r.name, cur, change };
   }).filter((p) => { const c = changeEntitlement(p.cur, p.change); return c.added.length || c.removed.length || c.problems.length || (give && until); });
 
-  const open = (give: boolean) => {
-    if (!target) { say(t('console.modules_page.choose_a_module_or_feature'), 'bad'); return; }
+  const open = (give: boolean) => { if (!target) { say(t('console.modules_page.choose_a_module_or_feature'), 'bad'); return; }
     const list = planOf(give);
     if (!list.length) { say(give ? t('console.modules_page.the_chosen_schools_already_have') : t('console.modules_page.none_of_the_chosen_schools'), 'bad'); return; }
     setReview(list);
   };
-  const lift = useMutation({
-    mutationFn: async (k: string) => { for (const f of (flags.data ?? []).filter((x) => x.key === `kill.${k}` && x.enabled)) await app.api.flags.remove(f.key, f.schoolId); },
+  const lift = useMutation({ mutationFn: async (k: string) => { for (const f of (flags.data ?? []).filter((x) => x.key === `kill.${k}` && x.enabled)) await app.api.flags.remove(f.key, f.schoolId); },
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ['flags'] }); say(t('console.modules_page.lifted_it_comes_back_within')); },
-    onError: (e) => say((e as Error).message, 'bad'),
-  });
+    onError: (e) => say((e as Error).message, 'bad') });
 
   if (q.isLoading || cat.isLoading) return <div className="skc" style={{ height: 320, borderRadius: 28 }} />;
   if (q.isError) return <div><EmptyCard error title={t('console.modules_page.schools')} chip={{ text: t('console.modules_page.couldn_t_load'), tone: 'c' }} icon="warning" heading={t('console.modules_page.that_didn_t_load')} body={(q.error as Error).message} actions={<button className="btn pri" onClick={() => void q.refetch()}>{t('console.modules_page.try_again')}</button>} /></div>;
@@ -223,14 +207,11 @@ function Schools({ say }: { say: Say }) {
 }
 
 /** A pause takes a module away from the apps and refuses its requests within seconds, for every school or one; the data is kept. */
-function PauseDialog({ mod, onClose, onDone }: { mod: Mod; onClose: () => void; onDone: (m: string) => void }) {
-  const app = useApp();
+function PauseDialog({ mod, onClose, onDone }: { mod: Mod; onClose: () => void; onDone: (m: string) => void }) { const app = useApp();
   const schools = useQuery({ queryKey: ['schools'], queryFn: () => app.api.schools() });
   const [school, setSchool] = useState('');
-  const go = useMutation({
-    mutationFn: () => app.api.flags.set(`kill.${mod.key}`, { enabled: true, schoolId: school || null, label: t('console.modules_page.paused_2', { name: mod.name }) }),
-    onSuccess: () => onDone(t('console.modules_page.is_paused_it_takes_effect', { name: mod.name, p1: school ? t('console.modules_page.at', { p0: schools.data?.find((s) => s.id === school)?.name ?? 'that school' }) : t('console.modules_page.for_every_school') })),
-  });
+  const go = useMutation({ mutationFn: () => app.api.flags.set(`kill.${mod.key}`, { enabled: true, schoolId: school || null, label: t('console.modules_page.paused_2', { name: mod.name }) }),
+    onSuccess: () => onDone(t('console.modules_page.is_paused_it_takes_effect', { name: mod.name, p1: school ? t('console.modules_page.at', { p0: schools.data?.find((s) => s.id === school)?.name ?? 'that school' }) : t('console.modules_page.for_every_school') })) });
   return (
     <Dialog title={t('console.modules_page.pause_2', { name: mod.name })} tag={{ text: t('console.modules_page.takes_effect_at_once'), tone: 'a' }} onClose={onClose} width={480}>
       <p style={{ marginTop: 0 }}>{t('console.modules_page.for_a_fault_that_cannot')}{' '}{mod.name} {t('console.modules_page.leaves_the_apps_and_the')}</p>
@@ -245,17 +226,14 @@ function PauseDialog({ mod, onClose, onDone }: { mod: Mod; onClose: () => void; 
 }
 
 /** The plans a school can start from: the price per student a year, the modules it brings, the features it leaves out, its limits. */
-function Plans({ say }: { say: Say }) {
-  const app = useApp();
+function Plans({ say }: { say: Say }) { const app = useApp();
   const qc = useQueryClient();
   const plans = useQuery({ queryKey: ['plans'], queryFn: app.api.plans });
   const [editing, setEditing] = useState<PlanRow | 'new' | null>(null);
   const can = app.can('billing.write');
-  const remove = useMutation({
-    mutationFn: (key: string) => app.api.plan.remove(key),
+  const remove = useMutation({ mutationFn: (key: string) => app.api.plan.remove(key),
     onSuccess: (list) => { qc.setQueryData(['plans'], list); say(t('console.modules_page.plan_removed')); },
-    onError: (e) => say((e as Error).message, 'bad'),
-  });
+    onError: (e) => say((e as Error).message, 'bad') });
   if (plans.isLoading) return <div className="skc" style={{ height: 320, borderRadius: 28 }} />;
   return (
     <>
@@ -276,8 +254,7 @@ function Plans({ say }: { say: Say }) {
   );
 }
 
-function PlanDialog({ plan, onClose, onDone }: { plan: PlanRow | null; onClose: () => void; onDone: (list: PlanRow[], m: string) => void }) {
-  const app = useApp();
+function PlanDialog({ plan, onClose, onDone }: { plan: PlanRow | null; onClose: () => void; onDone: (list: PlanRow[], m: string) => void }) { const app = useApp();
   const cat = useQuery({ queryKey: ['catalog'], queryFn: app.api.catalog, staleTime: 10 * 60_000 });
   const shake = useShake();
   const [f, setF] = useState({ key: plan?.key ?? '', name: plan?.name ?? '', price: String(plan?.perStudentYear ?? ''), students: String(plan?.limits.students ?? 500), staff: plan?.limits.staff == null ? '' : String(plan.limits.staff), storage: String(plan?.limits.storageGb ?? 5), sms: String(plan?.limits.smsPerMonth ?? 1000) });
@@ -286,21 +263,15 @@ function PlanDialog({ plan, onClose, onDone }: { plan: PlanRow | null; onClose: 
   const [err, setErr] = useState<Record<string, string>>({});
   const set = (k: keyof typeof f) => (v: string) => { setF((x) => ({ ...x, [k]: v })); setErr((e) => ({ ...e, [k]: '', _: '' })); };
   const list = (cat.data?.modules ?? []).filter((m) => m.state !== 'planned' && !m.core);
-  const save = useMutation({
-    mutationFn: () => {
-      const body = PlanSave.parse({
-        key: f.key.trim(), name: f.name.trim(), perStudentYear: Number(f.price || 0), modules: [...mods], features: Object.fromEntries(Object.entries(off).filter(([, v]) => v === false)),
-        limits: { students: Number(f.students), ...(f.staff.trim() ? { staff: Number(f.staff) } : {}), storageGb: Number(f.storage), smsPerMonth: Number(f.sms) },
-      });
+  const save = useMutation({ mutationFn: () => { const body = PlanSave.parse({ key: f.key.trim(), name: f.name.trim(), perStudentYear: Number(f.price || 0), modules: [...mods], features: Object.fromEntries(Object.entries(off).filter(([, v]) => v === false)),
+        limits: { students: Number(f.students), ...(f.staff.trim() ? { staff: Number(f.staff) } : {}), storageGb: Number(f.storage), smsPerMonth: Number(f.sms) } });
       return plan ? app.api.plan.save(plan.key, body) : app.api.plan.add(body);
     },
     onSuccess: (l) => onDone(l, plan ? t('console.modules_page.saved_new_invoices_use_the', { p0: f.name.trim() }) : t('console.modules_page.added', { p0: f.name.trim() })),
-    onError: (e) => {
-      const issues = (e as { issues?: { path: (string | number)[]; message: string }[] }).issues;
+    onError: (e) => { const issues = (e as { issues?: { path: (string | number)[]; message: string }[] }).issues;
       setErr(issues ? Object.fromEntries(issues.map((i) => [String(i.path.at(-1) === 'perStudentYear' ? 'price' : i.path.at(-1)), i.message])) : e instanceof HttpError && Object.keys(e.fields).length ? e.fields : { _: (e as Error).message });
       shake.hit();
-    },
-  });
+    } });
   return (
     <Dialog title={plan ? t('console.modules_page.change_2', { name: plan.name }) : t('console.modules_page.new_plan')} tag={plan?.schools ? { text: t('console.modules_page.on_it', { schools: plan.schools }), tone: 'a' } : undefined} onClose={onClose} width={620} shake={shake.cls}>
       <div className="stack">
@@ -320,8 +291,7 @@ function PlanDialog({ plan, onClose, onDone }: { plan: PlanRow | null; onClose: 
         <div className="fld">
           <label>{t('console.modules_page.modules_it_brings')}</label>
           {err.modules && <ErrorLine>{err.modules}</ErrorLine>}
-          {list.map((m) => {
-            const on = mods.has(m.key);
+          {list.map((m) => { const on = mods.has(m.key);
             return (
               <div key={m.key} style={{ padding: '8px 0', borderTop: '1px solid var(--line)' }}>
                 <label style={{ display: 'flex', gap: 10, alignItems: 'center', font: '700 14px var(--fb)' }}>
@@ -329,8 +299,7 @@ function PlanDialog({ plan, onClose, onDone }: { plan: PlanRow | null; onClose: 
                 </label>
                 {on && m.features.some((x) => x.state !== 'planned') && (
                   <div className="tgrow" style={{ marginTop: 6, paddingInlineStart: 56 }}>
-                    {m.features.filter((x) => x.state !== 'planned').map((x) => {
-                      const has = off[x.key] !== false;
+                    {m.features.filter((x) => x.state !== 'planned').map((x) => { const has = off[x.key] !== false;
                       return <button key={x.key} type="button" className={`fp ${has ? 'on' : ''}`} aria-pressed={has} onClick={() => setOff({ ...off, [x.key]: !has ? true : false })}>{x.name}</button>;
                     })}
                   </div>
@@ -350,8 +319,7 @@ function PlanDialog({ plan, onClose, onDone }: { plan: PlanRow | null; onClose: 
 }
 
 /** Modules on the way, from the module definition: plans can name them, and their switches turn on once each is built. */
-function Planned() {
-  const app = useApp();
+function Planned() { const app = useApp();
   const cat = useQuery({ queryKey: ['catalog'], queryFn: app.api.catalog, staleTime: 10 * 60_000 });
   const planned = (cat.data?.modules ?? []).filter((m) => m.state === 'planned');
   const features = (cat.data?.modules ?? []).filter((m) => m.state !== 'planned').flatMap((m) => m.features.filter((f) => f.state === 'planned').map((f) => ({ ...f, module: m.name })));

@@ -14,8 +14,7 @@ type Show = 'all' | 'active' | 'waiting' | 'off';
 const standing = (r: StaffRow) => r.status !== 'active' ? { label: tr('admin.staff_page.off'), tone: 'n' } : r.access === 'signed_in' ? { label: tr('admin.staff_page.active'), tone: 'g' } : r.access === 'invited' ? { label: tr('admin.staff_page.invited'), tone: 'a' } : { label: tr('admin.staff_page.not_invited'), tone: 'a' };
 const names = (list: string[]) => list.length > 3 ? tr('admin.staff_page.and_more', { p0: list.slice(0, 3).join(', '), p1: list.length - 3 }) : list.join(', ');
 
-export function StaffPage() {
-  const app = useApp();
+export function StaffPage() { const app = useApp();
   const qc = useQueryClient();
   const cfg = useSchoolConfig();
   const { toast, say } = useToast();
@@ -28,8 +27,7 @@ export function StaffPage() {
   // Periods a week come from the timetable, so the column is there only when the school has it.
   const periods = !!cfg?.modules.includes('timetable');
   const all = list.data ?? [];
-  const rows = useMemo(() => {
-    const t = q.trim().toLowerCase();
+  const rows = useMemo(() => { const t = q.trim().toLowerCase();
     return all.filter((r) => (!role || r.roles.some((x) => x.id === role))
       && (show === 'all' || (show === 'off' ? r.status !== 'active' : r.status === 'active' && (show === 'active' || r.access !== 'signed_in')))
       && (!t || [r.name, r.email ?? '', r.designation, r.department ?? '', ...r.subjects.map((s) => s.name), ...r.roles.map((x) => x.name)].some((x) => x.toLowerCase().includes(t))));
@@ -37,18 +35,13 @@ export function StaffPage() {
   const roles = [...new Map(all.flatMap((r) => r.roles).map((r) => [r.id, r.name])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
   const waiting = all.filter((r) => r.status === 'active' && r.access !== 'signed_in');
   const notInvited = waiting.filter((r) => r.access === 'none').length;
-  const invite = useMutation({
-    mutationFn: (remind: boolean) => app.api.movingIn.inviteStaff(remind),
-    onSuccess: (r, remind) => {
-      refresh(qc);
+  const invite = useMutation({ mutationFn: (remind: boolean) => app.api.movingIn.inviteStaff(remind),
+    onSuccess: (r, remind) => { refresh(qc);
       const sent = r.sent ? `${remind ? tr('admin.staff_page.sent_a_new_first_password') : tr('admin.staff_page.invited')} ${r.sent} ${r.sent === 1 ? 'person' : 'people'}.` : remind ? tr('admin.staff_page.everyone_invited_has_signed_in') : tr('admin.staff_page.everyone_has_been_invited');
-      say(r.skipped.length ? tr('admin.staff_page.no_email_or_phone_add', { sent, names: names(r.skipped), p2: r.skipped.length === 1 ? 'has' : 'have' }) : sent, r.skipped.length ? 'bad' : undefined);
+      say(r.skipped.length ? tr('admin.staff_page.no_email_or_phone_add', { sent, names: names(r.skipped), n: r.skipped.length }) : sent, r.skipped.length ? 'bad' : undefined);
     },
-    onError: (e) => say(Object.values(problem(e))[0] ?? tr('admin.staff_page.something_went_wrong'), 'bad'),
-  });
-  const download = async () => {
-    try {
-      const csv = await app.api.staff.exportCsv();
+    onError: (e) => say(Object.values(problem(e))[0] ?? tr('admin.staff_page.something_went_wrong'), 'bad') });
+  const download = async () => { try { const csv = await app.api.staff.exportCsv();
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }));
       a.download = 'staff.csv';
@@ -56,7 +49,7 @@ export function StaffPage() {
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     } catch (e) { say((e as Error).message, 'bad'); }
   };
-  const cols = tr('admin.staff_page.minmax_0_1_7fr_minmax', { p0: periods ? '120px ' : '' });
+  const cols = `minmax(0,1.7fr) minmax(0,1.3fr) 160px ${periods ? '120px ' : ''}110px`;
   return (
     <Page title={tr('admin.staff_page.staff')} sub={all.length ? tr('admin.staff_page.active_in_all', { length: all.filter((s) => s.status === 'active').length, length1: all.length }) : tr('admin.staff_page.teachers_and_office_staff')} toast={toast} loading={list.isLoading && !list.data}
       error={list.isError && !list.data ? { message: (list.error as Error).message, retry: () => void list.refetch() } : null}
@@ -75,7 +68,7 @@ export function StaffPage() {
         <div className="stack" style={{ gap: 16 }}>
           {canWrite && waiting.length > 0 && (
             <Card title={tr('admin.staff_page.not_signed_in_yet')} chip={<span className="chip a">{waiting.length}</span>}>
-              <p className="help" style={{ marginTop: 0 }}>{notInvited ? tr('admin.staff_page.not_been_invited', { notInvited, p1: notInvited === 1 ? 'person has' : 'people have' }) : ''}{waiting.length - notInvited ? tr('admin.staff_page.invited_not_signed_in', { p0: waiting.length - notInvited, p1: waiting.length - notInvited === 1 ? 'has' : 'have' }) : ''}{tr('admin.staff_page.an_invite_carries_a_first')}</p>
+              <p className="help" style={{ marginTop: 0 }}>{notInvited ? tr('admin.staff_page.not_been_invited', { notInvited }) : ''}{waiting.length - notInvited ? tr('admin.staff_page.invited_not_signed_in', { p0: waiting.length - notInvited }) : ''}{tr('admin.staff_page.an_invite_carries_a_first')}</p>
               <div className="tgrow">
                 {notInvited > 0 && <button className="btn pri" disabled={invite.isPending} onClick={() => invite.mutate(false)}>{tr('admin.staff_page.invite')}{' '}{notInvited === 1 ? 'them' : tr('admin.staff_page.all', { notInvited })}</button>}
                 {waiting.length > notInvited && <button className="btn" disabled={invite.isPending} onClick={() => invite.mutate(true)}>{tr('admin.staff_page.remind_those_invited')}</button>}
@@ -95,8 +88,7 @@ export function StaffPage() {
               <div className="scroll-x lscroll" data-fill="">
                 <div className="stfw" style={{ minWidth: periods ? 780 : 660 }}>
                   <div className="grd th stf" style={{ '--cols': cols } as React.CSSProperties}><span>{tr('admin.staff_page.person')}</span><span className="hs">{tr('admin.staff_page.teaches')}</span><span>{tr('admin.staff_page.role')}</span>{periods && <span className="hs">{tr('admin.staff_page.periods_a_week')}</span>}<span className="hs">{tr('admin.staff_page.status')}</span></div>
-                  {rows.map((r) => {
-                    const st = standing(r);
+                  {rows.map((r) => { const st = standing(r);
                     return (
                       <button className="rowbtn" key={r.id} onClick={() => setEditing(r)} aria-label={tr('admin.staff_page.open', { name: r.name })}>
                         <div className="grd rw stf" style={{ '--cols': cols } as React.CSSProperties}>
@@ -122,8 +114,7 @@ export function StaffPage() {
   );
 }
 
-function StaffDialog({ person, onClose, onDone }: { person: StaffRow | null; onClose: () => void; onDone: (msg: string) => void }) {
-  const app = useApp();
+function StaffDialog({ person, onClose, onDone }: { person: StaffRow | null; onClose: () => void; onDone: (msg: string) => void }) { const app = useApp();
   const subjects = useQuery({ queryKey: ['subjects'], queryFn: app.api.subjects, staleTime: 10 * 60_000 });
   const roles = useQuery({ queryKey: ['roles'], queryFn: app.api.roles.list, staleTime: 60_000 });
   const me = person?.id === app.user.id;
@@ -135,27 +126,19 @@ function StaffDialog({ person, onClose, onDone }: { person: StaffRow | null; onC
   const shake = useShake();
   const set = (k: keyof typeof f) => (v: string) => { setF((x) => ({ ...x, [k]: v })); setErr((e) => ({ ...e, [k]: '', _: '' })); };
   const fail = (e: unknown) => { setErr(problem(e)); shake.hit(); };
-  const save = useMutation({
-    mutationFn: () => {
-      if (!person) return app.api.staff.create({ name: f.name.trim(), email: f.email.trim(), phone: f.phone.trim(), designation: f.designation.trim() || tr('admin.staff_page.teacher'), department: f.department.trim() || undefined, subjectIds: subs, roleId });
+  const save = useMutation({ mutationFn: () => { if (!person) return app.api.staff.create({ name: f.name.trim(), email: f.email.trim(), phone: f.phone.trim(), designation: f.designation.trim() || tr('admin.staff_page.teacher'), department: f.department.trim() || undefined, subjectIds: subs, roleId });
       // Only what changed: a person with two roles keeps both unless the role is changed here.
       const changed = <T,>(now: T, was: T) => (now !== was ? now : undefined);
-      return app.api.staff.patch(person.id, {
-        name: changed(f.name.trim(), person.name), email: changed(f.email.trim().toLowerCase(), person.email ?? ''), phone: changed(f.phone.trim(), person.phone ?? ''),
-        designation: f.designation.trim(), department: f.department.trim() || null, subjectIds: subs, ...(me || roleId === person.roles[0]?.id ? {} : { roleId }),
-      });
+      return app.api.staff.patch(person.id, { name: changed(f.name.trim(), person.name), email: changed(f.email.trim().toLowerCase(), person.email ?? ''), phone: changed(f.phone.trim(), person.phone ?? ''),
+        designation: f.designation.trim(), department: f.department.trim() || null, subjectIds: subs, ...(me || roleId === person.roles[0]?.id ? {} : { roleId }) });
     },
     onSuccess: (r) => onDone(person ? tr('admin.staff_page.was_updated', { name: r.name }) : tr('admin.staff_page.was_added_invite_sent_to', { name: r.name, email: r.email })),
-    onError: fail,
-  });
-  const toggle = useMutation({
-    mutationFn: () => app.api.staff.patch(person!.id, { status: person!.status === 'active' ? 'inactive' : 'active' }),
+    onError: fail });
+  const toggle = useMutation({ mutationFn: () => app.api.staff.patch(person!.id, { status: person!.status === 'active' ? 'inactive' : 'active' }),
     onSuccess: (r) => onDone(r.status === 'active' ? tr('admin.staff_page.can_sign_in_again', { name: r.name }) : tr('admin.staff_page.was_switched_off_and_signed', { name: r.name })),
-    onError: fail,
-  });
+    onError: fail });
   const resend = useMutation({ mutationFn: () => app.api.staff.invite(person!.id), onSuccess: (r) => onDone(tr('admin.staff_page.invite_sent_to', { to: r.to })), onError: fail });
-  const go = () => {
-    const p: Record<string, string> = {};
+  const go = () => { const p: Record<string, string> = {};
     if (f.name.trim().length < 2) p.name = tr('admin.staff_page.enter_the_name');
     if ((!person || f.email.trim()) && !/^\S+@\S+\.\S+$/.test(f.email.trim())) p.email = tr('admin.staff_page.enter_a_valid_email');
     if (!person && !f.phone.trim()) p.phone = tr('admin.staff_page.enter_a_phone_number');
@@ -182,8 +165,7 @@ function StaffDialog({ person, onClose, onDone }: { person: StaffRow | null; onC
         <div className="fld">
           <label>{tr('admin.staff_page.teaches')}</label>
           <div className="tgrow">
-            {(subjects.data ?? []).map((s) => {
-              const on = subs.includes(s.id);
+            {(subjects.data ?? []).map((s) => { const on = subs.includes(s.id);
               return <button type="button" key={s.id} className={`fp ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => setSubs(on ? subs.filter((x) => x !== s.id) : [...subs, s.id])}>{s.name}</button>;
             })}
           </div>

@@ -7,8 +7,7 @@ import { RecordFields, emptyRec } from './StudentRecord';
 
 type Done = (message: string, openId?: string) => void;
 
-export function AddStudentDialog({ classes, defaultClass, onClose, onDone }: { classes: ClassInfo[]; defaultClass?: string; onClose: () => void; onDone: Done }) {
-  const { api } = useApp();
+export function AddStudentDialog({ classes, defaultClass, onClose, onDone }: { classes: ClassInfo[]; defaultClass?: string; onClose: () => void; onDone: Done }) { const { api } = useApp();
   const shake = useShake();
   const [f, setF] = useState({ name: '', classId: defaultClass ?? classes[0]?.id ?? '', rollNo: '', dob: '', guardianName: '', guardianPhone: '', ...emptyRec });
   // Opened before the classes arrived: take the first one when they do, as if it had been there.
@@ -17,8 +16,7 @@ export function AddStudentDialog({ classes, defaultClass, onClose, onDone }: { c
   const [general, setGeneral] = useState('');
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof f) => (v: string) => { setF((s) => ({ ...s, [k]: v })); setErr((e) => ({ ...e, [k]: '' })); };
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = async (e: React.FormEvent) => { e.preventDefault();
     const local: Record<string, string> = {};
     if (f.name.trim().length < 2) local.name = tr('admin.student_dialogs.enter_the_full_name');
     if (!f.classId) local.classId = tr('admin.student_dialogs.choose_a_class');
@@ -27,11 +25,9 @@ export function AddStudentDialog({ classes, defaultClass, onClose, onDone }: { c
     if (!f.guardianPhone.trim()) local.guardianPhone = tr('admin.student_dialogs.enter_a_phone_number');
     if (Object.keys(local).length) { setErr(local); shake.hit(); return; }
     setBusy(true);
-    try {
-      const s = await api.students.create({ ...f, rollNo: f.rollNo || undefined, bloodGroup: f.bloodGroup || undefined, address: f.address || undefined, gender: (f.gender || undefined) as 'female' | undefined, house: f.house || undefined, admissionNo: f.admissionNo || undefined });
+    try { const s = await api.students.create({ ...f, rollNo: f.rollNo || undefined, bloodGroup: f.bloodGroup || undefined, address: f.address || undefined, gender: (f.gender || undefined) as 'female' | undefined, house: f.house || undefined, admissionNo: f.admissionNo || undefined });
       onDone(tr('admin.student_dialogs.was_added_to', { name: s.name, className: s.className }), s.id);
-    } catch (x) {
-      setBusy(false); setErr(fieldsOf(x)); setGeneral(Object.keys(fieldsOf(x)).length ? '' : messageOf(x)); shake.hit();
+    } catch (x) { setBusy(false); setErr(fieldsOf(x)); setGeneral(Object.keys(fieldsOf(x)).length ? '' : messageOf(x)); shake.hit();
     }
   };
   return (
@@ -56,13 +52,10 @@ export function AddStudentDialog({ classes, defaultClass, onClose, onDone }: { c
 }
 
 /** What the import dialog says and calls for each kind of record a page imports itself (the one import engine on the server). */
-const IMPORTS = {
-  students: { one: 'student', many: 'students', columns: <><b>{tr('admin.student_dialogs.name_class_dob_guardian_phone')}</b> {tr('admin.student_dialogs.and')}{' '}<b>{tr('admin.student_dialogs.roll')}</b> {tr('admin.student_dialogs.or')}{' '}<b>{tr('admin.student_dialogs.admission_number')}</b> {tr('admin.student_dialogs.if_you_have_them')}</>, example: tr('admin.student_dialogs.name_class_dob_guardian_phone_2') },
-  staff: { one: 'person', many: 'staff', columns: <><b>{tr('admin.student_dialogs.name_email')}</b> {tr('admin.student_dialogs.and')}{' '}<b>{tr('admin.student_dialogs.phone_designation_department_role_subjects')}</b> {tr('admin.student_dialogs.if_you_have_them')}</>, example: tr('admin.student_dialogs.name_email_phone_designation_role') },
-};
+const IMPORTS = { students: { one: 'student', many: 'students', columns: <><b>{tr('admin.student_dialogs.name_class_dob_guardian_phone')}</b> {tr('admin.student_dialogs.and')}{' '}<b>{tr('admin.student_dialogs.roll')}</b> {tr('admin.student_dialogs.or')}{' '}<b>{tr('admin.student_dialogs.admission_number')}</b> {tr('admin.student_dialogs.if_you_have_them')}</>, example: tr('admin.student_dialogs.name_class_dob_guardian_phone_2') },
+  staff: { one: 'person', many: 'staff', columns: <><b>{tr('admin.student_dialogs.name_email')}</b> {tr('admin.student_dialogs.and')}{' '}<b>{tr('admin.student_dialogs.phone_designation_department_role_subjects')}</b> {tr('admin.student_dialogs.if_you_have_them')}</>, example: tr('admin.student_dialogs.name_email_phone_designation_role') } };
 
-export function ImportDialog({ onClose, onDone, kind = 'students' }: { onClose: () => void; onDone: Done; kind?: keyof typeof IMPORTS }) {
-  const { api } = useApp();
+export function ImportDialog({ onClose, onDone, kind = 'students' }: { onClose: () => void; onDone: Done; kind?: keyof typeof IMPORTS }) { const { api } = useApp();
   const k = IMPORTS[kind];
   const run = kind === 'staff' ? api.staff.import : api.students.import;
   const template = kind === 'staff' ? api.staff.template : api.students.template;
@@ -73,17 +66,15 @@ export function ImportDialog({ onClose, onDone, kind = 'students' }: { onClose: 
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ created: number; updated: number; skipped: number; errors: { line: number; message: string }[] } | null>(null);
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = async (e: React.FormEvent) => { e.preventDefault();
     if (csv.trim().length < 10) { setErr(tr('admin.student_dialogs.paste_your_sheet_here_or')); shake.hit(); return; }
     setBusy(true);
     try { setResult(await run(csv)); setBusy(false); } catch (x) { setBusy(false); setErr(messageOf(x)); shake.hit(); }
   };
-  if (result) {
-    const done = () => onDone(result.created || result.updated ? tr('admin.student_dialogs.imported', { n: n(result.created + result.updated) }) : '');
+  if (result) { const done = () => onDone(result.created || result.updated ? tr('admin.student_dialogs.imported', { n: n(result.created + result.updated) }) : '');
     return (
-      <Dialog title={result.created ? tr('admin.student_dialogs.added', { n: n(result.created), p1: result.created === 1 ? 'was' : 'were' }) : result.updated ? tr('admin.student_dialogs.updated', { n: n(result.updated), p1: result.updated === 1 ? 'was' : 'were' }) : tr('admin.student_dialogs.no_one_was_added')} onClose={done} width={520}>
-        <p>{result.created && result.updated ? tr('admin.student_dialogs.already_here_updated', { updated: result.updated, p1: result.updated === 1 ? 'was' : 'were' }) : ''}{result.skipped ? tr('admin.student_dialogs.skipped_fix_them_and_import', { skipped: result.skipped, p1: result.skipped === 1 ? 'line was' : 'lines were' }) : tr('admin.student_dialogs.every_line_was_imported')}</p>
+      <Dialog title={result.created ? tr('admin.student_dialogs.added', { n: n(result.created), count: result.created }) : result.updated ? tr('admin.student_dialogs.updated', { n: n(result.updated), count: result.updated }) : tr('admin.student_dialogs.no_one_was_added')} onClose={done} width={520}>
+        <p>{result.created && result.updated ? tr('admin.student_dialogs.already_here_updated', { updated: result.updated }) : ''}{result.skipped ? tr('admin.student_dialogs.skipped_fix_them_and_import', { skipped: result.skipped }) : tr('admin.student_dialogs.every_line_was_imported')}</p>
         {result.errors.length > 0 && (
           <ul style={{ margin: '0 0 8px', paddingInlineStart: 20, font: '600 13px/1.7 var(--fb)', color: 'var(--ink2)', maxHeight: 180, overflow: 'auto' }}>
             {result.errors.slice(0, 20).map((x) => <li key={x.line}>{tr('admin.student_dialogs.line')}{' '}{x.line}: {x.message}</li>)}
@@ -105,8 +96,7 @@ export function ImportDialog({ onClose, onDone, kind = 'students' }: { onClose: 
           {err && <ErrorLine>{err}</ErrorLine>}
         </div>
         <div className="tgrow">
-          <FilePick className="btn sm" accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onPick={(f) => {
-            // An .xlsx goes as the file itself (the import engine reads it); a CSV as its text, so it shows here to check.
+          <FilePick className="btn sm" accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onPick={(f) => { // An .xlsx goes as the file itself (the import engine reads it); a CSV as its text, so it shows here to check.
             if (/\.xlsx$/i.test(f.name)) { const r = new FileReader(); r.onload = () => { setCsv(String(r.result)); setFile(f.name); setErr(''); }; r.readAsDataURL(f); }
             else void f.text().then((t) => { setCsv(t); setFile(''); setErr(''); });
           }}>{tr('admin.student_dialogs.choose_a_file')}</FilePick>
@@ -119,17 +109,15 @@ export function ImportDialog({ onClose, onDone, kind = 'students' }: { onClose: 
   );
 }
 
-export function MessageDialog({ ids, label, onClose, onDone }: { ids: string[]; label: string; onClose: () => void; onDone: Done }) {
-  const { api } = useApp();
+export function MessageDialog({ ids, label, onClose, onDone }: { ids: string[]; label: string; onClose: () => void; onDone: Done }) { const { api } = useApp();
   const shake = useShake();
   const [body, setBody] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = async (e: React.FormEvent) => { e.preventDefault();
     if (body.trim().length < 2) { setErr(tr('admin.student_dialogs.write_the_message')); shake.hit(); return; }
     setBusy(true);
-    try { const r = await api.students.message({ ids, body }); onDone(tr('admin.student_dialogs.sent_to', { sent: r.sent, p1: r.sent === 1 ? 'guardian' : 'guardians' })); }
+    try { const r = await api.students.message({ ids, body }); onDone(tr('admin.student_dialogs.sent_to', { sent: r.sent })); }
     catch (x) { setBusy(false); setErr(messageOf(x)); shake.hit(); }
   };
   return (
@@ -150,8 +138,7 @@ export function MessageDialog({ ids, label, onClose, onDone }: { ids: string[]; 
   );
 }
 
-export function AssignFeeDialog({ ids, label, onClose, onDone }: { ids: string[]; label: string; onClose: () => void; onDone: Done }) {
-  const { api } = useApp();
+export function AssignFeeDialog({ ids, label, onClose, onDone }: { ids: string[]; label: string; onClose: () => void; onDone: Done }) { const { api } = useApp();
   const shake = useShake();
   const heads = useFeeHeads();
   const [f, setF] = useState({ head: '', title: '', amount: '', dueOn: '' });
@@ -159,15 +146,14 @@ export function AssignFeeDialog({ ids, label, onClose, onDone }: { ids: string[]
   const [err, setErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof f) => (v: string) => { setF((s) => ({ ...s, [k]: v })); setErr((e) => ({ ...e, [k]: '' })); };
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = async (e: React.FormEvent) => { e.preventDefault();
     const local: Record<string, string> = {};
     if (f.title.trim().length < 3) local.title = tr('admin.student_dialogs.name_the_fee');
     if (!(Number(f.amount) > 0)) local.amount = tr('admin.student_dialogs.enter_an_amount');
     if (!f.dueOn) local.dueOn = tr('admin.student_dialogs.choose_the_due_date');
     if (Object.keys(local).length) { setErr(local); shake.hit(); return; }
     setBusy(true);
-    try { const r = await api.students.assignFee({ ids, head, title: f.title, amount: Math.round(Number(f.amount)), dueOn: f.dueOn }); onDone(tr('admin.student_dialogs.added_for', { title: f.title, created: r.created, p2: r.created === 1 ? 'student' : 'students' })); }
+    try { const r = await api.students.assignFee({ ids, head, title: f.title, amount: Math.round(Number(f.amount)), dueOn: f.dueOn }); onDone(tr('admin.student_dialogs.added_for', { title: f.title, created: r.created })); }
     catch (x) { setBusy(false); setErr({ ...fieldsOf(x), title: fieldsOf(x).title ?? (Object.keys(fieldsOf(x)).length ? '' : messageOf(x)) }); shake.hit(); }
   };
   return (

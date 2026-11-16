@@ -94,7 +94,7 @@ export function useLogin(c: LoginController, themeCls: string) {
       const f = failure(e);
       bad(() => {
         if (f.fields?.identifier) setEmErr(f.fields.identifier);
-        else { setPwErr(true); setPwMsg(f.attemptsLeft !== undefined && f.attemptsLeft <= 2 ? tr('ui.use_login.left', { message: f.message, attemptsLeft: f.attemptsLeft, p2: f.attemptsLeft === 1 ? 'try' : 'tries' }) : f.message); }
+        else { setPwErr(true); setPwMsg(f.attemptsLeft !== undefined && f.attemptsLeft <= 2 ? tr('ui.use_login.left', { message: f.message, attemptsLeft: f.attemptsLeft }) : f.message); }
       });
     }
   };
@@ -164,12 +164,12 @@ export function useLogin(c: LoginController, themeCls: string) {
     idLabel: cons ? tr('ui.use_login.tangent_email') : tr('ui.use_login.email_or_phone_number'), idType: cons ? 'email' : 'text',
     busy, notBusy: !busy,
     next: () => void next(),
-    otpTitle: challenge?.enroll ? tr('ui.use_login.set_up_your_authenticator') : challenge?.channel === 'app' ? tr('ui.use_login.open_your_authenticator') : tr('ui.use_login.check_your', { p0: challenge?.channel === 'sms' ? 'messages' : 'inbox' }),
+    otpTitle: challenge?.enroll ? tr('ui.use_login.set_up_your_authenticator') : challenge?.channel === 'app' ? tr('ui.use_login.open_your_authenticator') : tr('ui.use_login.check_your', { channel: challenge?.channel === 'sms' ? 'sms' : 'email' }),
     otpSub: challenge?.enroll
       ? tr('ui.use_login.add_tangent_to_an_authenticator')
       : challenge?.channel === 'app'
         ? tr('ui.use_login.type_the_6_digit_code_2')
-        : tr('ui.use_login.we_sent_a_6_digit', { p0: challenge?.channel === 'sms' ? 'text message' : 'email', p1: (challenge?.maskedTo ?? email).replace(/ /g, '\u00a0'), p2: Math.max(1, Math.round((challenge?.expiresInSeconds ?? 600) / 60)), p3: resetting ? ' Type it with your new password.' : '' }),
+        : tr('ui.use_login.we_sent_a_6_digit', { p0: challenge?.channel === 'sms' ? tr('ui.use_login.by_text_message') : tr('ui.use_login.by_email_channel'), p1: (challenge?.maskedTo ?? email).replace(/ /g, '\u00a0'), p2: Math.max(1, Math.round((challenge?.expiresInSeconds ?? 600) / 60)), p3: resetting ? tr('ui.use_login.type_it_with_your_new_password') : '' }),
     enroll: challenge?.enroll ?? null, back: () => { setStep('cred'); setCode(''); setOtpErr(false); setResetting(false); },
     boxes, code, otpBad: otpErr ? 'bad shake' : '', otpErr, otpMsg, tries,
     onCode: (e: { target: { value: string } }) => {

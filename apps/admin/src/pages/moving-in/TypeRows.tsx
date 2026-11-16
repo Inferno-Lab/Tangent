@@ -8,8 +8,7 @@ const csvCell = (v: string) => (/[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"
  * For a school on paper: type a register straight in, and it goes to Tangent's team like a file they sent (the same checks run when
  * the team imports it). Columns that take fixed values are dropdowns.
  */
-export function TypeRows({ kind, busy, onSend, onCancel }: { kind: ImportKind; busy: boolean; onSend: (csv: string, count: number) => void; onCancel: () => void }) {
-  const blank = () => Object.fromEntries(kind.columns.map((c) => [c.key, ''])) as Record<string, string>;
+export function TypeRows({ kind, busy, onSend, onCancel }: { kind: ImportKind; busy: boolean; onSend: (csv: string, count: number) => void; onCancel: () => void }) { const blank = () => Object.fromEntries(kind.columns.map((c) => [c.key, ''])) as Record<string, string>;
   const [rows, setRows] = useState(() => Array.from({ length: 5 }, blank));
   const filled = rows.filter((r) => Object.values(r).some((v) => v.trim()));
   const short = kind.columns.filter((c) => c.required && filled.some((r) => !r[c.key]!.trim()));
@@ -38,7 +37,7 @@ export function TypeRows({ kind, busy, onSend, onCancel }: { kind: ImportKind; b
         <button className="btn sm" onClick={() => setRows([...rows, ...Array.from({ length: 5 }, blank)])}>{t('admin.type_rows.add_5_rows')}</button>
         <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <button className="btn" onClick={onCancel}>{t('admin.type_rows.cancel')}</button>
-          <button className="btn pri" disabled={busy || !filled.length || short.length > 0} onClick={send}>{busy ? t('admin.type_rows.sending') : t('admin.type_rows.send_to_tangent', { length: filled.length, p1: filled.length === 1 ? 'row' : 'rows' })}</button>
+          <button className="btn pri" disabled={busy || !filled.length || short.length > 0} onClick={send}>{busy ? t('admin.type_rows.sending') : t('admin.type_rows.send_to_tangent', { length: filled.length })}</button>
         </span>
       </div>
     </div>

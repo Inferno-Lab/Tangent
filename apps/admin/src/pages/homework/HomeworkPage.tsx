@@ -75,7 +75,7 @@ export function HomeworkPage() {
   );
 }
 
-const COLS = t('admin.homework_page.minmax_0_1_7fr_70px');
+const COLS = 'minmax(0,1.7fr) 70px 90px minmax(120px,1fr) 90px';
 
 function Row({ r, today, onOpen }: { r: HomeworkRow; today: string; onOpen: () => void }) {
   const p = r.total ? Math.round((r.handedIn / r.total) * 100) : 0;

@@ -6,8 +6,7 @@ import { useApp } from '../../app/context';
 import { url } from '../../app/base';
 import { ago, initials, statusOf, count } from '../../app/format';
 
-export function HealthPage() {
-  const app = useApp();
+export function HealthPage() { const app = useApp();
   const qc = useQueryClient();
   const { toast, say } = useToast();
   const schools = useQuery({ queryKey: ['schools'], queryFn: () => app.api.schools(), refetchInterval: 20_000 });
@@ -18,7 +17,7 @@ export function HealthPage() {
   const done = useMutation({ mutationFn: app.api.errorHandled, onSuccess: () => { void qc.invalidateQueries({ queryKey: ['errors'] }); say(tr('console.health_page.marked_handled_it_comes_back')); }, onError: (e) => say((e as Error).message, 'bad') });
   const drills = useQuery({ queryKey: ['drills'], queryFn: app.api.drills });
   const drill = useMutation({ mutationFn: app.api.runDrill, onSuccess: (d) => { void qc.invalidateQueries({ queryKey: ['drills'] }); say(d.ok ? tr('console.health_page.restored_rows_of_into_a', { count: count(d.rows), schoolName: d.schoolName }) : tr('console.health_page.the_drill_failed', { error: d.error }), d.ok ? undefined : 'bad'); }, onError: (e) => say((e as Error).message, 'bad') });
-  const probe = useMutation({ mutationFn: app.api.probe, onSuccess: (r) => { void qc.invalidateQueries({ predicate: (q) => ['schools', 'fleet'].includes(String(q.queryKey[0])) }); say(tr('console.health_page.checked', { probed: r.probed, p1: r.probed === 1 ? 'school' : 'schools' })); }, onError: (e) => say((e as Error).message, 'bad') });
+  const probe = useMutation({ mutationFn: app.api.probe, onSuccess: (r) => { void qc.invalidateQueries({ predicate: (q) => ['schools', 'fleet'].includes(String(q.queryKey[0])) }); say(tr('console.health_page.checked', { probed: r.probed })); }, onError: (e) => say((e as Error).message, 'bad') });
   const rows = (schools.data ?? []).filter((s) => s.status !== 'archived');
   const order = { down: 0, degraded: 1, unknown: 2, ok: 3 } as const;
   rows.sort((a, b) => order[a.health] - order[b.health]);
@@ -33,8 +32,7 @@ export function HealthPage() {
           <p style={{ margin: '4px 0 0', font: '400 13px/1.45 var(--fb)', opacity: .75 }}>{inc.body}</p>
         </div>
       )}
-      {rows.length > 0 && (() => {
-        const timed = rows.filter((s) => s.healthMs != null);
+      {rows.length > 0 && (() => { const timed = rows.filter((s) => s.healthMs != null);
         const slow = timed.reduce<typeof rows[number] | null>((m, s) => (!m || (s.healthMs ?? 0) > (m.healthMs ?? 0) ? s : m), null);
         const look = rows.filter((s) => s.health === 'down' || s.health === 'degraded').length;
         return <Tiles items={[
@@ -49,8 +47,7 @@ export function HealthPage() {
         <Card style={{ padding: 0 }}>
           <div className="tbl scroll-x"><div style={{ minWidth: 620 }}>
             <div className="grd th" style={{ '--cols': 'minmax(0,2fr) 70px 140px 100px 130px' } as React.CSSProperties}><span>{tr('console.health_page.school')}</span><span>{tr('console.health_page.cell')}</span><span>{tr('console.health_page.status')}</span><span>{tr('console.health_page.answers_in')}</span><span></span></div>
-            {rows.map((s) => {
-              const st = statusOf(s); const t = tintFor(s.name);
+            {rows.map((s) => { const st = statusOf(s); const t = tintFor(s.name);
               return (
                 <a key={s.id} className="grd rw" href={url(`/schools/${s.id}/technical`)} onClick={(e) => { e.preventDefault(); app.go(`/schools/${s.id}/technical`); }} style={{ '--cols': 'minmax(0,2fr) 70px 140px 100px 130px', color: 'inherit', textDecoration: 'none' } as React.CSSProperties}>
                   <span style={{ display: 'flex', gap: 12, alignItems: 'center', minWidth: 0 }}><span className="av" style={{ width: 34, height: 34, fontSize: 11, background: t.bg, color: t.fg, boxShadow: 'none' }}>{initials(s.name)}</span><b data-tip={s.name} style={{ font: '700 14px/1.25 var(--fb)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{s.name}</b></span>
@@ -63,7 +60,7 @@ export function HealthPage() {
       )}
       <Card title={tr('console.health_page.errors')} chip={<span className="tgrow" style={{ alignItems: 'center' }}><Segmented label={tr('console.health_page.range')} value={days} onChange={setDays} options={[{ value: '1', label: tr('console.health_page.day') }, { value: '7', label: tr('console.health_page.week') }, { value: '30', label: tr('console.health_page.month') }]} /><Checkbox checked={handled} onChange={setHandled} label={tr('console.health_page.show_handled')} /></span>} style={{ padding: 0 }}>
         {errors.isError ? <div className="help" style={{ padding: 20 }}>{(errors.error as Error).message}</div>
-          : !(errors.data ?? []).length ? <div style={{ padding: 20 }}><EmptyNote icon="checkCircle" title={tr('console.health_page.no_errors', { p0: handled ? '' : 'unhandled ' })} body={tr('console.health_page.nothing_has_gone_wrong_in')} /></div>
+          : !(errors.data ?? []).length ? <div style={{ padding: 20 }}><EmptyNote icon="checkCircle" title={tr('console.health_page.no_errors', { which: handled ? 'all' : 'unhandled' })} body={tr('console.health_page.nothing_has_gone_wrong_in')} /></div>
           : (errors.data ?? []).map((e) => (
             <details key={e.fingerprint} className="rw" style={{ display: 'block', height: 'auto', padding: '12px 20px' }}>
               <summary style={{ display: 'flex', gap: 10, alignItems: 'center', cursor: 'pointer', listStyle: 'none', minWidth: 0 }}>
@@ -97,16 +94,13 @@ export function HealthPage() {
   );
 }
 
-const JOB_LABELS: Record<string, string> = {
-  'fees.reminders': tr('console.health_page.fee_reminders'), 'fees.lateFines': tr('console.health_page.late_fines'), 'files.scan': tr('console.health_page.virus_check'), 'files.thumb': tr('console.health_page.thumbnails'), 'payments.reconcile': tr('console.health_page.payment_reconciliation'),
-  'retention.erase': tr('console.health_page.erase_leavers'), 'imports.run': tr('console.health_page.import'), 'notices.publish': tr('console.health_page.scheduled_notice'), 'transport.poll': tr('console.health_page.bus_positions'), 'files.usage': tr('console.health_page.storage_used'),
-};
+const JOB_LABELS: Record<string, string> = { 'fees.reminders': tr('console.health_page.fee_reminders'), 'fees.lateFines': tr('console.health_page.late_fines'), 'files.scan': tr('console.health_page.virus_check'), 'files.thumb': tr('console.health_page.thumbnails'), 'payments.reconcile': tr('console.health_page.payment_reconciliation'),
+  'retention.erase': tr('console.health_page.erase_leavers'), 'imports.run': tr('console.health_page.import'), 'notices.publish': tr('console.health_page.scheduled_notice'), 'transport.poll': tr('console.health_page.bus_positions'), 'files.usage': tr('console.health_page.storage_used') };
 const JOB_TONE = { queued: 'v', running: 'a', done: 'g', failed: 'c' } as const;
 const JOB_WORDS = { queued: tr('console.health_page.waiting'), running: tr('console.health_page.running'), done: tr('console.health_page.done'), failed: tr('console.health_page.failed') } as const;
 
 /** Each school's background work (reminders, late fines, reconciliation, file checks, erasure): what is waiting, running or failed. */
-function Jobs({ say }: { say: (m: string, tone?: 'bad') => void }) {
-  const app = useApp();
+function Jobs({ say }: { say: (m: string, tone?: 'bad') => void }) { const app = useApp();
   const qc = useQueryClient();
   const jobs = useQuery({ queryKey: ['jobs'], queryFn: app.api.jobs.list, refetchInterval: 20_000 });
   const retry = useMutation({ mutationFn: app.api.jobs.retry, onSuccess: () => { void qc.invalidateQueries({ queryKey: ['jobs'] }); say(tr('console.health_page.queued_again')); }, onError: (e) => say((e as Error).message, 'bad') });

@@ -16,8 +16,7 @@ const TARGET: Record<string, string> = DEPLOY_TARGET_LABELS;
  * second step; and the roles every new school starts with. Rules for risky changes are under Console settings, how a release
  * rolls out under Releases.
  */
-export function BlueprintsPage() {
-  const app = useApp();
+export function BlueprintsPage() { const app = useApp();
   const qc = useQueryClient();
   const { toast, say } = useToast();
   const bps = useQuery({ queryKey: ['blueprints'], queryFn: app.api.blueprints.list });
@@ -25,16 +24,12 @@ export function BlueprintsPage() {
   const [draft, setDraft] = useState<Record<string, BlueprintRow['steps']>>({});
   const [adding, setAdding] = useState(false);
   const refresh = () => void qc.invalidateQueries({ queryKey: ['blueprints'] });
-  const save = useMutation({
-    mutationFn: (bp: BlueprintRow) => app.api.blueprints.save({ key: bp.key, name: bp.name, target: bp.target, plan: bp.plan, steps: draft[bp.id] ?? bp.steps }),
+  const save = useMutation({ mutationFn: (bp: BlueprintRow) => app.api.blueprints.save({ key: bp.key, name: bp.name, target: bp.target, plan: bp.plan, steps: draft[bp.id] ?? bp.steps }),
     onSuccess: (r) => { refresh(); setDraft({}); say(tr('console.blueprints_page.saved_as_version_switch_it', { version: r.version })); },
-    onError: (e) => say(e instanceof HttpError ? e.message : (e as Error).message, 'bad'),
-  });
-  const activate = useMutation({
-    mutationFn: (bp: BlueprintRow) => app.api.blueprints.activate(bp.id),
+    onError: (e) => say(e instanceof HttpError ? e.message : (e as Error).message, 'bad') });
+  const activate = useMutation({ mutationFn: (bp: BlueprintRow) => app.api.blueprints.activate(bp.id),
     onSuccess: (_, bp) => { refresh(); say(tr('console.blueprints_page.version_of_is_on_new', { version: bp.version, name: bp.name })); },
-    onError: (e) => say((e as Error).message, 'bad'),
-  });
+    onError: (e) => say((e as Error).message, 'bad') });
   const canBp = app.can('blueprints.write');
   const all = bps.data ?? [];
   const keys = [...new Set(all.map((b) => b.key))];
@@ -45,8 +40,7 @@ export function BlueprintsPage() {
       <section className="grid">
         <div className="s12" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(320px,100%),1fr))', gap: 16, alignItems: 'start', minWidth: 0 }}>
           {keys.length === 0 && <EmptyState scene="blueprints" onAction={canBp ? () => setAdding(true) : undefined} />}
-          {keys.map((k) => {
-            const versions = all.filter((b) => b.key === k).sort((x, y) => y.version - x.version);
+          {keys.map((k) => { const versions = all.filter((b) => b.key === k).sort((x, y) => y.version - x.version);
             const on = versions.find((b) => b.active);
             const newest = versions[0]!;
             const bp = on ?? newest;
@@ -65,8 +59,7 @@ export function BlueprintsPage() {
                 <button className="btn sm" style={{ marginTop: 10 }} onClick={() => setOpen(isOpen ? '' : bp.id)} aria-expanded={isOpen}>{isOpen ? tr('console.blueprints_page.hide_steps') : tr('console.blueprints_page.show_steps')}</button>
                 {isOpen && (
                   <div style={{ marginTop: 10 }}>
-                    {steps.map((s, i) => {
-                      const must = REQUIRED.includes(s.key);
+                    {steps.map((s, i) => { const must = REQUIRED.includes(s.key);
                       return (
                         <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 0', borderTop: '1px solid var(--line)' }}>
                           <span className="av" style={{ width: 28, height: 28, fontSize: 12, background: 'var(--s2)', color: 'var(--ink3)', boxShadow: 'none' }}>{i + 1}</span>
@@ -90,8 +83,7 @@ export function BlueprintsPage() {
 }
 
 /** Saved setups (a school's settings and roles, never who it is), applied to many schools at once. Saved from a school's Configuration. */
-function SetupTemplates({ say }: { say: (m: string, tone?: 'ok' | 'bad') => void }) {
-  const app = useApp();
+function SetupTemplates({ say }: { say: (m: string, tone?: 'ok' | 'bad') => void }) { const app = useApp();
   const qc = useQueryClient();
   const list = useQuery({ queryKey: ['config-templates'], queryFn: app.api.config.templates });
   const [applying, setApplying] = useState(false);
@@ -102,14 +94,13 @@ function SetupTemplates({ say }: { say: (m: string, tone?: 'ok' | 'bad') => void
       {rows.length === 0 && <EmptyNote icon="blueprints" title={tr('console.blueprints_page.no_blueprints_yet')} body={tr('console.blueprints_page.save_one_from_a_school')} />}
       {rows.map((t) => <div key={t.id} className="kv">{t.name}<b>{t.keys} {tr('console.blueprints_page.settings')}{' '}{t.roles} {tr('console.blueprints_page.roles')}{' '}{ago(t.createdAt)}</b></div>)}
       {app.can('schools.configure') && rows.length > 0 && <button className="btn pri" style={{ marginTop: 12 }} onClick={() => setApplying(true)}>{tr('console.blueprints_page.apply_to_schools')}</button>}
-      {applying && <ApplyDialog onClose={() => setApplying(false)} onDone={(n) => { setApplying(false); void qc.invalidateQueries({ queryKey: ['config'] }); say(tr('console.blueprints_page.applied_to', { n, p1: n === 1 ? 'school' : 'schools' })); }} />}
+      {applying && <ApplyDialog onClose={() => setApplying(false)} onDone={(n) => { setApplying(false); void qc.invalidateQueries({ queryKey: ['config'] }); say(tr('console.blueprints_page.applied_to', { n })); }} />}
     </Card>
   );
 }
 
 /** The roles every new school starts with (decision D6). Built-in ones can be renamed and changed, not removed; more can be added. */
-function StartingRoles({ say }: { say: (m: string, tone?: 'ok' | 'bad') => void }) {
-  const app = useApp();
+function StartingRoles({ say }: { say: (m: string, tone?: 'ok' | 'bad') => void }) { const app = useApp();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['role-templates'], queryFn: app.api.roleTemplates.get });
   const [list, setList] = useState<RoleTemplate[] | null>(null);
@@ -117,11 +108,9 @@ function StartingRoles({ say }: { say: (m: string, tone?: 'ok' | 'bad') => void 
   const [err, setErr] = useState('');
   useEffect(() => { if (q.data) { setList(q.data); setSel((s) => s || q.data[0]?.key || ''); } }, [q.data]);
   const groups = useMemo(() => [...new Set(PERMISSION_CATALOG.map((p) => p.area))].map((a) => ({ area: a, items: PERMISSION_CATALOG.filter((p) => p.area === a) })), []);
-  const save = useMutation({
-    mutationFn: () => app.api.roleTemplates.set(list!),
+  const save = useMutation({ mutationFn: () => app.api.roleTemplates.set(list!),
     onSuccess: (r) => { qc.setQueryData(['role-templates'], r); setList(r); say(tr('console.blueprints_page.starting_roles_saved_schools_set')); },
-    onError: (e) => setErr(e instanceof HttpError ? e.message : (e as Error).message),
-  });
+    onError: (e) => setErr(e instanceof HttpError ? e.message : (e as Error).message) });
   const can = app.can('blueprints.write');
   if (!list) return <div className="skc s12" style={{ height: 240, borderRadius: 24 }} />;
   const cur = list.find((r) => r.key === sel);
@@ -166,23 +155,18 @@ function StartingRoles({ say }: { say: (m: string, tone?: 'ok' | 'bad') => void 
   );
 }
 
-function NewBlueprint({ from, onClose, onDone }: { from: BlueprintRow[]; onClose: () => void; onDone: (m: string) => void }) {
-  const app = useApp();
+function NewBlueprint({ from, onClose, onDone }: { from: BlueprintRow[]; onClose: () => void; onDone: (m: string) => void }) { const app = useApp();
   const [f, setF] = useState({ name: '', key: '', target: from[0]?.target ?? 'free-test', plan: '' });
   const [err, setErr] = useState<Record<string, string>>({});
   const shake = useShake();
   const plans = useQuery({ queryKey: ['plans'], queryFn: app.api.plans });
   const set = (k: keyof typeof f) => (v: string) => { setF((x) => ({ ...x, [k]: v })); setErr((e) => ({ ...e, [k]: '', _: '' })); };
-  const make = useMutation({
-    mutationFn: () => {
-      const base = from.find((b) => b.target === f.target)?.steps ?? from[0]!.steps;
+  const make = useMutation({ mutationFn: () => { const base = from.find((b) => b.target === f.target)?.steps ?? from[0]!.steps;
       return app.api.blueprints.save({ key: f.key.trim(), name: f.name.trim(), target: f.target as 'local', plan: f.plan || null, steps: base });
     },
     onSuccess: (r) => onDone(tr('console.blueprints_page.is_saved_check_its_steps', { name: r.name, p1: TARGET[r.target] ?? r.target, p2: r.plan ? tr('console.blueprints_page.with_the_plan', { plan: r.plan }) : '' })),
-    onError: (e) => { setErr(e instanceof HttpError && Object.keys(e.fields).length ? e.fields : { _: (e as Error).message }); shake.hit(); },
-  });
-  const go = () => {
-    const p: Record<string, string> = {};
+    onError: (e) => { setErr(e instanceof HttpError && Object.keys(e.fields).length ? e.fields : { _: (e as Error).message }); shake.hit(); } });
+  const go = () => { const p: Record<string, string> = {};
     if (f.name.trim().length < 3) p.name = tr('console.blueprints_page.give_it_a_name');
     if (!/^[a-z][a-z0-9-]{2,40}$/.test(f.key.trim())) p.key = tr('console.blueprints_page.use_3_to_41_lowercase');
     if (from.some((b) => b.key === f.key.trim())) p.key = tr('console.blueprints_page.a_blueprint_with_that_key');

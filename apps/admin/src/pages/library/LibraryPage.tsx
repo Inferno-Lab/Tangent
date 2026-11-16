@@ -12,8 +12,7 @@ import { fmtMoney } from '@tangent/contracts';
 type Tab = 'books' | 'loans' | 'waiting';
 const rupees = (n: number) => fmtMoney(n);
 
-export function LibraryPage() {
-  const app = useApp();
+export function LibraryPage() { const app = useApp();
   const qc = useQueryClient();
   const { toast, say } = useToast();
   const { tab: at, tabs } = usePageTabs('/library');
@@ -129,8 +128,7 @@ export function LibraryPage() {
   );
 }
 
-function BookDialog({ book, categories, onClose, onDone }: { book: BookRow | null; categories: string[]; onClose: () => void; onDone: (m: string) => void }) {
-  const app = useApp();
+function BookDialog({ book, categories, onClose, onDone }: { book: BookRow | null; categories: string[]; onClose: () => void; onDone: (m: string) => void }) { const app = useApp();
   const shake = useShake();
   const [confirm, setConfirm] = useState(false);
   const [newCat, setNewCat] = useState(false);
@@ -157,7 +155,7 @@ function BookDialog({ book, categories, onClose, onDone }: { book: BookRow | nul
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
         {book && (confirm
-          ? <span style={{ marginInlineEnd: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}><span className="help">{book.out ? tr('admin.library_page.out_take_them_back_first', { out: book.out, p1: book.out === 1 ? 'copy is' : 'copies are' }) : tr('admin.library_page.take_it_out_of_the')}</span>{!book.out && <button className="btn sm dngf" disabled={del.isPending} onClick={() => del.mutate()}>{tr('admin.library_page.yes_remove')}</button>}<button className="btn sm" onClick={() => setConfirm(false)}>{tr('admin.library_page.keep')}</button></span>
+          ? <span style={{ marginInlineEnd: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}><span className="help">{book.out ? tr('admin.library_page.out_take_them_back_first', { out: book.out }) : tr('admin.library_page.take_it_out_of_the')}</span>{!book.out && <button className="btn sm dngf" disabled={del.isPending} onClick={() => del.mutate()}>{tr('admin.library_page.yes_remove')}</button>}<button className="btn sm" onClick={() => setConfirm(false)}>{tr('admin.library_page.keep')}</button></span>
           : <button className="btn dng" style={{ marginInlineEnd: 'auto' }} onClick={() => setConfirm(true)}>{tr('admin.library_page.remove_from_catalogue')}</button>)}
         <button className="btn" onClick={onClose}>{tr('admin.library_page.cancel')}</button>
         <button className="btn pri" disabled={save.isPending || !f.title.trim()} onClick={() => save.mutate()}>{save.isPending ? tr('admin.library_page.saving') : book ? tr('admin.library_page.save') : tr('admin.library_page.add_book')}</button>
@@ -166,8 +164,7 @@ function BookDialog({ book, categories, onClose, onDone }: { book: BookRow | nul
   );
 }
 
-function IssueDialog({ book, loanDays, onClose, onDone }: { book: BookRow; loanDays: number; onClose: () => void; onDone: (m: string) => void }) {
-  const app = useApp();
+function IssueDialog({ book, loanDays, onClose, onDone }: { book: BookRow; loanDays: number; onClose: () => void; onDone: (m: string) => void }) { const app = useApp();
   const shake = useShake();
   const [to, setTo] = useState<'student' | 'staff'>('student');
   const [student, setStudent] = useState<{ id: string; name: string; className: string } | null>(null);
@@ -175,10 +172,8 @@ function IssueDialog({ book, loanDays, onClose, onDone }: { book: BookRow; loanD
   const staff = useQuery({ queryKey: ['staff'], queryFn: () => app.api.staff.list(), enabled: to === 'staff' });
   const [due, setDue] = useState('');
   const [err, setErr] = useState<Record<string, string>>({});
-  const issue = useMutation({
-    mutationFn: () => app.api.library.issue({ bookId: book.id, studentId: to === 'student' ? student!.id : null, staffUserId: to === 'staff' ? staffId : null, dueOn: due || undefined }),
-    onSuccess: (l) => onDone(tr('admin.library_page.is_with_until', { title: book.title, student: l.student, dateLabel: dateLabel(l.dueOn) })), onError: (e) => { setErr(problem(e)); shake.hit(); },
-  });
+  const issue = useMutation({ mutationFn: () => app.api.library.issue({ bookId: book.id, studentId: to === 'student' ? student!.id : null, staffUserId: to === 'staff' ? staffId : null, dueOn: due || undefined }),
+    onSuccess: (l) => onDone(tr('admin.library_page.is_with_until', { title: book.title, student: l.student, dateLabel: dateLabel(l.dueOn) })), onError: (e) => { setErr(problem(e)); shake.hit(); } });
   return (
     <Dialog title={tr('admin.library_page.issue_2', { title: book.title })} onClose={onClose} width={500} shake={shake.cls}>
       <div className="stack">
@@ -198,8 +193,7 @@ function IssueDialog({ book, loanDays, onClose, onDone }: { book: BookRow; loanD
 }
 
 /** Taking a book back: how it came back, a charge for a lost or damaged one, and what happens to the fine. */
-function ReturnDialog({ loan, onClose, onDone }: { loan: LoanRow; onClose: () => void; onDone: (m: string) => void }) {
-  const app = useApp();
+function ReturnDialog({ loan, onClose, onDone }: { loan: LoanRow; onClose: () => void; onDone: (m: string) => void }) { const app = useApp();
   const shake = useShake();
   const { shell } = useShellChrome();
   const fees = !!shell?.modules.includes('fees') && !!loan.studentId;
@@ -209,11 +203,9 @@ function ReturnDialog({ loan, onClose, onDone }: { loan: LoanRow; onClose: () =>
   const [reason, setReason] = useState('');
   const [err, setErr] = useState<Record<string, string>>({});
   const owed = loan.fine + (outcome === 'returned' ? 0 : Number(charge || 0));
-  const back = useMutation({
-    mutationFn: () => app.api.library.giveBack(loan.id, { outcome, charge: Number(charge || 0), fine, reason: reason.trim() }),
+  const back = useMutation({ mutationFn: () => app.api.library.giveBack(loan.id, { outcome, charge: Number(charge || 0), fine, reason: reason.trim() }),
     onSuccess: (r) => onDone(`${loan.title} ${outcome === 'lost' ? tr('admin.library_page.is_marked_lost') : tr('admin.library_page.is_back')}.${r.fine ? (r.billed ? tr('admin.library_page.was_added_to_the_family', { rupees: rupees(r.fine) }) : fine === 'waive' ? tr('admin.library_page.the_was_waived', { rupees: rupees(r.fine) }) : tr('admin.library_page.paid_at_the_desk', { rupees: rupees(r.fine) })) : ''}`),
-    onError: (e) => { setErr(problem(e)); shake.hit(); },
-  });
+    onError: (e) => { setErr(problem(e)); shake.hit(); } });
   const go = () => { if (owed > 0 && fine === 'waive' && reason.trim().length < 3) { setErr({ reason: tr('admin.library_page.say_why_the_fine_is') }); shake.hit(); } else back.mutate(); };
   return (
     <Dialog title={tr('admin.library_page.take_back_2', { title: loan.title })} onClose={onClose} width={500} shake={shake.cls}>
@@ -238,8 +230,7 @@ function ReturnDialog({ loan, onClose, onDone }: { loan: LoanRow; onClose: () =>
 }
 
 /** Cancels a family's reservation, saying why: the family is told. */
-function CancelDialog({ title, onClose, onSend, busy }: { title: string; onClose: () => void; onSend: (reason: string) => void; busy: boolean }) {
-  const [reason, setReason] = useState('');
+function CancelDialog({ title, onClose, onSend, busy }: { title: string; onClose: () => void; onSend: (reason: string) => void; busy: boolean }) { const [reason, setReason] = useState('');
   const [err, setErr] = useState('');
   return (
     <Dialog title={tr('admin.library_page.cancel_the_reservation_of', { title })} onClose={onClose} width={460}>

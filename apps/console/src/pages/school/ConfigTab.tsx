@@ -20,8 +20,7 @@ const groupLabel = (g: string) => (MODULES.find((m) => m.key === g) ? (g === 'sc
  * Everything Tangent sets for one school, built from SETTINGS_META: a new setting appears here without a new screen. Groups sit
  * in a side list with their own address (?group=…), a search finds any setting, and changes in several groups go in one save.
  */
-export function ConfigTab({ schoolId, say }: { schoolId: string; say: Say }) {
-  const app = useApp();
+export function ConfigTab({ schoolId, say }: { schoolId: string; say: Say }) { const app = useApp();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['config', schoolId], queryFn: () => app.api.config.get(schoolId) });
   const [edits, setEdits] = useState<Record<string, unknown>>({});
@@ -34,8 +33,7 @@ export function ConfigTab({ schoolId, say }: { schoolId: string; say: Say }) {
   const shake = useShake();
   const can = app.can('schools.configure');
   const cfg = q.data;
-  const setGroup = (g: string) => {
-    setGroupState(g);
+  const setGroup = (g: string) => { setGroupState(g);
     setFind('');
     const u = new URL(window.location.href);
     u.searchParams.set('group', g);
@@ -44,26 +42,20 @@ export function ConfigTab({ schoolId, say }: { schoolId: string; say: Say }) {
   const value = (k: string): unknown => (k in edits ? edits[k] : cfg && k in cfg.values ? cfg.values[k] : dflt(k));
   const changed = cfg ? Object.keys(edits).filter((k) => !same(edits[k], k in cfg.values ? cfg.values[k] : dflt(k))) : [];
   const refresh = () => void qc.invalidateQueries({ queryKey: ['config', schoolId] });
-  const save = useMutation({
-    mutationFn: async () => {
-      // The logo is a file: it goes up first, then the rest of the change, so both are one save with one note.
-      if (logo) {
-        const data = await new Promise<string>((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] ?? ''); r.onerror = () => no(new Error(tr('console.config_tab.that_file_could_not_be'))); r.readAsDataURL(logo); });
+  const save = useMutation({ mutationFn: async () => { // The logo is a file: it goes up first, then the rest of the change, so both are one save with one note.
+      if (logo) { const data = await new Promise<string>((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] ?? ''); r.onerror = () => no(new Error(tr('console.config_tab.that_file_could_not_be'))); r.readAsDataURL(logo); });
         await app.api.logo(schoolId, { name: logo.name, mime: logo.type as 'image/png', data });
       }
       if (!changed.length) return { saved: true } as const;
       return app.api.config.patch(schoolId, { expectedVersion: cfg!.version, changes: Object.fromEntries(changed.map((k) => [k, edits[k]])), note: note.trim() });
     },
-    onSuccess: (r) => {
-      setEdits({}); setLogo(null); setNote(''); setErr({}); refresh();
+    onSuccess: (r) => { setEdits({}); setLogo(null); setNote(''); setErr({}); refresh();
       say('pending' in r ? tr('console.config_tab.a_risky_setting_is_in') : tr('console.config_tab.saved_the_school_s_admin'));
     },
-    onError: (e) => {
-      setErr(e instanceof HttpError && Object.keys(e.fields).length ? e.fields : { _: (e as Error).message });
+    onError: (e) => { setErr(e instanceof HttpError && Object.keys(e.fields).length ? e.fields : { _: (e as Error).message });
       if (e instanceof HttpError && e.code === 'conflict') refresh();
       shake.hit();
-    },
-  });
+    } });
 
   if (q.isLoading) return <div className="skc" style={{ height: 420, borderRadius: 24 }} />;
   if (q.isError || !cfg) return <EmptyCard error title={tr('console.config_tab.configuration')} chip={{ text: tr('console.config_tab.couldn_t_load'), tone: 'c' }} icon="warning" heading={tr('console.config_tab.the_school_s_configuration_didn')} body={(q.error as Error)?.message ?? ''} actions={<button className="btn pri" onClick={() => void q.refetch()}>{tr('console.config_tab.try_again')}</button>} />;
@@ -96,8 +88,7 @@ export function ConfigTab({ schoolId, say }: { schoolId: string; say: Say }) {
       </div>
 
       <nav className="card s3 rise" aria-label={tr('console.config_tab.setting_groups')} style={{ padding: 12, alignSelf: 'start' }}>
-        {groups.map((g) => {
-          const n = changed.filter((k) => SETTINGS_META[k as SettingKey]?.group === g).length;
+        {groups.map((g) => { const n = changed.filter((k) => SETTINGS_META[k as SettingKey]?.group === g).length;
           return (
             <button key={g} className={`rpb ${!needle && g === group ? 'on' : ''}`} aria-current={!needle && g === group} onClick={() => setGroup(g)} style={{ width: '100%' }}>
               <b>{groupLabel(g)}{n ? tr('console.config_tab.changed', { n }) : ''}</b><small>{KEYS.filter((k) => SETTINGS_META[k].group === g && shown(k)).length} {tr('console.config_tab.settings')}</small>
@@ -124,7 +115,7 @@ export function ConfigTab({ schoolId, say }: { schoolId: string; say: Say }) {
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 220 }}><Field label={tr('console.config_tab.why_kept_in_the_history')} value={note} onChange={setNote} maxLength={200} placeholder={tr('console.config_tab.for_example_the_principal_asked')} /></div>
               <button className="btn" disabled={!total || save.isPending} onClick={() => { setEdits({}); setLogo(null); setErr({}); }}>{tr('console.config_tab.discard_all')}</button>
-              <button className="btn pri" disabled={!total || save.isPending} onClick={() => save.mutate()}>{save.isPending ? tr('console.config_tab.saving') : total ? tr('console.config_tab.save', { total, p1: total === 1 ? 'change' : 'changes' }) : tr('console.config_tab.save_2')}</button>
+              <button className="btn pri" disabled={!total || save.isPending} onClick={() => save.mutate()}>{save.isPending ? tr('console.config_tab.saving') : total ? tr('console.config_tab.save', { total }) : tr('console.config_tab.save_2')}</button>
             </div>
           </div>
         )}
@@ -137,15 +128,12 @@ export function ConfigTab({ schoolId, say }: { schoolId: string; say: Say }) {
   );
 }
 
-function History({ cfg, schoolId, can, say }: { cfg: SchoolConfig; schoolId: string; can: boolean; say: Say }) {
-  const app = useApp();
+function History({ cfg, schoolId, can, say }: { cfg: SchoolConfig; schoolId: string; can: boolean; say: Say }) { const app = useApp();
   const qc = useQueryClient();
   const [sure, setSure] = useState<string | null>(null);
-  const back = useMutation({
-    mutationFn: (versionId: string) => app.api.config.rollback(schoolId, versionId),
+  const back = useMutation({ mutationFn: (versionId: string) => app.api.config.rollback(schoolId, versionId),
     onSuccess: (r) => { setSure(null); void qc.invalidateQueries({ queryKey: ['config', schoolId] }); say(tr('console.config_tab.rolled_back_the_configuration_is', { version: r.version })); },
-    onError: (e) => say((e as Error).message, 'bad'),
-  });
+    onError: (e) => say((e as Error).message, 'bad') });
   return (
     <div className="card s12 rise">
       <div className="ch"><h2>{tr('console.config_tab.history')}</h2><span className="chip">{cfg.versions.length} {tr('console.config_tab.changes')}</span></div>
@@ -166,17 +154,14 @@ function History({ cfg, schoolId, can, say }: { cfg: SchoolConfig; schoolId: str
   );
 }
 
-function Templates({ schoolId, can, say }: { schoolId: string; can: boolean; say: Say }) {
-  const app = useApp();
+function Templates({ schoolId, can, say }: { schoolId: string; can: boolean; say: Say }) { const app = useApp();
   const qc = useQueryClient();
   const list = useQuery({ queryKey: ['config-templates'], queryFn: app.api.config.templates });
   const [name, setName] = useState('');
   const [applying, setApplying] = useState(false);
-  const save = useMutation({
-    mutationFn: () => app.api.config.saveTemplate(schoolId, name.trim()),
+  const save = useMutation({ mutationFn: () => app.api.config.saveTemplate(schoolId, name.trim()),
     onSuccess: () => { setName(''); void qc.invalidateQueries({ queryKey: ['config-templates'] }); say(tr('console.config_tab.saved_as_a_template_its')); },
-    onError: (e) => say((e as Error).message, 'bad'),
-  });
+    onError: (e) => say((e as Error).message, 'bad') });
   return (
     <div className="card s12 rise">
       <div className="ch"><h2>{tr('console.config_tab.templates')}</h2><span className="chip">{(list.data ?? []).length}</span></div>
@@ -189,14 +174,13 @@ function Templates({ schoolId, can, say }: { schoolId: string; can: boolean; say
           <button className="btn pri" disabled={!(list.data ?? []).length} onClick={() => setApplying(true)}>{tr('console.config_tab.start_from_a_template')}</button>
         </div>
       )}
-      {applying && <ApplyDialog only={schoolId} onClose={() => setApplying(false)} onDone={(n) => { setApplying(false); void qc.invalidateQueries({ queryKey: ['config'] }); say(tr('console.config_tab.applied_to', { n, p1: n === 1 ? 'school' : 'schools' })); }} />}
+      {applying && <ApplyDialog only={schoolId} onClose={() => setApplying(false)} onDone={(n) => { setApplying(false); void qc.invalidateQueries({ queryKey: ['config'] }); say(tr('console.config_tab.applied_to', { n })); }} />}
     </div>
   );
 }
 
 /** Applies a saved setup: to this school only (its Configuration), or to the schools chosen (Blueprints → Setup templates). */
-export function ApplyDialog({ only, onClose, onDone }: { only?: string; onClose: () => void; onDone: (n: number) => void }) {
-  const app = useApp();
+export function ApplyDialog({ only, onClose, onDone }: { only?: string; onClose: () => void; onDone: (n: number) => void }) { const app = useApp();
   const list = useQuery({ queryKey: ['config-templates'], queryFn: app.api.config.templates });
   const schools = useQuery({ queryKey: ['schools'], queryFn: () => app.api.schools() });
   const [tpl, setTpl] = useState('');
@@ -228,8 +212,7 @@ export function ApplyDialog({ only, onClose, onDone }: { only?: string; onClose:
 }
 
 /** The admin menu and the app's layout exactly as one role at this school sees them. */
-function Preview({ cfg, schoolId }: { cfg: SchoolConfig; schoolId: string }) {
-  const app = useApp();
+function Preview({ cfg, schoolId }: { cfg: SchoolConfig; schoolId: string }) { const app = useApp();
   const [roleId, setRoleId] = useState(cfg.roles[0]?.id ?? '');
   const p = useQuery({ queryKey: ['config-preview', schoolId, roleId, cfg.version], queryFn: () => app.api.config.preview(schoolId, roleId), enabled: !!roleId });
   const label = useMemo(() => Object.fromEntries([...APP_CATALOG.dock, ...APP_CATALOG.home, ...APP_CATALOG.quick].map((c) => [c.key, c.label])), []);
@@ -253,8 +236,7 @@ function Preview({ cfg, schoolId }: { cfg: SchoolConfig; schoolId: string }) {
 }
 
 /** The seed colour card of the School board: what the brand colour's hue makes, each colour with the text it carries checked against AA. */
-function HueSwatches({ colour }: { colour: string }) {
-  const h = hueOf(/^#[0-9a-fA-F]{6}$/.test(colour) ? colour : DEFAULT_BRAND);
+function HueSwatches({ colour }: { colour: string }) { const h = hueOf(/^#[0-9a-fA-F]{6}$/.test(colour) ? colour : DEFAULT_BRAND);
   const t = hueTokens(h, 'light');
   const ROWS: [string, string, string, string][] = [['deep', tr('console.config_tab.deep'), tr('console.config_tab.frame_menu_and_tab_bar'), 'on-deep'], ['bright', tr('console.config_tab.bright'), tr('console.config_tab.you_are_here_the_main'), 'on-bright'], ['brand', tr('console.config_tab.brand'), tr('console.config_tab.buttons_and_links'), 'on-brand'],
     ['brand-soft', tr('console.config_tab.soft'), tr('console.config_tab.selected_rows_quiet_buttons'), 'brand-ink'], ['hero', tr('console.config_tab.hero'), tr('console.config_tab.the_headline_card'), 'on-deep'], ['heat4', tr('console.config_tab.heat'), tr('console.config_tab.how_much_quiet_to_loud'), 'heat-hi-t']];
@@ -279,18 +261,15 @@ function HueSwatches({ colour }: { colour: string }) {
  * Whose setting it is, and Tangent's lock for this school: a locked setting keeps Tangent's value whatever the school chooses
  * (on a security or privacy setting the value is a floor the school may tighten). The reason is shown to the school.
  */
-function LockLine({ k, cfg, schoolId, can, current, say }: { k: SettingKey; cfg: SchoolConfig; schoolId: string; can: boolean; current: unknown; say: Say }) {
-  const app = useApp();
+function LockLine({ k, cfg, schoolId, can, current, say }: { k: SettingKey; cfg: SchoolConfig; schoolId: string; can: boolean; current: unknown; say: Say }) { const app = useApp();
   const qc = useQueryClient();
   const [asking, setAsking] = useState(false);
   const [note, setNote] = useState('');
   const lock = cfg.locks.find((l) => l.key === k);
   const floor = !!TIGHTEN[k];
-  const go = useMutation({
-    mutationFn: (locked: boolean) => app.api.config.lock(schoolId, { key: k, locked, value: current, note: note.trim() }),
+  const go = useMutation({ mutationFn: (locked: boolean) => app.api.config.lock(schoolId, { key: k, locked, value: current, note: note.trim() }),
     onSuccess: (_r, locked) => { setAsking(false); setNote(''); void qc.invalidateQueries({ queryKey: ['config', schoolId] }); say(locked ? (floor ? tr('console.config_tab.set_as_the_school_s') : tr('console.config_tab.locked_for_this_school')) : tr('console.config_tab.unlocked_the_school_can_change')); },
-    onError: (e) => say((e as Error).message, 'bad'),
-  });
+    onError: (e) => say((e as Error).message, 'bad') });
   const owner = settingOwner(k);
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 14 }}>

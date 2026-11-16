@@ -22,8 +22,7 @@ const CLEAR: { kind: string; module?: string; perms: string[]; t: string }[] = [
   { kind: 'attendance', module: 'attendance', perms: ['attendance.read'], t: tr('admin.dashboard_page.every_class_has_taken_the') },
 ];
 /** A long list of classes ("6 A · 7 C · …") names the first five and counts the rest. */
-export const fewNames = (list: string) => {
-  const names = list.split(' · ');
+export const fewNames = (list: string) => { const names = list.split(' · ');
   return names.length > 6 ? tr('admin.dashboard_page.and_more', { p0: names.slice(0, 5).join(' · '), p1: names.length - 5 }) : list;
 };
 const H = 236;
@@ -32,20 +31,17 @@ const DOWN = 'downRight';
 
 const money = (n: number) => fmtMoneyShort(n);
 /** A round top for the chart so the gridlines fall on friendly numbers. */
-function niceMax(v: number): number {
-  const steps = [20000, 40000, 100000, 200000, 400000, 1000000, 2000000, 4000000, 10000000];
+function niceMax(v: number): number { const steps = [20000, 40000, 100000, 200000, 400000, 1000000, 2000000, 4000000, 10000000];
   return steps.find((s) => s >= v) ?? Math.ceil(v / 1000000) * 1000000;
 }
 const trend = (pct: number) => ({ cls: pct >= 0 ? 'up' : 'dn', icon: pct >= 0 ? UP : DOWN, text: `${Math.abs(pct)}%` });
 const greeting = () => { const h = (new Date().getUTCHours() * 60 + new Date().getUTCMinutes() + 330) / 60 % 24; return h < 12 ? tr('admin.dashboard_page.good_morning') : h < 17 ? tr('admin.dashboard_page.good_afternoon') : tr('admin.dashboard_page.good_evening'); };
 
 /** A phone gets its own home screen; everything wider gets the dashboard. */
-export function DashboardPage() {
-  return useIsPhone() ? <PhoneDashboard /> : <DashboardDesktop />;
+export function DashboardPage() { return useIsPhone() ? <PhoneDashboard /> : <DashboardDesktop />;
 }
 
-function DashboardDesktop() {
-  const app = useApp();
+function DashboardDesktop() { const app = useApp();
   const chrome = useShellChrome();
   const qc = useQueryClient();
   const [range, setRange] = useState(1);
@@ -57,8 +53,7 @@ function DashboardDesktop() {
   // The widgets this person hid, kept with their account so the choice follows them to any computer.
   const prefs = useQuery({ queryKey: ['prefs'], queryFn: app.api.prefs.get, staleTime: 5 * 60_000 });
   const hidden = (prefs.data?.['dashboard.widgets'] as string[] | undefined) ?? [];
-  const setHide = (id: string, off: boolean) => {
-    const n = off ? [...new Set([...hidden, id])] : hidden.filter((x) => x !== id);
+  const setHide = (id: string, off: boolean) => { const n = off ? [...new Set([...hidden, id])] : hidden.filter((x) => x !== id);
     qc.setQueryData(['prefs'], { ...prefs.data, 'dashboard.widgets': n });
     void app.api.prefs.put('dashboard.widgets', n).catch(() => say(tr('admin.dashboard_page.your_choice_could_not_be'), 'bad'));
   };
@@ -68,19 +63,15 @@ function DashboardDesktop() {
   const q = useQuery({ queryKey: ['dashboard', days], queryFn: () => app.api.dashboard(days), refetchInterval: 20_000, placeholderData: keepPreviousData });
 
 
-  const decide = useMutation({
-    mutationFn: async (a: { n: ApprovalRow; decision: 'approve' | 'undo' }) => {
-      if (a.n.kind === 'attendance') return app.api.attendance.remind();
+  const decide = useMutation({ mutationFn: async (a: { n: ApprovalRow; decision: 'approve' | 'undo' }) => { if (a.n.kind === 'attendance') return app.api.attendance.remind();
       return app.api.approvals.decide(a.n.id, { decision: a.decision });
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ['dashboard'] }),
-  });
+    onSettled: () => void qc.invalidateQueries({ queryKey: ['dashboard'] }) });
 
   const d: DashboardData | undefined = q.data;
   const v = useMemo(() => (d ? build(d) : null), [d, range, tab, rangeOpen, newOpen, done, toast, chrome.shell, hidden, widgets]);
 
-  function build(d: DashboardData) {
-    const may = (p: string) => app.user.permissions.includes(p as never);
+  function build(d: DashboardData) { const may = (p: string) => app.user.permissions.includes(p as never);
     const has = (m: string) => d.modules.includes(m);
     // Widgets and the New menu come from the module definitions: what the school has and what this person may do.
     const pieces = dashboardPieces({ modules: d.modules, features: chrome.shell?.features ?? [] }, app.user.permissions);
@@ -96,45 +87,34 @@ function DashboardDesktop() {
     const max = kind === 'fees' ? niceMax(Math.max(goal, ...values) * 1.1) : 100;
     const fmt = (x: number) => (kind === 'fees' ? money(x) : `${x}%`);
     const dense = pts.length > 8;
-    const cols = pts.map((p, i) => {
-      const x = values[i]!;
+    const cols = pts.map((p, i) => { const x = values[i]!;
       const prev = kind === 'attendance' ? (p as { previousPct: number | null }).previousPct : null;
-      return {
-        n: dense ? (i % 3 === 0 || p.isToday ? String(Number(p.date.slice(8))) : '') : p.label,
+      return { n: dense ? (i % 3 === 0 || p.isToday ? String(Number(p.date.slice(8))) : '') : p.label,
         v: fmt(x), full: kind === 'attendance' ? `${p.date}` : (p as { full: string }).full ?? p.date, prev: prev !== null ? fmt(prev) : '',
         h: Math.max(6, (x / max) * H), gh: prev !== null ? Math.max(6, (prev / max) * H) : 0,
-        c: 'var(--brand-line)', today: p.isToday ? 'today' : '',
-      };
+        c: 'var(--brand-line)', today: p.isToday ? 'today' : '' };
     });
     const grid = [0, 1, 2, 3, 4].map((g) => ({ b: 30 + (g / 4) * H, l: kind === 'fees' ? (g === 0 ? '0' : money((max / 4) * g)) : `${(max / 4) * g}%` }));
     // Requests to decide first, then reminders (a class not marked yet): two kinds of thing, never mixed in one order.
-    const needs = [...d.needsYou].sort((a, b) => Number(a.kind === 'attendance') - Number(b.kind === 'attendance')).map((n) => {
-      const tone = TONES[n.tone] ?? TONES.violet!;
+    const needs = [...d.needsYou].sort((a, b) => Number(a.kind === 'attendance') - Number(b.kind === 'attendance')).map((n) => { const tone = TONES[n.tone] ?? TONES.violet!;
       const isDone = !!done[n.id];
-      return {
-        t: n.title, s: n.kind === 'attendance' ? tr('admin.dashboard_page.reminder', { fewNames: fewNames(n.subtitle) }) : n.subtitle, tip: fewNames(n.subtitle) !== n.subtitle ? n.subtitle.split(' · ').join(', ') : undefined, ini: n.initials, bg: tone.bg, fg: tone.fg, a: n.action, open: !isDone, done: isDone ? 'done' : '',
+      return { t: n.title, s: n.kind === 'attendance' ? tr('admin.dashboard_page.reminder', { fewNames: fewNames(n.subtitle) }) : n.subtitle, tip: fewNames(n.subtitle) !== n.subtitle ? n.subtitle.split(' · ').join(', ') : undefined, ini: n.initials, bg: tone.bg, fg: tone.fg, a: n.action, open: !isDone, done: isDone ? 'done' : '',
         view: n.kind === 'attendance' ? () => app.go('/attendance') : () => app.go('/approvals'),
-        act: () => {
-          setDone((s) => ({ ...s, [n.id]: true }));
+        act: () => { setDone((s) => ({ ...s, [n.id]: true }));
           decide.mutate({ n, decision: 'approve' });
-          say(n.doneText, 'ok', n.id === 'att_reminder' ? undefined : {
-            label: tr('admin.dashboard_page.undo'),
-            onPress: () => { setDone((s) => ({ ...s, [n.id]: false })); clear(); if (n.kind !== 'attendance') decide.mutate({ n, decision: 'undo' }); },
-          });
-        },
-      };
+          say(n.doneText, 'ok', n.id === 'att_reminder' ? undefined : { label: tr('admin.dashboard_page.undo'),
+            onPress: () => { setDone((s) => ({ ...s, [n.id]: false })); clear(); if (n.kind !== 'attendance') decide.mutate({ n, decision: 'undo' }); } });
+        } };
     });
     const left = needs.filter((n) => n.open).length;
     const allClear = CLEAR.filter((c) => (!c.module || has(c.module)) && c.perms.every(may) && !d.needsYou.some((n) => n.kind === c.kind));
     const me = tintFor(app.user.name);
     const t = d.timeline;
-    return {
-      ...chrome, goto: app.go, money, allClear,
+    return { ...chrome, goto: app.go, money, allClear,
       remind: () => void app.api.attendance.remind().then(() => say(tr('admin.dashboard_page.reminders_sent_to_the_class'))).catch((e: Error) => say(e.message, 'bad')),
       hidden: [...hidden, ...off], openWidgets: () => setWidgets(true),
       has: { attendance: has('attendance') && may('attendance.read'), fees: has('fees') && may('fees.read'), chat: has('chat') && may('messages.read') }, showChart: tabsOn.length > 0,
-      approvalKinds: (() => {
-        const by = new Map<string, number>();
+      approvalKinds: (() => { const by = new Map<string, number>();
         for (const n of d.needsYou) if (n.kind !== 'attendance') by.set(n.kind, (by.get(n.kind) ?? 0) + 1);
         return [...by].map(([k, c]) => `${c} ${(KIND_WORD[k] ?? [k, k])[c === 1 ? 0 : 1]}`).join(', ') || tr('admin.dashboard_page.nothing_waiting');
       })(),
@@ -161,9 +141,9 @@ function DashboardDesktop() {
       kPresent: rollDigits(fmtNumber(d.present.value)), totalStudents: fmtNumber(d.present.total),
       presentTrend: trend(d.present.deltaPct), presentVersus: d.present.versus,
       kFees: rollDigits(fmtNumber(d.fees.collected)), feeMonth: d.fees.monthLabel, feePct: d.fees.pct, feeDue: fmtMoney(d.fees.due), feeTrend: trend(d.fees.deltaPct),
-      overdueLine: tr('admin.dashboard_page.overdue', { overdueFamilies: d.fees.overdueFamilies, p1: d.fees.overdueFamilies === 1 ? 'family' : 'families' }),
+      overdueLine: tr('admin.dashboard_page.overdue', { overdueFamilies: d.fees.overdueFamilies }),
       kLeft: rollDigits(String(left)), avatars: d.approvals.avatars.map((a) => ({ initials: a.initials, ...(TONES[a.tone] ?? TONES.violet!) })), moreAvatars: Math.max(0, d.approvals.count - 3),
-      chartTitle: kind === 'attendance' ? tr('admin.dashboard_page.attendance_last_school', { length: pts.length, p1: pts.length === 1 ? 'day' : 'days' }) : kind === 'fees' ? tr('admin.dashboard_page.fees_collected_each_day') : tr('admin.dashboard_page.homework_handed_in_on_time'),
+      chartTitle: kind === 'attendance' ? tr('admin.dashboard_page.attendance_last_school', { length: pts.length }) : kind === 'fees' ? tr('admin.dashboard_page.fees_collected_each_day') : tr('admin.dashboard_page.homework_handed_in_on_time'),
       chartAlt: tr('admin.dashboard_page.for_the_last_school_days', { p0: T[0], length: pts.length }),
       tabs: tabsOn.map((x, i) => ({ n: x[0], on: x === T ? 'on' : '', sel: x === T ? 'true' : 'false', pick: () => setTab(i) })),
       grid, goalB: 30 + (goal / max) * H, goalL: kind === 'fees' ? tr('admin.dashboard_page.daily_target', { money: money(goal) }) : tr('admin.dashboard_page.goal', { goal }), cols,
@@ -171,19 +151,15 @@ function DashboardDesktop() {
       chartEmptyText: kind === 'attendance' ? tr('admin.dashboard_page.attendance_appears_here_after_the') : kind === 'fees' ? tr('admin.dashboard_page.payments_appear_here_as_fees') : tr('admin.dashboard_page.homework_appears_here_once_teachers'),
       needs, leftLabel: left ? tr('admin.dashboard_page.open', { left }) : tr('admin.dashboard_page.clear'), allDone: left === 0,
       toast,
-      rolls: d.classRolls.map((r) => ({
-        n: r.name, pct: r.unmarked === r.size ? tr('admin.dashboard_page.not_yet') : `${r.pct}%`,
+      rolls: d.classRolls.map((r) => ({ n: r.name, pct: r.unmarked === r.size ? tr('admin.dashboard_page.not_yet') : `${r.pct}%`,
         segs: [{ k: 'p', n: r.present }, { k: 'l', n: r.late }, { k: 'a', n: r.absent }, { k: 'u', n: r.unmarked }].filter((s) => s.n > 0),
-        aria: tr('admin.dashboard_page.present_late_absent', { name: r.name, present: r.present, late: r.late, absent: r.absent, p4: r.unmarked ? tr('admin.dashboard_page.n_not_marked', { n: r.unmarked }) : '' }),
-      })),
+        aria: tr('admin.dashboard_page.present_late_absent', { name: r.name, present: r.present, late: r.late, absent: r.absent, p4: r.unmarked ? tr('admin.dashboard_page.n_not_marked', { n: r.unmarked }) : '' }) })),
       heads: d.feeHeads.map((h) => ({ n: h.label, pct: h.pct, fill: h.due ? Math.max(h.pct, 2) : 0, amt: h.due ? tr('admin.dashboard_page.of', { money: money(h.collected), money1: money(h.due) }) : tr('admin.dashboard_page.nothing_due') })),
       nowLabel: d.day.isToday ? tr('admin.dashboard_page.now', { clock: d.day.clock }) : tr('admin.dashboard_page.earlier'), prog: d.timelineProgress,
-      events: t.map((e) => ({ t: e.time, n: e.title, s: e.subtitle, cls: e.state === 'done' ? 'past' : e.state === 'now' ? 'now' : '' })),
-    };
+      events: t.map((e) => ({ t: e.time, n: e.title, s: e.subtitle, cls: e.state === 'done' ? 'past' : e.state === 'now' ? 'now' : '' })) };
   }
 
-  if (q.isError && !d) {
-    return (
+  if (q.isError && !d) { return (
       <PageScope page="dashboard">
         <main className="mn"><header className="hd"><div><h1>{tr('admin.dashboard_page.dashboard')}</h1></div></header>
           <div><EmptyCard error title={tr('admin.dashboard_page.dashboard')} chip={{ text: tr('admin.dashboard_page.couldn_t_load'), tone: 'c' }} icon="warning" heading={tr('admin.dashboard_page.that_didn_t_load')} body={(q.error as Error).message} actions={<button className="btn pri" onClick={() => void q.refetch()}>{tr('admin.dashboard_page.try_again')}</button>} /></div>
@@ -192,8 +168,7 @@ function DashboardDesktop() {
     );
   }
   // A school with no students yet: the dashboard has nothing to show, so it says how to start.
-  if (d && d.present.total === 0) {
-    return (
+  if (d && d.present.total === 0) { return (
       <PageScope page="dashboard">
         <main className="mn"><header className="hd"><div><h1>{tr('admin.dashboard_page.dashboard')}</h1></div></header>
           <EmptyState scene="dashboard" onAction={() => app.go('/year/classes')} onLink={() => app.go('/staff')} />

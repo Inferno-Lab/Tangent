@@ -10,8 +10,7 @@ import { FleetHue } from './FleetHue';
 const TICKS = 60;
 const STATE: Record<string, string> = { draft: tr('console.fleet_page.ready_to_start'), rolling: tr('console.fleet_page.rolling_out'), paused: tr('console.fleet_page.paused'), halted: tr('console.fleet_page.halted'), done: tr('console.fleet_page.finished'), rolled_back: tr('console.fleet_page.rolled_back') };
 
-export function FleetPage() {
-  const app = useApp();
+export function FleetPage() { const app = useApp();
   const chrome = useShellChrome();
   const qc = useQueryClient();
   const [ci, setCi] = useState(-1);
@@ -31,8 +30,7 @@ export function FleetPage() {
 
   useEffect(() => { if (f && ci < 0) setCi(Math.min(23, new Date().getHours())); }, [f, ci]);
 
-  if (fleet.isError && !f) {
-    return (
+  if (fleet.isError && !f) { return (
       <PageScope page="fleet">
         <main className="mn"><header className="hd"><div><h1>{tr('console.fleet_page.fleet')}</h1></div></header>
           <div><EmptyCard error title={tr('console.fleet_page.fleet')} chip={{ text: tr('console.fleet_page.couldn_t_load'), tone: 'c' }} icon="warning" heading={tr('console.fleet_page.that_didn_t_load')} body={(fleet.error as Error).message} actions={<button className="btn pri" onClick={() => void fleet.refetch()}>{tr('console.fleet_page.try_again')}</button>} /></div>
@@ -40,8 +38,7 @@ export function FleetPage() {
       </PageScope>
     );
   }
-  if (!f) {
-    return (
+  if (!f) { return (
       <PageScope page="fleet">
         <main className="mn" aria-busy="true"><header className="hd"><div><h1>{tr('console.fleet_page.fleet')}</h1><p>&nbsp;</p></div></header>
           <div className="skc" style={{ height: 240, borderRadius: 28 }} />
@@ -69,15 +66,13 @@ export function FleetPage() {
   const cy = 228 - (today[at]! / max) * 190;
   const delta = today[at]! - before[at]!;
   const peak = hours.reduce((m, h) => (h.value > m.value ? h : m), hours[0]!);
-  const place = (clientX: number, box: HTMLElement) => {
-    const r = box.getBoundingClientRect();
+  const place = (clientX: number, box: HTMLElement) => { const r = box.getBoundingClientRect();
     setCi(Math.max(0, Math.min(23, Math.round(((clientX - r.left) / r.width) * 23))));
   };
 
   const list = [...(schools.data ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const clock = (iso: string) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  const cellRows = f.cells.map((c) => {
-    const here = list.filter((s) => s.cell === c.key);
+  const cellRows = f.cells.map((c) => { const here = list.filter((s) => s.cell === c.key);
     const pct = c.max ? Math.round((c.schools / c.max) * 100) : 0;
     const bad = here.some((s) => s.health === 'degraded' || s.health === 'down');
     const upd = here.some((s) => prevOf.get(s.id)?.state === 'rolling');
@@ -85,25 +80,21 @@ export function FleetPage() {
     return { n: tr('console.fleet_page.cell', { key: c.key }), s: c.schools, p: pct, st: st.t, cc: st.c, col: st.col, off: (138 * (1 - Math.min(100, pct) / 100)).toFixed(1), href: url('/cells'), open: (e: React.MouseEvent) => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); app.go('/cells'); } };
   });
   // The newest few; the whole list, with search and filters, is the Schools page.
-  const rows = list.slice(0, 8).map((s) => {
-    const t = tintFor(s.name);
+  const rows = list.slice(0, 8).map((s) => { const t = tintFor(s.name);
     const r = prevOf.get(s.id);
     const newer = r?.state === 'done';
     const st = statusOf(s);
-    return {
-      id: s.id, n: s.name, cell: s.cell, ini: initials(s.name), bg: t.bg, fg: t.fg, from: r?.prev ?? s.versions.api, to: rel?.version ?? s.versions.api, vy: newer ? -26 : 0,
+    return { id: s.id, n: s.name, cell: s.cell, ini: initials(s.name), bg: t.bg, fg: t.fg, from: r?.prev ?? s.versions.api, to: rel?.version ?? s.versions.api, vy: newer ? -26 : 0,
       st: st.text, cc: st.tone, p: s.healthMs != null ? tr('console.fleet_page.ms', { healthMs: s.healthMs }) : '–',
-      href: url(`/schools/${s.id}`), open: (e: React.MouseEvent) => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); app.go(`/schools/${s.id}`); },
-    };
+      href: url(`/schools/${s.id}`), open: (e: React.MouseEvent) => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); app.go(`/schools/${s.id}`); } };
   });
   const month = new Date().toISOString().slice(0, 7);
   const incident = f.incident;
   const hOk = f.healthy, hWarn = f.degraded, hBad = Math.max(0, f.live - f.healthy - f.degraded);
   const upcoming = f.upcoming;
 
-  const v = {
-    ...chrome, pending: chrome.pending,
-    subtitle: tr('console.fleet_page.in', { schools: f.schools, p1: f.schools === 1 ? 'school' : 'schools', length: f.cells.length, p3: f.cells.length === 1 ? 'cell' : 'cells' }),
+  const v = { ...chrome, pending: chrome.pending,
+    subtitle: tr('console.fleet_page.in', { schools: f.schools, length: f.cells.length }),
     chartSub: f.readingAt ? tr('console.fleet_page.last_reading', { clock: clock(f.readingAt) }) : tr('console.fleet_page.no_readings_yet'),
     openAlerts: () => setAlerts(true), onboard: () => app.go('/onboarding/new'), openReleases: () => app.go('/releases'), openCells: () => app.go('/cells'),
     openSchools: () => app.go('/schools'), openHealth: () => app.go('/health'), openOnboarding: () => app.go('/onboarding'), more: list.length > rows.length ? list.length : 0,
@@ -116,7 +107,7 @@ export function FleetPage() {
     pauseLabel: paused ? tr('console.fleet_page.resume_wave') : tr('console.fleet_page.pause_wave'), pauseIc: paused ? 'play' : 'pause',
     pause: () => rel && pause.mutate({ id: rel.id, paused: !paused }), rollback: () => setConfirm(true),
     live: f.live, newThisMonth: (schools.data ?? []).filter((s) => s.createdAt.startsWith(month)).length,
-    soon: f.onboarding ? tr('console.fleet_page.still_being_set_up', { onboarding: f.onboarding, p1: f.onboarding === 1 ? 'is' : 'are' }) : tr('console.fleet_page.none_waiting_to_start'),
+    soon: f.onboarding ? tr('console.fleet_page.still_being_set_up', { onboarding: f.onboarding }) : tr('console.fleet_page.none_waiting_to_start'),
     p95: f.p95Ms ? tr('console.fleet_page.p95_ms', { p95Ms: f.p95Ms }) : tr('console.fleet_page.p95_not_measured_yet'), hOk, hWarn, hBad,
     p1: curve(today, max), p2: curve(before, max), pArea: curve(today, max, true),
     // The bubble stays inside the chart near the ends of the day; the dot and the line still sit on the hour.
@@ -126,13 +117,11 @@ export function FleetPage() {
     chartLabel: tr('console.fleet_page.requests_per_minute_across_the', { p0: String(peak.hour).padStart(2, '0'), count: count(peak.value) }),
     cmove: (e: React.MouseEvent<HTMLElement>) => place(e.clientX, e.currentTarget), ctouch: (e: React.TouchEvent<HTMLElement>) => place(e.touches[0]!.clientX, e.currentTarget),
     cells: cellRows, rows, loading: schools.isLoading,
-    inc: incident ? {
-      cls: incident.state === 'resolved' ? 'ok' : '', chip: incident.state === 'resolved' ? 'g' : 'c', tag: incident.state === 'resolved' ? tr('console.fleet_page.resolved') : tr('console.fleet_page.incident', { p0: incident.schoolName ? ` · ${incident.schoolName}` : '' }),
-      title: incident.title, body: incident.body, dismiss: () => dismiss.mutate(incident.id), open: incident.schoolId ? () => app.go(`/schools/${incident.schoolId}/technical`) : undefined,
-    } : null,
+    inc: incident ? { cls: incident.state === 'resolved' ? 'ok' : '', chip: incident.state === 'resolved' ? 'g' : 'c', tag: incident.state === 'resolved' ? tr('console.fleet_page.resolved') : tr('console.fleet_page.incident', { p0: incident.schoolName ? ` · ${incident.schoolName}` : '' }),
+      title: incident.title, body: incident.body, dismiss: () => dismiss.mutate(incident.id), open: incident.schoolId ? () => app.go(`/schools/${incident.schoolId}/technical`) : undefined } : null,
     recheck: () => probe.mutate(),
     up: upcoming.length
-      ? { title: tr('console.fleet_page.soon', { length: upcoming.length, p1: upcoming.length === 1 ? tr('console.fleet_page.school_starts') : tr('console.fleet_page.schools_start') }), body: tr('console.fleet_page.being_set_up_for_the', { p0: upcoming.map((u) => u.name).slice(0, 2).join(' and '), p1: upcoming.length === 1 ? 'is' : 'are' }) }
+      ? { title: tr('console.fleet_page.soon', { length: upcoming.length, p1: upcoming.length === 1 ? tr('console.fleet_page.school_starts') : tr('console.fleet_page.schools_start') }), body: tr('console.fleet_page.being_set_up_for_the', { p0: upcoming.map((u) => u.name).slice(0, 2).join(' and '), n: upcoming.length }) }
       : { title: tr('console.fleet_page.no_schools_waiting'), body: tr('console.fleet_page.onboard_a_school_and_it') },
     alertsDialog: alerts && (
       <Dialog title={tr('console.fleet_page.alerts')} tag={{ text: chrome.pending || (f.degraded && f.degraded > 0) || incident?.state === 'open' ? tr('console.fleet_page.needs_you') : tr('console.fleet_page.all_clear'), tone: chrome.pending || incident?.state === 'open' ? 'a' : 'g' }} onClose={() => setAlerts(false)} width={460}>
@@ -154,7 +143,6 @@ export function FleetPage() {
           <button className="btn dngf" disabled={rollback.isPending} onClick={() => rollback.mutate(rel.id)}>{tr('console.fleet_page.mark_as_rolled_back_2')}</button>
         </div>
       </Dialog>
-    ) : null,
-  };
+    ) : null };
   return <FleetHue v={{ ...v, openApprovals: () => app.go('/approvals'), schoolHref: (id: string) => url(`/schools/${id}`), goSchool: (id: string) => app.go(`/schools/${id}`) }} f={f} schools={schools.data ?? []} actions={chrome.actions?.data ?? []} />;
 }

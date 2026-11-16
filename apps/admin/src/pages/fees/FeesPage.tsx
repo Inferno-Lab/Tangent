@@ -14,8 +14,7 @@ import { OnlinePaymentsPage } from './OnlinePaymentsPage';
 const money = (n: number) => (n >= 100000 ? fmtMoneyShort(n) : fmtMoney(n));
 
 /** Fees: one page whose tabs the fees module defines (overview, invoices, receipts, online payments, the fee structure). */
-export function FeesPage() {
-  const { tab, tabs } = usePageTabs('/fees');
+export function FeesPage() { const { tab, tabs } = usePageTabs('/fees');
   if (tab === 'invoices' || tab === 'receipts') return <InvoicesPage view={tab} tabs={tabs} />;
   if (tab === 'online') return <OnlinePaymentsPage tabs={tabs} />;
   if (tab === 'structure') return <FeeStructure tabs={tabs} />;
@@ -25,8 +24,7 @@ export function FeesPage() {
 // Kinds of fee take spectrum colours in order, as the board's payment methods do.
 const HEAD_COLOURS = ['blue', 'pink', 'lime', 'orange', 'teal', 'violet'] as const;
 
-function Overview({ tabs }: { tabs: React.ReactNode }) {
-  const app = useApp();
+function Overview({ tabs }: { tabs: React.ReactNode }) { const app = useApp();
   const qc = useQueryClient();
   const { toast, say } = useToast();
   const [paying, setPaying] = useState<StudentDetail | null>(null);
@@ -41,17 +39,14 @@ function Overview({ tabs }: { tabs: React.ReactNode }) {
   const refresh = () => void qc.invalidateQueries({ predicate: (q) => ['fee-summary', 'students', 'dashboard'].includes(String(q.queryKey[0])) });
   const open = useMutation({ mutationFn: (id: string) => app.api.students.detail(id), onSuccess: setPaying, onError: (e) => say((e as Error).message, 'bad') });
   // Every overdue family, not only the page shown; how it travels is the console's rule for the fee reminder.
-  const remind = useMutation({
-    mutationFn: () => app.api.fees.remindOverdue(),
-    onSuccess: (r) => { setConfirmRemind(false); say(r.sent ? t('admin.fees_page.reminder_sent_to', { sent: r.sent, p1: r.sent === 1 ? 'family' : 'families' }) : t('admin.fees_page.no_overdue_family_has_a')); },
-    onError: (e) => say((e as Error).message, 'bad'),
-  });
+  const remind = useMutation({ mutationFn: () => app.api.fees.remindOverdue(),
+    onSuccess: (r) => { setConfirmRemind(false); say(r.sent ? t('admin.fees_page.reminder_sent_to', { sent: r.sent }) : t('admin.fees_page.no_overdue_family_has_a')); },
+    onError: (e) => say((e as Error).message, 'bad') });
   const s = summary.data;
   const rows = overdue.data?.items ?? [];
   const canPay = app.user.permissions.includes('fees.collect');
   // From a student's record (?collect=<student>): their payment opens straight away.
-  useEffect(() => {
-    if (asked && asked !== '1' && canPay) { open.mutate(asked); history.replaceState(null, '', window.location.pathname); }
+  useEffect(() => { if (asked && asked !== '1' && canPay) { open.mutate(asked); history.replaceState(null, '', window.location.pathname); }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const err = [summary, overdue].find((q) => q.isError && !q.data);
   return (
@@ -96,8 +91,7 @@ function Overview({ tabs }: { tabs: React.ReactNode }) {
               <div className="ch"><h2>{t('admin.fees_page.collected_each_day')}</h2><small>{s.dailyTarget ? t('admin.fees_page.target_a_day', { money: money(s.dailyTarget) }) : t('admin.fees_page.this_period')}</small></div>
               {s.daily.some((x) => x.amount > 0) ? (
                 <div className="fx" role="img" aria-label={t('admin.fees_page.fees_collected_each_day')} style={{ alignItems: 'flex-end', gap: 8, height: 180 }}>
-                  {s.daily.slice(-14).map((x) => {
-                    const top = Math.max(...s.daily.map((y) => y.amount), 1);
+                  {s.daily.slice(-14).map((x) => { const top = Math.max(...s.daily.map((y) => y.amount), 1);
                     return (
                       <div key={x.date} className="vc" style={{ flex: 1, alignItems: 'center', gap: 6, height: '100%', justifyContent: 'flex-end' }} data-tip={`${x.full}: ${money(x.amount)}`}>
                         {x.amount > 0 && <b className="num" style={{ fontSize: 12 }}>{money(x.amount)}</b>}

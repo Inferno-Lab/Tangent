@@ -86,7 +86,7 @@ function AnswerDialog({ r, onClose, onDone }: { r: DataRequestRow; onClose: () =
   const shake = useShake();
   const go = useMutation({
     mutationFn: (status: 'done' | 'declined') => app.api.privacy.decide(r.id, { status, note: note.trim() }),
-    onSuccess: (x) => onDone(x.status === 'done' ? t('admin.privacy_page.closed_as_done', { p0: r.fromApp ? ' The family is told.' : '' }) : t('admin.privacy_page.declined_2', { p0: r.fromApp ? ' The family is told why.' : '' })),
+    onSuccess: (x) => onDone(x.status === 'done' ? t('admin.privacy_page.closed_as_done', { p0: r.fromApp ? t('admin.privacy_page.the_family_is_told') : '' }) : t('admin.privacy_page.declined_2', { p0: r.fromApp ? t('admin.privacy_page.the_family_is_told_why') : '' })),
     onError: (e) => { setErr((e as Error).message); shake.hit(); },
   });
   const decline = () => { if (!note.trim()) { setErr(t('admin.privacy_page.say_why_so_the_family')); shake.hit(); } else go.mutate('declined'); };

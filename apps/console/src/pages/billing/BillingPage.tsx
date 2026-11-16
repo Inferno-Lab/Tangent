@@ -13,8 +13,7 @@ const COLS = tr('console.billing_page.minmax_0_2fr_100px_120px');
 const esc = (v: string) => v.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 /** One invoice per live school each month: students times the plan's yearly price, divided by twelve, plus modules added on top. */
-export function BillingPage() {
-  const app = useApp();
+export function BillingPage() { const app = useApp();
   const qc = useQueryClient();
   const { toast, say } = useToast();
   const [period, setPeriod] = useState(new Date().toISOString().slice(0, 7));
@@ -27,9 +26,8 @@ export function BillingPage() {
   const fleet = useQuery({ queryKey: ['schools'], queryFn: () => app.api.schools(), staleTime: 60_000 });
   const slug = fleet.data?.find((x) => x.id === school)?.slug;
   const refresh = () => void qc.invalidateQueries({ queryKey: ['invoices'] });
-  const gen = useMutation({ mutationFn: () => app.api.billing.generate(period), onSuccess: (r) => { refresh(); say(r.created ? tr('console.billing_page.created_for', { created: r.created, p1: r.created === 1 ? 'invoice' : 'invoices', period }) : tr('console.billing_page.every_live_school_already_has', { period })); }, onError: (e) => say((e as Error).message, 'bad') });
-  if (!app.can('billing.read')) {
-    return (
+  const gen = useMutation({ mutationFn: () => app.api.billing.generate(period), onSuccess: (r) => { refresh(); say(r.created ? tr('console.billing_page.created_for', { created: r.created, period }) : tr('console.billing_page.every_live_school_already_has', { period })); }, onError: (e) => say((e as Error).message, 'bad') });
+  if (!app.can('billing.read')) { return (
       <Page title={tr('console.billing_page.billing')} sub={tr('console.billing_page.invoices_for_every_school')}>
         <div><EmptyCard title={tr('console.billing_page.billing')} chip={{ text: tr('console.billing_page.not_for_your_role'), tone: 'a' }} icon="lock" heading={tr('console.billing_page.billing_is_for_the_finance')} body={tr('console.billing_page.ask_a_super_admin_to')} /></div>
       </Page>
@@ -103,8 +101,7 @@ export function BillingPage() {
 }
 
 /** One invoice: its lines, sending it, marking it paid (and undoing that), and printing or saving it. */
-function InvoiceDialog({ r, can, onClose, onDone }: { r: InvoiceRowC; can: boolean; onClose: () => void; onDone: (m: string) => void }) {
-  const app = useApp();
+function InvoiceDialog({ r, can, onClose, onDone }: { r: InvoiceRowC; can: boolean; onClose: () => void; onDone: (m: string) => void }) { const app = useApp();
   const shake = useShake();
   const [paying, setPaying] = useState(false);
   const [f, setF] = useState({ paidOn: schoolToday(), reference: '' });
@@ -114,8 +111,7 @@ function InvoiceDialog({ r, can, onClose, onDone }: { r: InvoiceRowC; can: boole
   const pay = useMutation({ mutationFn: () => app.api.billing.paid(r.id, { paidOn: f.paidOn, reference: f.reference.trim() }), onSuccess: () => onDone(tr('console.billing_page.marked_paid')), onError: fail });
   const undo = useMutation({ mutationFn: () => app.api.billing.unpaid(r.id), onSuccess: () => onDone(tr('console.billing_page.no_longer_marked_paid')), onError: fail });
   // A plain page of the invoice in a new tab, to print or save as PDF from the browser.
-  const print = () => {
-    const w = window.open('', '_blank');
+  const print = () => { const w = window.open('', '_blank');
     if (!w) return;
     w.document.write(`<!doctype html><meta charset="utf-8"><title>Invoice ${esc(r.schoolName)} ${r.period}</title><body style="font:15px/1.5 system-ui,sans-serif;max-width:640px;margin:40px auto;padding:0 16px">
       <h1 style="font-size:22px">Tangent invoice</h1><p>${esc(r.schoolName)}<br>Month: ${r.period}<br>Due by: ${r.dueOn}</p>

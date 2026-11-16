@@ -15,13 +15,10 @@ type Kid = { id: string; name: string; className: string };
 
 /** Which of the school's setup records each tab of Academic year lists (config-engine: the school module's year page). */
 const KINDS: Record<string, string[]> = { terms: ['years', 'terms'], holidays: ['holidays'], classes: ['classes'], subjects: ['subjects'], bells: ['periods'] };
-const SUBS: Record<string, string> = {
-  terms: t('admin.year_page.the_school_s_years_and'), holidays: t('admin.year_page.days_the_school_is_closed'),
-  classes: t('admin.year_page.every_class_and_its_class'), subjects: t('admin.year_page.what_is_taught_and_how'), bells: t('admin.year_page.when_each_period_break_and'),
-};
+const SUBS: Record<string, string> = { terms: t('admin.year_page.the_school_s_years_and'), holidays: t('admin.year_page.days_the_school_is_closed'),
+  classes: t('admin.year_page.every_class_and_its_class'), subjects: t('admin.year_page.what_is_taught_and_how'), bells: t('admin.year_page.when_each_period_break_and') };
 
-export function YearPage() {
-  const { tab, tabs } = usePageTabs('/year');
+export function YearPage() { const { tab, tabs } = usePageTabs('/year');
   const { toast, say } = useToast();
   const setup = useSetupSections(KINDS[tab] ?? [], say);
   if (tab === 'year-end') return <YearEnd tabs={tabs} />;
@@ -29,8 +26,7 @@ export function YearPage() {
 }
 
 /** Drafting the next year, promoting students into it, and starting it. */
-function YearEnd({ tabs }: { tabs: React.ReactNode }) {
-  const app = useApp();
+function YearEnd({ tabs }: { tabs: React.ReactNode }) { const app = useApp();
   const qc = useQueryClient();
   const { toast, say } = useToast();
   const [dlg, setDlg] = useState<'year' | 'promote' | null>(null);
@@ -40,15 +36,12 @@ function YearEnd({ tabs }: { tabs: React.ReactNode }) {
   const can = app.user.permissions.includes('year.manage');
   const refresh = () => void qc.invalidateQueries({ predicate: (q) => ['year', 'students', 'classes', 'shell'].includes(String(q.queryKey[0])) });
   const done = (m: string) => { setDlg(null); refresh(); say(m); };
-  const act = useMutation({
-    mutationFn: async (a: { what: 'start' | 'remove' | 'undo' | 'rejoin'; id: string }) => {
-      if (a.what === 'start') { await app.api.year.start(a.id); return t('admin.year_page.the_new_year_has_started'); }
+  const act = useMutation({ mutationFn: async (a: { what: 'start' | 'remove' | 'undo' | 'rejoin'; id: string }) => { if (a.what === 'start') { await app.api.year.start(a.id); return t('admin.year_page.the_new_year_has_started'); }
       if (a.what === 'remove') { await app.api.year.remove(a.id); return t('admin.year_page.the_draft_year_was_removed'); }
       if (a.what === 'undo') { await app.api.year.undo(a.id); return t('admin.year_page.every_student_is_back_where'); }
       await app.api.year.rejoin(a.id); return t('admin.year_page.the_student_is_back_on');
     },
-    onSuccess: (m) => { refresh(); say(m); }, onError: (e) => say((e as Error).message, 'bad'),
-  });
+    onSuccess: (m) => { refresh(); say(m); }, onError: (e) => say((e as Error).message, 'bad') });
   const v = view.data;
   const draft = v?.years.find((y) => y.status === 'draft');
   const latestRun = v?.runs[0];
@@ -95,7 +88,7 @@ function YearEnd({ tabs }: { tabs: React.ReactNode }) {
           </Card>
         </section>
         <Card title={t('admin.year_page.students_who_left')}>
-          <p className="help" style={{ margin: 0 }}>{v.leavers.length ? t('admin.year_page.left', { length: v.leavers.length, p1: v.leavers.length === 1 ? 'student has' : 'students have' }) : t('admin.year_page.nobody_has_left_yet')} {t('admin.year_page.their_records_are_kept_for')}{' '}{Math.round(v.retentionMonths / 12)} {v.retentionMonths === 12 ? 'year' : 'years'}{t('admin.year_page.then_erased_they_are_listed')}</p>
+          <p className="help" style={{ margin: 0 }}>{v.leavers.length ? t('admin.year_page.left', { length: v.leavers.length }) : t('admin.year_page.nobody_has_left_yet')} {t('admin.year_page.their_records_are_kept_for')}{' '}{Math.round(v.retentionMonths / 12)} {v.retentionMonths === 12 ? 'year' : 'years'}{t('admin.year_page.then_erased_they_are_listed')}</p>
           {v.leavers.length > 0 && <button className="btn sm" style={{ marginTop: 10 }} onClick={() => app.go('/students')}>{t('admin.year_page.open_students')}</button>}
         </Card>
       </>}
@@ -103,8 +96,7 @@ function YearEnd({ tabs }: { tabs: React.ReactNode }) {
   );
 }
 
-function NewYear({ years, onClose, onDone }: { years: YearRow[]; onClose: () => void; onDone: (m: string) => void }) {
-  const app = useApp();
+function NewYear({ years, onClose, onDone }: { years: YearRow[]; onClose: () => void; onDone: (m: string) => void }) { const app = useApp();
   const shake = useShake();
   const cur = years.find((y) => y.status === 'current');
   const nextStart = cur ? `${Number(cur.endsOn.slice(0, 4))}-${cur.startsOn.slice(5)}` : schoolToday();
@@ -127,8 +119,7 @@ function NewYear({ years, onClose, onDone }: { years: YearRow[]; onClose: () => 
   );
 }
 
-function Promote({ years, onClose, onDone }: { years: YearRow[]; onClose: () => void; onDone: (m: string) => void }) {
-  const app = useApp();
+function Promote({ years, onClose, onDone }: { years: YearRow[]; onClose: () => void; onDone: (m: string) => void }) { const app = useApp();
   const shake = useShake();
   const preview = useQuery({ queryKey: ['year', 'preview'], queryFn: app.api.year.preview });
   const [moves, setMoves] = useState<PromotionPreview['classes']>([]);
@@ -138,10 +129,8 @@ function Promote({ years, onClose, onDone }: { years: YearRow[]; onClose: () => 
   const [checking, setChecking] = useState(false);
   const [err, setErr] = useState('');
   useEffect(() => { if (preview.data) setMoves(preview.data.classes); }, [preview.data]);
-  const run = useMutation({
-    mutationFn: () => app.api.year.promote({ toYear: target!.id, moves: moves.map((m) => ({ fromClassId: m.fromClassId, toClassId: m.toClassId })), detained: held.map((k) => k.id), leaving: leaving.map((k) => k.id) }),
-    onSuccess: (r) => onDone(t('admin.year_page.students_moved_up_and_left', { moved: r.moved, left: r.left })), onError: (e) => { setErr((e as Error).message); shake.hit(); },
-  });
+  const run = useMutation({ mutationFn: () => app.api.year.promote({ toYear: target!.id, moves: moves.map((m) => ({ fromClassId: m.fromClassId, toClassId: m.toClassId })), detained: held.map((k) => k.id), leaving: leaving.map((k) => k.id) }),
+    onSuccess: (r) => onDone(t('admin.year_page.students_moved_up_and_left', { moved: r.moved, left: r.left })), onError: (e) => { setErr((e as Error).message); shake.hit(); } });
   const classes = preview.data?.classes ?? [];
   const total = moves.reduce((n, m) => n + m.students, 0);
   return (
@@ -171,8 +160,7 @@ function Promote({ years, onClose, onDone }: { years: YearRow[]; onClose: () => 
         </div>
       )}
       {/* A last look at the numbers before anything moves. */}
-      {checking && (() => {
-        const tops = moves.filter((m) => m.toClassId === null).reduce((n, m) => n + m.students, 0);
+      {checking && (() => { const tops = moves.filter((m) => m.toClassId === null).reduce((n, m) => n + m.students, 0);
         const out = tops + leaving.length;
         return <div className="card" style={{ padding: 16, marginTop: 16 }}><b style={{ font: '700 15px var(--fb)' }}>{Math.max(0, total - out - held.length)} {t('admin.year_page.move_up')}{' '}{held.length} {t('admin.year_page.stay_in_their_class')}{' '}{out} {t('admin.year_page.leave_the_school')}</b><p className="help" style={{ margin: '6px 0 0' }}>{t('admin.year_page.into_2')}{' '}{target?.label}{t('admin.year_page.undo_stays_on_this_page')}</p></div>;
       })()}

@@ -11,8 +11,7 @@ import { tx } from '@tangent/contracts';
 const COLLAPSE_KEY = 'tangent.admin.menu.collapsed';
 
 /** What every page shares: the theme, the menu, the shortcuts and the search box. Called once, by the signed-in layout. */
-export function useChrome() {
-  const { api, base, slug, user, go, signOut } = useApp();
+export function useChrome() { const { api, base, slug, user, go, signOut } = useApp();
   const theme = useTheme();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const active = activeNav(base && pathname.startsWith(base) ? pathname.slice(base.length) || '/' : pathname);
@@ -23,8 +22,7 @@ export function useChrome() {
   const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { return false; } });
   const [open, setOpen] = useState(false);
   // "Search" on the not-found page lands here with ?search=1: open the box, and take the flag out of the address.
-  useEffect(() => {
-    const u = new URL(window.location.href);
+  useEffect(() => { const u = new URL(window.location.href);
     if (!u.searchParams.has('search')) return;
     setOpen(true);
     u.searchParams.delete('search');
@@ -46,18 +44,15 @@ export function useChrome() {
   const goRef = useRef(go);
   goRef.current = go;
 
-  useEffect(() => {
-    let armed = 0;
+  useEffect(() => { let armed = 0;
     let mode: 'g' | 'n' = 'g';
-    const onKey = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement | null;
+    const onKey = (e: KeyboardEvent) => { const el = e.target as HTMLElement | null;
       const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setOpen((o) => !o); return; }
       if (e.key === 'Escape') { setOpen(false); setMore(false); return; }
       if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === '/') { e.preventDefault(); setOpen(true); return; }
-      if (Date.now() - armed < 1200) {
-        const to = mode === 'n' ? news.get(e.key.toLowerCase()) : targets.get(e.key.toLowerCase());
+      if (Date.now() - armed < 1200) { const to = mode === 'n' ? news.get(e.key.toLowerCase()) : targets.get(e.key.toLowerCase());
         armed = 0;
         if (to) { e.preventDefault(); goRef.current(to.startsWith(base) && base ? to.slice(base.length) || '/' : to); }
       } else if (e.key.toLowerCase() === 'g' || e.key.toLowerCase() === 'n') { armed = Date.now(); mode = e.key.toLowerCase() as 'g' | 'n'; }
@@ -67,8 +62,7 @@ export function useChrome() {
   }, [targets, news, base]);
 
   const close = () => { setOpen(false); setQ(''); };
-  const pick = (h: PaletteHit) => {
-    close();
+  const pick = (h: PaletteHit) => { close();
     if (h.href.startsWith('action:')) { window.dispatchEvent(new CustomEvent('tangent:action', { detail: h.href.slice(7) })); return; }
     goRef.current(h.href);
   };
@@ -95,7 +89,7 @@ export function useChrome() {
       promo={data && has('ex') && data.term.daysToGo !== null && (
         <div className="sbc">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, font: '700 12px var(--fb)', color: 'var(--ink2)' }}>{data.term.name && <span className="chip a">{data.term.name}</span>}{data.term.examsLabel}</div>
-          <div className="fd" style={{ fontSize: 22, letterSpacing: '-.03em' }}>{data.term.daysToGo === 0 ? tr('admin.use_chrome.starts_today') : tr('admin.use_chrome.to_go', { daysToGo: data.term.daysToGo, p1: data.term.daysToGo === 1 ? 'day' : 'days' })}</div>
+          <div className="fd" style={{ fontSize: 22, letterSpacing: '-.03em' }}>{data.term.daysToGo === 0 ? tr('admin.use_chrome.starts_today') : tr('admin.use_chrome.to_go', { daysToGo: data.term.daysToGo })}</div>
           <div style={{ height: 10, borderRadius: 7, background: 'var(--s2)' }}><div style={{ width: `${data.term.progress}%`, height: '100%', borderRadius: 7, background: 'var(--brand)' }} /></div>
           {has('ex') && <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => goRef.current('/exams')}>{tr('admin.use_chrome.see_the_exam_schedule')}<Icon name="next" /></button>}
         </div>
