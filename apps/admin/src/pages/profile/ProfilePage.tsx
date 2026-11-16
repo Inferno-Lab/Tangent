@@ -131,7 +131,7 @@ function Roles({ cfg }: { cfg: EffectiveConfig }) {
   const areas = [...new Set(allowed.map((p) => p.area))];
   return <>
     <Segmented label={t('admin.profile_page.roles')} value={cur.id} onChange={setSel} options={list.map((r) => ({ value: r.id, label: r.name, count: r.people }))} style={{ alignSelf: 'flex-start', maxWidth: '100%', overflowX: 'auto' }} />
-    <Card title={cur.name} chip={<span className="chip">{cur.people} {cur.people === 1 ? 'person' : 'people'}</span>}>
+    <Card title={cur.name} chip={<span className="chip">{t('admin.profile_page.n_people', { n: cur.people })}</span>}>
       {cur.description && <p className="help" style={{ margin: '0 0 8px' }}>{cur.description}</p>}
       {areas.map((a) => (
         <div key={a} className="kv" style={{ alignItems: 'flex-start', gap: 16 }}>

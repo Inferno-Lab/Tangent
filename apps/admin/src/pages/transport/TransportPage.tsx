@@ -161,7 +161,7 @@ function RouteDialog({ route, onClose, onDone }: { route: BusRouteRow | null; on
                 <button type="button" className="btn sm" aria-label={tr('admin.transport_page.move_down')} disabled={i === stops.length - 1} onClick={() => move(i, 1)}><Ico d={DOWN} /></button>
                 <button type="button" className="btn sm" aria-label={tr('admin.transport_page.remove_stop')} onClick={() => (ridersAt(s.id) ? setDropping(i) : setStops((list) => list.filter((_, j) => j !== i)))}><Ico d={X} /></button>
               </div>
-              {dropping === i && <div className="tgrow" style={{ marginTop: 8 }}><span className="help">{ridersAt(s.id)} {ridersAt(s.id) === 1 ? tr('admin.transport_page.rider_loses') : tr('admin.transport_page.riders_lose')} {tr('admin.transport_page.this_stop_and_must_be')}</span><button type="button" className="btn sm dngf" onClick={() => { setStops((list) => list.filter((_, j) => j !== i)); setDropping(null); }}>{tr('admin.transport_page.remove_it')}</button><button type="button" className="btn sm" onClick={() => setDropping(null)}>{tr('admin.transport_page.keep')}</button></div>}
+              {dropping === i && <div className="tgrow" style={{ marginTop: 8 }}><span className="help">{tr('admin.transport_page.this_stop_and_must_be', { n: ridersAt(s.id) })}</span><button type="button" className="btn sm dngf" onClick={() => { setStops((list) => list.filter((_, j) => j !== i)); setDropping(null); }}>{tr('admin.transport_page.remove_it')}</button><button type="button" className="btn sm" onClick={() => setDropping(null)}>{tr('admin.transport_page.keep')}</button></div>}
               <div className="two"><TimeField label={tr('admin.transport_page.pick_up')} value={s.pickup} onChange={setStop(i, 'pickup')} /><TimeField label={tr('admin.transport_page.drop')} value={s.dropTime} onChange={setStop(i, 'dropTime')} /></div>
               {maps && <PlaceFind placed={!!s.lat} onPick={(p) => setStops((list) => list.map((x, j) => (j === i ? { ...x, lat: String(p.lat), lng: String(p.lng) } : x)))} />}
             </div>
@@ -253,7 +253,7 @@ function BillDialog({ route, onClose, onDone }: { route: BusRouteRow; onClose: (
   return (
     <Dialog title={tr('admin.transport_page.bill_the_riders_of', { name: route.name })} onClose={onClose} width={480} shake={shake.cls}>
       <div className="stack">
-        <p className="help" style={{ margin: 0 }}>{route.riders} {route.riders === 1 ? 'rider' : 'riders'} {tr('admin.transport_page.get_a_transport_fee_of')}{' '}{rupees(route.fee)}.</p>
+        <p className="help" style={{ margin: 0 }}>{tr('admin.transport_page.get_a_transport_fee_of', { n: route.riders, fee: rupees(route.fee) })}</p>
         <Field label={tr('admin.transport_page.fee_name')} value={title} onChange={(v) => { setTitle(v); setErr({}); }} error={err.title} maxLength={80} />
         <DateField label={tr('admin.transport_page.due_on')} value={dueOn} onChange={(v) => { setDueOn(v); setErr({}); }} error={err.dueOn} />
         {err._ && <div className="emsg" role="alert">{err._}</div>}

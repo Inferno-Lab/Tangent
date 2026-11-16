@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { SPECTRUM_COLOURS, spectrumTokens } from '@tangent/contracts';
 import { SCENE_CSS, SCENES } from './scenes';
-import { t as tr } from '../i18n';
 
 export type EmptyScene = keyof typeof SCENES;
 
@@ -14,7 +13,7 @@ const SPECTRUM = SPECTRUM_COLOURS.map((c) => {
 }).join('');
 // The scene card in the Nest look: a hairline and the old 28px corners; it rises and lifts from the host (empty.css).
 const CARD = '.es{border-radius:28px;box-shadow:inset 0 0 0 1px var(--line)}';
-const HOST = SPECTRUM + CARD + '[style*="background:var(--s2)"]:not(.ring){background:none!important}' + tr('ui.empty_state.host_hue_nolink_lk_noact');
+const HOST = SPECTRUM + CARD + '[style*="background:var(--s2)"]:not(.ring){background:none!important}' + ':host{display:block;--t1:var(--ink);--t2:var(--ink2);--t3:var(--ink3);--shadow:var(--sh2)}.hue{background:none;font-family:var(--fb)}.nolink .lk,.noact .acts .btn{display:none!important}';
 
 /**
  * A page with nothing in it yet (Tangent Hue, design/hue/EMPTY-STATES.md): the approved composition for that page, its words

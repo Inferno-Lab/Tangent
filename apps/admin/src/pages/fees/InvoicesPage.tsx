@@ -48,7 +48,7 @@ export function InvoicesPage({ view, tabs }: { view: 'invoices' | 'receipts'; ta
       </>}>
       <section className="grid">
         {view === 'invoices' && s && <>
-          <div className="tile t-v s4 rise"><span className="lbl">{tr('admin.invoices_page.billed')}</span><div className="big" style={{ marginTop: 8 }}>{money(s.billed)}</div><div style={{ font: '600 13px var(--fb)', opacity: 0.8 }}>{fmtNumber(s.count)} {s.count === 1 ? 'invoice' : 'invoices'} {tr('admin.invoices_page.in_view')}</div></div>
+          <div className="tile t-v s4 rise"><span className="lbl">{tr('admin.invoices_page.billed')}</span><div className="big" style={{ marginTop: 8 }}>{money(s.billed)}</div><div style={{ font: '600 13px var(--fb)', opacity: 0.8 }}>{tr('admin.invoices_page.in_view', { n: s.count, count: fmtNumber(s.count) })}</div></div>
           <div className="tile t-a s4 rise" style={{ '--d': '.05s' } as React.CSSProperties}><span className="lbl">{tr('admin.invoices_page.collected')}</span><div className="big" style={{ marginTop: 8 }}>{money(s.collected)}</div><div style={{ font: '600 13px var(--fb)', opacity: 0.75 }}>{s.billed ? Math.round((s.collected / s.billed) * 100) : 0}{tr('admin.invoices_page.of_what_was_billed')}</div></div>
           <div className="tile t-p s4 rise" style={{ '--d': '.1s' } as React.CSSProperties}><span className="lbl">{tr('admin.invoices_page.still_to_pay')}</span><div className="big" style={{ marginTop: 8, color: s.outstanding ? 'var(--bad)' : undefined }}>{money(s.outstanding)}</div><div style={{ font: '600 13px var(--fb)', color: 'var(--ink3)' }}>{tr('admin.invoices_page.across_the_invoices_in_view')}</div></div>
         </>}

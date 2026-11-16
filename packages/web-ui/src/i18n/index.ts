@@ -104,3 +104,11 @@ export function useLanguage(next: string | undefined, vocab: Vocabulary | undefi
 }
 
 export const currentLanguage = (): string => lang;
+
+/** "A, B and C" in the reader's language; `or` gives "A or B". */
+export const listOf = (items: string[], or = false): string => new Intl.ListFormat(lang, { type: or ? 'disjunction' : 'conjunction' }).format(items);
+/** A weekday as settings keep it ('saturday') in the reader's language. */
+export function dayOf(day: string): string {
+  const i = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].indexOf(day.toLowerCase());
+  return i < 0 ? day : new Intl.DateTimeFormat(lang, { weekday: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, 10, 15 + i)));
+}

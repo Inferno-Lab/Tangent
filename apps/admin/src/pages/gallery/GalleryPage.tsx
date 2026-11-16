@@ -39,7 +39,7 @@ export function GalleryPage() { const app = useApp();
             <button key={a.id} className="card s4 rise" onClick={() => setOpen(a)} style={{ '--d': `${Math.min(i, 8) * 0.04}s`, textAlign: 'start', cursor: 'pointer', border: 0, font: 'inherit', color: 'inherit' } as React.CSSProperties} aria-label={t('admin.gallery_page.open', { title: a.title })}>
               {a.coverFileId ? <Photo id={a.coverFileId} alt={a.title} /> : <div style={{ width: '100%', aspectRatio: '4 / 3', borderRadius: 12, background: 'var(--s2)', display: 'grid', placeItems: 'center', alignContent: 'center', gap: 6, color: 'var(--ink3)', font: '600 13px var(--fb)' }}><Icon name="image" size={28} />{t('admin.gallery_page.no_photos_yet')}</div>}
               <div className="ch" style={{ marginTop: 12 }}><h2 style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.title}</h2><span className={`chip ${a.published ? 'g' : ''}`}>{a.published ? t('admin.gallery_page.shared') : t('admin.gallery_page.draft')}</span></div>
-              <div className="help" style={{ marginTop: 4 }}>{a.className ?? t('admin.gallery_page.whole_school')} · {a.photos} {a.photos === 1 ? 'photo' : 'photos'} · {stamp(a.createdAt)}</div>
+              <div className="help" style={{ marginTop: 4 }}>{a.className ?? t('admin.gallery_page.whole_school')} · {t('admin.gallery_page.n_photos', { n: a.photos })} · {stamp(a.createdAt)}</div>
             </button>
           ))}
         </section>
@@ -72,7 +72,7 @@ function AlbumPanel({ album, canWrite, say, onEdit, onClose }: { album: AlbumRow
         <div className="dtop">
           <div style={{ minWidth: 0 }}>
             <div className="fd" style={{ fontSize: 30, letterSpacing: '-.03em', lineHeight: 1.1 }}>{album.title}</div>
-            <div className="help" style={{ marginTop: 4 }}>{album.className ?? t('admin.gallery_page.whole_school')} · {list.length} {list.length === 1 ? 'photo' : 'photos'}</div>
+            <div className="help" style={{ marginTop: 4 }}>{album.className ?? t('admin.gallery_page.whole_school')} · {t('admin.gallery_page.n_photos', { n: list.length })}</div>
           </div>
           <button className="xbtn" aria-label={t('admin.gallery_page.close')} onClick={onClose}><Icon name="close" size={20} /></button>
         </div>
@@ -83,7 +83,7 @@ function AlbumPanel({ album, canWrite, say, onEdit, onClose }: { album: AlbumRow
         </div>}
       </div>
       <div className="db">
-        {hidden > 0 && <div className="chip a" role="status" style={{ height: 'auto', padding: '8px 12px', whiteSpace: 'normal', lineHeight: 1.4 }}>{hidden} {hidden === 1 ? t('admin.gallery_page.photo_has') : t('admin.gallery_page.photos_have')} {t('admin.gallery_page.a_child_whose_family_has')}{' '}{hidden === 1 ? 'it' : 'them'}.</div>}
+        {hidden > 0 && <div className="chip a" role="status" style={{ height: 'auto', padding: '8px 12px', whiteSpace: 'normal', lineHeight: 1.4 }}>{t('admin.gallery_page.a_child_whose_family_has', { n: hidden })}</div>}
         {photos.isLoading ? <div className="skc" style={{ height: 200, borderRadius: 16 }} /> : !list.length ? <EmptyNote icon="camera" title={t('admin.gallery_page.no_photos_in_this_album')} body={t('admin.gallery_page.add_the_first_ones_families')} /> : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 12 }}>
             {list.map((p) => (
@@ -148,7 +148,7 @@ function AlbumDialog({ album, onClose, onDone }: { album: AlbumRow | null; onClo
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
         {album && (confirm
-          ? <span style={{ marginInlineEnd: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}><span className="help">{t('admin.gallery_page.delete_it_and_its')}{' '}{album.photos} {album.photos === 1 ? 'photo' : 'photos'}?</span><button className="btn sm dngf" disabled={del.isPending} onClick={() => del.mutate()}>{t('admin.gallery_page.yes_delete')}</button><button className="btn sm" onClick={() => setConfirm(false)}>{t('admin.gallery_page.keep')}</button></span>
+          ? <span style={{ marginInlineEnd: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}><span className="help">{t('admin.gallery_page.delete_it_and_its', { n: album.photos })}</span><button className="btn sm dngf" disabled={del.isPending} onClick={() => del.mutate()}>{t('admin.gallery_page.yes_delete')}</button><button className="btn sm" onClick={() => setConfirm(false)}>{t('admin.gallery_page.keep')}</button></span>
           : <button className="btn dng" style={{ marginInlineEnd: 'auto' }} onClick={() => setConfirm(true)}>{t('admin.gallery_page.delete_album')}</button>)}
         <button className="btn" onClick={onClose}>{t('admin.gallery_page.cancel')}</button>
         <button className="btn pri" disabled={save.isPending || title.trim().length < 2} onClick={() => save.mutate()}>{save.isPending ? t('admin.gallery_page.saving') : album ? t('admin.gallery_page.save') : t('admin.gallery_page.create_album')}</button>

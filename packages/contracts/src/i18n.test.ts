@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { formatMessage, languageDir, makeT, pluralCategory, wordsFor } from './i18n.js';
+import { formatMessage, languageDir, makeT, messageArgs, pluralCategory, wordsFor } from './i18n.js';
 
 describe('messages in any language', () => {
+  it('names the values a message uses, not its branch words', () => {
+    expect(messageArgs('{n, plural, one {# {@student} has} other {{count} {@students} have}} {who}')).toEqual(['@student', '@students', 'count', 'n', 'who']);
+    expect(messageArgs('{n, plural, zero {لا شيء} two {اثنان} other {#}}')).toEqual(['n']);
+  });
+
   it('fills values, and leaves a missing one showing', () => {
     expect(formatMessage('Hello {name}, {missing}', { name: 'Sam' })).toBe('Hello Sam, {missing}');
   });

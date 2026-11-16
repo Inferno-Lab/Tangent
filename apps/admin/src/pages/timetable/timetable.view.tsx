@@ -45,7 +45,7 @@ export function TimetableView({ v }: { v: any }) {
           <span className={`chip ${v.clashChip ?? ""}`}>{v.clashText}</span>
           {v.draftChanges > 0 && (
             <span className="chip v">
-              {v.draftChanges} {t('admin.timetable.view.unpublished')}{' '}{v.draftChanges === 1 ? "change" : "changes"}
+              {t('admin.timetable.view.unpublished', { n: v.draftChanges })}
             </span>
           )}
           <span className="lgd" style={{ display: "flex", gap: "10px", flexWrap: "wrap" } as CSSProperties}>
@@ -253,7 +253,7 @@ export function TimetableView({ v }: { v: any }) {
                 {v.unplaced.map((u: any, $i: number) => (
                   <div className="un" key={$i}>
                     <Icon name="drag" size={16} style={{ color: "var(--ink3)" }} />
-                    {u.name} · {u.missing} {u.missing === 1 ? "period" : "periods"}
+                    {u.name} · {t('admin.timetable.view.n_periods', { n: u.missing })}
                   </div>
                 ))}
               </div>

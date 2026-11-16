@@ -45,7 +45,7 @@ export function ReviewDialog({ list, onClose, onDone }: { list: Push[]; onClose:
   const problems = rows.flatMap(({ p, r }) => r.problems.map((m) => `${p.name}: ${m}`));
   const takes = rows.some(({ r }) => r.removed.length);
   return (
-    <Dialog title={t('console.modules_page.review_the_change')} tag={{ text: `${list.length} ${list.length === 1 ? 'school' : 'schools'}`, tone: takes ? 'a' : 'v' }} onClose={onClose} width={560}>
+    <Dialog title={t('console.modules_page.review_the_change')} tag={{ text: t('console.modules_page.n_schools', { n: list.length }), tone: takes ? 'a' : 'v' }} onClose={onClose} width={560}>
       <div className="stack" style={{ maxHeight: '50vh', overflowY: 'auto' }}>
         {rows.map(({ p, r }) => (
           <div key={p.schoolId} style={{ padding: '10px 0', borderTop: '1px solid var(--line)' }}>
@@ -243,7 +243,7 @@ function Plans({ say }: { say: Say }) { const app = useApp();
         {(plans.data ?? []).map((p) => (
           <div key={p.key} style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '12px 0', borderTop: '1px solid var(--line)', flexWrap: 'wrap' }}>
             <span style={{ flex: '1 1 260px', minWidth: 0 }}>
-              <b style={{ font: '700 15px var(--fb)' }}>{p.name}</b> <span className="chip">{p.schools ?? 0} {p.schools === 1 ? 'school' : 'schools'}</span>
+              <b style={{ font: '700 15px var(--fb)' }}>{p.name}</b> <span className="chip">{t('console.modules_page.n_schools', { n: p.schools ?? 0 })}</span>
               <small style={{ display: 'block', color: 'var(--ink3)' }}>{rupees(p.perStudentYear)} {t('console.modules_page.a_student_a_year')}{' '}{p.modules.length} {t('console.modules_page.modules_up_to')}{' '}{count(p.limits.students)} {t('console.modules_page.students')}{' '}{count(p.limits.storageGb)} {t('console.modules_page.gb')}{' '}{count(p.limits.smsPerMonth)} {t('console.modules_page.texts_a_month')}</small>
             </span>
             {can && <span className="tgrow"><button className="btn sm" onClick={() => setEditing(p)}>{t('console.modules_page.change')}</button><button className="btn sm dng" disabled={!!p.schools || remove.isPending} data-tip={p.schools ? t('console.modules_page.move_its_schools_to_another') : undefined} onClick={() => remove.mutate(p.key)}>{t('console.modules_page.remove')}</button></span>}

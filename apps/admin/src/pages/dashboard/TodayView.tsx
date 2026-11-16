@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { DashboardData } from '@tangent/contracts';
-import { EmptyNote, Icon, MenuButton, PageScope, Roll, Segmented, ToastSlot, rollDigits, type IconName, type PageIcon, t as tr } from '@tangent/web-ui';
+import { EmptyNote, Icon, MenuButton, PageScope, Roll, Segmented, ToastSlot, rollDigits, type IconName, type PageIcon, t as tr, listOf } from '@tangent/web-ui';
 
 // The dashboard as the Today board (design/hue/src/Today.html): the day on the deep colour, what needs the person, fees and the
 // day ahead. `v` is what DashboardPage works out from the data; `d` is the data itself.
@@ -19,8 +19,8 @@ export function TodayView({ v, d }: { v: V; d: DashboardData }) {
   // The grid shows the classes chosen for it; the reminder goes to every class in the school that has not marked.
   const allNot = d.needsYou.find((n) => n.kind === 'attendance')?.subtitle.split(' · ') ?? notTaken;
   const rest = allNot.length - notTaken.length;
-  const note = (notTaken.length ? tr('admin.today_view.not_taken_the_roll', { p0: notTaken.length === 1 ? 'One class here has' : `${notTaken.length} classes here have` }) : tr('admin.today_view.every_class_here_has_taken'))
-    + (rest > 0 ? tr('admin.today_view.across_the_school', { p0: rest === 1 ? 'one more' : `${rest} more` }) : '.');
+  const note = (notTaken.length ? tr('admin.today_view.not_taken_the_roll', { n: notTaken.length }) : tr('admin.today_view.every_class_here_has_taken'))
+    + (rest > 0 ? tr('admin.today_view.across_the_school', { rest }) : '.');
   // Classes by grade (columns) and section (rows), as on the board; a name that is not "8 A" goes in its own row.
   const parse = (n: string) => /^(\S+)\s+(\S+)$/.exec(n.trim());
   const grades = [...new Set(rolls.map((r) => parse(r.name)?.[1] ?? r.name))];
@@ -60,7 +60,7 @@ export function TodayView({ v, d }: { v: V; d: DashboardData }) {
                 </div>
               </div>
               <div className="fx" style={{ gap: 10, marginTop: 'auto', flexWrap: 'wrap' }}>
-                {allNot.length > 0 && <button className="btn bri" onClick={v.remind}><Icon name="notifications" className="i" />{tr('admin.today_view.remind')}{' '}{allNot.slice(0, 2).join(' and ')}{allNot.length > 2 ? tr('admin.today_view.and_more', { p0: allNot.length - 2 }) : ''}</button>}
+                {allNot.length > 0 && <button className="btn bri" onClick={v.remind}><Icon name="notifications" className="i" />{tr('admin.today_view.remind', { who: listOf(allNot.length > 2 ? [...allNot.slice(0, 2), tr('admin.today_view.and_more', { n: allNot.length - 2 })] : allNot) })}</button>}
                 <button className="btn ond" onClick={() => v.goto('/attendance')}>{tr('admin.today_view.open_attendance')}</button>
               </div>
             </div>
@@ -109,7 +109,7 @@ export function TodayView({ v, d }: { v: V; d: DashboardData }) {
               <div className="vc" style={{ gap: 8 }}><div className="bar"><i style={{ width: `${d.fees.pct}%` }} /></div><span className="cap">{d.fees.pct}{tr('admin.today_view.collected')}</span></div>
               <div className="fx" style={{ gap: 10, marginTop: 'auto' }}>
                 <div className="mcard grow"><span className="lbl">{tr('admin.today_view.still_to_come')}</span><b className="d">{v.money(Math.max(0, d.fees.due - d.fees.collected))}</b><small>{tr('admin.today_view.this_month')}</small></div>
-                <div className="mcard grow"><span className="lbl">{tr('admin.today_view.overdue')}</span><b className="d" style={{ color: 'var(--bad-i)' }}>{d.fees.overdueFamilies}</b><small>{d.fees.overdueFamilies === 1 ? 'family' : 'families'}</small></div>
+                <div className="mcard grow"><span className="lbl">{tr('admin.today_view.overdue')}</span><b className="d" style={{ color: 'var(--bad-i)' }}>{d.fees.overdueFamilies}</b><small>{tr('admin.today_view.families', { n: d.fees.overdueFamilies })}</small></div>
               </div>
             </section>
           )}

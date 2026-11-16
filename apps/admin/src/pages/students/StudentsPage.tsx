@@ -161,7 +161,7 @@ function StudentList({ tabs }: { tabs: React.ReactNode }) { const app = useApp()
     sum: (() => { const s = sum.data;
       return { inView: s ? fmtNumber(s.inView) : '–', total: fmtNumber(s?.total ?? 0), marked: s?.markedToday ?? 0, unmarked: fmtNumber(Math.max(0, (s?.inView ?? 0) - (s?.markedToday ?? 0))), presD: rollDigits(String(s?.presentToday ?? 0)),
         dayWord: s && s.dayLabel !== dayLabel(schoolToday()) ? tr('admin.students_page.on', { dayLabel: s.dayLabel }) : 'today', overdue: fmtMoney(s?.overdueAmount ?? 0),
-        families: `${s?.overdueFamilies ?? 0} ${s?.overdueFamilies === 1 ? 'family' : 'families'}`, avg: s?.avgAttendance ?? 0, avgNone: !s || s.total === 0,
+        families: tr('admin.students_page.n_families', { n: s?.overdueFamilies ?? 0 }), avg: s?.avgAttendance ?? 0, avgNone: !s || s.total === 0,
         delta: `${(s?.avgDelta ?? 0) >= 0 ? '+' : ''}${s?.avgDelta ?? 0}%`, deltaCls: (s?.avgDelta ?? 0) >= 0 ? 'up' : 'dn' };
     })(),
     title, q, onQ: (e: { target: { value: string } }) => setQ(e.target.value),

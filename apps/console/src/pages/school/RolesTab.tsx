@@ -93,7 +93,7 @@ export function RolesTab({ schoolId, say }: { schoolId: string; say: Say }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
                 {cur && !cur.people ? (sure
                   ? <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><button className="btn sm dng" onClick={() => remove.mutate()}>{tr('console.roles_tab.yes_delete')}</button><button className="btn sm" onClick={() => setSure(false)}>{tr('console.roles_tab.keep')}</button></span>
-                  : <button className="btn dng" onClick={() => setSure(true)}>{tr('console.roles_tab.delete_role')}</button>) : <span className="help">{cur?.people ? tr('console.roles_tab.this_role', { people: cur.people, p1: cur.people === 1 ? tr('console.roles_tab.person_has') : tr('console.roles_tab.people_have') }) : ''}</span>}
+                  : <button className="btn dng" onClick={() => setSure(true)}>{tr('console.roles_tab.delete_role')}</button>) : <span className="help">{cur?.people ? tr('console.roles_tab.this_role', { people: cur.people }) : ''}</span>}
                 <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                   {sel === 'new' && <button className="btn" onClick={() => setSel(roles[0]?.id ?? '')}>{tr('console.roles_tab.cancel')}</button>}
                   <button className="btn pri" disabled={save.isPending} onClick={() => { if (name.trim().length < 2) { setErr({ name: tr('console.roles_tab.name_the_role') }); shake.hit(); } else save.mutate(); }}>{save.isPending ? tr('console.roles_tab.saving') : tr('console.roles_tab.save_role')}</button>

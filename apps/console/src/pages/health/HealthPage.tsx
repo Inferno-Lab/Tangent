@@ -36,7 +36,7 @@ export function HealthPage() { const app = useApp();
         const slow = timed.reduce<typeof rows[number] | null>((m, s) => (!m || (s.healthMs ?? 0) > (m.healthMs ?? 0) ? s : m), null);
         const look = rows.filter((s) => s.health === 'down' || s.health === 'degraded').length;
         return <Tiles items={[
-          { label: tr('console.health_page.answering_normally'), value: tr('console.health_page.of', { length: rows.filter((s) => s.health === 'ok').length, length1: rows.length }), note: rows.length === 1 ? 'school' : 'schools', tone: 'g' },
+          { label: tr('console.health_page.answering_normally'), value: tr('console.health_page.of', { length: rows.filter((s) => s.health === 'ok').length, length1: rows.length }), note: tr('console.health_page.schools', { n: rows.length }), tone: 'g' },
           { label: tr('console.health_page.needs_a_look'), value: look, note: look ? tr('console.health_page.slow_or_not_answering') : tr('console.health_page.nothing_slow_or_silent'), tone: look ? 'a' : 'v' },
           { label: tr('console.health_page.slowest_answer'), value: slow ? tr('console.health_page.ms', { healthMs: slow.healthMs }) : '–', note: slow ? slow.name : tr('console.health_page.no_heartbeat_yet'), tone: 'i' },
         ]} />;

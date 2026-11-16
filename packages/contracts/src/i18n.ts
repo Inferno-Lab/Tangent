@@ -148,6 +148,29 @@ function branches(s: string): Record<string, string> {
   return out;
 }
 
+/** The values and school words a message uses (`{name}`, `{n, plural…}`, `{@student}`), whatever its branches say: a
+ *  translation must use the same ones, though Arabic may have more plural branches than English. */
+export function messageArgs(msg: string): string[] {
+  const out = new Set<string>();
+  const walk = (s: string): void => {
+    for (let i = s.indexOf('{'); i >= 0; i = s.indexOf('{', i)) {
+      const end = closing(s, i);
+      if (end < 0) return;
+      const body = s.slice(i + 1, end);
+      const comma = body.indexOf(',');
+      if (comma < 0) out.add(body.trim().toLowerCase());
+      else {
+        out.add(body.slice(0, comma).trim().toLowerCase());
+        const rest = body.slice(comma + 1);
+        for (const b of Object.values(branches(rest.slice(rest.indexOf(',') + 1)))) walk(b);
+      }
+      i = end + 1;
+    }
+  };
+  walk(msg);
+  return [...out].sort();
+}
+
 /** Fills one message: values, plurals, selects and the school's words. A missing value leaves its `{name}` showing. */
 export function formatMessage(msg: string, params: Params = {}, lang = 'en', words: Record<string, string> = {}, num = (n: number) => String(n)): string {
   let out = '';

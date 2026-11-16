@@ -151,7 +151,7 @@ export function SchoolPage() {
     steps: (run?.steps ?? []).map((s, i) => ({
       n: STEP_LABELS[s.key] ?? s.label, num: i + 1, cls: s.status === 'running' ? 'run' : s.status === 'done' ? 'done' : s.status === 'failed' ? 'fail' : s.status === 'skipped' ? 'skip' : '',
       ok: s.status === 'done', bad: s.status === 'failed', todo: s.status === 'pending' || s.status === 'skipped',
-      d: s.status === 'failed' ? (s.error ?? 'This step did not finish.') : s.status === 'skipped' ? 'Skipped for now. It can be done later.' : (s.log.at(-1)?.text ?? DESC[s.key] ?? ''),
+      d: s.status === 'failed' ? (s.error ?? tr('console.school_page.step_did_not_finish')) : s.status === 'skipped' ? tr('console.school_page.skipped_for_now') : (s.log.at(-1)?.text ?? DESC[s.key] ?? ''),
       t: s.status === 'skipped' ? tr('console.school_page.skipped') : dur(s.startedAt, s.finishedAt),
     })),
     log: lines.length ? lines.map((l) => ({ t: clock(l.at), m: l.text, c: l.level === 'error' ? 'bad' : l.level === 'info' ? 'ok' : '' })) : [{ t: '--:--:--', m: tr('console.school_page.ready_nothing_has_run_for'), c: '' }],
@@ -347,7 +347,7 @@ function GoLive({ d, say, onDone }: { d: SchoolDetail; say: (m: string, tone?: '
       {app.can('schools.write') && (
         <div style={{ marginTop: 16, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <button className="btn pri" disabled={open.length > 0 || go.isPending} onClick={() => setConfirm(true)}>{tr('console.school_page.go_live')}</button>
-          <span className="help" style={{ margin: 0 }}>{open.length ? tr('console.school_page.still_open', { length: open.length, p1: open.length === 1 ? tr('console.school_page.item_is') : tr('console.school_page.items_are') }) : tr('console.school_page.every_item_is_green')}</span>
+          <span className="help" style={{ margin: 0 }}>{open.length ? tr('console.school_page.still_open', { n: open.length }) : tr('console.school_page.every_item_is_green')}</span>
         </div>
       )}
       {confirm && (

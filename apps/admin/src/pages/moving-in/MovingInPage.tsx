@@ -38,7 +38,7 @@ export function MovingInPage() { const app = useApp();
       for (const f of picked) next = await app.api.movingIn.upload({ fileName: f.name, note: note.trim(), content: await read(f) });
       return next!;
     },
-    onSuccess: (next) => { qc.setQueryData(['uploads'], next); const n = picked.length; setPicked([]); setNote(''); say(tr('admin.moving_in_page.sent_to_tangent_the_team', { p0: n === 1 ? 'it' : `${n} files`, n: n })); },
+    onSuccess: (next) => { qc.setQueryData(['uploads'], next); const n = picked.length; setPicked([]); setNote(''); say(tr('admin.moving_in_page.sent_to_tangent_the_team', { n })); },
     onError: (e) => setErr(Object.values(problem(e))[0] ?? '') });
   const [typing, setTyping] = useState(false);
   const typed = useMutation({ mutationFn: ({ csv, count }: { csv: string; count: number }) => { const k = IMPORT_KINDS.find((x) => x.key === kind)!;

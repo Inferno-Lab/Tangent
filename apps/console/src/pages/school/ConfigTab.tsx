@@ -81,7 +81,7 @@ export function ConfigTab({ schoolId, say }: { schoolId: string; say: Say }) { c
         <div className="help">{tr('console.config_tab.the_school_changes_its_own')}{off.length ? tr('console.config_tab.not_in_its_plan_so', { p0: off.map((m) => m.name).join(', ') }) : ''}</div>
         {dirtyGroups.length > 0 && (
           <div className="tgrow" style={{ marginTop: 10, alignItems: 'center' }}>
-            <span className="chip a">{dirtyGroups.length === 1 ? tr('console.config_tab.1_group_has') : tr('console.config_tab.groups_have', { length: dirtyGroups.length })} {tr('console.config_tab.unsaved_changes')}</span>
+            <span className="chip a">{tr('console.config_tab.unsaved_changes', { n: dirtyGroups.length })}</span>
             {dirtyGroups.map((g) => <button key={g} className="btn sm" onClick={() => setGroup(g)}>{groupLabel(g)}</button>)}
           </div>
         )}
@@ -205,7 +205,7 @@ export function ApplyDialog({ only, onClose, onDone }: { only?: string; onClose:
       <div className="help" style={{ marginTop: 10 }}>{tr('console.config_tab.each_school_gets_a_new')}</div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
         <button className="btn" onClick={onClose}>{tr('console.config_tab.cancel')}</button>
-        <button className="btn pri" disabled={!tpl || !picked.size || go.isPending} onClick={() => go.mutate()}>{tr('console.config_tab.apply_to')}{' '}{picked.size} {picked.size === 1 ? 'school' : 'schools'}</button>
+        <button className="btn pri" disabled={!tpl || !picked.size || go.isPending} onClick={() => go.mutate()}>{tr('console.config_tab.apply_to', { n: picked.size })}</button>
       </div>
     </Dialog>
   );

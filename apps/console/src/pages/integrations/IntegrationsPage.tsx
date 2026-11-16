@@ -77,7 +77,7 @@ export function IntegrationsPage() {
           <span style={{ flex: 1, minWidth: 220, font: '600 13px/1.45 var(--fb)', color: 'var(--ink2)' }}>
             {v.mode === 'live' ? tr('console.integrations_page.real_providers_send_to_families')
               : v.allowList.length === 0 ? tr('console.integrations_page.every_message_goes_to_the')
-              : tr('console.integrations_page.messages_go_to_the_test', { length: v.allowList.length, p1: v.allowList.length === 1 ? tr('console.integrations_page.number_or_address') : tr('console.integrations_page.numbers_and_addresses') })}
+              : tr('console.integrations_page.messages_go_to_the_test', { n: v.allowList.length })}
           </span>
           {v.mode === 'sandbox' && write && <button className="btn sm" onClick={() => setDlg({ kind: 'allow' })}>{tr('console.integrations_page.allow_list')}</button>}
           {write && <button className={`btn sm ${v.mode === 'sandbox' ? 'pri' : ''}`} disabled={mode.isPending} onClick={() => mode.mutate(v.mode === 'sandbox' ? 'live' : 'sandbox')}>{v.mode === 'sandbox' ? tr('console.integrations_page.switch_to_live') : tr('console.integrations_page.back_to_sandbox')}</button>}

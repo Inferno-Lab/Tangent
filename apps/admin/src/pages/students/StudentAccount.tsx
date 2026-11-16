@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { StudentDetail } from '@tangent/contracts';
-import { Field, t } from '@tangent/web-ui';
+import { Field, t, listOf } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { problem, stamp, useSchoolConfig } from '../../app/kit';
 
@@ -28,7 +28,7 @@ export function StudentAccount({ s, say }: { s: StudentDetail; say: (m: string) 
     <div style={{ marginTop: 16 }}>
       <h3>{t('admin.student_account.the_student_s_own_app')}</h3>
       {a ? (
-        <div className="kv"><span>{t('admin.student_account.signs_in_with')}{' '}{[a.phone, a.email].filter(Boolean).join(' or ')}</span><b>{a.lastSignIn ? t('admin.student_account.last_in', { stamp: stamp(a.lastSignIn) }) : t('admin.student_account.not_signed_in_yet')}</b></div>
+        <div className="kv"><span>{t('admin.student_account.signs_in_with', { how: listOf([a.phone, a.email].filter((x): x is string => !!x), true) })}</span><b>{a.lastSignIn ? t('admin.student_account.last_in', { stamp: stamp(a.lastSignIn) }) : t('admin.student_account.not_signed_in_yet')}</b></div>
       ) : <p className="help" style={{ margin: 0 }}>{s.name.split(' ')[0]} {t('admin.student_account.has_no_account_of_their')}</p>}
       {canWrite && !open && <button className="btn sm" style={{ marginTop: 8 }} onClick={() => setOpen(true)}>{a ? t('admin.student_account.change_how_they_sign_in') : t('admin.student_account.give_them_the_app')}</button>}
       {open && (

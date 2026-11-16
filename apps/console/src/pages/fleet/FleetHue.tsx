@@ -18,7 +18,7 @@ export function FleetHue({ v, f, schools, actions }: { v: V; f: FleetSummary; sc
     <PageScope page="fleet" overlays={<><Presence>{v.dialog}</Presence><Presence>{v.alertsDialog}</Presence></>}>
       <main className="mn hb">
         <header className="top">
-          <div><h1>{tr('console.fleet_hue.fleet')}</h1><p>{f.live} {f.live === 1 ? 'school' : 'schools'} {tr('console.fleet_hue.live')}{' '}{f.onboarding} {tr('console.fleet_hue.onboarding')}{' '}{f.cells.length} {f.cells.length === 1 ? 'cell' : 'cells'}</p></div>
+          <div><h1>{tr('console.fleet_hue.fleet')}</h1><p>{tr('console.fleet_hue.live', { live: f.live, onboarding: f.onboarding, cells: f.cells.length })}</p></div>
           <span className="sp" />
           <button className="search" onClick={v.openSearch}><Icon name="search" className="i" />{tr('console.fleet_hue.find_a_school_a_person')}<kbd>{tr('console.fleet_hue.ctrl_k')}</kbd></button>
           <button className="ib" aria-label={tr('console.fleet_hue.alerts')} data-tip={tr('console.fleet_hue.alerts')} onClick={v.openAlerts}><Icon name="notifications" className="i" />{v.alertCount > 0 && <span className="pip" />}</button>
@@ -78,7 +78,7 @@ export function FleetHue({ v, f, schools, actions }: { v: V; f: FleetSummary; sc
                   {waiting.length ? waiting.slice(0, 3).map((a) => (
                     <div key={a.id} className="row"><span className="av sm">{(a.schoolName ?? 'G')[0]}</span><span className="grow"><b>{a.summary}</b><small>{a.schoolName ?? tr('console.fleet_hue.every_school')} {tr('console.fleet_hue.asked_by')}{' '}{a.requestedBy}</small></span></div>
                   )) : <EmptyNote icon="approvals" title={tr('console.fleet_hue.nothing_waits_for_a_second')} body={tr('console.fleet_hue.a_change_that_needs_another')} />}
-                  {waiting.length > 0 && <button className="btn ton" onClick={v.openApprovals}>{tr('console.fleet_hue.review')}{' '}{waiting.length === 1 ? 'it' : waiting.length === 2 ? 'both' : tr('console.fleet_hue.all_2', { length: waiting.length })}</button>}
+                  {waiting.length > 0 && <button className="btn ton" onClick={v.openApprovals}>{tr('console.fleet_hue.review', { n: waiting.length })}</button>}
                 </section>
                 <section className="card">
                   <div className="ch"><h2>{rel ? tr('console.fleet_hue.release', { version: rel.version }) : tr('console.fleet_hue.releases')}</h2><small>{v.relState}</small></div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Dialog, EmptyCard, PageScope, tintFor, EmptyNote, t as tr } from '@tangent/web-ui';
+import { Dialog, EmptyCard, PageScope, tintFor, EmptyNote, t as tr, listOf } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { url } from '../../app/base';
 import { useShellChrome } from '../../app/Layout';
@@ -121,14 +121,14 @@ export function FleetPage() { const app = useApp();
       title: incident.title, body: incident.body, dismiss: () => dismiss.mutate(incident.id), open: incident.schoolId ? () => app.go(`/schools/${incident.schoolId}/technical`) : undefined } : null,
     recheck: () => probe.mutate(),
     up: upcoming.length
-      ? { title: tr('console.fleet_page.soon', { length: upcoming.length, p1: upcoming.length === 1 ? tr('console.fleet_page.school_starts') : tr('console.fleet_page.schools_start') }), body: tr('console.fleet_page.being_set_up_for_the', { p0: upcoming.map((u) => u.name).slice(0, 2).join(' and '), n: upcoming.length }) }
+      ? { title: tr('console.fleet_page.soon', { n: upcoming.length }), body: tr('console.fleet_page.being_set_up_for_the', { p0: listOf(upcoming.map((u) => u.name).slice(0, 2)), n: upcoming.length }) }
       : { title: tr('console.fleet_page.no_schools_waiting'), body: tr('console.fleet_page.onboard_a_school_and_it') },
     alertsDialog: alerts && (
       <Dialog title={tr('console.fleet_page.alerts')} tag={{ text: chrome.pending || (f.degraded && f.degraded > 0) || incident?.state === 'open' ? tr('console.fleet_page.needs_you') : tr('console.fleet_page.all_clear'), tone: chrome.pending || incident?.state === 'open' ? 'a' : 'g' }} onClose={() => setAlerts(false)} width={460}>
         <div className="stack">
           {incident?.state === 'open' && <div className="kv" style={{ alignItems: 'flex-start' }}><span><b style={{ color: 'var(--ink)' }}>{incident.title}</b><br /><small style={{ color: 'var(--ink3)' }}>{incident.body}</small></span><b><button className="btn sm" onClick={() => { setAlerts(false); app.go(incident.schoolId ? `/schools/${incident.schoolId}/technical` : '/health'); }}>{tr('console.fleet_page.open')}</button></b></div>}
-          {chrome.pending > 0 && <div className="kv"><span>{chrome.pending} {chrome.pending === 1 ? tr('console.fleet_page.request_is') : tr('console.fleet_page.requests_are')} {tr('console.fleet_page.waiting_for_a_second_person')}</span><b><button className="btn sm" onClick={() => { setAlerts(false); app.go('/approvals'); }}>{tr('console.fleet_page.review')}</button></b></div>}
-          {f.degraded > 0 && <div className="kv"><span>{f.degraded} {f.degraded === 1 ? tr('console.fleet_page.school_is') : tr('console.fleet_page.schools_are')} {tr('console.fleet_page.answering_slowly')}</span><b><button className="btn sm" onClick={() => { setAlerts(false); app.go('/health'); }}>{tr('console.fleet_page.open_health')}</button></b></div>}
+          {chrome.pending > 0 && <div className="kv"><span>{tr('console.fleet_page.waiting_for_a_second_person', { n: chrome.pending })}</span><b><button className="btn sm" onClick={() => { setAlerts(false); app.go('/approvals'); }}>{tr('console.fleet_page.review')}</button></b></div>}
+          {f.degraded > 0 && <div className="kv"><span>{tr('console.fleet_page.answering_slowly', { n: f.degraded })}</span><b><button className="btn sm" onClick={() => { setAlerts(false); app.go('/health'); }}>{tr('console.fleet_page.open_health')}</button></b></div>}
           {!chrome.pending && !f.degraded && incident?.state !== 'open' && <EmptyNote icon="checkCircle" title={tr('console.fleet_page.nothing_needs_you_right_now')} body={tr('console.fleet_page.approvals_incidents_and_slow_schools')} />}
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}><button className="btn pri" onClick={() => setAlerts(false)}>{tr('console.fleet_page.done')}</button></div>

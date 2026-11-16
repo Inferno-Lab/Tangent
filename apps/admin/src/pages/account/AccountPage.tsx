@@ -35,7 +35,7 @@ export function AccountPage() {
         <Card span="s6" title={t('admin.account_page.you_at_the_school')}>
           <div className="kv"><span>{t('admin.account_page.name')}</span><b>{app.user.name}</b></div>
           <div className="kv"><span>{t('admin.account_page.signs_in_with')}</span><b>{app.user.email || app.user.phone || '–'}</b></div>
-          <div className="kv" style={{ alignItems: 'flex-start' }}><span>{app.user.roleNames.length === 1 ? t('admin.account_page.role') : t('admin.account_page.roles')}</span><b style={{ textAlign: 'end' }}>{app.user.roleNames.join(' · ') || t('admin.account_page.staff')}</b></div>
+          <div className="kv" style={{ alignItems: 'flex-start' }}><span>{t('admin.account_page.roles', { n: app.user.roleNames.length })}</span><b style={{ textAlign: 'end' }}>{app.user.roleNames.join(' · ') || t('admin.account_page.staff')}</b></div>
           <p className="help" style={{ marginBottom: 0 }}>{t('admin.account_page.the_office_changes_your_name')}</p>
           <div className="tgrow" style={{ marginTop: 12 }}>
             <button className="btn" onClick={theme.toggle}>{theme.theme === 'dark' ? t('admin.account_page.switch_to_light') : t('admin.account_page.switch_to_dark')}</button>

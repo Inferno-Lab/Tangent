@@ -80,7 +80,7 @@ function Overview({ tabs }: { tabs: React.ReactNode }) { const app = useApp();
             <section className="card">
               <span className="lbl">{t('admin.fees_page.overdue')}</span>
               <b className="d" style={{ fontSize: 40, lineHeight: '44px', color: 'var(--bad-i)' }}>{money(s.overdue)}</b>
-              <small className="t2" style={{ fontSize: 14 }}>{s.overdueFamilies} {s.overdueFamilies === 1 ? 'family' : 'families'}</small>
+              <small className="t2" style={{ fontSize: 14 }}>{t('admin.fees_page.n_families', { n: s.overdueFamilies })}</small>
               {s.overdueFamilies > 0 && app.user.permissions.includes('fees.read') && (confirmRemind
                 ? <span className="fx" style={{ gap: 8, marginTop: 'auto', flexWrap: 'wrap' }}><button className="btn pri sm" disabled={remind.isPending} onClick={() => remind.mutate()}>{t('admin.fees_page.remind_all')}{' '}{s.overdueFamilies}</button><button className="btn sm" onClick={() => setConfirmRemind(false)}>{t('admin.fees_page.not_now')}</button></span>
                 : <button className="btn ton sm" style={{ alignSelf: 'flex-start', marginTop: 'auto' }} onClick={() => setConfirmRemind(true)}>{t('admin.fees_page.send_reminders')}</button>)}
@@ -120,7 +120,7 @@ function Overview({ tabs }: { tabs: React.ReactNode }) { const app = useApp();
             </section>
           </div>
           <section className="card flush">
-            <div className="ch" style={{ padding: '20px 20px 8px' }}><h2>{t('admin.fees_page.overdue')}</h2><small>{overdue.data?.total ?? 0} {overdue.data?.total === 1 ? 'family' : 'families'} {t('admin.fees_page.largest_first')}</small></div>
+            <div className="ch" style={{ padding: '20px 20px 8px' }}><h2>{t('admin.fees_page.overdue')}</h2><small>{t('admin.fees_page.n_families', { n: overdue.data?.total ?? 0 })} {t('admin.fees_page.largest_first')}</small></div>
             {rows.length === 0 && !overdue.isLoading ? <p className="t2" style={{ fontSize: 14, padding: '0 20px 20px' }}>{t('admin.fees_page.nobody_is_overdue_families_with')}</p> : (
               <div className="scroll-x" data-fill="">
                 <div style={{ minWidth: 620 }}>

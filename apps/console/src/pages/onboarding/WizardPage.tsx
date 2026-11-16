@@ -4,7 +4,7 @@ import { useParams } from '@tanstack/react-router';
 import { HttpError } from '@tangent/api-client';
 import { closeModules } from '@tangent/config-engine';
 import { packSettings, curriculaFor, countryName, ZONES, LOCALES, COUNTRY_DEFAULTS, COUNTRIES, DEFAULT_BRAND, DEPLOY_TARGET_LABELS, LANGUAGES, readableOn, WizardAdmin, WizardBasics, WizardBranding, WizardData, WizardPayload, WizardPlacement, WizardPlan, type ProvisionRunRow, type WizardReview } from '@tangent/contracts';
-import { ColourField, Field, FilePick, NumberField, SelectField, useShake, Icon, t as tr } from '@tangent/web-ui';
+import { ColourField, Field, FilePick, NumberField, SelectField, useShake, Icon, t as tr, listOf, dayOf } from '@tangent/web-ui';
 import { Card, Page, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
 import { count, rupees } from '../../app/format';
@@ -261,7 +261,7 @@ export function WizardPage() {
           <div className="help" style={{ marginBottom: 12 }}>{tr('console.wizard_page.this_person_gets_the_principal')}</div>
           {f('admin', 'name', tr('console.wizard_page.name'))}{f('admin', 'email', tr('console.wizard_page.email'), { type: 'email' })}{f('admin', 'phone', tr('console.wizard_page.phone'), { type: 'tel' })}
           <SelectField label={tr('console.wizard_page.send_the_invitation_by')} value={invite.some((o) => o.value === str(data.admin.invite)) ? str(data.admin.invite) : invite[0]?.value ?? ''} onChange={(v) => set('admin', 'invite', v)} options={invite} />
-          {invite.length < 3 && <div className="help">{invite.length === 1 ? tr('console.wizard_page.only_this') : tr('console.wizard_page.only_these')} {invite.length === 1 ? 'is' : 'are'} {tr('console.wizard_page.connected_under_integrations')}{links.data?.mode === 'sandbox' ? tr('console.wizard_page.in_sandbox_it_lands_in') : ''}.</div>}
+          {invite.length < 3 && <div className="help">{tr('console.wizard_page.connected_under_integrations', { n: invite.length })}{links.data?.mode === 'sandbox' ? tr('console.wizard_page.in_sandbox_it_lands_in') : ''}.</div>}
         </>
       );
       case 'data': return (
@@ -320,7 +320,7 @@ function ReviewStep({ review, loading, error, payloadOk, missing, rehearsal }: {
       <div className="lbl" style={{ margin: '16px 0 4px' }}>{tr('console.wizard_page.launch_will')}</div>
       <div className="steps">
         {review.willDo.map((w, i) => (
-          <div key={w.key} className="stp"><span className="dot">{i + 1}</span><div><b>{w.label}{w.optional ? ' (optional)' : ''}</b><small>{w.detail}</small></div><span></span></div>
+          <div key={w.key} className="stp"><span className="dot">{i + 1}</span><div><b>{w.optional ? tr('console.wizard_page.optional', { label: w.label }) : w.label}</b><small>{w.detail}</small></div><span></span></div>
         ))}
       </div>
       <div className="help" style={{ marginTop: 10 }}>{tr('console.wizard_page.cell')}{' '}{review.capacity.cell} {tr('console.wizard_page.holds')}{' '}{review.capacity.schools} {tr('console.wizard_page.of')}{' '}{review.capacity.max} {tr('console.wizard_page.schools')}{review.capacity.ok ? '.' : tr('console.wizard_page.and_is_full')}</div>
@@ -341,8 +341,8 @@ function PackLine({ country, curriculum }: { country: string; curriculum: string
   const methods = p['fees.paymentMethods'] as { name: string }[] | undefined;
   const off = p['calendar.weeklyOff'] as string[] | undefined;
   const parts = [
-    scale && tr('console.wizard_page.grades', { p0: scale.map((g) => g.grade).join(', ') }), p['grading.passPct'] !== undefined && tr('console.wizard_page.pass_at', { String: String(p['grading.passPct']) }),
-    methods && tr('console.wizard_page.paid_by', { p0: methods.map((m) => m.name).join(', ') }), off && tr('console.wizard_page.closed', { p0: off.map((d) => d.charAt(0).toUpperCase() + d.slice(1)).join(' and ') }),
+    scale && tr('console.wizard_page.grades', { p0: listOf(scale.map((g) => g.grade)) }), p['grading.passPct'] !== undefined && tr('console.wizard_page.pass_at', { String: String(p['grading.passPct']) }),
+    methods && tr('console.wizard_page.paid_by', { p0: listOf(methods.map((m) => m.name), true) }), off && tr('console.wizard_page.closed', { p0: listOf(off.map(dayOf)) }),
   ].filter(Boolean);
   return <div className="help" style={{ margin: '0 0 12px' }}>{parts.length ? tr('console.wizard_page.starts_with_everything_can_be', { p0: parts.join('; ') }) : tr('console.wizard_page.starts_with_tangent_s_defaults')}</div>;
 }

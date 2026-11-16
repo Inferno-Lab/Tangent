@@ -37,7 +37,7 @@ export function StaffPage() { const app = useApp();
   const notInvited = waiting.filter((r) => r.access === 'none').length;
   const invite = useMutation({ mutationFn: (remind: boolean) => app.api.movingIn.inviteStaff(remind),
     onSuccess: (r, remind) => { refresh(qc);
-      const sent = r.sent ? `${remind ? tr('admin.staff_page.sent_a_new_first_password') : tr('admin.staff_page.invited')} ${r.sent} ${r.sent === 1 ? 'person' : 'people'}.` : remind ? tr('admin.staff_page.everyone_invited_has_signed_in') : tr('admin.staff_page.everyone_has_been_invited');
+      const sent = r.sent ? remind ? tr('admin.staff_page.sent_a_new_first_password', { n: r.sent }) : tr('admin.staff_page.invited', { n: r.sent }) : remind ? tr('admin.staff_page.everyone_invited_has_signed_in') : tr('admin.staff_page.everyone_has_been_invited');
       say(r.skipped.length ? tr('admin.staff_page.no_email_or_phone_add', { sent, names: names(r.skipped), n: r.skipped.length }) : sent, r.skipped.length ? 'bad' : undefined);
     },
     onError: (e) => say(Object.values(problem(e))[0] ?? tr('admin.staff_page.something_went_wrong'), 'bad') });
@@ -70,7 +70,7 @@ export function StaffPage() { const app = useApp();
             <Card title={tr('admin.staff_page.not_signed_in_yet')} chip={<span className="chip a">{waiting.length}</span>}>
               <p className="help" style={{ marginTop: 0 }}>{notInvited ? tr('admin.staff_page.not_been_invited', { notInvited }) : ''}{waiting.length - notInvited ? tr('admin.staff_page.invited_not_signed_in', { p0: waiting.length - notInvited }) : ''}{tr('admin.staff_page.an_invite_carries_a_first')}</p>
               <div className="tgrow">
-                {notInvited > 0 && <button className="btn pri" disabled={invite.isPending} onClick={() => invite.mutate(false)}>{tr('admin.staff_page.invite')}{' '}{notInvited === 1 ? 'them' : tr('admin.staff_page.all', { notInvited })}</button>}
+                {notInvited > 0 && <button className="btn pri" disabled={invite.isPending} onClick={() => invite.mutate(false)}>{tr('admin.staff_page.invite', { n: notInvited })}</button>}
                 {waiting.length > notInvited && <button className="btn" disabled={invite.isPending} onClick={() => invite.mutate(true)}>{tr('admin.staff_page.remind_those_invited')}</button>}
                 <button className="btn" onClick={() => setShow('waiting')}>{tr('admin.staff_page.show_who')}</button>
               </div>

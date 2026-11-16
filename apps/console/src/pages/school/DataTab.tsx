@@ -91,7 +91,7 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
         {v.batches.length === 0 ? <div style={{ marginTop: 10 }}><EmptyNote icon="upload" title={tr('console.data_tab.nothing_imported_yet')} body={tr('console.data_tab.each_import_shows_here_with')} /></div> : v.batches.map((b) => <BatchRow key={b.id} b={b} kinds={v.kinds} canUndo={can && b.canUndo} busy={undo.isPending} onUndo={() => setUndoing(b)} />)}
         {undoing && (
           <Dialog title={tr('console.data_tab.undo_this_import')} tag={{ text: v.kinds.find((k) => k.key === undoing.kind)?.label ?? undoing.kind, tone: 'a' }} onClose={() => setUndoing(null)} width={460}>
-            <p style={{ marginTop: 0 }}>{tr('console.data_tab.the')}{' '}{undoing.created} {undoing.created === 1 ? tr('console.data_tab.record_it_added_is') : tr('console.data_tab.records_it_added_are')} {tr('console.data_tab.removed_and_the')}{' '}{undoing.updated} {tr('console.data_tab.it_updated_go_back_to')}</p>
+            <p style={{ marginTop: 0 }}>{tr('console.data_tab.it_updated_go_back_to', { created: undoing.created, updated: undoing.updated })}</p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
               <button className="btn" onClick={() => setUndoing(null)}>{tr('console.data_tab.keep_it')}</button>
               <button className="btn dngf" disabled={undo.isPending} onClick={() => undo.mutate(undoing.id)}>{tr('console.data_tab.undo')}{' '}{undoing.created + undoing.updated} {tr('console.data_tab.rows')}</button>
