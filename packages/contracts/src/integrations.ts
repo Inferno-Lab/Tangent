@@ -8,7 +8,7 @@ import { localized, localizedLabels } from './i18n.js';
  */
 export const CAPABILITIES = [
   'sms', 'whatsapp', 'email', 'push', 'payments', 'storage', 'maps', 'tracking', 'scanning', 'webhook',
-  'alerts', 'builds', 'stores', 'databases', 'hosting',
+  'alerts', 'builds', 'stores', 'databases', 'hosting', 'translation',
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
@@ -16,10 +16,11 @@ export const CAPABILITY_LABELS: Record<Capability, string> = localizedLabels({
   sms: 'Text messages', whatsapp: 'WhatsApp', email: 'Email', push: 'Phone notifications', payments: 'Payments', storage: 'File storage',
   maps: 'Maps', tracking: 'Bus trackers', scanning: 'Virus scanning', webhook: 'Events to other systems',
   alerts: 'Alerts to the Tangent team', builds: 'App builds', stores: 'App stores', databases: 'School databases', hosting: 'Hosting and domains',
+  translation: 'Translation drafts',
 });
 
 /** Capabilities Tangent itself uses (never a school's own connection). */
-export const PLATFORM_CAPABILITIES: Capability[] = ['alerts', 'builds', 'stores', 'databases', 'hosting', 'scanning'];
+export const PLATFORM_CAPABILITIES: Capability[] = ['alerts', 'builds', 'stores', 'databases', 'hosting', 'scanning', 'translation'];
 
 /**
  * One field of a provider's form in the console: what to type, where to find it, and the shape it must have. `secret` and
@@ -158,6 +159,17 @@ export const INTEGRATION_PROVIDERS: ProviderDef[] = localized([
   { key: 'mapbox', name: 'Mapbox', capabilities: ['maps'], testAction: 'Asks for the travel time between two points in Pune.', docs: 'https://docs.mapbox.com/api/navigation/directions/',
     steps: ['In Mapbox → Tokens, create a token with the default public scopes.', 'Fill in the form and Test.'],
     fields: [f('accessToken', 'Access token', 'secret', { help: 'Mapbox → Tokens', pattern: '^pk\\.\\w+\\.[\\w-]+$', patternHint: 'Starts with pk.' })] },
+  // Translation drafts (Languages in the console): a person reviews each draft before it counts as reviewed.
+  { key: 'anthropic', name: 'Claude (Anthropic)', capabilities: ['translation'], testAction: 'Translates one sentence with a placeholder into French and checks the placeholder survived.', docs: 'https://docs.claude.com/en/api/overview',
+    steps: ['In the Claude Console (console.anthropic.com), create a workspace for Tangent and an API key in it.', 'Set a monthly spend limit on the workspace: a full catalogue in one language is a few dollars.', 'Fill in the form and Test.'],
+    fields: [f('apiKey', 'API key', 'secret', { help: 'Claude Console → API keys', pattern: '^sk-ant-[\\w-]+$', patternHint: 'Starts with sk-ant-.' }),
+      opt(f('model', 'Model', 'text', { placeholder: 'claude-opus-5-5', help: 'Leave empty for the default.' }))] },
+  { key: 'deepl', name: 'DeepL', capabilities: ['translation'], testAction: 'Translates one sentence with a placeholder into French.', docs: 'https://developers.deepl.com/docs',
+    steps: ['Create a DeepL API account (Free or Pro).', 'Account → API keys: copy the key (a Free key ends in :fx).', 'Fill in the form and Test.'],
+    fields: [f('apiKey', 'Authentication key', 'secret', { help: 'DeepL → Account → API keys' })] },
+  { key: 'google-translate', name: 'Google Cloud Translation', capabilities: ['translation'], testAction: 'Translates one sentence with a placeholder into French.', docs: 'https://cloud.google.com/translate/docs',
+    steps: ['In Google Cloud, enable the Cloud Translation API on a project with billing.', 'Credentials → Create API key; restrict it to the Translation API.', 'Fill in the form and Test.'],
+    fields: [f('apiKey', 'API key', 'secret', { help: 'Google Cloud → Credentials', pattern: '^AIza[\\w-]{35}$', patternHint: 'Starts with AIza, 39 characters.' })] },
   { key: 'gps-http', name: 'GPS trackers (HTTP)', capabilities: ['tracking'], testAction: 'Asks the tracker service for the latest positions and shows how many vehicles it found.', docs: '',
     steps: ['Ask the tracker company for its API: the address that lists the latest position of each vehicle, and how to sign in to it.', 'Fill in the address, the header that carries the key, and where in the reply each vehicle’s number, latitude and longitude are.', 'Test, then under Transport give each bus the tracker’s vehicle number. Positions are read every 30 seconds while a trip runs.'],
     fields: [f('url', 'Positions address', 'url', { placeholder: 'https://api.tracker.example/v1/positions' }), opt(f('headers', 'Headers (JSON; {secret.apiKey} reads the key)', 'json', { placeholder: '{"Authorization": "Bearer {secret.apiKey}"}' })),

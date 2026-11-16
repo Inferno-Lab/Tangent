@@ -495,12 +495,14 @@ export const CONSOLE_PERMISSIONS = [
   'schools.configure',
   // Third parties: connections, routes, templates and the delivery log.
   'integrations.read', 'integrations.write',
+  // Languages: translate, correct and approve the words of every surface (machine drafts included).
+  'languages.write',
 ] as const;
 export type ConsolePermission = (typeof CONSOLE_PERMISSIONS)[number];
 
 export const CONSOLE_ROLE_PERMISSIONS: Record<ConsoleRole, readonly ConsolePermission[]> = {
   super_admin: CONSOLE_PERMISSIONS,
-  implementation: ['schools.read', 'schools.configure', 'sandbox.read', 'audit.read', 'integrations.read', 'integrations.write'],
+  implementation: ['schools.read', 'schools.configure', 'sandbox.read', 'audit.read', 'integrations.read', 'integrations.write', 'languages.write'],
   support: ['schools.read', 'support.access', 'sandbox.read', 'audit.read', 'integrations.read'],
   release_manager: ['schools.read', 'releases.write', 'builds.write', 'flags.write', 'sandbox.read'],
   finance: ['schools.read', 'billing.read', 'billing.write'],
@@ -735,7 +737,7 @@ const AUDIT_WORDS: Record<string, string> = {
   'blueprint.activated': 'Switched a blueprint on', 'blueprint.saved': 'Saved a blueprint', 'build.requested': 'Asked for an app build', 'cell.changed': 'Changed a cell',
   'cell.created': 'Added a cell', 'cell.removed': 'Removed a cell', 'checklist.changed': 'Changed an app store step', 'config.changed': 'Changed settings', 'flag.removed': 'Removed a flag',
   'flag.set': 'Switched a flag', 'import.committed': 'Imported records', 'import.file_set_aside': 'Set a school’s file aside', 'import.sample_loaded': 'Loaded a test school',
-  'import.undone': 'Undid an import', 'integration.allowlist': 'Changed who gets real messages in test', 'integration.changed': 'Changed a connection',
+  'import.undone': 'Undid an import', 'language.text': 'Translated or approved a text', 'language.draft': 'Drafted translations by machine', 'language.import': 'Brought in a translator’s sheet', 'integration.allowlist': 'Changed who gets real messages in test', 'integration.changed': 'Changed a connection',
   'integration.created': 'Added a connection', 'integration.deleted': 'Deleted a connection', 'integration.mode': 'Switched messages to live or test',
   'integration.retried': 'Sent a failed message again', 'integration.routed': 'Chose a school’s connection', 'integration.template': 'Saved an approved template',
   'integration.template.deleted': 'Deleted an approved template', 'integration.tested': 'Tested a connection', 'integration.unrouted': 'Put a school back on Tangent’s connection',
@@ -781,3 +783,38 @@ export const SchoolSettingsPatch = z.object({
   note: z.string().trim().max(200).default(''),
 });
 export type SchoolSettingsPatch = z.infer<typeof SchoolSettingsPatch>;
+
+// ── Languages (docs/one-shot-plan.md §3.5.9) ───────────────────────────────
+
+/** The surfaces whose words are translated: the admin, the console, the shared web parts, shared text (labels, errors) and the app. */
+export const I18N_SURFACES = ['admin', 'console', 'ui', 'text', 'app'] as const;
+export type I18nSurface = (typeof I18N_SURFACES)[number];
+export const I18N_SURFACE_LABELS: Record<I18nSurface, string> = localizedLabels({
+  admin: 'School admin', console: 'Console', ui: 'Shared pieces', text: 'Labels, errors and messages', app: 'The app',
+});
+
+/** One language's progress: per surface, how many texts English has, how many are translated and how many a person approved. */
+export interface LanguageSummary {
+  code: string;
+  surfaces: Record<I18nSurface, { total: number; translated: number; reviewed: number }>;
+}
+
+/** One text of a surface in a language. */
+export interface TranslationRow {
+  key: string;
+  english: string;
+  text: string;
+  /** Approved by a person; a machine draft or a shipped file's text is shown until then but marked. */
+  reviewed: boolean;
+  /** Where the text came from: the repository's file, a machine draft or a person. */
+  source: 'file' | 'machine' | 'person' | 'missing';
+  updatedBy: string | null;
+}
+
+export const TranslationPut = z.object({ key: z.string().min(1).max(4000), text: z.string().max(4000), reviewed: z.boolean() });
+export type TranslationPut = z.infer<typeof TranslationPut>;
+
+/** Machine drafts for the texts a language is missing, a batch at a time (the Hub's translation connection). */
+export const DraftRequest = z.object({ surface: z.enum(I18N_SURFACES), limit: z.number().int().min(1).max(400).default(200) });
+export type DraftRequest = z.infer<typeof DraftRequest>;
+export interface DraftResult { drafted: number; skipped: number; left: number }

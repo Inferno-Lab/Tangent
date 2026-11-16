@@ -24,7 +24,7 @@ export function OnboardingPage() {
   return (
     <Page title={tr('console.onboarding_page.onboarding')} sub={tr('console.onboarding_page.set_a_new_school_up')} toast={toast} loading={schools.isLoading} error={schools.isError ? { message: (schools.error as Error).message, retry: () => void schools.refetch() } : null}
       overlays={deleting && (
-        <Dialog title={tr('console.onboarding_page.delete_the_draft_for', { p0: deleting.name || 'an untitled school' })} tag={{ text: tr('console.onboarding_page.cannot_be_undone'), tone: 'a' }} onClose={() => setDeleting(null)} width={440}>
+        <Dialog title={tr('console.onboarding_page.delete_the_draft_for', { p0: deleting.name || tr('console.onboarding_page.an_untitled_school') })} tag={{ text: tr('console.onboarding_page.cannot_be_undone'), tone: 'a' }} onClose={() => setDeleting(null)} width={440}>
           <p style={{ marginTop: 0 }}>{tr('console.onboarding_page.what_was_typed_into_the')}</p>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
             <button className="btn" onClick={() => setDeleting(null)}>{tr('console.onboarding_page.keep_it')}</button>

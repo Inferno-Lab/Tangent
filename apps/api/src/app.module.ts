@@ -27,6 +27,7 @@ import { StudentsService } from './school/students.service.js';
 import { AuditService, Messenger, SettingsService } from './school/support.js';
 import { SweepService } from './school/sweep.service.js';
 import { ChangeRequestsController, ErrorReports, ErrorsController } from './school/errors.js';
+import { I18nController } from './school/i18n.controller.js';
 import { MovingInController, MovingInService } from './school/moving-in.js';
 import { SetupController, SetupService } from './school/setup.js';
 import { TimetableService } from './school/timetable.service.js';
@@ -71,7 +72,7 @@ export class AppModule {
       module: AppModule,
       controllers: [
         AuthController, MeController, ClassesController, StudentsController, AttendanceController, FeesController, ApprovalsController, NoticesController,
-        TimetableController, DashboardController, SettingsController, HealthController, LearningController, PeopleController, OfficeController, FamilyController, ErrorsController, ChangeRequestsController, SetupController, MovingInController,
+        TimetableController, DashboardController, SettingsController, HealthController, LearningController, PeopleController, OfficeController, FamilyController, ErrorsController, I18nController, ChangeRequestsController, SetupController, MovingInController,
         HooksController, FilesController, SchoolLogoController, ChannelsController, FeesOnlineController, ReportCardsController, LibraryController, TransportController, GalleryController, YearController, FamilyCampusController, FinderController,
       ],
       providers: [

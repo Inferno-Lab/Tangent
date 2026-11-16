@@ -229,7 +229,7 @@ function PauseDialog({ mod, onClose, onDone }: { mod: Mod; onClose: () => void; 
   const [school, setSchool] = useState('');
   const go = useMutation({
     mutationFn: () => app.api.flags.set(`kill.${mod.key}`, { enabled: true, schoolId: school || null, label: t('console.modules_page.paused_2', { name: mod.name }) }),
-    onSuccess: () => onDone(t('console.modules_page.is_paused_it_takes_effect', { name: mod.name, p1: school ? ` at ${schools.data?.find((s) => s.id === school)?.name ?? 'that school'}` : ' for every school' })),
+    onSuccess: () => onDone(t('console.modules_page.is_paused_it_takes_effect', { name: mod.name, p1: school ? t('console.modules_page.at', { p0: schools.data?.find((s) => s.id === school)?.name ?? 'that school' }) : t('console.modules_page.for_every_school') })),
   });
   return (
     <Dialog title={t('console.modules_page.pause_2', { name: mod.name })} tag={{ text: t('console.modules_page.takes_effect_at_once'), tone: 'a' }} onClose={onClose} width={480}>

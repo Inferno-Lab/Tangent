@@ -280,7 +280,7 @@ export function WizardPage() {
   const last = step === STEPS.length - 1;
   const problems = review.data?.problems ?? [];
   return (
-    <Page title={tr('console.wizard_page.onboard_a_school')} sub={tr('console.wizard_page.short_steps_nothing_is_created', { length: STEPS.length, p1: savedAt ? ' Draft saved.' : '' })} toast={toast} back={{ label: tr('console.wizard_page.onboarding'), to: '/onboarding', go: app.go }} loading={!loaded}>
+    <Page title={tr('console.wizard_page.onboard_a_school')} sub={tr('console.wizard_page.short_steps_nothing_is_created', { length: STEPS.length, p1: savedAt ? tr('console.wizard_page.draft_saved') : '' })} toast={toast} back={{ label: tr('console.wizard_page.onboarding'), to: '/onboarding', go: app.go }} loading={!loaded}>
       <div className="wiz">
         <nav className="wst" aria-label={tr('console.wizard_page.steps')}>
           {STEPS.map((s, i) => (

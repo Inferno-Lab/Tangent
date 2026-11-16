@@ -40,7 +40,7 @@ function Rules({ say }: { say: Say }) {
   return (
     <>
       <Card title={t('console.settings_page.freeze_changes')} chip={<span className={`chip ${pol.freeze ? 'c' : 'g'}`}>{pol.freeze ? t('console.settings_page.frozen') : t('console.settings_page.off')}</span>}>
-        <div className="help" style={{ marginTop: 0 }}>{pol.freeze ? t('console.settings_page.frozen_nothing_changes_in_any', { p0: pol.freezeReason || 'no reason given' }) : t('console.settings_page.stops_every_change_across_the')}</div>
+        <div className="help" style={{ marginTop: 0 }}>{pol.freeze ? t('console.settings_page.frozen_nothing_changes_in_any', { p0: pol.freezeReason || t('console.settings_page.no_reason_given') }) : t('console.settings_page.stops_every_change_across_the')}</div>
         {can && <button className={`btn ${pol.freeze ? '' : 'dng'}`} style={{ marginTop: 12 }} disabled={save.isPending} onClick={() => (pol.freeze ? save.mutate({ ...policy.data!, freeze: false, freezeReason: '' }) : setFreezing(true))}>{pol.freeze ? t('console.settings_page.lift_the_freeze') : t('console.settings_page.freeze_changes_2')}</button>}
       </Card>
       <Card title={t('console.settings_page.needs_a_second_person')}>

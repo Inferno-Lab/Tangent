@@ -178,7 +178,7 @@ function NewBlueprint({ from, onClose, onDone }: { from: BlueprintRow[]; onClose
       const base = from.find((b) => b.target === f.target)?.steps ?? from[0]!.steps;
       return app.api.blueprints.save({ key: f.key.trim(), name: f.name.trim(), target: f.target as 'local', plan: f.plan || null, steps: base });
     },
-    onSuccess: (r) => onDone(tr('console.blueprints_page.is_saved_check_its_steps', { name: r.name, p1: TARGET[r.target] ?? r.target, p2: r.plan ? ` with the ${r.plan} plan` : '' })),
+    onSuccess: (r) => onDone(tr('console.blueprints_page.is_saved_check_its_steps', { name: r.name, p1: TARGET[r.target] ?? r.target, p2: r.plan ? tr('console.blueprints_page.with_the_plan', { plan: r.plan }) : '' })),
     onError: (e) => { setErr(e instanceof HttpError && Object.keys(e.fields).length ? e.fields : { _: (e as Error).message }); shake.hit(); },
   });
   const go = () => {

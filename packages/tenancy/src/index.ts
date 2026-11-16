@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { setLocaleSource, setZoneSource, type EntitlementDoc, setTextSource, isLanguage, type Catalogue } from '@tangent/contracts';
 import { pg } from '@tangent/db';
@@ -63,6 +63,8 @@ export class Registry {
       application_name: 'tangent-registry',
     });
     this.db = drizzle(this.pool);
+    // Translations kept on the console's Languages page reach every page and message within a minute.
+    watchTranslations(this.pool);
   }
 
   async school(slug: string): Promise<TenantInfo | null> {
@@ -201,16 +203,74 @@ setTextSource(() => {
   return lang && lang !== 'en' ? { lang, cat: serverCatalogue(lang) } : undefined;
 });
 
-const catalogues = new Map<string, Catalogue>();
-const I18N_DIR = path.join(path.dirname(createRequire(import.meta.url).resolve('@tangent/contracts/package.json')), 'i18n');
-/** The shared-text catalogue of a language (packages/contracts/i18n/<lang>.json); none yet means English. */
-export function serverCatalogue(lang: string): Catalogue {
-  let c = catalogues.get(lang);
+/**
+ * Where each surface's catalogues live in the repository: `<dir>/<lang>.json`, English always there. Translations kept in the
+ * registry (`translations`, edited on the console's Languages page) are laid over them, so a language or a fix needs no release.
+ */
+export const SURFACES = { admin: 'apps/admin/src/i18n', console: 'apps/console/src/i18n', ui: 'packages/web-ui/src/i18n', text: 'packages/contracts/i18n', app: 'assets/i18n' } as const;
+export type Surface = keyof typeof SURFACES;
+export const isSurface = (s: string): s is Surface => s in SURFACES;
+const REPO = path.resolve(path.dirname(createRequire(import.meta.url).resolve('@tangent/contracts/package.json')), '../..');
+const files = new Map<string, Catalogue>();
+
+/** A surface's catalogue as the repository ships it (empty when the language has none yet). */
+export function repoCatalogue(surface: Surface, lang: string): Catalogue {
+  const k = `${surface}|${lang}`;
+  let c = files.get(k);
   if (!c) {
-    try { c = JSON.parse(readFileSync(path.join(I18N_DIR, `${lang}.json`), 'utf8')) as Catalogue; } catch { c = {}; }
-    catalogues.set(lang, c);
+    try { c = JSON.parse(readFileSync(path.join(REPO, SURFACES[surface], `${lang}.json`), 'utf8')) as Catalogue; } catch { c = {}; }
+    files.set(k, c);
   }
   return c;
+}
+
+let stored = new Map<string, Catalogue>();
+let storedVersion = 0;
+/** Reads the registry's translations into memory (at start and every minute; the Languages page also calls it after a change). */
+export async function refreshTranslations(pool: pg.Pool): Promise<void> {
+  try {
+    const rows = (await pool.query<{ lang: string; surface: string; key: string; text: string; v: string }>(
+      'select lang, surface, key, text, extract(epoch from updated_at)::bigint::text v from translations')).rows;
+    const next = new Map<string, Catalogue>();
+    let v = 0;
+    for (const r of rows) {
+      const k = `${r.surface}|${r.lang}`;
+      (next.get(k) ?? next.set(k, {}).get(k)!)[r.key] = r.text;
+      v = Math.max(v, Number(r.v));
+    }
+    stored = next;
+    storedVersion = v;
+    merged.clear();
+  } catch { /* the table arrives with registry migration 0018; until then the repository's files serve alone */ }
+}
+const watched = new WeakSet<pg.Pool>();
+export function watchTranslations(pool: pg.Pool): void {
+  if (watched.has(pool)) return;
+  watched.add(pool);
+  void refreshTranslations(pool);
+  setInterval(() => void refreshTranslations(pool), 60_000).unref();
+}
+
+/** A surface's catalogue in a language: the repository's, with the registry's translations over it; and its version for caches. */
+const merged = new Map<string, Catalogue>();
+export function catalogue(surface: Surface, lang: string): { messages: Catalogue; version: number } {
+  const k = `${surface}|${lang}`;
+  let m = merged.get(k);
+  if (!m) merged.set(k, (m = { ...repoCatalogue(surface, lang), ...stored.get(k) }));
+  return { messages: m, version: storedVersion };
+}
+
+/** The languages a surface has words in: English, the repository's files and those kept on the Languages page. */
+export function cataloguedLanguages(surface: Surface): string[] {
+  let shipped: string[] = [];
+  try { shipped = readdirSync(path.join(REPO, SURFACES[surface])).filter((f) => /^[a-z]{2,3}\.json$/.test(f)).map((f) => f.slice(0, -5)); } catch { /* none yet */ }
+  const kept = [...stored.keys()].filter((k) => k.startsWith(`${surface}|`)).map((k) => k.split('|')[1]!);
+  return ['en', ...[...new Set([...shipped, ...kept])].filter((l) => l !== 'en').sort()];
+}
+
+/** The shared-text catalogue of a language (errors, labels, PDFs); none yet means English. */
+export function serverCatalogue(lang: string): Catalogue {
+  return catalogue('text', lang).messages;
 }
 
 /** The first language of an Accept-Language header that Tangent knows ("fr-CA,fr;q=0.9" → "fr"), else English. */

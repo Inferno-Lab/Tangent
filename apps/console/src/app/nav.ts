@@ -28,6 +28,7 @@ export const DEFS: { name: string; items: Def[] }[] = [
     ] },
     { id: 'cells', label: tr('console.nav.cells'), icon: 'cells', keys: 'G C', to: '/cells' },
     { id: 'health', label: tr('console.nav.health'), icon: 'health', keys: 'G H', to: '/health' },
+    { id: 'lang', label: tr('console.nav.languages'), icon: 'languages', keys: 'G W', to: '/languages' },
   ] },
   { name: tr('console.nav.business'), items: [
     { id: 'bill', label: tr('console.nav.billing'), icon: 'billing', keys: 'G $', to: '/billing', needs: 'billing.read' },

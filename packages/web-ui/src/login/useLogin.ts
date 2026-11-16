@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { rollDigits } from '../digits';
 import { markStyle } from '../shell/Sidebar';
-import { CATALOGUE_LANGUAGES, chooseLanguage, currentLanguage, t as tr } from '../i18n';
+import { catalogueLanguages, chooseLanguage, currentLanguage, t as tr } from '../i18n';
 import { languageOf } from '@tangent/contracts';
 
 const EYE_ON = 'show';
@@ -63,6 +63,9 @@ export function useLogin(c: LoginController, themeCls: string) {
   const [code, setCode] = useState('');
   const [otpErr, setOtpErr] = useState(false);
   const [otpMsg, setOtpMsg] = useState('');
+  // The languages this app has words in: the picker offers only those (English until a catalogue arrives).
+  const [langs, setLangs] = useState<string[]>(['en']);
+  useEffect(() => { void catalogueLanguages().then(setLangs); }, []);
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [name, setName] = useState('');
   const [forgotNote, setForgotNote] = useState('');
@@ -148,7 +151,7 @@ export function useLogin(c: LoginController, themeCls: string) {
     toastT: cons ? tr('ui.use_login.wave_3_passed_every_check') : tr('ui.use_login.attendance_sent_for_8_a'),
     headline: cons ? tr('ui.use_login.run_every_school_from_one') : tr('ui.use_login.everything_the_school_office_needs'),
     subline: cons ? tr('ui.use_login.releases_cells_support_and_billing') : tr('ui.use_login.attendance_fees_exams_and_every'),
-    langs: CATALOGUE_LANGUAGES.map((code) => ({ n: languageOf(code).own, code, on: code === currentLanguage() ? 'on' : '', pick: () => chooseLanguage(code) })),
+    langs: langs.map((code) => ({ n: languageOf(code).own, code, on: code === currentLanguage() ? 'on' : '', pick: () => chooseLanguage(code) })),
     isCred: step === 'cred', isOtp: step === 'otp', isOk: step === 'ok',
     title: cons ? tr('ui.use_login.console_sign_in') : tr('ui.use_login.welcome_back'), sub: cons ? tr('ui.use_login.tangent_team_members_only_every') : tr('ui.use_login.sign_in_to_the_staff', { shortName: c.shortName }), cta: cons ? tr('ui.use_login.continue') : tr('ui.use_login.sign_in'),
     email, onEmail: (e: { target: { value: string } }) => { setEmail(e.target.value); setEmErr(''); },

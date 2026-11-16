@@ -57,3 +57,13 @@ describe('webhooks', () => {
     expect(r.deliveries).toEqual([{ providerId: 'a', status: 'delivered' }, { providerId: 'b', status: 'failed' }]);
   });
 });
+
+describe('translation drafts', () => {
+  it('keeps a draft only when its values and words are all still there', async () => {
+    const { keepsValues } = await import('./providers/translation.js');
+    expect(keepsValues('Add {name} to {@class}', 'Ajouter {name} à {@class}')).toBe(true);
+    expect(keepsValues('Add {name} to {@class}', 'Ajouter {nom} à {@class}')).toBe(false);
+    expect(keepsValues('{n, plural, one {# book} other {# books}}', '{n, plural, one {# livre} many {# livres} other {# livres}}')).toBe(true);
+    expect(keepsValues('Save', '')).toBe(false);
+  });
+});

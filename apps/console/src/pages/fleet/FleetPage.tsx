@@ -109,7 +109,7 @@ export function FleetPage() {
     openSchools: () => app.go('/schools'), openHealth: () => app.go('/health'), openOnboarding: () => app.go('/onboarding'), more: list.length > rows.length ? list.length : 0,
     alertCount: chrome.pending + (incident?.state === 'open' ? 1 : 0) + (f.degraded > 0 ? 1 : 0),
     pausedCls: paused ? 'paused' : '', relState: rel ? STATE[rel.status] : tr('console.fleet_page.no_release_yet'), relVersion: rel?.version ?? '–',
-    relLine: rel ? tr('console.fleet_page.of_schools', { p0: rel.waves.length ? `Wave ${wave} of ${rel.waves.length} · ` : '', done, total }) : tr('console.fleet_page.create_a_release_to_update'),
+    relLine: rel ? tr('console.fleet_page.of_schools', { p0: rel.waves.length ? tr('console.fleet_page.wave_of', { wave, length: rel.waves.length }) : '', done, total }) : tr('console.fleet_page.create_a_release_to_update'),
     hasRelease: !!rel, done, total, ticks: Array.from({ length: TICKS }, (_, k) => ({ c: k < on - 1 ? 'on' : k === on - 1 && rolling ? 'now' : k < on ? 'on' : '' })),
     waves: (rel?.waves ?? []).map((w) => ({ c: w.status === 'done' ? 'd' : w.status === 'rolling' || w.status === 'halted' ? 'c' : '' })),
     canPause: !!live && rel?.status !== 'halted', canRollback: !!live, relCta: rel ? tr('console.fleet_page.open_releases') : tr('console.fleet_page.create_a_release'), busy: pause.isPending || rollback.isPending,
@@ -132,7 +132,7 @@ export function FleetPage() {
     } : null,
     recheck: () => probe.mutate(),
     up: upcoming.length
-      ? { title: tr('console.fleet_page.soon', { length: upcoming.length, p1: upcoming.length === 1 ? 'school starts' : 'schools start' }), body: tr('console.fleet_page.being_set_up_for_the', { p0: upcoming.map((u) => u.name).slice(0, 2).join(' and '), p1: upcoming.length === 1 ? 'is' : 'are' }) }
+      ? { title: tr('console.fleet_page.soon', { length: upcoming.length, p1: upcoming.length === 1 ? tr('console.fleet_page.school_starts') : tr('console.fleet_page.schools_start') }), body: tr('console.fleet_page.being_set_up_for_the', { p0: upcoming.map((u) => u.name).slice(0, 2).join(' and '), p1: upcoming.length === 1 ? 'is' : 'are' }) }
       : { title: tr('console.fleet_page.no_schools_waiting'), body: tr('console.fleet_page.onboard_a_school_and_it') },
     alertsDialog: alerts && (
       <Dialog title={tr('console.fleet_page.alerts')} tag={{ text: chrome.pending || (f.degraded && f.degraded > 0) || incident?.state === 'open' ? tr('console.fleet_page.needs_you') : tr('console.fleet_page.all_clear'), tone: chrome.pending || incident?.state === 'open' ? 'a' : 'g' }} onClose={() => setAlerts(false)} width={460}>

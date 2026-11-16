@@ -167,7 +167,7 @@ function MoveSchool({ school, cells, onClose, onDone }: { school: SchoolRow; cel
   return (
     <Dialog title={tr('console.cells_page.move_2', { name: school.name })} tag={{ text: tr('console.cells_page.from', { cell: school.cell }), tone: 'v' }} onClose={onClose} width={500}>
       <div className="stack">
-        <SelectField label={tr('console.cells_page.move_to')} value={to} onChange={(v) => { setTo(v); setErr(''); }} options={options.map((c) => ({ value: c.key, label: tr('console.cells_page.of_schools', { key: c.key, schools: c.schools, maxSchools: c.maxSchools, p3: usable(c) ? '' : ' (not available)' }) }))} />
+        <SelectField label={tr('console.cells_page.move_to')} value={to} onChange={(v) => { setTo(v); setErr(''); }} options={options.map((c) => ({ value: c.key, label: tr('console.cells_page.of_schools', { key: c.key, schools: c.schools, maxSchools: c.maxSchools, p3: usable(c) ? '' : tr('console.cells_page.not_available') }) }))} />
         {why && <div className="emsg" role="alert">{why}</div>}
         <div className="help">{tr('console.cells_page.on_the_test_track_every')}</div>
         {err && <div className="emsg" role="alert">{err}</div>}

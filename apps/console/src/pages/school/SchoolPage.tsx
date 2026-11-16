@@ -252,7 +252,7 @@ function Technical({ d, onAct, busy }: { d: SchoolDetail; onAct: (a: ActionKey, 
         {app.can('schools.write') && <div style={{ marginTop: 12 }}><button className="btn" disabled={busy || waitingFor != null} onClick={() => { setWaitingFor(backups.data?.length ?? 0); onAct('backup.take'); }}>{waitingFor != null ? tr('console.school_page.backing_up') : tr('console.school_page.back_up_now')}</button></div>}
       </Card>
       {build && (
-        <Dialog title={tr('console.school_page.build_the_app', { p0: build === 'android' ? 'Android' : 'iPhone' })} tag={{ text: d.shortName, tone: 'v' }} onClose={() => setBuild(null)} width={460}>
+        <Dialog title={tr('console.school_page.build_the_app', { p0: build === 'android' ? tr('console.school_page.android') : 'iPhone' })} tag={{ text: d.shortName, tone: 'v' }} onClose={() => setBuild(null)} width={460}>
           <p style={{ marginTop: 0 }}>{tr('console.school_page.it_is_built_from_the')}{' '}{build === 'android' ? tr('console.school_page.google_play_s_test_track') : 'TestFlight'}{tr('console.school_page.it_takes_about_20_minutes')}</p>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
             <button className="btn" onClick={() => setBuild(null)}>{tr('console.school_page.cancel')}</button>
@@ -347,7 +347,7 @@ function GoLive({ d, say, onDone }: { d: SchoolDetail; say: (m: string, tone?: '
       {app.can('schools.write') && (
         <div style={{ marginTop: 16, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <button className="btn pri" disabled={open.length > 0 || go.isPending} onClick={() => setConfirm(true)}>{tr('console.school_page.go_live')}</button>
-          <span className="help" style={{ margin: 0 }}>{open.length ? tr('console.school_page.still_open', { length: open.length, p1: open.length === 1 ? 'item is' : 'items are' }) : tr('console.school_page.every_item_is_green')}</span>
+          <span className="help" style={{ margin: 0 }}>{open.length ? tr('console.school_page.still_open', { length: open.length, p1: open.length === 1 ? tr('console.school_page.item_is') : tr('console.school_page.items_are') }) : tr('console.school_page.every_item_is_green')}</span>
         </div>
       )}
       {confirm && (

@@ -2,7 +2,7 @@ import type {
   ActionRequest, ActionRow, LoginChallenge, AuditRow, BackupRow, RestoreDrillRow, ChangeRequestRow, ConfigPatch, ConfigTemplateRow, EffectiveConfig, RoleDef, RoleDefSave, SchoolConfig, BlueprintInput, BlueprintRow, BuildRow, ConsoleLoginResponse, ConsoleTokens, ConsoleUserRow, ErrorGroup, FleetSummary, FlagRow, InvoiceRowC, LoginRequest,
   CellCreate, CellPatch, ComplianceCreate, ComplianceRow, ComplianceUpdate, DataRequestAcross, MigrationRow, PlanRow, PlanSave, SubprocessorRow, RoleTemplate, SchoolDetailsPatch, PolicyDoc, ProvisionRunRow, ReleaseRow, SandboxMessage, SchoolDetail, SchoolRow, StepKey, SupportSessionRow, SupportToken, VerifyRequest, WizardDraftRow,
   WizardPayload, WizardReview, EntitlementRow, ImportBatchRow, ImportInput, ImportPreview, MigrationView, ReadinessMark, UploadRow,
-  ActivityQuery, ActivityView, ConnectionInput, ConnectionPatch, HookEventRow, IntegrationsView, JobRow, RouteInput as IntRouteInput, TemplateInput } from '@tangent/contracts';
+  DraftResult, I18nSurface, LanguageSummary, TranslationPut, TranslationRow, ActivityQuery, ActivityView, ConnectionInput, ConnectionPatch, HookEventRow, IntegrationsView, JobRow, RouteInput as IntRouteInput, TemplateInput } from '@tangent/contracts';
 import type { Http } from './http';
 
 /** What the console sends to preview or import: the file name may be left out. */
@@ -29,6 +29,14 @@ export function consoleApi(h: Http) {
     dismissIncident: (id: string) => h.post<void>(`${base}/fleet/incident/${id}/dismiss`),
     errors: (days = 7, handled = false) => h.get<ErrorGroup[]>(`${base}/errors`, { days, handled: handled ? 'true' : undefined }),
     errorHandled: (fingerprint: string) => h.post<void>(`${base}/errors/${encodeURIComponent(fingerprint)}/handled`),
+    languages: {
+      summary: () => h.get<LanguageSummary[]>(`${base}/languages`),
+      rows: (lang: string, surface: I18nSurface, filter: 'all' | 'missing' | 'review', q = '') => h.get<TranslationRow[]>(`${base}/languages/${lang}/${surface}`, { filter, q: q || undefined }),
+      put: (lang: string, surface: I18nSurface, b: TranslationPut) => h.put<TranslationRow>(`${base}/languages/${lang}/${surface}`, b),
+      draft: (lang: string, b: { surface: I18nSurface; limit?: number }) => h.post<DraftResult>(`${base}/languages/${lang}/draft`, b),
+      exportCsv: (lang: string, surface: I18nSurface) => h.get<{ csv: string }>(`${base}/languages/${lang}/${surface}/export`),
+      importCsv: (lang: string, surface: I18nSurface, csv: string) => h.post<{ saved: number; refused: string[] }>(`${base}/languages/${lang}/${surface}/import`, { csv }),
+    },
     backups: (schoolId: string) => h.get<BackupRow[]>(`${base}/schools/${schoolId}/backups`),
     migration: {
       view: (schoolId: string) => h.get<MigrationView>(`${base}/schools/${schoolId}/import`),

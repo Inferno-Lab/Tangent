@@ -77,7 +77,7 @@ export function IntegrationsPage() {
           <span style={{ flex: 1, minWidth: 220, font: '600 13px/1.45 var(--fb)', color: 'var(--ink2)' }}>
             {v.mode === 'live' ? tr('console.integrations_page.real_providers_send_to_families')
               : v.allowList.length === 0 ? tr('console.integrations_page.every_message_goes_to_the')
-              : tr('console.integrations_page.messages_go_to_the_test', { length: v.allowList.length, p1: v.allowList.length === 1 ? 'number or address' : 'numbers and addresses' })}
+              : tr('console.integrations_page.messages_go_to_the_test', { length: v.allowList.length, p1: v.allowList.length === 1 ? tr('console.integrations_page.number_or_address') : tr('console.integrations_page.numbers_and_addresses') })}
           </span>
           {v.mode === 'sandbox' && write && <button className="btn sm" onClick={() => setDlg({ kind: 'allow' })}>{tr('console.integrations_page.allow_list')}</button>}
           {write && <button className={`btn sm ${v.mode === 'sandbox' ? 'pri' : ''}`} disabled={mode.isPending} onClick={() => mode.mutate(v.mode === 'sandbox' ? 'live' : 'sandbox')}>{v.mode === 'sandbox' ? tr('console.integrations_page.switch_to_live') : tr('console.integrations_page.back_to_sandbox')}</button>}
@@ -244,7 +244,7 @@ function ConnectionDialog({ c: initial, schools, onClose, onDone }: { c?: Connec
       }
       if (Object.keys(problems).length) throw Object.assign(new Error(tr('console.integrations_page.some_fields_need_a_look')), { problems });
       await app.api.integrations.update(c!.id, { name: name.trim(), settings, secrets });
-      return c!.state === 'draft' ? tr('console.integrations_page.is_set_up_run_test', { p0: name.trim() }) : tr('console.integrations_page.was_saved', { p0: name.trim(), p1: c!.state === 'live' ? ' Its keys changed, so it is back in test until a second person takes it live again.' : '' });
+      return c!.state === 'draft' ? tr('console.integrations_page.is_set_up_run_test', { p0: name.trim() }) : tr('console.integrations_page.was_saved', { p0: name.trim(), p1: c!.state === 'live' ? tr('console.integrations_page.its_keys_changed_so_it') : '' });
     },
     onSuccess: onDone,
     onError: (e) => { setErr((e as { problems?: Record<string, string> }).problems ?? fields(e)); shake.hit(); },

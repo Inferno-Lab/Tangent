@@ -4,18 +4,18 @@ import ui from './en.json';
 
 /**
  * The one translator of the web apps (docs/one-shot-plan.md §3.5): `t('area.key', params)` reads the person's language,
- * English underneath, with the school's own words. English is bundled; another language loads before the pages do (each
- * app's main.tsx awaits `startLanguage()`), so labels kept in constants are right too, and a change reloads the page once.
+ * English underneath, with the school's own words. English is bundled; another language comes from the API (`/v1/i18n`, the
+ * repository's catalogues with the console's Languages page over them) before the pages load (each app's main.tsx awaits
+ * `startLanguage()`), so labels kept in constants are right too, and a change reloads the page once.
  */
-type Loader = (lang: string) => Promise<Catalogue>;
-
 const english: Catalogue = { ...ui };
-const loaders: Loader[] = [(lang) => import(`./${lang}.json`).then((m: { default: Catalogue }) => m.default)];
+let api = '';
+let surface = '';
 const SAVED = 'tangent.language';
 let lang = 'en';
 let words: Vocabulary | undefined;
 let current = makeT('en', {}, english);
-// Shared text (setting labels, module names, server-made lines): English is the key; packages/contracts/i18n holds the rest.
+// Shared text (setting labels, module names, server-made lines): English is the key.
 let text: { lang: string; cat: Catalogue; words: Record<string, string> } | undefined;
 setTextSource(() => text);
 
@@ -23,18 +23,22 @@ export function t(key: string, params?: Params): string {
   return current(key, params);
 }
 
-/** An app's own English, and how to fetch its other languages (each app's `src/i18n/<lang>.json`). */
-export function addCatalogue(en: Catalogue, load?: Loader): void {
-  Object.assign(english, en);
-  if (load) loaders.push(load);
+/** An app's own English, its surface (admin, console) and where the API is. */
+export function configureLanguages(o: { en: Catalogue; surface: string; api: string }): void {
+  Object.assign(english, o.en);
+  surface = o.surface;
+  api = o.api.replace(/\/$/, '');
   current = makeT(lang, {}, english, words);
 }
+
+const fetchCatalogue = (s: string, l: string): Promise<Catalogue> =>
+  fetch(`${api}/v1/i18n/${s}/${l}`).then((r) => (r.ok ? (r.json() as Promise<Catalogue>) : {})).catch(() => ({}));
 
 /** Sets the language and the school's words; resolves once the catalogues are in. A language without one reads in English. */
 export async function setLanguage(next: string, vocab?: Vocabulary): Promise<void> {
   const [own, shared] = next === 'en' ? [{}, {}] : await Promise.all([
-    Promise.all(loaders.map((l) => l(next).catch(() => ({})))).then((parts) => Object.assign({}, ...parts) as Catalogue),
-    import(`../../../contracts/i18n/${next}.json`).then((m: { default: Catalogue }) => m.default).catch(() => ({})),
+    Promise.all([fetchCatalogue(surface, next), fetchCatalogue('ui', next)]).then(([a, b]) => ({ ...b, ...a })),
+    fetchCatalogue('text', next),
   ]);
   lang = next;
   words = vocab;
@@ -46,8 +50,9 @@ export async function setLanguage(next: string, vocab?: Vocabulary): Promise<voi
   }
 }
 
-/** The languages the web apps have catalogues for (the others read in English until translated). */
-export const CATALOGUE_LANGUAGES = ['en'];
+/** The languages this app has words in (English always), for the sign-in page's picker. */
+export const catalogueLanguages = (): Promise<string[]> =>
+  fetch(`${api}/v1/i18n/languages/${surface}`).then((r) => (r.ok ? (r.json() as Promise<string[]>) : ['en'])).catch(() => ['en']);
 
 type Saved = { lang: string; vocab?: Vocabulary; chosen?: boolean };
 const saved = (): Saved | null => {

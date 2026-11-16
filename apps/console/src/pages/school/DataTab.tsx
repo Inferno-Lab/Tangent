@@ -48,7 +48,7 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
   const fail = (e: unknown) => say((e as Error).message, 'bad');
   const commit = useMutation({
     mutationFn: () => app.api.migration.commit(schoolId, input()!),
-    onSuccess: (b) => { change(null); refresh(); say(tr('console.data_tab.imported_added_updated', { p0: kind!.label.toLowerCase(), created: b.created, updated: b.updated, p3: b.skipped ? `, ${b.skipped} left out` : '' })); },
+    onSuccess: (b) => { change(null); refresh(); say(tr('console.data_tab.imported_added_updated', { p0: kind!.label.toLowerCase(), created: b.created, updated: b.updated, p3: b.skipped ? tr('console.data_tab.left_out_2', { skipped: b.skipped }) : '' })); },
     onError: fail,
   });
   const undo = useMutation({ mutationFn: (id: string) => app.api.migration.undo(schoolId, id), onSuccess: (batches) => { setUndoing(null); refresh({ batches }); say(tr('console.data_tab.undone_everything_it_changed_is')); }, onError: fail });
@@ -235,7 +235,7 @@ function PreviewPanel({ kind, src, preview: p, loading, error, onMap, onRows, on
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16, flexWrap: 'wrap' }}>
         <button className="btn" onClick={onCancel}>{tr('console.data_tab.cancel')}</button>
         <button className="btn pri" disabled={!p || loading || committing || p.missing.length > 0 || p.counts.create + p.counts.update === 0} onClick={onCommit}>
-          {committing ? tr('console.data_tab.importing') : p ? tr('console.data_tab.import_rows', { p0: p.counts.create + p.counts.update, p1: p.counts.skip ? `, leave out ${p.counts.skip}` : '' }) : tr('console.data_tab.import')}
+          {committing ? tr('console.data_tab.importing') : p ? tr('console.data_tab.import_rows', { p0: p.counts.create + p.counts.update, p1: p.counts.skip ? tr('console.data_tab.leave_out_2', { skip: p.counts.skip }) : '' }) : tr('console.data_tab.import')}
         </button>
       </div>
     </div>

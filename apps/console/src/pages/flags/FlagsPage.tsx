@@ -67,14 +67,14 @@ export function FlagsPage() {
               {canWrite && (
                 <MenuButton label={t('console.flags_page.for_one_school')} chevron open={menuFor === f.key} onOpenChange={(o) => setMenuFor(o ? f.key : '')} menuLabel={t('console.flags_page.choose_a_school')}>
                   {(schools.data ?? []).filter((s) => !per(f.key).some((x) => x.schoolId === s.id)).map((s) => (
-                    <button key={s.id} role="menuitem" onClick={() => { setMenuFor(''); setAsk({ key: f.key, label: f.label, enabled: !f.enabled, schoolId: s.id, what: t('console.flags_page.at', { p0: f.enabled ? 'Switch off' : 'Switch on', label: f.label, name: s.name }) }); }}>{s.name}</button>
+                    <button key={s.id} role="menuitem" onClick={() => { setMenuFor(''); setAsk({ key: f.key, label: f.label, enabled: !f.enabled, schoolId: s.id, what: t('console.flags_page.at', { p0: f.enabled ? t('console.flags_page.switch_off') : t('console.flags_page.switch_on'), label: f.label, name: s.name }) }); }}>{s.name}</button>
                   ))}
                 </MenuButton>
               )}
               {canWrite && <button className="btn sm dng" onClick={() => setAsk({ remove: f })}>{t('console.flags_page.delete_2')}</button>}
               <span className="lbl" style={{ margin: 0 }}>{t('console.flags_page.everyone')}</span>
               <button className={`sw ${f.enabled ? 'on' : ''}`} role="switch" aria-checked={f.enabled} aria-label={t('console.flags_page.for_everyone', { label: f.label })} disabled={!canWrite}
-                onClick={() => setAsk({ key: f.key, label: f.label, enabled: !f.enabled, schoolId: null, what: t('console.flags_page.for_everyone_2', { p0: f.enabled ? 'Switch off' : 'Switch on', label: f.label }) })}></button>
+                onClick={() => setAsk({ key: f.key, label: f.label, enabled: !f.enabled, schoolId: null, what: t('console.flags_page.for_everyone_2', { p0: f.enabled ? t('console.flags_page.switch_off') : t('console.flags_page.switch_on'), label: f.label }) })}></button>
             </div>
             {per(f.key).map((x) => (
               <div key={x.schoolId} className="kv" style={{ paddingLeft: 24 }}>
@@ -82,7 +82,7 @@ export function FlagsPage() {
                 <b style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   {canWrite && <button className="btn sm" onClick={() => remove.mutate(x)}>{t('console.flags_page.follow_everyone')}</button>}
                   <button className={`sw ${x.enabled ? 'on' : ''}`} role="switch" aria-checked={x.enabled} aria-label={t('console.flags_page.at_2', { label: f.label, name: name(x.schoolId) })} disabled={!canWrite}
-                    onClick={() => setAsk({ key: f.key, label: f.label, enabled: !x.enabled, schoolId: x.schoolId, what: t('console.flags_page.at', { p0: x.enabled ? 'Switch off' : 'Switch on', label: f.label, name: name(x.schoolId) }) })}></button>
+                    onClick={() => setAsk({ key: f.key, label: f.label, enabled: !x.enabled, schoolId: x.schoolId, what: t('console.flags_page.at', { p0: x.enabled ? t('console.flags_page.switch_off') : t('console.flags_page.switch_on'), label: f.label, name: name(x.schoolId) }) })}></button>
                 </b>
               </div>
             ))}

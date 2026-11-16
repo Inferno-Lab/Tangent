@@ -98,6 +98,8 @@ export interface BuildsAdapter {
 export interface TrackingAdapter { positions(c: Ctx): Promise<{ vehicle: string; lat: number; lng: number; at: Date }[]> }
 /** A template as the provider lists it, for importing into the console's Templates. */
 export interface ProviderTemplate { id: string; name: string; language: string; text: string; status: string }
+/** Texts to draft in another language, in order; `glossary` holds words a school or Tangent fixed ("Fees" → "Frais"). */
+export interface TranslateInput { texts: string[]; from: string; to: string; glossary?: Record<string, string> }
 
 /** One provider: the capabilities it implements, a test, and how it reads its webhooks. */
 export interface Adapter {
@@ -115,6 +117,8 @@ export interface Adapter {
   databases?: DatabasesAdapter;
   hosting?: HostingAdapter;
   tracking?: TrackingAdapter;
+  /** Drafts of `texts` in another language, one per text in the same order ('' where it could not). */
+  translate?(c: Ctx, t: TranslateInput): Promise<string[]>;
   /** The provider's approved message templates, for importing (WhatsApp providers that can list them). */
   templates?(c: Ctx): Promise<ProviderTemplate[]>;
   test(c: Ctx, input: { to?: string }): Promise<{ ok: boolean; detail: string }>;
