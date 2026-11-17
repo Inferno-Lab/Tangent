@@ -1706,7 +1706,7 @@
  "admin.students_page.present_late_absent": "{p} present, {l} late, {a} absent",
  "admin.students_page.reveal": "Reveal",
  "admin.students_page.rows_per_page": "Rows per page",
- "admin.students_page.selected": "{size} selected {size, plural, one {student} other {students}}",
+ "admin.students_page.selected": "{size} selected {size, plural, one {{@student}} other {{@students}}}",
  "admin.students_page.students": "{@Students}",
  "admin.students_page.that_didn_t_load": "That didn’t load",
  "admin.students_page.try_a_first_name_or": "Try a first name, or an {@admissionNumber} like 2019/0412.",
