@@ -177,7 +177,7 @@ export const MODULES: ModuleManifest[] = localized([
       A('home', 'attendance', 'Attendance this month', FAMILY), A('quick', 'applyLeave', 'Apply for leave', ['parent']),
       A('quick', 'markAttendance', 'Mark attendance', ['teacher'], 'attendance.teacherApp'),
     ],
-    settings: ['attendance.notifyParents', 'attendance.lockAfterDays', 'attendance.goalPct', 'attendance.statuses', 'leave.reasons'],
+    settings: ['attendance.notifyParents', 'attendance.registers', 'attendance.pmFrom', 'attendance.lockAfterDays', 'attendance.goalPct', 'attendance.persistentPct', 'attendance.statuses', 'leave.reasons'],
     permissions: ['attendance.read', 'attendance.mark'],
     messages: ['attendance.absent', 'attendance.reminder', 'leave.decided'],
     imports: ['attendance'],

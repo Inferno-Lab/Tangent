@@ -117,8 +117,7 @@ export class StudentsService {
     const out = new Map<string, (AttendanceStatus | null)[]>();
     if (!ids.length) return out;
     const { rows } = await t.pool.query<{ student_id: string; date: string; status: AttendanceStatus }>(
-      `select m.student_id, to_char(s.date, 'YYYY-MM-DD') date, m.status from attendance_marks m join attendance_sessions s on s.id = m.session_id
-       where m.student_id = any($1) and s.date = any($2::date[])`, [ids, days]);
+      `select d.student_id, to_char(d.date, 'YYYY-MM-DD') date, d.status from attendance_days d where d.student_id = any($1) and d.date = any($2::date[])`, [ids, days]);
     for (const id of ids) out.set(id, days.map(() => null));
     for (const r of rows) out.get(r.student_id)![days.indexOf(r.date)] = r.status;
     return out;
@@ -143,7 +142,7 @@ export class StudentsService {
          avg(a.now_pct) a_now, avg(a.prev_pct) a_prev
        from students s
        left join od on od.student_id = s.id
-       left join lateral (select m.status, ses.submitted_at from attendance_marks m join attendance_sessions ses on ses.id = m.session_id where m.student_id = s.id and ses.date = $2::date) td on true
+       left join lateral (select d.status, d.submitted_at from attendance_days d where d.student_id = s.id and d.date = $2::date) td on true
        left join lateral (select
           avg(case when ses.date > '${split}' then (case when m.status in ('present','late','half_day') then 1.0 else 0.0 end) end) now_pct,
           avg(case when ses.date <= '${split}' then (case when m.status in ('present','late','half_day') then 1.0 else 0.0 end) end) prev_pct

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { AppMode } from './theme.js';
 import { COUNTRIES, isCurrency, isLocale, isZone } from './locale.js';
 import { localizedLabels, VOCAB_CONCEPTS, isLanguage, type Vocabulary } from './i18n.js';
-import { DEFAULT_BLOOD_GROUPS, DEFAULT_GENDERS, DEFAULT_RELATIONSHIPS, schoolList } from './lists.js';
+import { DEFAULT_BLOOD_GROUPS, DEFAULT_GENDERS, DEFAULT_LEAVE_REASONS, DEFAULT_RELATIONSHIPS, schoolList } from './lists.js';
 import { CustomFieldsSetting } from './fields.js';
 import { WorkflowsSetting } from './workflows.js';
 import { AdmissionStages, DEFAULT_ADMISSION_STAGES } from './admissions.js';
@@ -118,11 +118,17 @@ export const SchoolSettingsSchema = z.object({
   'workflows.steps': WorkflowsSetting.default({}),
   'attendance.notifyParents': z.boolean().default(true),
   'attendance.lockAfterDays': z.number().int().min(0).max(30).default(2),
+  // One roll call a day, or a morning and an afternoon register (counted as sessions, as schools in England do).
+  'attendance.registers': z.enum(['day', 'ampm']).default('day'),
+  // With two registers: when the afternoon one starts (the app marks whichever it is now).
+  'attendance.pmFrom': z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('12:00'),
   'fees.lateFeePct': z.number().min(0).max(25).default(0),
   'fees.remindDaysBefore': z.number().int().min(0).max(30).default(3),
   // 0: no daily target (the dashboard shows the collection without a goal line).
   'fees.dailyTarget': z.number().int().min(0).max(100000000).default(0),
   'attendance.goalPct': z.number().min(50).max(100).default(95),
+  // Below this share of the year's registers a student is persistently absent (England: missing 10% or more).
+  'attendance.persistentPct': z.number().min(50).max(100).default(90),
   'homework.goalPct': z.number().min(50).max(100).default(85),
   'dashboard.rollClasses': z.array(z.string()).max(8).default([]),
   'security.twoFactor': z.boolean().default(true),
@@ -207,7 +213,8 @@ export const SchoolSettingsSchema = z.object({
   // The attendance marks the school uses (present and absent always).
   'attendance.statuses': AttendanceMarks.default(DEFAULT_ATTENDANCE_MARKS),
   // Reasons a family picks when asking for leave.
-  'leave.reasons': z.array(z.string().trim().min(1).max(40)).min(1).max(12).default(['Unwell', 'Family', 'Travel', 'Medical appointment', 'Other']),
+  // The reasons families give for leave, a school list (names in each language); a list of words saved before reads as items.
+  'leave.reasons': schoolList(DEFAULT_LEAVE_REASONS, 1, 12),
   // Families see how many classmates have handed in; who may hand in from the app.
   'homework.showClassProgress': z.boolean().default(false),
   'homework.defaultDueDays': z.number().int().min(1).max(30).default(2),
@@ -362,6 +369,8 @@ export const USER_PREFS = {
   'students.class': z.string().max(60).nullable(),
   /** The admin dashboard's widgets this person hid. */
   'dashboard.widgets': z.array(z.string().max(40)).max(12),
+  /** The classes whose roll call this person sees on the dashboard (up to six; none: the school's choice, else the first six). */
+  'dashboard.rollClasses': z.array(z.string().max(60)).max(6),
   /** Messages this person turned off in the app (message keys; urgent ones cannot be). */
   'notify.off': z.array(z.string().max(60)).max(60),
   /** The language this person reads (the app's picker): messages reach them in it. */

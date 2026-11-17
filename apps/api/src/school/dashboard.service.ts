@@ -31,7 +31,9 @@ export class DashboardService {
     const last = latestSchoolDay(today, OFF_DAYS);
     const doc = await this.settings.doc(t);
     const v = doc.values;
-    const rollIds = ((v['dashboard.rollClasses'] as string[] | undefined) ?? []).slice(0, 6);
+    // The classes this person chose for the roll-call widget, else the school's choice (People → Academic year), else the first six.
+    const mine = (await t.pool.query<{ value: string[] }>("select value from user_prefs where user_id = $1 and key = 'dashboard.rollClasses'", [user.id])).rows[0]?.value;
+    const rollIds = ((mine?.length ? mine : (v['dashboard.rollClasses'] as string[] | undefined)) ?? []).slice(0, 6);
     // A module the school does not have, or one this person may not read (a teacher without "See fees" gets no fee totals),
     // is not queried at all, so its numbers never leave the server; the admin leaves out the widgets of what is not listed.
     const modules = (await this.settings.effective(t)).modules.filter((m) => !SEE[m] || user.permissions.includes(SEE[m]));
@@ -45,7 +47,7 @@ export class DashboardService {
       this.approvals.needsYou(t, user),
       this.approvals.counts(t, user),
       on('attendance', () => this.attendance.unmarked(t), []),
-      on('attendance', () => t.pool.query<{ present: string }>("select count(*) filter (where m.status in ('present','late','half_day')) present from attendance_sessions s join attendance_marks m on m.session_id = s.id where s.date = $1", [last]), { rows: [{ present: '0' }] }),
+      on('attendance', () => t.pool.query<{ present: string }>("select count(*) filter (where d.status in ('present','late','half_day')) present from attendance_days d where d.date = $1", [last]), { rows: [{ present: '0' }] }),
       on('attendance', () => t.pool.query<{ pct: number | null }>("select avg(case when m.status in ('present','late','half_day') then 1.0 else 0.0 end) pct from attendance_sessions s join attendance_marks m on m.session_id = s.id where s.date = $1", [addDays(last, -7)]), { rows: [{ pct: null }] }),
       on('homework', () => this.homeworkWeek(t, last, count), Array.from({ length: count }, () => 0)),
       on('attendance', () => this.classRolls(t, last, rollIds), []),
@@ -61,7 +63,7 @@ export class DashboardService {
     const stamp = schoolNow();
     const clock = `${String(stamp.getUTCHours()).padStart(2, '0')}:${String(stamp.getUTCMinutes()).padStart(2, '0')}`;
     const timeline = events.rows.map((e) => {
-      const ist = new Date(e.at.getTime() + 5.5 * 3600_000);
+      const ist = schoolNow(e.at);
       return { id: e.id, minutes: ist.getUTCHours() * 60 + ist.getUTCMinutes(), time: `${String(ist.getUTCHours()).padStart(2, '0')}:${String(ist.getUTCMinutes()).padStart(2, '0')}`, title: e.title, subtitle: e.note };
     });
     const mins = schoolMinutes();
@@ -112,9 +114,9 @@ export class DashboardService {
   private async classRolls(t: TenantCtx, last: string, ids: string[]): Promise<DashboardData['classRolls']> {
     const { rows } = await t.pool.query<{ id: string; name: string; size: string; present: string; late: string; absent: string; marked: string }>(
       `select c.id, c.name, (select count(*) from students s where s.class_id = c.id) size,
-         count(m.status) filter (where m.status = 'present') present, count(m.status) filter (where m.status = 'late') late,
+         count(m.status) filter (where m.status in ('present','half_day')) present, count(m.status) filter (where m.status = 'late') late,
          count(m.status) filter (where m.status in ('absent','leave')) absent, count(m.status) marked
-       from classes c left join attendance_sessions ses on ses.class_id = c.id and ses.date = $2 left join attendance_marks m on m.session_id = ses.id
+       from classes c left join attendance_days m on m.class_id = c.id and m.date = $2
        where ($1::text[] is null or cardinality($1::text[]) = 0 or c.id = any($1)) group by c.id, c.name, c.grade, c.section order by c.grade, c.section limit 6`, [ids.length ? ids : null, last]);
     return rows.map((r) => {
       const size = Number(r.size);

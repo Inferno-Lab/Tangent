@@ -130,7 +130,8 @@ export async function seedSchool(pool: Pool, input: SeedInput): Promise<SeedRepo
 }
 
 async function run(db: PoolClient, input: SeedInput): Promise<Omit<SeedReport, 'ms'>> {
-  const today = input.today ?? schoolToday();
+  // Today on the school's own clock, as the API reckons it (near midnight in its zone, UTC is a day behind or ahead).
+  const today = input.today ?? schoolToday(new Date(), input.school.timezone ?? 'Asia/Kolkata'); // india-pack: the demo school's zone
   const last = latestSchoolDay(today, OFF_DAYS);
   const r = rng(20261014);
   const year = Number(last.slice(0, 4));

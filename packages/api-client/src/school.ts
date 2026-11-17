@@ -1,6 +1,6 @@
 import type {
   ChangeRequestCreate, ChangeRequestRow, PasswordChange, ReportQuery, EventReply, InvoiceDetail, WaiverRequest, ReceiptCancel, SlotCreate, WeekOf, StudentPatch, GuardiansPut, GuardianRow, DataRequestCreate, DataRequestDecision, DataRequestRow, EnquiryCreate, EnquiryEnrol, EnquiryPatch, EnquiryRow, EventRow, EventSave, ExamCreate, ExamMarksPut, ExamMarksView, ExamResults, ExamRow,
-  HomeworkCreate, HomeworkDetail, HomeworkMarks, HomeworkRow, InvoiceListQuery, InvoiceListRow, InvoiceListSummary, ReceiptRow, ReportData, ReportInfo, RoleDefSave, RoleRow, StudentLeaveInput, ApplyInfo, EnquiryApply, StaffCreate, StaffPatch, StaffRow,
+  HomeworkCreate, HomeworkDetail, HomeworkMarks, HomeworkRow, InvoiceListQuery, InvoiceListRow, InvoiceListSummary, ReceiptRow, ReportData, ReportInfo, RoleDefSave, RoleRow, StudentLeaveInput, ApplyInfo, EnquiryApply, RegisterPart, StaffCreate, StaffPatch, StaffRow,
   ThreadCreate, ThreadDetail, ThreadPatch, ThreadReply, ThreadRow,
   AttendanceDayPut, PeriodMarksPut, PeriodRoll, GalleryReportRow, ApprovalDecision, ApprovalKind, ApprovalRow, AssignFee, AttendanceDay, AuditRow, ClassInfo, ContactReveal, CoverRequest, DashboardData, EffectiveConfig, FeeHead, FeeHeadsPut, FeeSummary, ImportResult, InvoiceRow,
   LoginChallenge, LoginRequest, LoginResponse, MessageRequest, NoticeCreate, NoticeRow, Paged, PaymentCreate, SearchHit, SchoolSettingsPatch, SchoolSettingsView, SessionUser, SettingsResponse, ShellData, SlotPatch, StudentCreate, StudentDetail,
@@ -60,7 +60,7 @@ export function schoolApi(h: Http) {
       invite: (ids: string[]) => h.post<{ sent: number }>('/v1/students/invite', { ids }),
     },
     attendance: {
-      day: (classId: string, date: string) => h.get<AttendanceDay>('/v1/attendance/day', { classId, date }),
+      day: (classId: string, date: string, part?: RegisterPart) => h.get<AttendanceDay>('/v1/attendance/day', part ? { classId, date, part } : { classId, date }),
       save: (b: AttendanceDayPut) => h.put<AttendanceDay>('/v1/attendance/day', b),
       remind: () => h.post<{ sent: number; classes: string[] }>('/v1/attendance/remind'),
       periods: (classId: string, date: string) => h.get<PeriodRoll>('/v1/attendance/periods', { classId, date }),

@@ -38,4 +38,5 @@ export function listKey(list: readonly ListItem[] | undefined, typed: string): s
 }
 export const DEFAULT_GENDERS = [item('female', 'Female'), item('male', 'Male'), item('other', 'Another gender'), item('unsaid', 'Prefer not to say')];
 export const DEFAULT_RELATIONSHIPS = [item('mother', 'Mother'), item('father', 'Father'), item('parent', 'Parent'), item('guardian', 'Guardian'), item('grandparent', 'Grandparent'), item('carer', 'Carer'), item('sibling', 'Brother or sister'), item('other', 'Other')];
+export const DEFAULT_LEAVE_REASONS = [item('unwell', 'Unwell'), item('family', 'Family'), item('travel', 'Travel'), item('medical', 'Medical appointment'), item('other', 'Other')];
 export const DEFAULT_BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((g) => item(g, g));

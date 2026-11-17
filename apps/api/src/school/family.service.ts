@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
-import { tx, hasReachedAge, customText, type CustomFieldsSetting, type CustomValues, type FieldDef, type AttendanceMarkDef, MESSAGE_EVENTS, addDays, schoolToday, type AttendanceStatus, type NoticeCreate, type PeriodMarksPut } from '@tangent/contracts';
+import { tx, schoolNow, hasReachedAge, customText, listKey, listLabel, listOptions, SchoolSettingsSchema, DEFAULT_LEAVE_REASONS, type ListItem, type CustomFieldsSetting, type CustomValues, type FieldDef, type AttendanceMarkDef, MESSAGE_EVENTS, addDays, schoolToday, type AttendanceStatus, type NoticeCreate, type PeriodMarksPut } from '@tangent/contracts';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import { schoolContext, type Registry } from '@tangent/tenancy';
 import { REGISTRY, type AuthedUser, type TenantCtx } from '../tenancy/tenant.js';
@@ -328,7 +328,7 @@ export class FamilyService {
   async attendanceOf(t: TenantCtx, user: AuthedUser, studentId: string) {
     await this.mayStudent(await this.who(t, user), studentId, t);
     const { rows } = await t.pool.query<{ date: string; status: AttendanceStatus; code: string | null }>(
-      `select x.date::text date, m.status, m.code from attendance_marks m join attendance_sessions x on x.id = m.session_id where m.student_id = $1 and x.date >= $2 order by x.date`, [studentId, addDays(schoolToday(), -120)]);
+      `select d.date::text date, d.status, d.code from attendance_days d where d.student_id = $1 and d.date >= $2 order by d.date`, [studentId, addDays(schoolToday(), -120)]);
     // The app draws each day by what the mark means and names it the school's way.
     const used = await this.settings.value<AttendanceMarkDef[]>(t, 'attendance.statuses', []);
     const name = (r: { status: string; code: string | null }) => used.find((m) => m.key === (r.code ?? r.status))?.name ?? used.find((m) => m.meaning === r.status)?.name ?? '';
@@ -339,7 +339,7 @@ export class FamilyService {
     const w = await this.who(t, user);
     if (w.kind !== 'staff') students = students.filter((s) => w.children.includes(s));
     const { rows } = await t.pool.query<{ student_id: string; status: string }>(
-      `select m.student_id, m.status from attendance_marks m join attendance_sessions x on x.id = m.session_id where x.date = $1 and m.student_id = any($2)`, [schoolToday(), students]);
+      `select d.student_id, d.status from attendance_days d where d.date = $1 and d.student_id = any($2)`, [schoolToday(), students]);
     return Object.fromEntries(rows.map((r) => [r.student_id, r.status === 'leave' ? 'absent' : r.status]));
   }
 
@@ -365,15 +365,16 @@ export class FamilyService {
     if (!user.permissions.includes('attendance.mark')) throw forbidden('You are not allowed to mark attendance.');
     const ids = Object.keys(byStudent);
     const { rows } = await t.pool.query<{ id: string; class_id: string }>('select id, class_id from students where id = any($1)', [ids]);
+    const { part } = await this.attendance.partOf(t, undefined, date);
     for (const cls of new Set(rows.map((r) => r.class_id))) {
       const existing = await t.pool.query<{ student_id: string; status: string }>(
-        'select m.student_id, coalesce(m.code, m.status) status from attendance_marks m join attendance_sessions x on x.id = m.session_id where x.class_id = $1 and x.date = $2', [cls, date]);
+        'select m.student_id, coalesce(m.code, m.status) status from attendance_marks m join attendance_sessions x on x.id = m.session_id where x.class_id = $1 and x.date = $2 and x.part = $3', [cls, date, part]);
       const merged = new Map(existing.rows.map((e) => [e.student_id, e.status]));
       for (const r of rows.filter((x) => x.class_id === cls)) {
         // Any mark the school uses, by its key or by its meaning (the app sends present, late or absent).
         if (byStudent[r.id]) merged.set(r.id, byStudent[r.id]!);
       }
-      await this.attendance.put(t, user, { classId: cls, date, marks: [...merged].map(([studentId, status]) => ({ studentId, status })) });
+      await this.attendance.put(t, user, { classId: cls, date, part, marks: [...merged].map(([studentId, status]) => ({ studentId, status })) });
     }
     return { ok: true };
   }
@@ -684,7 +685,8 @@ export class FamilyService {
     // A class's own event reaches only the families (and students) of that class.
     const classes = w.children.length ? (await t.pool.query<{ class_id: string }>('select distinct class_id from students where id = any($1)', [w.children])).rows.map((r) => r.class_id) : [];
     const mine = w.children.length ? await t.pool.query<{ event_id: string; student_id: string; status: string; adults: number }>('select event_id, student_id, status, adults from event_rsvps where student_id = any($1)', [w.children]) : { rows: [] as { event_id: string; student_id: string; status: string; adults: number }[] };
-    const ist = (d: Date) => new Date(d.getTime() + 330 * 60_000).toISOString();
+    // The event's day and time on the school's clock.
+    const ist = (d: Date) => schoolNow(d).toISOString();
     return rows.filter((e) => w.kind === 'staff' || (e.audience !== 'staff' && (e.audience !== 'class' || classes.includes(e.class_id ?? '')))).map((e) => {
       const replies = mine.rows.filter((m) => m.event_id === e.id);
       return {
@@ -896,15 +898,21 @@ export class FamilyService {
     return out.filter((a) => a.photos.length);
   }
 
-  private leaveJson(r: { id: string; status: string; payload: Record<string, unknown>; created_at: Date; subject_ref: string | null }) {
+  private async leaveReasons(t: TenantCtx): Promise<ListItem[]> {
+    const read = SchoolSettingsSchema.shape['leave.reasons'].safeParse(await this.settings.value<unknown>(t, 'leave.reasons', undefined));
+    return read.success ? read.data : DEFAULT_LEAVE_REASONS;
+  }
+
+  private leaveJson(r: { id: string; status: string; payload: Record<string, unknown>; created_at: Date; subject_ref: string | null }, reasons: ListItem[] = []) {
     const p = r.payload;
-    return { id: r.id, studentId: String(p.studentId ?? r.subject_ref ?? ''), from: String(p.from ?? ''), to: String(p.to ?? ''), reason: String(p.reason ?? ''), status: r.status, appliedOn: r.created_at.toISOString().slice(0, 10), ...(p.reviewer ? { reviewedBy: String(p.reviewer) } : {}), ...(p.reviewNote ? { reviewNote: String(p.reviewNote) } : {}) };
+    return { id: r.id, studentId: String(p.studentId ?? r.subject_ref ?? ''), from: String(p.from ?? ''), to: String(p.to ?? ''), reason: listLabel(reasons, String(p.reason ?? ''), schoolContext.getStore()?.lang ?? 'en'), status: r.status, appliedOn: r.created_at.toISOString().slice(0, 10), ...(p.reviewer ? { reviewedBy: String(p.reviewer) } : {}), ...(p.reviewNote ? { reviewNote: String(p.reviewNote) } : {}) };
   }
 
   async leave(t: TenantCtx, user: AuthedUser, studentId: string) {
     await this.mayStudent(await this.who(t, user), studentId, t);
     const { rows } = await t.pool.query("select id, status, payload, created_at, subject_ref from approvals where kind = 'leave' and payload->>'studentLeave' = 'true' and payload->>'studentId' = $1 order by created_at desc", [studentId]);
-    return rows.map((r) => this.leaveJson(r));
+    const reasons = await this.leaveReasons(t);
+    return rows.map((r) => this.leaveJson(r, reasons));
   }
 
   /** A parent asks for leave for one child: whole days, or half of one day. It goes to the class teacher and the approvals queue. */
@@ -927,10 +935,13 @@ export class FamilyService {
     const from = b.from.slice(0, 10);
     const to = b.halfDay ? from : b.to.slice(0, 10);
     if (to < from) throw new ApiError('validation', 'The last day cannot be before the first day.');
-    const reasons = await this.settings.value<string[]>(t, 'leave.reasons', []);
-    if (reasons.length && !reasons.includes(b.reason)) throw new ApiError('validation', 'Choose one of the school’s reasons.', { fields: { reason: 'Choose one of the reasons.' } });
+    // A reason is one of the school's, by its key or its name in any language; it is kept by its key.
+    const reasons = await this.leaveReasons(t);
+    const key = listKey(listOptions(reasons), b.reason);
+    if (reasons.length && !key) throw new ApiError('validation', tx('Choose one of the school’s reasons.'), { fields: { reason: tx('Choose one of the reasons.') } });
+    if (key) b.reason = key;
     const when = b.halfDay ? `${from}, ${b.halfDay === 'am' ? 'morning' : 'afternoon'} only` : from === to ? from : `${from} to ${to}`;
-    return { from, to, subtitle: `${when} · ${b.reason.slice(0, 60)}` };
+    return { from, to, subtitle: `${when} · ${listLabel(reasons, b.reason).slice(0, 60)}` };
   }
 
   /** A request still waiting can be corrected or withdrawn by the parent who sent it; once answered it is the school's record. */

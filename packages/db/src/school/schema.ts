@@ -193,8 +193,10 @@ export const attendanceSessions = pgTable(
     date: date('date').notNull(),
     markedBy: text('marked_by').references(() => users.id, { onDelete: 'set null' }),
     submittedAt: timestamp('submitted_at', { withTimezone: true }),
+    // 'day', or 'am' / 'pm' where the school keeps a morning and an afternoon register (attendance.registers).
+    part: text('part').notNull().default('day'),
   },
-  (t) => [uniqueIndex('attendance_sessions_uq').on(t.classId, t.date)],
+  (t) => [uniqueIndex('attendance_sessions_part_uq').on(t.classId, t.date, t.part)],
 );
 
 /** Attendance every period (feature attendance.periodWise), beside the day's roll call (migration 0020). */

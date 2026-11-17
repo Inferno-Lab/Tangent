@@ -560,7 +560,7 @@ type AttLookups = { students: Map<string, { id: string; class_id: string }>; ses
 const attendance = kind<AttLookups>({
   async load(db, rows) {
     const dates = [...new Set(rows.map((r) => isoDay(r.date!)).filter(Boolean))];
-    const ss = (await db.query<{ id: string; class_id: string; date: string }>('select id, class_id, date::text from attendance_sessions where date = any($1::date[])', [dates])).rows;
+    const ss = (await db.query<{ id: string; class_id: string; date: string }>("select id, class_id, date::text from attendance_sessions where date = any($1::date[]) and part = 'day'", [dates])).rows;
     const ms = (await db.query<{ session_id: string; student_id: string; status: string }>('select session_id, student_id, status from attendance_marks where session_id = any($1)', [ss.map((s) => s.id)])).rows;
     return { students: await studentMap(db), sessions: new Map(ss.map((s) => [`${s.class_id}|${s.date}`, s.id])), marks: new Map(ms.map((m) => [`${m.session_id}|${m.student_id}`, m.status])) };
   },

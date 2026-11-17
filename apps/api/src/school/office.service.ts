@@ -14,6 +14,7 @@ const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
 const REPORTS: ReportInfo[] = [
   { id: 'attendance-class', title: 'Attendance by class', blurb: 'Present, late, absent and leave for every class over a period (the last 30 school days unless chosen).', area: 'Attendance', filters: ['dates', 'class'], needs: 'attendance' },
   { id: 'attendance-low', title: 'Low attendance', blurb: 'Students present on fewer days than the school’s attendance goal over a period (this month unless chosen).', area: 'Attendance', filters: ['dates', 'class'], needs: 'attendance' },
+  { id: 'attendance-persistent', title: 'Persistent absence', blurb: 'Students who missed more than the school’s limit of the year so far (Attendance → Settings), leave included, counted in registers.', area: 'Attendance', filters: ['class'], needs: 'attendance' },
   { id: 'fees-collection', title: 'Fees by type', blurb: 'What was billed, collected and is still due for each kind of fee (fees due in the period, if one is chosen).', area: 'Fees', filters: ['dates', 'class'], needs: 'fees' },
   { id: 'fees-defaulters', title: 'Overdue families', blurb: 'Families with an unpaid fee past its due date, largest first.', area: 'Fees', filters: ['class'], needs: 'fees' },
   { id: 'strength', title: 'Class strength', blurb: 'Students in every class, with the class teacher.', area: 'People', filters: [], needs: null },
@@ -120,6 +121,22 @@ export class OfficeService {
       return { ...base, scope: scope(p), summary: [{ label: `Students below ${goal}%`, value: String(rows.length) }, { label: 'Period', value: `${dayMonth(p[0])} to ${dayMonth(p[1])}` }],
         columns: [{ key: 'student', label: 'Student' }, { key: 'class', label: 'Class' }, { key: 'days', label: 'School days', align: 'right' }, { key: 'absent', label: 'Absent', align: 'right' }, { key: 'rate', label: 'Present', align: 'right' }],
         rows: rows.map((r) => ({ _student: r.id, student: r.name, class: r.class_name, days: Number(r.days), absent: Number(r.absent), rate: `${pct(Number(r.present), Number(r.days))}%` })) };
+    }
+    if (id === 'attendance-persistent') {
+      // From the first day of the school year; every register counts (two a day where the school keeps two), leave included.
+      const start = (await t.pool.query<{ s: string }>('select starts_on::text s from academic_years where current limit 1')).rows[0]?.s ?? `${last.slice(0, 4)}-01-01`;
+      const p = period([start, last]);
+      const below = await this.settings.value<number>(t, 'attendance.persistentPct', 90);
+      const { rows } = await t.pool.query<{ id: string; name: string; class_name: string; n: string; present: string }>(
+        `select s.id, s.name, c.name class_name, count(*) n, count(*) filter (where m.status in ('present','late','half_day')) present
+         from attendance_marks m join attendance_sessions x on x.id = m.session_id join students s on s.id = m.student_id and s.status = 'active' join classes c on c.id = s.class_id
+         where x.date between $1 and $2 and ($4::text is null or c.id = $4) group by s.id, s.name, c.name, c.grade, c.section
+         having count(*) filter (where m.status in ('present','late','half_day'))::float / count(*) < $3
+         order by count(*) filter (where m.status in ('present','late','half_day'))::float / count(*), s.name limit 500`, [p[0], p[1], below / 100, q.classId ?? null]);
+      const two = (await this.settings.value<string>(t, 'attendance.registers', 'day')) === 'ampm';
+      return { ...base, scope: scope(p), summary: [{ label: tx('Below {below}%', { below }), value: String(rows.length) }],
+        columns: [{ key: 'student', label: tx('Student') }, { key: 'class', label: tx('Class') }, { key: 'n', label: two ? tx('Sessions') : tx('School days'), align: 'right' }, { key: 'missed', label: tx('Missed'), align: 'right' }, { key: 'rate', label: tx('Present'), align: 'right' }],
+        rows: rows.map((r) => ({ _student: r.id, student: r.name, class: r.class_name, n: Number(r.n), missed: Number(r.n) - Number(r.present), rate: `${pct(Number(r.present), Number(r.n))}%` })) };
     }
     if (id === 'fees-collection') {
       const { rows } = await t.pool.query<{ head: string; head_name: string; billed: string; collected: string }>(

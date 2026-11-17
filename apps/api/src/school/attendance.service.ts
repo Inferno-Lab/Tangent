@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { type AttendanceMarkDef, markMeaning, schoolZone, addDays, dayName, schoolToday, latestSchoolDay, schoolDaysEnding, type AttendanceDay, type AttendanceDayPut, type AttendanceWeekPoint, type PeriodMarksPut, type PeriodRoll, tx } from '@tangent/contracts';
+import { type AttendanceMarkDef, type RegisterPart, markMeaning, schoolMinutes, schoolZone, addDays, dayName, schoolToday, latestSchoolDay, schoolDaysEnding, type AttendanceDay, type AttendanceDayPut, type AttendanceWeekPoint, type PeriodMarksPut, type PeriodRoll, tx } from '@tangent/contracts';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
@@ -13,14 +13,31 @@ export class AttendanceService {
     private readonly settings: SettingsService,
   ) {}
 
-  async day(t: TenantCtx, classId: string, date: string): Promise<AttendanceDay> {
+  /** The registers the school keeps a day: one, or a morning and an afternoon one. */
+  async parts(t: TenantCtx): Promise<RegisterPart[]> {
+    return (await this.settings.value<string>(t, 'attendance.registers', 'day')) === 'ampm' ? ['am', 'pm'] : ['day'];
+  }
+
+  /** The register asked for, or the one it is now (the afternoon's from attendance.pmFrom); one the school does not keep is refused. */
+  async partOf(t: TenantCtx, asked: RegisterPart | undefined, date: string): Promise<{ part: RegisterPart; parts: RegisterPart[] }> {
+    const parts = await this.parts(t);
+    if (asked && !parts.includes(asked)) throw new ApiError('validation', parts.length > 1 ? tx('Your school keeps a morning and an afternoon register: choose one.') : tx('Your school keeps one register a day.'));
+    if (asked) return { part: asked, parts };
+    if (parts.length === 1) return { part: parts[0]!, parts };
+    const pm = await this.settings.value<string>(t, 'attendance.pmFrom', '12:00');
+    const afternoon = date === schoolToday() && schoolMinutes() >= Number(pm.slice(0, 2)) * 60 + Number(pm.slice(3, 5));
+    return { part: afternoon ? 'pm' : 'am', parts };
+  }
+
+  async day(t: TenantCtx, classId: string, date: string, asked?: RegisterPart): Promise<AttendanceDay> {
     const cls = await t.pool.query('select 1 from classes where id = $1', [classId]);
     if (!cls.rowCount) throw notFound('That class');
+    const { part, parts } = await this.partOf(t, asked, date);
     const { rows } = await t.pool.query<{ id: string; name: string; roll_no: string; status: string | null; submitted: Date | null }>(
       `select s.id, s.name, s.roll_no, coalesce(m.code, m.status) status, ses.submitted_at submitted from students s
-       left join attendance_sessions ses on ses.class_id = s.class_id and ses.date = $2
+       left join attendance_sessions ses on ses.class_id = s.class_id and ses.date = $2 and ses.part = $3
        left join attendance_marks m on m.session_id = ses.id and m.student_id = s.id
-       where s.class_id = $1 and s.status = 'active' order by s.roll_no, s.name`, [classId, date]);
+       where s.class_id = $1 and s.status = 'active' order by s.roll_no, s.name`, [classId, date, part]);
     // Leave the office approved already answers for that day: the roll call starts with it marked.
     const leave = await t.pool.query<{ student_id: string; half: string | null }>(
       `select payload->>'studentId' student_id, payload->>'halfDay' half from approvals where kind = 'leave' and status = 'approved'
@@ -29,12 +46,15 @@ export class AttendanceService {
     const used = await this.settings.value<AttendanceMarkDef[]>(t, 'attendance.statuses', []);
     const first = (meaning: string) => used.find((m) => m.meaning === meaning)?.key;
     const away = (half: string | null): string => (half && first('half_day')) || first('leave') || first('absent') || 'absent';
+    // With two registers a half-day leave covers only its own half, and is a whole leave there.
+    const covers = (half: string | null) => part === 'day' || !half || half === part;
+    const mark = (half: string | null) => (part === 'day' ? away(half) : first('leave') || first('absent') || 'absent');
     const submitted = rows.some((r) => r.submitted);
     return {
-      classId, date, submitted,
+      classId, date, part, parts, submitted,
       marks: rows.map((r) => {
-        const l = leave.rows.find((x) => x.student_id === r.id);
-        return { studentId: r.id, name: r.name, rollNo: r.roll_no, status: r.status ?? (l && !submitted ? away(l.half) : null), onLeave: !!l };
+        const l = leave.rows.find((x) => x.student_id === r.id && covers(x.half));
+        return { studentId: r.id, name: r.name, rollNo: r.roll_no, status: r.status ?? (l && !submitted ? mark(l.half) : null), onLeave: !!l };
       }),
     };
   }
@@ -73,13 +93,15 @@ export class AttendanceService {
     const ids = new Set(roster.rows.map((r) => r.id));
     const bad = body.marks.find((m) => !ids.has(m.studentId));
     if (bad) throw new ApiError('validation', 'One of those students is not in this class.');
+    const { part } = await this.partOf(t, body.part, body.date);
     const client = await t.pool.connect();
-    const sid = `att_${body.classId}_${body.date}`;
+    let sid = `att_${body.classId}_${body.date}${part === 'day' ? '' : `_${part}`}`;
     try {
       await client.query('begin');
-      await client.query(
-        `insert into attendance_sessions (id, class_id, date, marked_by, submitted_at) values ($1,$2,$3,$4,now())
-         on conflict (class_id, date) do update set marked_by = excluded.marked_by, submitted_at = now()`, [sid, body.classId, body.date, user.id]);
+      // An existing register keeps its id (and so its marks' links).
+      sid = (await client.query<{ id: string }>(
+        `insert into attendance_sessions (id, class_id, date, part, marked_by, submitted_at) values ($1,$2,$3,$4,$5,now())
+         on conflict (class_id, date, part) do update set marked_by = excluded.marked_by, submitted_at = now() returning id`, [sid, body.classId, body.date, part, user.id])).rows[0]!.id;
       await client.query('delete from attendance_marks where session_id = $1', [sid]);
       const params: unknown[] = [];
       const tuples = marks.map((m) => `(${[sid, m.studentId, m.meaning, m.code].map((v) => { params.push(v); return `$${params.length}`; }).join(',')})`);
@@ -91,10 +113,14 @@ export class AttendanceService {
     } finally {
       client.release();
     }
-    await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'attendance.marked', entity: 'class', entityId: body.classId, detail: { date: body.date, marks: body.marks.length } });
+    await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'attendance.marked', entity: 'class', entityId: body.classId, detail: { date: body.date, part, marks: body.marks.length } });
     if (await this.settings.value<boolean>(t, 'attendance.notifyParents', true)) {
-      // Families hear about an absence the school did not expect and about lateness, not about approved leave.
-      const away = marks.filter((m) => m.meaning === 'absent' || m.meaning === 'late');
+      // Families hear about an absence the school did not expect and about lateness, not about approved leave; a child
+      // already away in the morning is not reported again in the afternoon.
+      const wasAway = part === 'pm' ? new Set((await t.pool.query<{ student_id: string }>(
+        "select m.student_id from attendance_marks m join attendance_sessions s on s.id = m.session_id where s.class_id = $1 and s.date = $2 and s.part = 'am' and m.status in ('absent','leave')",
+        [body.classId, body.date])).rows.map((r) => r.student_id)) : new Set<string>();
+      const away = marks.filter((m) => (m.meaning === 'absent' || m.meaning === 'late') && !wasAway.has(m.studentId));
       if (away.length) {
         const g = await t.pool.query<{ phone: string | null; name: string; student_id: string }>(
           'select g.phone, s.name, s.id student_id from students s join student_guardians sg on sg.student_id = s.id and sg.gets_messages join guardians g on g.id = sg.guardian_id where s.id = any($1)', [away.map((a) => a.studentId)]);
@@ -102,7 +128,7 @@ export class AttendanceService {
         await this.messenger.notify(t, 'attendance.absent', g.rows.filter((r) => r.phone).map((r) => ({ to: r.phone!, vars: { student: r.name, status: status.get(r.student_id) === 'late' ? 'late' : 'absent' } })));
       }
     }
-    return this.day(t, body.classId, body.date);
+    return this.day(t, body.classId, body.date, part);
   }
 
   /** A class's periods on one day (from the timetable for that weekday), each with its teacher and the marks given so far. */

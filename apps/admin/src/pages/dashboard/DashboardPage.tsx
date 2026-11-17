@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { dashboardPieces } from '@tangent/config-engine';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fmtNumber, fmtMoneyShort, fmtMoney, type ApprovalRow, type DashboardData } from '@tangent/contracts';
-import { Dialog, EmptyCard, IC, type PageIcon, PageScope, TONES, rollDigits, tintFor, useIsPhone, useToast, EmptyState, t as tr } from '@tangent/web-ui';
+import { Checkbox, Dialog, EmptyCard, IC, type PageIcon, PageScope, TONES, rollDigits, tintFor, useIsPhone, useToast, EmptyState, t as tr } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { useShellChrome } from '../../app/Layout';
 import { TodayView } from './TodayView';
@@ -56,6 +56,14 @@ function DashboardDesktop() { const app = useApp();
   const setHide = (id: string, off: boolean) => { const n = off ? [...new Set([...hidden, id])] : hidden.filter((x) => x !== id);
     qc.setQueryData(['prefs'], { ...prefs.data, 'dashboard.widgets': n });
     void app.api.prefs.put('dashboard.widgets', n).catch(() => say(tr('admin.dashboard_page.your_choice_could_not_be'), 'bad'));
+  };
+  // The classes in this person's roll-call widget (up to six); none chosen keeps the school's choice.
+  const classes = useQuery({ queryKey: ['classes'], queryFn: app.api.classes, staleTime: 5 * 60_000, enabled: widgets });
+  const rollMine = (prefs.data?.['dashboard.rollClasses'] as string[] | undefined) ?? [];
+  const setRoll = (id: string, on: boolean) => {
+    const n = on ? [...rollMine, id].slice(0, 6) : rollMine.filter((x) => x !== id);
+    qc.setQueryData(['prefs'], { ...prefs.data, 'dashboard.rollClasses': n });
+    void app.api.prefs.put('dashboard.rollClasses', n).then(() => qc.invalidateQueries({ queryKey: ['dashboard'] })).catch(() => say(tr('admin.dashboard_page.your_choice_could_not_be'), 'bad'));
   };
   const { toast, say, clear } = useToast();
   const days = RANGES[range]![1];
@@ -129,6 +137,15 @@ function DashboardDesktop() { const app = useApp();
               </div>
             ))}
           </div>
+          {!!classes.data?.length && (
+            <div className="fld" style={{ marginTop: 12 }}>
+              <label>{tr('admin.dashboard_page.classes_in_roll_call')}</label>
+              <div className="help" style={{ marginTop: 0 }}>{tr('admin.dashboard_page.up_to_six_classes')}</div>
+              <div className="tgrow" style={{ maxHeight: 180, overflow: 'auto' }}>
+                {classes.data.map((c) => <Checkbox key={c.id} label={c.name} checked={rollMine.includes(c.id)} disabled={!rollMine.includes(c.id) && rollMine.length >= 6} onChange={(on) => setRoll(c.id, on)} />)}
+              </div>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}><button className="btn pri" onClick={() => setWidgets(false)}>{tr('admin.dashboard_page.done')}</button></div>
         </Dialog>
       ), me: { name: app.user.name, initials: app.user.initials, role: app.user.roleNames[0] ?? 'Staff', ...me }, schoolName: chrome.shell?.school.shortName ?? d.schoolName,

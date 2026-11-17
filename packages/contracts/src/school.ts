@@ -236,9 +236,15 @@ export const BulkStudentAction = z.object({
 export type BulkStudentAction = z.infer<typeof BulkStudentAction>;
 
 // Attendance
+/** A roll call is for the whole day, or for its morning or afternoon where the school keeps two registers. */
+export const REGISTER_PARTS = ['day', 'am', 'pm'] as const;
+export type RegisterPart = (typeof REGISTER_PARTS)[number];
+
 export const AttendanceDayPut = z.object({
   classId: z.string(),
   date: IsoDate,
+  /** Left out: the whole day, or the half it is now where the school keeps two registers. */
+  part: z.enum(REGISTER_PARTS).optional(),
   /** Each a mark the school uses (attendance.statuses), by its key. */
   marks: z.array(z.object({ studentId: z.string(), status: z.string().min(1).max(24) })).min(1).max(200),
 });
@@ -247,6 +253,9 @@ export type AttendanceDayPut = z.infer<typeof AttendanceDayPut>;
 export interface AttendanceDay {
   classId: string;
   date: string;
+  /** Which register this is, and which the school keeps (['day'], or ['am', 'pm']). */
+  part: RegisterPart;
+  parts: RegisterPart[];
   submitted: boolean;
   /** onLeave: an approved leave covers the day; until the roll is taken its mark is filled in from the leave. */
   /** status: the school's mark (its key); null until the roll is taken. */

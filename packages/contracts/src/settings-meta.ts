@@ -125,10 +125,13 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = localized({
 
   // Attendance
   'attendance.notifyParents': { group: 'attendance', label: 'Tell families when a child is absent or late', kind: 'bool' },
+  'attendance.registers': { group: 'attendance', label: 'Registers a day', kind: 'enum', options: [['day', 'One roll call a day'], ['ampm', 'A morning and an afternoon register']], help: 'With two, each half is marked on its own and counted as a session; screens that show one mark a day put the two together.' },
+  'attendance.pmFrom': { group: 'attendance', label: 'The afternoon register starts at', kind: 'time', help: 'With two registers a day, the teachers’ app marks the morning one before this time and the afternoon one after it.' },
   'attendance.lockAfterDays': { group: 'attendance', label: 'Attendance can be corrected for this many days', kind: 'number', min: 0, max: 30, help: 'In the admin and in the teachers’ app; after that, only someone allowed to approve can change it.' },
+  'attendance.persistentPct': { group: 'attendance', label: 'Persistent absence below', kind: 'number', min: 50, max: 100, help: 'A student present for less than this share of the year’s registers (leave counted as absence) is on the Persistent absence report.' },
   'attendance.goalPct': { group: 'attendance', label: 'Attendance goal (%)', kind: 'number', min: 50, max: 100, help: 'The dashboard and reports measure against it.' },
   'attendance.statuses': { group: 'attendance', label: 'Marks the school uses', kind: 'attendanceMarks', max: 20, help: 'Each with the name and letter the register uses, and what it means for attendance figures. Approved leave is filled in with the first mark that means authorised absence.' },
-  'leave.reasons': { group: 'attendance', label: 'Reasons families give for leave', kind: 'strings', max: 12 },
+  'leave.reasons': { group: 'attendance', label: 'Reasons families give for leave', kind: 'list', max: 12, help: 'Offered in the app when a family asks for leave, each in the family’s language where the school names it.' },
 
   // Timetable
   'timetable.schoolEdits': { group: 'timetable', label: 'The school may edit its own timetable', kind: 'bool', help: 'Off: the timetable is locked and only Tangent changes it. Covering an absent teacher for a day is always allowed.' },

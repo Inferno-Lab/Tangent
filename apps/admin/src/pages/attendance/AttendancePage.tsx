@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
-import { addDays, dayLabel, markMeaning, type AttendanceMarkDef, type AttendanceStatus } from '@tangent/contracts';
+import { addDays, dayLabel, markMeaning, type AttendanceMarkDef, type AttendanceStatus, type RegisterPart } from '@tangent/contracts';
 import { DateField, EmptyCard, EmptyState, Icon, Segmented, Select, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { useSetting } from '../../app/kit';
@@ -35,11 +35,13 @@ export function AttendancePage() { const app = useApp();
   // Past the correction window only someone who approves requests may change a day; the server says so if needed.
   const mayOld = app.user.permissions.includes('approvals.decide');
   useEffect(() => { if (!classId && classes.data?.length) setClassId(classes.data[0]!.id); }, [classes.data, classId]);
-  const day = useQuery({ queryKey: ['attendance-day', classId, date], queryFn: () => app.api.attendance.day(classId, date), enabled: !!classId && !!date && tab === 'roll' });
-  useEffect(() => { setDraft({}); }, [classId, date]);
+  // With a morning and an afternoon register the server opens the one it is now; the switch picks the other.
+  const [part, setPart] = useState<RegisterPart | null>(null);
+  const day = useQuery({ queryKey: ['attendance-day', classId, date, part], queryFn: () => app.api.attendance.day(classId, date, part ?? undefined), enabled: !!classId && !!date && tab === 'roll' });
+  useEffect(() => { setDraft({}); }, [classId, date, part]);
 
   const save = useMutation({ // The whole day is saved at once, so marks already saved go back with the changes.
-    mutationFn: () => app.api.attendance.save({ classId, date, marks: marks.flatMap((m) => { const status = statusOf(m.studentId, m.status); return status ? [{ studentId: m.studentId, status }] : []; }) }),
+    mutationFn: () => app.api.attendance.save({ classId, date, part: day.data?.part, marks: marks.flatMap((m) => { const status = statusOf(m.studentId, m.status); return status ? [{ studentId: m.studentId, status }] : []; }) }),
     onSuccess: () => { setDraft({});
       void qc.invalidateQueries({ predicate: (q) => ['attendance-day', 'dashboard', 'shell', 'students'].includes(String(q.queryKey[0])) });
       say(t('admin.attendance_page.roll_call_saved_parents_of'));
@@ -66,6 +68,10 @@ export function AttendancePage() { const app = useApp();
           <>
             {latest && <DateField compact label={t('admin.attendance_page.day')} value={date} onChange={(d) => setPicked(d && d !== latest ? d : null)} max={latest} min={mayOld ? undefined : addDays(latest, -lockDays)} />}
             <Select compact aria-label={t('admin.attendance_page.class_2')} value={classId} onChange={setClassId} options={classes.data.map((c) => ({ value: c.id, label: t('admin.attendance_page.class', { name: c.name }) }))} />
+            {tab === 'roll' && (day.data?.parts.length ?? 0) > 1 && (
+              <Segmented label={t('admin.attendance_page.register')} value={day.data!.part} onChange={(v) => setPart(v as RegisterPart)}
+                options={[{ value: 'am', label: t('admin.attendance_page.morning') }, { value: 'pm', label: t('admin.attendance_page.afternoon') }]} />
+            )}
           </>
         )}
       </>}>

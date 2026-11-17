@@ -122,7 +122,22 @@ abstract final class SchoolConfig {
     return houses.firstWhereOrNull((h) => h.key == k || h.name.toLowerCase() == k);
   }
 
-  static List<String> get leaveReasons => List<String>.from(_s<List<dynamic>>('leave.reasons', const ['Other']));
+  /// The school's leave reasons (a school list), each in the reader's language where the school named it there; retired ones are
+  /// not offered. A list of plain words (sample content, an older server) reads as it is. The server takes any of these names.
+  static List<String> get leaveReasons {
+    final lang = Get.locale?.languageCode ?? 'en';
+    final out = <String>[];
+    for (final r in _s<List<dynamic>>('leave.reasons', const ['Other'])) {
+      if (r is String) {
+        out.add(r);
+      } else if (r is Map && r['active'] != false) {
+        final names = r['names'];
+        final own = names is Map ? names[lang] : null;
+        out.add(own is String && own.isNotEmpty ? own : '${r['name'] ?? r['key'] ?? ''}');
+      }
+    }
+    return out.where((e) => e.isNotEmpty).toList();
+  }
 
   /// The first weekday of every week grid, any day the school chose ([DateTime.monday] is 1 … [DateTime.sunday] is 7).
   static int get weekStarts {

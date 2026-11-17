@@ -62,6 +62,8 @@ export const COUNTRY_PACKS: Record<string, Record<string, unknown>> = {
     'privacy.notice': "{school} is the controller of the personal data it keeps to educate and look after your child: who they are, their attendance, work, results, fees and messages. We use it under UK GDPR and the Data Protection Act 2018, for our public task and to keep children safe, never for advertising. You may ask for a copy of your data, its correction or erasure, and complain to the Information Commissioner's Office. Our data protection officer's details are below.",
     'fees.paymentMethods': [method('cash', 'Cash', 'cash'), method('card', 'Card', 'card'), method('bank', 'Bank transfer', 'bank'), method('direct-debit', 'Direct Debit', 'bank'), method('cheque', 'Cheque', 'cheque')],
     'calendar.weekStarts': 'mon', 'calendar.weeklyOff': ['sat', 'sun'], 'leave.reasons': ['Illness', 'Medical appointment', 'Family', 'Religious observance', 'Other'],
+    // Schools in England keep a morning and an afternoon register and report absence in sessions.
+    'attendance.registers': 'ampm', 'attendance.pmFrom': '13:00',
     'vocab.words': { en: { student: { one: 'Pupil' }, guardian: { one: 'parent' }, principal: { one: 'head teacher' }, class: { one: 'form' } } }, 'fees.refundApprovalAbove': 100,
     'tax.name': 'VAT', 'tax.numberLabel': 'VAT registration number', 'tax.ratePct': 20, 'tax.inclusive': true,
     'people.addressFormat': [part('line1', 'Address line 1'), part('line2', 'Address line 2'), part('city', 'Town'), part('region', 'County'), part('postcode', 'Postcode', '^[A-Z]{1,2}\\d[A-Z\\d]? ?\\d[A-Z]{2}$', 'Like SW1A 1AA.')],
