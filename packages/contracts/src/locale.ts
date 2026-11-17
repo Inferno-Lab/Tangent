@@ -30,6 +30,27 @@ export const roundToCurrency = (n: number, currency = schoolCurrency()): number 
   return Math.round(n * f) / f;
 };
 
+/**
+ * An amount typed by a person, read the school's way: "12,50" in French, "1.250,75" in German, "1,250.75" in English, with or
+ * without a currency sign; rounded to what the currency can be paid in. NaN when it is not an amount.
+ */
+export function readAmount(text: string, locale = schoolLocale(), currency = schoolCurrency()): number {
+  if (/-/.test(text)) return NaN;
+  let dec = '.';
+  try { dec = new Intl.NumberFormat(locale).formatToParts(1.1).find((p) => p.type === 'decimal')?.value ?? '.'; } catch { /* an unknown locale reads as English */ }
+  // Arabic and Persian digits and the Arabic decimal sign read as their Latin forms; anything else (a sign, spaces) goes.
+  let s = text.replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x660)).replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x6f0)).replace(/٫/g, '.').replace(/[^\d.,]/g, '');
+  const comma = dec === ',';
+  s = s.split(comma ? '.' : ',').join('');
+  if (comma) s = s.replace(',', '.');
+  if (!/^\d+(\.\d+)?$/.test(s)) return NaN;
+  return roundToCurrency(Number(s), currency);
+}
+
+/** An amount written for a person to edit, the way readAmount reads it back ("12,5" in French, no grouping). */
+export const amountText = (n: number, locale = schoolLocale(), currency = schoolCurrency()): string =>
+  new Intl.NumberFormat(locale, { useGrouping: false, maximumFractionDigits: currencyDigits(currency) }).format(roundToCurrency(n, currency));
+
 /** An amount in the currency's smallest unit (paise, cents, fils), as payment providers take it. */
 export const toMinor = (n: number, currency: string): number => Math.round(n * 10 ** currencyDigits(currency));
 

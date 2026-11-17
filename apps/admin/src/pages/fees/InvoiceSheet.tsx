@@ -82,7 +82,7 @@ export function InvoiceSheet({ id, onClose, say, onCollect }: { id: string; onCl
             <div className="card" style={{ padding: 16, display: 'grid', gap: 10 }}>
               {ask.kind !== 'receipt' && <Segmented label={t('admin.invoice_sheet.what_to_ask')} value={ask.kind} onChange={(k) => setAsk({ kind: k })} options={[{ value: 'waive', label: t('admin.invoice_sheet.waive_part_of_it') }, { value: 'cancel', label: t('admin.invoice_sheet.cancel_the_left', { fmtMoney: fmtMoney(d.outstanding) }) }]} />}
               {ask.kind === 'receipt' && <b style={{ font: '700 14px var(--fb)' }}>{t('admin.invoice_sheet.cancel_receipt')}{' '}{ask.receiptNo}</b>}
-              {ask.kind === 'waive' && <NumberField label={t('admin.invoice_sheet.amount_to_waive_at_most', { fmtMoney: fmtMoney(d.outstanding) })} value={f.amount} onChange={(amount) => { setF({ ...f, amount }); setErr({}); }} error={err.amount} min={1} max={d.outstanding} />}
+              {ask.kind === 'waive' && <NumberField label={t('admin.invoice_sheet.amount_to_waive_at_most', { fmtMoney: fmtMoney(d.outstanding) })} value={f.amount} onChange={(amount) => { setF({ ...f, amount }); setErr({}); }} error={err.amount} min={0} max={d.outstanding} decimals />}
               <AreaField label={t('admin.invoice_sheet.why')} value={f.reason} onChange={(reason) => { setF({ ...f, reason }); setErr({}); }} error={err.reason} rows={2} maxLength={300} placeholder={ask.kind === 'receipt' ? t('admin.invoice_sheet.recorded_against_the_wrong_student') : t('admin.invoice_sheet.sibling_concession_agreed_with_the')} />
               {err._ && <ErrorLine>{err._}</ErrorLine>}
               <div className="tgrow" style={{ justifyContent: 'flex-end' }}>

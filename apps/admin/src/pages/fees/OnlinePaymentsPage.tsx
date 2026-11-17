@@ -5,7 +5,7 @@ import { Dialog, Field, NumberField, Segmented, useShake, EmptyState, EmptyNote,
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { AreaField, dateLabel, openPdf, problem, stamp, useOpenParam } from '../../app/kit';
-import { fmtMoney } from '@tangent/contracts';
+import { fmtMoney, roundToCurrency } from '@tangent/contracts';
 
 const REFUND: Record<RefundRow['status'], { text: string; tone: string }> = {
   requested: { text: t('admin.online_payments_page.needs_a_second_person'), tone: 'a' }, sent: { text: t('admin.online_payments_page.sent_to_the_bank'), tone: 'v' }, done: { text: t('admin.online_payments_page.refunded'), tone: 'g' }, failed: { text: t('admin.online_payments_page.failed'), tone: 'c' }, rejected: { text: t('admin.online_payments_page.declined'), tone: '' },
@@ -121,7 +121,7 @@ function RefundDialog({ p, onClose, onDone }: { p: OnlinePaymentRow; onClose: ()
   const app = useApp();
   const shake = useShake();
   const left = p.amount - p.refunded;
-  const [amount, setAmount] = useState(String(left));
+  const [amount, setAmount] = useState(String(roundToCurrency(left)));
   const [reason, setReason] = useState('');
   const [err, setErr] = useState<Record<string, string>>({});
   const send = useMutation({
@@ -132,7 +132,7 @@ function RefundDialog({ p, onClose, onDone }: { p: OnlinePaymentRow; onClose: ()
   return (
     <Dialog title={t('admin.online_payments_page.refund_2', { receiptNo: p.receiptNo })} tag={{ text: p.student, tone: 'v' }} onClose={onClose} width={480} shake={shake.cls}>
       <div className="stack">
-        <NumberField label={t('admin.online_payments_page.amount_up_to', { amount: fmtMoney(left) })} value={amount} onChange={(x) => { setAmount(x); setErr({}); }} min={1} max={left} error={err.amount} />
+        <NumberField label={t('admin.online_payments_page.amount_up_to', { amount: fmtMoney(left) })} value={amount} onChange={(x) => { setAmount(x); setErr({}); }} min={0} max={left} error={err.amount} decimals />
         <Field label={t('admin.online_payments_page.why')} value={reason} onChange={(x) => { setReason(x); setErr({}); }} error={err.reason} placeholder={t('admin.online_payments_page.paid_twice')} />
         <div className="help">{t('admin.online_payments_page.the_money_goes_back_to_2')}</div>
         {err._ && <div className="emsg" role="alert">{err._}</div>}

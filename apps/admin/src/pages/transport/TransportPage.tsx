@@ -149,7 +149,7 @@ function RouteDialog({ route, onClose, onDone }: { route: BusRouteRow | null; on
         </div>
         <div className="two"><Field label={tr('admin.transport_page.attendant')} value={f.attendantName} onChange={set('attendantName')} placeholder={tr('admin.transport_page.meena_kale')} /><Field label={tr('admin.transport_page.attendant_s_phone')} type="tel" value={f.attendantPhone} onChange={set('attendantPhone')} hint={tr('admin.transport_page.families_call_the_attendant_or')} /></div>
         <Field label={tr('admin.transport_page.gps_tracker_number_optional')} value={f.trackerId} onChange={set('trackerId')} hint={tr('admin.transport_page.if_the_bus_has_a')} />
-        <NumberField label={tr('admin.transport_page.route_fee_for_a_term', { currencySymbol: currencySymbol() })} value={f.fee} onChange={set('fee')} min={0} />
+        <NumberField label={tr('admin.transport_page.route_fee_for_a_term', { currencySymbol: currencySymbol() })} value={f.fee} onChange={set('fee')} min={0} decimals />
         <div>
           <div className="lbl" style={{ marginBottom: 8 }}>{tr('admin.transport_page.stops_in_order')}</div>
           {stops.map((s, i) => (

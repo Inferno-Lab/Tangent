@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readReceiptTax, receiptTax, fmtDate, fmtMoney, fmtMoneyShort, isCurrency, isLocale, isZone, schoolInstant, schoolMinutes, schoolToday, zoneOffsetMinutes } from './locale.js';
+import { readAmount, readReceiptTax, receiptTax, fmtDate, fmtMoney, fmtMoneyShort, isCurrency, isLocale, isZone, schoolInstant, schoolMinutes, schoolToday, zoneOffsetMinutes } from './locale.js';
 
 describe('a school’s own clock', () => {
   it('“today” is the school’s day, not the server’s', () => {
@@ -66,5 +66,19 @@ describe('tax on a receipt', () => {
   it('shows one line under the tax’s own name when the country does not split it, and reads old GST receipts', () => {
     expect(receiptTax({ name: 'VAT', number: 'GB123456789', numberLabel: 'VAT number', code: '', codeLabel: '', ratePct: 20, inclusive: true, split: [] }, 120, round).parts).toEqual([{ name: 'VAT', pct: 20, amount: 20 }]);
     expect(readReceiptTax({ gstin: 'G', sac: '999293', ratePct: 18, taxable: 1000, cgst: 90, sgst: 90 })!.parts.map((p) => p.amount)).toEqual([90, 90]);
+  });
+});
+
+describe('an amount typed the school’s way', () => {
+  it('reads each locale’s separators, keeps what the currency pays in, and refuses what is not an amount', () => {
+    expect(readAmount('12,50', 'fr-FR', 'EUR')).toBe(12.5);
+    expect(readAmount('1.250,75', 'de-DE', 'EUR')).toBe(1250.75);
+    expect(readAmount('1,250.75', 'en-GB', 'GBP')).toBe(1250.75);
+    expect(readAmount('£ 12.50', 'en-GB', 'GBP')).toBe(12.5);
+    expect(readAmount('1,50,000', 'en-IN', 'INR')).toBe(150000);
+    expect(readAmount('12.345', 'en-US', 'KWD')).toBe(12.345);
+    expect(readAmount('12.5', 'ja-JP', 'JPY')).toBe(13);
+    expect(readAmount('١٢٫٥', 'ar-AE', 'AED')).toBe(12.5);
+    for (const bad of ['', 'abc', '-5', '1.2.3']) expect(readAmount(bad, 'en-GB', 'GBP')).toBeNaN();
   });
 });

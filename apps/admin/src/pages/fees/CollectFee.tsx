@@ -5,7 +5,7 @@ import { Dialog, Field, SelectField, useShake, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { DialogActions as Actions, fieldsOf, messageOf } from '../../app/kit';
 import { useShellChrome } from '../../app/Layout';
-import { currencySymbol, fmtDate, fmtMoney } from '@tangent/contracts';
+import { amountText, currencySymbol, fmtDate, fmtMoney, readAmount } from '@tangent/contracts';
 
 
 /** Records a payment at the desk against one of a student's open invoices. */
@@ -23,11 +23,11 @@ export function CollectFeeDialog({ student, onClose, onDone }: { student: Studen
   const [err, setErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const chosen = open.find((i) => i.id === (pick || open[0]?.id));
-  useEffect(() => { if (chosen) setAmount(String(chosen.amount - chosen.paid)); }, [chosen?.id]);
+  useEffect(() => { if (chosen) setAmount(amountText(chosen.amount - chosen.paid)); }, [chosen?.id]);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chosen) return;
-    const n = Math.round(Number(amount));
+    const n = readAmount(amount);
     if (!(n > 0)) { setErr({ amount: t('admin.collect_fee.enter_an_amount') }); shake.hit(); return; }
     setBusy(true);
     try { const r = await api.fees.pay({ studentId: student.id, invoiceId: chosen.id, amount: n, method, reference: ref || undefined }); onDone(t('admin.collect_fee.receipt_recorded_for', { receiptNo: r.receiptNo, fmtMoney: fmtMoney(n) })); }

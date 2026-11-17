@@ -205,7 +205,7 @@ export function NumberInput({ value, onChange, min, max, step = 1, className = '
   const bump = (d: number) => onChange(clampNum(String((Number(value) || 0) + d * step), min, max));
   return (
     <input className={className} value={value} disabled={disabled} inputMode={decimals ? 'decimal' : 'numeric'} autoComplete="off" {...aria}
-      onChange={(e) => onChange(e.target.value.replace(decimals ? /[^\d.]/g : /\D/g, ''))}
+      onChange={(e) => onChange(decimals ? e.target.value.replace(/,/g, '.').replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1') : e.target.value.replace(/\D/g, ''))}
       onBlur={() => { const c = clampNum(value, min, max); if (c !== value) onChange(c); }}
       onKeyDown={(e) => { if (e.key === 'ArrowUp') { e.preventDefault(); bump(1); } else if (e.key === 'ArrowDown') { e.preventDefault(); bump(-1); } }} />
   );
