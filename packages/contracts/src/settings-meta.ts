@@ -14,7 +14,7 @@ const regionName = (c: string): string => {
 export type SettingKind =
   | 'text' | 'textarea' | 'number' | 'bool' | 'enum' | 'color' | 'time' | 'date' | 'language'
   | 'multi' | 'appRoles' | 'appLayout' | 'notifyRules' | 'templates' | 'classes' | 'logo'
-  | 'houses' | 'categories' | 'strings' | 'gradingScale' | 'paymentMethods' | 'attendanceMarks' | 'vocabulary';
+  | 'houses' | 'categories' | 'strings' | 'gradingScale' | 'paymentMethods' | 'attendanceMarks' | 'vocabulary' | 'list';
 
 export interface SettingMeta {
   /** One of the school-wide groups, or the key of the module that owns the setting (config-engine's MODULES lists it there too). */
@@ -107,6 +107,9 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = localized({
   'students.required': { group: 'people', label: 'Fields the office must fill for a student', kind: 'multi', options: [['gender', 'Gender'], ['house', 'House'], ['admissionNo', 'Admission number'], ['bloodGroup', 'Blood group'], ['address', 'Address']], help: 'Name, class, date of birth and a guardian are always needed. These become required too when adding or editing a student. Without a required admission number, a new student takes the next in the school’s series.' },
   'people.admissionNumber': { group: 'people', label: 'Admission numbers', kind: 'text', help: 'For a new student when none is typed in. {yyyy}/{seq:4} gives 2026/0001; ADM-{ay}-{seq} gives ADM-2026-27-1. Tokens: {yyyy} {yy} {mm} {ay} {seq}.' },
   'people.admissionStart': { group: 'people', label: 'First admission number', kind: 'number', min: 1, max: 99_999_999 },
+  'lists.genders': { group: 'people', label: 'Genders', kind: 'list', max: 40, help: 'What the office can choose on a student’s record and in an import. Retire one rather than remove it, so records that use it keep their word.' },
+  'lists.relationships': { group: 'people', label: 'How guardians are related', kind: 'list', max: 40, help: 'Mother, grandparent, carer…: chosen on each guardian of a student.' },
+  'lists.bloodGroups': { group: 'people', label: 'Blood groups', kind: 'list', max: 40 },
   'people.houses': { group: 'people', label: 'Houses', kind: 'houses', max: 12, help: 'The school’s houses and their colours, if it has them: on student profiles, the roll-call grid and the app. Students are put in a house by import or on their profile.' },
   'admissions.sources': { group: 'people', label: 'Where enquiries come from', kind: 'strings', max: 16, help: 'The choices on a new enquiry, and how Admissions counts them.' },
   'admissions.stages': { group: 'people', label: 'Admission stages', kind: 'multi', options: [['applied', 'Applied (form received)'], ['test', 'Entrance test'], ['offer', 'Offer (the family is told)']], help: 'The steps between an enquiry and enrolment on the Admissions board. Enquiry and Enrolled are always there.' },

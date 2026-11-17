@@ -6,7 +6,7 @@ import {
   type NoticeRow, type SearchHit, type SettingsResponse, type ShellData, type GuardianRow, type StudentDetail, type StudentRow, type StudentSummary, type StudentViews, type TeacherLoad, type TeacherOption, type TimetableView, type WeekOf, type Paged,
 } from '@tangent/contracts';
 import { MODULES, activeModules } from '@tangent/config-engine';
-import { templateXlsx } from '@tangent/db';
+import { ownOptions, templateXlsx } from '@tangent/db';
 import { z } from 'zod';
 import { ZodPipe } from '@tangent/nest-kit';
 import { Core, CurrentUser, Require, RequireModule } from '../auth/guards.js';
@@ -73,8 +73,8 @@ export class StudentsController {
 
   /** The students sheet to fill (the import engine's template: columns, an example row, dropdowns). */
   @Get('template') @Require('students.write') @Header('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-  template(): Buffer {
-    return templateXlsx('students');
+  async template(@Tenant() t: TenantCtx): Promise<Buffer> {
+    return templateXlsx('students', await ownOptions(t.pool, 'students'));
   }
 
   @Post('import') @HttpCode(200) @Require('students.write')

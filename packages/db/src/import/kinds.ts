@@ -1,6 +1,6 @@
 import type pg from 'pg';
 import { createHash } from 'node:crypto';
-import { ADMISSION_STAGES, PAY_METHODS, PERIOD_KINDS, WEEKDAYS, fmtMoney, schoolInstant, schoolToday, schoolZone, phoneProblem, schoolCountry, toE164 } from '@tangent/contracts';
+import { ADMISSION_STAGES, PAY_METHODS, PERIOD_KINDS, WEEKDAYS, fmtMoney, schoolInstant, schoolToday, schoolZone, phoneProblem, schoolCountry, toE164, listKey, tx, type ListItem } from '@tangent/contracts';
 import { newId } from '../ids.js';
 import { savedSetting, seriesFrom } from '../numbers.js';
 
@@ -289,7 +289,7 @@ const staff = kind<StaffLookups>({
 });
 
 type GuardianRow = { id: string; user_id: string | null; name: string; phone: string | null; email: string | null; relation: string };
-type StudentLookups = { classes: Map<string, ClassRow>; students: Map<string, Rec & { id: string }>; people: Map<string, Rec & { id: string }>; next: { take: () => string }; guardians: Map<string, GuardianRow>; users: Map<string, string>; links: Set<string> };
+type StudentLookups = { classes: Map<string, ClassRow>; students: Map<string, Rec & { id: string }>; people: Map<string, Rec & { id: string }>; next: { take: () => string }; lists: { genders: ListItem[]; blood: ListItem[]; rels: ListItem[] }; guardians: Map<string, GuardianRow>; users: Map<string, string>; links: Set<string> };
 const person = (name: string, dob: string) => `${norm(name)}|${dob}`;
 const STATUS: Record<string, string> = { active: 'active', inactive: 'inactive', left: 'inactive', tc: 'inactive', transferred: 'inactive', passedout: 'inactive' };
 const students = kind<StudentLookups>({
@@ -304,6 +304,7 @@ const students = kind<StudentLookups>({
     return {
       classes: await classMap(db), students: new Map(st.map((s) => [lc(s.admission_no), s])), people: new Map(st.map((s) => [person(String(s.name), String(s.dob)), s])),
       next,
+      lists: { genders: await savedSetting(db, 'lists.genders'), blood: await savedSetting(db, 'lists.bloodGroups'), rels: await savedSetting(db, 'lists.relationships') },
       guardians: new Map(gs.filter((g) => g.phone).map((g) => [digits(g.phone!), g])), users: new Map(us.map((u) => [digits(u.phone), u.id])), links: new Set(links.map((x) => `${x.s}|${x.g}`)),
     };
   },
@@ -315,7 +316,8 @@ const students = kind<StudentLookups>({
       ...(r.guardian_phone && !digits(r.guardian_phone) ? [`The guardian’s phone: ${badPhone(r.guardian_phone)} Families sign in with it.`] : []),
       ...(r.guardian2_phone && !digits(r.guardian2_phone) ? [`The second guardian’s phone: ${badPhone(r.guardian2_phone)}`] : []),
       ...(r.status && !STATUS[norm(r.status)] ? ['Status is active or inactive (left, TC and transferred count as inactive).'] : []),
-      ...(r.gender && !['female', 'male', 'other'].includes(norm(r.gender)) ? ['Gender is female, male or other.'] : []),
+      ...(r.gender && !listKey(l.lists.genders, r.gender) ? [tx('Gender is one of the school’s: {names}.', { names: l.lists.genders.filter((g) => g.active !== false).map((g) => g.name).join(', ') })] : []),
+      ...(r.blood_group && !listKey(l.lists.blood, r.blood_group) ? [tx('Blood group is one of the school’s: {names}.', { names: l.lists.blood.filter((g) => g.active !== false).map((g) => g.name).join(', ') })] : []),
     ];
     // No admission number (a sheet of new children): the same child is the same name and date of birth, and Tangent numbers new ones.
     if (!r.admission_no) return ok(`new|${person(r.name!, isoDay(r.dob!) ?? '')}`, errors, l.people.has(person(r.name!, isoDay(r.dob!) ?? '')));
@@ -330,7 +332,7 @@ const students = kind<StudentLookups>({
         const known = [...l.links].find((k) => k.startsWith(`${studentId}|`));
         if (known) return known.split('|')[1]!;
         const id = newId('gdn');
-        guardians.set(`none|${studentId}|${name}`, { id, user_id: null, name, phone: null, email: email || null, relation: relation || 'Parent' });
+        guardians.set(`none|${studentId}|${name}`, { id, user_id: null, name, phone: null, email: email || null, relation: (relation && (listKey(l.lists.rels, relation) ?? relation)) || 'parent' });
         return id;
       }
       const d = digits(phone);
@@ -343,7 +345,7 @@ const students = kind<StudentLookups>({
         l.users.set(d, userId);
         users.push({ id: userId, kind: 'guardian', name, phone: d });
       }
-      guardians.set(d, { id: was?.id ?? newId('gdn'), user_id: userId, name: was?.name ?? name, phone: was?.phone ?? d, email: was?.email || email || null, relation: was?.relation ?? (relation || 'Parent') });
+      guardians.set(d, { id: was?.id ?? newId('gdn'), user_id: userId, name: was?.name ?? name, phone: was?.phone ?? d, email: was?.email || email || null, relation: was?.relation ?? ((relation && (listKey(l.lists.rels, relation) ?? relation)) || 'parent') });
       return guardians.get(d)!.id as string;
     };
     for (const r of rows) {
@@ -351,7 +353,7 @@ const students = kind<StudentLookups>({
       const id = was?.id ?? newId('stu');
       studs.push({
         id, admission_no: r.admission_no?.trim() || (was?.admission_no as string | undefined) || l.next.take(), name: r.name, class_id: l.classes.get(classKey(r.class!))!.id, roll_no: r.roll_no || (was?.roll_no as string) || '', dob: isoDay(r.dob!),
-        blood_group: r.blood_group || was?.blood_group || null, house: r.house || was?.house || null, address: r.address || was?.address || null, gender: r.gender ? norm(r.gender) : was?.gender ?? null,
+        blood_group: (r.blood_group && listKey(l.lists.blood, r.blood_group)) || was?.blood_group || null, house: r.house || was?.house || null, address: r.address || was?.address || null, gender: r.gender ? listKey(l.lists.genders, r.gender) : was?.gender ?? null,
         status: r.status ? STATUS[norm(r.status)] : was?.status ?? 'active', admitted_on: r.admitted_on ? isoDay(r.admitted_on) : was?.admitted_on ?? null,
       });
       const g1 = guardian(r.guardian_name!, r.guardian_phone ?? '', r.guardian_email!, r.relation!, id);

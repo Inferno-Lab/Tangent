@@ -2,6 +2,7 @@ import type pg from 'pg';
 import { rawOf, IMPORT_KINDS, importKind, type ImportBatchRow, type ImportInput, type ImportKind, type ImportPreview, type ImportRowCheck, tx } from '@tangent/contracts';
 import { ImportError, readTable, toCsv, xlsx, zip } from './files.js';
 import { KINDS, type Impl, type Row, type Write } from './kinds.js';
+import { savedSetting } from '../numbers.js';
 
 type Q = pg.Pool | pg.PoolClient;
 type Rec = Record<string, unknown>;
@@ -230,15 +231,25 @@ export function templateCsv(key: string): string {
  * The template as an .xlsx: the columns by their names with an example row, a dropdown on every column that takes fixed
  * values, and a second sheet that says what each column is, whether it is needed and what it takes.
  */
-export function templateXlsx(key: string): Buffer {
+export function templateXlsx(key: string, own: Record<string, readonly string[]> = {}): Buffer {
   const kind = importKind(key);
   if (!kind) throw new ImportError(tx('There is no import for “{key}”.', { key }));
-  const lists = Object.fromEntries(kind.columns.flatMap((c, i) => (c.options ? [[i, c.options]] : [])));
-  const help = [[tx('Column'), tx('Needed'), tx('Example'), tx('What it takes')], ...kind.columns.map((c) => [c.label, c.required ? tx('Yes') : tx('No'), c.example, c.options ? c.options.join(', ') : c.aliases?.length ? tx('Also read as: {names}', { names: c.aliases.join(', ') }) : ''])];
+  const opts = (c: (typeof kind.columns)[number]) => own[c.key] ?? c.options;
+  const lists = Object.fromEntries(kind.columns.flatMap((c, i) => (opts(c) && c.key !== 'relation' ? [[i, opts(c)!]] : [])));
+  const help = [[tx('Column'), tx('Needed'), tx('Example'), tx('What it takes')], ...kind.columns.map((c) => [c.label, c.required ? tx('Yes') : tx('No'), c.example, opts(c) ? opts(c)!.join(', ') : c.aliases?.length ? tx('Also read as: {names}', { names: c.aliases.join(', ') }) : ''])];
   return xlsx([
     { name: kind.label, rows: [kind.columns.map((c) => c.label), kind.columns.map((c) => c.example)], lists, widths: kind.columns.map((c) => Math.max(14, c.label.length + 4)) },
     { name: 'How to fill', rows: help, widths: [26, 10, 22, 70] },
   ]);
+}
+
+/** The school's own choices for a kind's list columns (its genders, blood groups…), for `templateXlsx`. */
+export async function ownOptions(db: Q, key: string): Promise<Record<string, string[]>> {
+  const out: Record<string, string[]> = {};
+  for (const c of importKind(key)?.columns ?? []) {
+    if (c.list) out[c.key] = (await savedSetting(db, c.list)).filter((i) => i.active !== false).map((i) => i.name);
+  }
+  return out;
 }
 
 /** Everything the school has, in the same templates it can be imported from: one CSV per kind in a ZIP. Leaving is easy too. */

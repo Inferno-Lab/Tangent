@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, hasKey, type AppRole } from '@tangent/config-engine';
-import { rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
+import { rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
 import { Checkbox, DateField, FilePick, NumberField, TimeField } from './fields';
 import { ColourField } from './ColourPicker';
 import { ErrorLine, Field, SelectField } from './forms';
@@ -86,6 +86,11 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
       const v = ctx.values ?? {};
       const langs = [...new Set([String(v['school.language'] ?? 'en'), ...(Array.isArray(v['app.languages']) ? (v['app.languages'] as string[]) : [])])];
       return box(<VocabularyEditor value={(value ?? {}) as Vocabulary} languages={langs} disabled={disabled} onChange={onChange} />);
+    }
+    case 'list': {
+      const v = ctx.values ?? {};
+      const others = (Array.isArray(v['app.languages']) ? (v['app.languages'] as string[]) : []).filter((l) => l !== String(v['school.language'] ?? 'en'));
+      return box(<ListItemsEditor value={(Array.isArray(value) ? value : []) as ListItem[]} languages={others} max={meta.max ?? 40} disabled={disabled} onChange={onChange} />);
     }
     case 'gradingScale':
       return box(<GradingEditor value={(Array.isArray(value) ? value : []) as { grade: string; minPct: number }[]} max={meta.max ?? 12} disabled={disabled} onChange={onChange} />);
@@ -251,6 +256,42 @@ function GradingEditor({ value, max, disabled, onChange }: { value: { grade: str
 
 
 /** The ways the school takes money: the name the office uses, and what kind of money it is (reports group by the kind). */
+/** A school list (§3.6.5): rename, add, retire or bring back an item, and name it in the school's other languages. */
+function ListItemsEditor({ value, languages, max, disabled, onChange }: { value: ListItem[]; languages: string[]; max: number; disabled: boolean; onChange: (v: unknown) => void }) {
+  const put = (i: number, patch: Partial<ListItem>) => onChange(value.map((it, j) => (j === i ? { ...it, ...patch } : it)));
+  const [open, setOpen] = useState<number | null>(null);
+  return (
+    <div>
+      {value.map((it, i) => {
+        const off = it.active === false;
+        return (
+          <div key={it.key} style={{ marginTop: 6 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', opacity: off ? 0.6 : 1 }}>
+              <div style={{ flex: 1, minWidth: 160 }}><Field label={tr('ui.settings.item', { p0: i + 1 })} value={it.name} maxLength={40} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
+              <div style={{ width: 100 }}><Field label={tr('ui.settings.code')} value={it.code ?? ''} maxLength={8} disabled={disabled} onChange={(v) => put(i, { code: v || undefined })} /></div>
+              {languages.length > 0 && <button type="button" className="btn sm" aria-expanded={open === i} disabled={disabled} onClick={() => setOpen(open === i ? null : i)}>{tr('ui.settings.other_languages')}</button>}
+              <button type="button" className="btn sm" disabled={disabled || (!off && value.filter((x) => x.active !== false).length <= 1)} onClick={() => put(i, { active: off ? undefined : false })}>{off ? tr('ui.settings.bring_back') : tr('ui.settings.retire')}</button>
+            </div>
+            {open === i && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>{languages.map((l) => (
+              <div key={l} style={{ flex: 1, minWidth: 160 }}><Field label={languageLabel(l)} value={it.names?.[l] ?? ''} maxLength={40} disabled={disabled} onChange={(v) => {
+                const names = { ...it.names, [l]: v };
+                if (!v) delete names[l];
+                put(i, { names: Object.keys(names).length ? names : undefined });
+              }} /></div>
+            ))}</div>}
+          </div>
+        );
+      })}
+      {value.length < max && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={() => {
+        let n = value.length + 1;
+        while (value.some((x) => x.key === `item-${n}`)) n++;
+        onChange([...value, { key: `item-${n}`, name: tr('ui.settings.new_item') }]);
+      }}>{tr('ui.settings.add_an_item')}</button>}
+      <div className="help">{tr('ui.settings.an_item_keeps_its_key')}</div>
+    </div>
+  );
+}
+
 function PaymentMethodsEditor({ value, max, disabled, onChange }: { value: PaymentMethod[]; max: number; disabled: boolean; onChange: (v: unknown) => void }) {
   const put = (i: number, patch: Partial<PaymentMethod>) => onChange(value.map((m, j) => (j === i ? { ...m, ...patch } : m)));
   const keyOf = (name: string) => name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24) || 'method';

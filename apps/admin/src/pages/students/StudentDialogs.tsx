@@ -25,7 +25,7 @@ export function AddStudentDialog({ classes, defaultClass, onClose, onDone }: { c
     if (!f.guardianPhone.trim()) local.guardianPhone = tr('admin.student_dialogs.enter_a_phone_number');
     if (Object.keys(local).length) { setErr(local); shake.hit(); return; }
     setBusy(true);
-    try { const s = await api.students.create({ ...f, rollNo: f.rollNo || undefined, bloodGroup: f.bloodGroup || undefined, address: f.address || undefined, gender: (f.gender || undefined) as 'female' | undefined, house: f.house || undefined, admissionNo: f.admissionNo || undefined });
+    try { const s = await api.students.create({ ...f, rollNo: f.rollNo || undefined, bloodGroup: f.bloodGroup || undefined, address: f.address || undefined, gender: f.gender || undefined, house: f.house || undefined, admissionNo: f.admissionNo || undefined });
       onDone(tr('admin.student_dialogs.was_added_to', { name: s.name, className: s.className }), s.id);
     } catch (x) { setBusy(false); setErr(fieldsOf(x)); setGeneral(Object.keys(fieldsOf(x)).length ? '' : messageOf(x)); shake.hit();
     }

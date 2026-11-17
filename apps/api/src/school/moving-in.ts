@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Header, HttpCode, Inject, Injectable, Param, Post, Query, Res } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 import { FamilyInvite, IMPORT_KINDS, UploadCreate, importKind, type Activation, type ImportBatchRow, type LetterRow, type UploadRow } from '@tangent/contracts';
-import { exportAll, listBatches, newId, readTable, templateXlsx } from '@tangent/db';
+import { exportAll, listBatches, newId, ownOptions, readTable, templateXlsx } from '@tangent/db';
 import { hashPassword } from '@tangent/security';
 import { ZodPipe, notFound } from '@tangent/nest-kit';
 import { z } from 'zod';
@@ -192,9 +192,9 @@ export class MovingInController {
 
   /** A blank sheet to fill, as the console's: an .xlsx with the columns, an example row and dropdowns. */
   @Get('template/:kind') @Require('setup.write') @Header('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-  template(@Param('kind') kind: string): Buffer {
+  async template(@Tenant() t: TenantCtx, @Param('kind') kind: string): Promise<Buffer> {
     if (!importKind(kind)) throw notFound('That kind of import');
-    return templateXlsx(kind);
+    return templateXlsx(kind, await ownOptions(t.pool, kind));
   }
 
   @Get('export') @Require('privacy.manage') @Header('content-type', 'application/zip') @Header('content-disposition', 'attachment; filename="school-export.zip"')

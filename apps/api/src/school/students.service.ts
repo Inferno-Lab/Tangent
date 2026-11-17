@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { nextNumber, commitImport, newId, previewImport } from '@tangent/db';
-import { schoolInstant, addDays, dayLabel, initials, schoolToday, latestSchoolDay, schoolDaysEnding, type AssignFee, type AttendanceStatus, type ContactReveal, type FeeStatus, type ImportResult, type MessageRequest, type GuardianRow, type GuardiansPut, type Paged, type StudentCreate, type StudentDetail, type StudentPatch, type StudentQuery, type StudentRow, type StudentSummary, type StudentViews, tx } from '@tangent/contracts';
+import { schoolInstant, addDays, dayLabel, initials, schoolToday, latestSchoolDay, schoolDaysEnding, type AssignFee, type AttendanceStatus, type ContactReveal, type FeeStatus, type ImportResult, type MessageRequest, type GuardianRow, type GuardiansPut, type Paged, type StudentCreate, type StudentDetail, type StudentPatch, type StudentQuery, type StudentRow, type StudentSummary, type StudentViews, type ListItem, listKey, tx } from '@tangent/contracts';
 import { maskPhone } from '@tangent/security';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
@@ -264,6 +264,14 @@ export class StudentsService {
     const need = await this.settings.value<string[]>(t, 'students.required', []);
     const missing = need.filter((k) => k in body ? !String((body as Record<string, unknown>)[k] ?? '').trim() : false);
     if (missing.length) throw new ApiError('validation', 'Fill in the fields your school keeps for every student.', { fields: Object.fromEntries(missing.map((k) => [k, 'Your school needs this.'])) });
+    // Gender and blood group come from the school's lists (§3.6.5): stored as the item's key, whatever was typed.
+    for (const [field, list] of [['gender', 'lists.genders'], ['bloodGroup', 'lists.bloodGroups']] as const) {
+      const typed = body[field];
+      if (!typed) continue;
+      const key = listKey(await this.settings.value<ListItem[]>(t, list, []), typed);
+      if (!key) throw new ApiError('validation', 'Choose from the school’s list.', { fields: { [field]: 'Choose from the list.' } });
+      body[field] = key;
+    }
   }
 
   async create(t: TenantCtx, body: StudentCreate, user: { id: string; name: string }): Promise<StudentDetail> {
@@ -349,6 +357,14 @@ export class StudentsService {
    */
   async setGuardians(t: TenantCtx, studentId: string, b: GuardiansPut, user: { id: string; name: string }): Promise<GuardianRow[]> {
     if (!(await t.pool.query('select 1 from students where id = $1', [studentId])).rowCount) throw notFound('That student');
+    // How each is related comes from the school's list; a relation typed before the list existed is kept as it was.
+    const rels = await this.settings.value<ListItem[]>(t, 'lists.relationships', []);
+    const was = new Set((await this.guardians(t, studentId)).map((g) => g.relation.toLowerCase()));
+    b.guardians.forEach((g, i) => {
+      const key = listKey(rels, g.relation);
+      if (key) g.relation = key;
+      else if (!was.has(g.relation.toLowerCase())) throw new ApiError('validation', 'Choose how each guardian is related from the list.', { fields: { [`guardians.${i}.relation`]: 'Choose from the list.' } });
+    });
     const byPhone = 'phone = $1';
     const client = await t.pool.connect();
     try {

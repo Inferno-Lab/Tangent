@@ -53,7 +53,7 @@ export interface StudentDetail extends StudentRow {
   admittedOn: string | null;
   recentActivity: { id: string; at: string; label: string; sub: string; tone: 'g' | 'v' | 'a' }[];
   roll24: (AttendanceStatus | null)[];
-  gender: (typeof GENDERS)[number] | null;
+  gender: string | null;
   /** When and why a student who left the school left (null while on the roll). */
   left: { on: string; reason: string } | null;
   /** Every guardian (phones masked: the reveal call shows one in full). */
@@ -143,7 +143,6 @@ export const AssignFee = z.object({
 });
 export type AssignFee = z.infer<typeof AssignFee>;
 
-export const GENDERS = ['female', 'male', 'other'] as const;
 /** The fields of a student's record a school may require (console: People → fields the office must fill). */
 export const STUDENT_FIELDS = ['gender', 'house', 'admissionNo', 'bloodGroup', 'address'] as const;
 const StudentFields = {
@@ -151,7 +150,8 @@ const StudentFields = {
   classId: z.string().min(1, 'Choose a class'),
   rollNo: z.string().trim().max(10).optional(),
   dob: IsoDate,
-  gender: z.enum(GENDERS).optional(),
+  // A key of the school's lists.genders (the service checks it against the school's list).
+  gender: z.string().trim().max(32).optional(),
   house: z.string().trim().max(24).optional(),
   admissionNo: z.string().trim().max(30).optional(),
   bloodGroup: z.string().trim().max(4).optional(),
@@ -170,7 +170,7 @@ export type StudentPatch = z.infer<typeof StudentPatch>;
 export const GuardiansPut = z.object({
   guardians: z.array(z.object({
     id: z.string().optional(), name: z.string().trim().min(2, 'Enter the name').max(80), phone: z.string().trim().min(1, 'Enter the phone number').max(24),
-    email: z.string().trim().email('Check the email').max(120).or(z.literal('')).optional(), relation: z.string().trim().min(2).max(30), canCollect: z.boolean(), isPrimary: z.boolean(),
+    email: z.string().trim().email('Check the email').max(120).or(z.literal('')).optional(), relation: z.string().trim().min(1, 'Choose how they are related').max(30), canCollect: z.boolean(), isPrimary: z.boolean(),
     language: z.string().refine((l) => !l || isLanguage(l), 'Pick a language from the list').optional(),
   })).min(1, 'A student needs at least one guardian').max(4),
 }).refine((b) => b.guardians.filter((g) => g.isPrimary).length === 1, { message: 'Choose one guardian to contact first.', path: ['guardians'] });

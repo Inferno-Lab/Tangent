@@ -1,12 +1,16 @@
 import { useState } from 'react';
-import { languageLabel, LANGUAGE_LIST, GENDERS, schoolToday, type ClassInfo, type GuardianRow, type StudentDetail } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, ErrorLine, Field, SelectField, useShake, t } from '@tangent/web-ui';
+import { languageLabel, LANGUAGE_LIST, listKey, listLabel, listOptions, schoolToday, type ListItem, type ClassInfo, type GuardianRow, type StudentDetail } from '@tangent/contracts';
+import { Checkbox, DateField, Dialog, ErrorLine, Field, SelectField, currentLanguage, useShake, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { AreaField, problem, useSetting } from '../../app/kit';
 
 export type Rec = { gender: string; house: string; admissionNo: string; bloodGroup: string; address: string };
 export const emptyRec: Rec = { gender: '', house: '', admissionNo: '', bloodGroup: '', address: '' };
-const GENDER_LABEL: Record<string, string> = { female: t('admin.student_record.female'), male: t('admin.student_record.male'), other: t('admin.student_record.other') };
+/** A school list as a form's choices, keeping a value that was retired since (or typed before the list existed). */
+export const choices = (list: ListItem[], current: string) => {
+  const items = listOptions(list, current).map((i) => ({ value: i.key, label: listLabel([i], i.key, currentLanguage()) }));
+  return current && !items.some((o) => o.value === current) ? [...items, { value: current, label: current }] : items;
+};
 
 /**
  * The parts of a student's record beyond name, class and birth date. Which of them the school must fill is the console's
@@ -15,16 +19,18 @@ const GENDER_LABEL: Record<string, string> = { female: t('admin.student_record.f
 export function RecordFields({ f, set, err, adding }: { f: Rec; set: (k: keyof Rec) => (v: string) => void; err: Record<string, string>; adding?: boolean }) {
   const need = useSetting<string[]>('students.required', []);
   const houses = useSetting<{ key: string; name: string }[]>('people.houses', []);
+  const genders = useSetting<ListItem[]>('lists.genders', []);
+  const blood = useSetting<ListItem[]>('lists.bloodGroups', []);
   const opt = (k: keyof Rec, label: string) => (need.includes(k) ? label : t('admin.student_record.optional', { label }));
   return (
     <>
       <div className="two">
-        <SelectField label={opt('gender', t('admin.student_record.gender'))} value={f.gender} onChange={set('gender')} error={err.gender} options={[{ value: '', label: t('admin.student_record.not_given') }, ...GENDERS.map((g) => ({ value: g, label: GENDER_LABEL[g]! }))]} />
+        <SelectField label={opt('gender', t('admin.student_record.gender'))} value={f.gender} onChange={set('gender')} error={err.gender} options={[{ value: '', label: t('admin.student_record.not_given') }, ...choices(genders, f.gender)]} />
         {houses.length > 0 && <SelectField label={opt('house', t('admin.student_record.house'))} value={f.house} onChange={set('house')} error={err.house} options={[{ value: '', label: t('admin.student_record.no_house') }, ...houses.map((h) => ({ value: h.name, label: h.name }))]} />}
       </div>
       <div className="two">
         <Field label={adding && !need.includes('admissionNo') ? t('admin.student_record.admission_number_blank_tangent_numbers') : opt('admissionNo', t('admin.student_record.admission_number'))} value={f.admissionNo} onChange={set('admissionNo')} error={err.admissionNo} maxLength={30} />
-        <Field label={opt('bloodGroup', t('admin.student_record.blood_group'))} value={f.bloodGroup} onChange={set('bloodGroup')} error={err.bloodGroup} maxLength={4} placeholder="B+" />
+        <SelectField label={opt('bloodGroup', t('admin.student_record.blood_group'))} value={f.bloodGroup} onChange={set('bloodGroup')} error={err.bloodGroup} options={[{ value: '', label: t('admin.student_record.not_given') }, ...choices(blood, f.bloodGroup)]} />
       </div>
       <Field label={opt('address', t('admin.student_record.address'))} value={f.address} onChange={set('address')} error={err.address} maxLength={200} />
     </>
@@ -43,7 +49,7 @@ export function EditStudentDialog({ s, classes, onClose, onDone }: { s: StudentD
     if (f.name.trim().length < 2) { setErr({ name: t('admin.student_record.enter_the_full_name') }); shake.hit(); return; }
     setBusy(true);
     try {
-      const next = await api.students.update(s.id, { ...f, gender: (f.gender || undefined) as StudentDetail['gender'] & string | undefined });
+      const next = await api.students.update(s.id, { ...f, gender: f.gender || undefined });
       onDone(next.className !== s.className ? t('admin.student_record.moved_to_their_marks_and', { name: next.name, className: next.className }) : t('admin.student_record.s_record_was_saved', { name: next.name }));
     } catch (e) { setBusy(false); setErr(problem(e)); shake.hit(); }
   };
@@ -73,7 +79,9 @@ type G = Omit<GuardianRow, 'hasApp'> & { key: string };
 export function GuardiansDialog({ s, onClose, onDone }: { s: StudentDetail; onClose: () => void; onDone: (m: string) => void }) {
   const { api } = useApp();
   const shake = useShake();
-  const [list, setList] = useState<G[]>(s.guardians.map((g) => ({ ...g, key: g.id })));
+  const rels = useSetting<ListItem[]>('lists.relationships', []);
+  // Relations typed before the list existed ("Mother") open as the list's item when one matches.
+  const [list, setList] = useState<G[]>(s.guardians.map((g) => ({ ...g, relation: listKey(rels, g.relation) ?? g.relation, key: g.id })));
   const [err, setErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const upd = (i: number, p: Partial<G>) => { setList(list.map((g, j) => (j === i ? { ...g, ...p } : p.isPrimary ? { ...g, isPrimary: false } : g))); setErr({}); };
@@ -92,7 +100,7 @@ export function GuardiansDialog({ s, onClose, onDone }: { s: StudentDetail; onCl
           <div key={g.key} className="card" style={{ padding: 16, display: 'grid', gap: 10 }}>
             <div className="two">
               <Field label={t('admin.student_record.name')} value={g.name} onChange={(name) => upd(i, { name })} maxLength={80} />
-              <Field label={t('admin.student_record.relation')} value={g.relation} onChange={(relation) => upd(i, { relation })} maxLength={30} placeholder={t('admin.student_record.mother')} />
+              <SelectField label={t('admin.student_record.relation')} value={g.relation} onChange={(relation) => upd(i, { relation })} options={choices(rels, g.relation)} />
             </div>
             <div className="two">
               <Field label={t('admin.student_record.phone')} type="tel" value={g.phone} onChange={(phone) => upd(i, { phone })} maxLength={20} hint={g.id ? t('admin.student_record.shown_hidden_type_a_new') : undefined} />
@@ -108,7 +116,7 @@ export function GuardiansDialog({ s, onClose, onDone }: { s: StudentDetail; onCl
             </div>
           </div>
         ))}
-        {list.length < 4 && <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => setList([...list, { key: `new-${Date.now()}`, id: '', name: '', phone: '', email: '', relation: '', canCollect: true, isPrimary: false, language: '' }])}>{t('admin.student_record.add_a_guardian')}</button>}
+        {list.length < 4 && <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => setList([...list, { key: `new-${Date.now()}`, id: '', name: '', phone: '', email: '', relation: listOptions(rels).find((r) => r.key === 'parent')?.key ?? listOptions(rels)[0]?.key ?? '', canCollect: true, isPrimary: false, language: '' }])}>{t('admin.student_record.add_a_guardian')}</button>}
         {Object.values(err)[0] && <ErrorLine>{Object.values(err)[0]}</ErrorLine>}
         <div className="tgrow" style={{ justifyContent: 'flex-end' }}>
           <button className="btn" onClick={onClose}>{t('admin.student_record.cancel')}</button>

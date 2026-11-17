@@ -189,7 +189,10 @@ describe('a student’s record', () => {
       { name: 'Sam Test', phone: '9822099002', email: 'sam@example.com', relation: 'Father', canCollect: false, isPrimary: true },
     ] } });
     expect(g.status).toBe(200);
-    expect(g.json).toEqual([expect.objectContaining({ name: 'Sam Test', isPrimary: true, canCollect: false }), expect.objectContaining({ name: 'Pat Test', relation: 'Mother', isPrimary: false })]);
+    expect(g.json).toEqual([expect.objectContaining({ name: 'Sam Test', isPrimary: true, canCollect: false }), expect.objectContaining({ name: 'Pat Test', relation: 'mother', isPrimary: false })]);
+    // Gender, blood group and relations come from the school's lists: a word not on them is refused.
+    expect((await h.call('PATCH', `/v1/students/${made.json.id}`, { token, body: { gender: 'robot' } })).status).toBe(400);
+    expect((await h.call('PUT', `/v1/students/${made.json.id}/guardians`, { token, body: { guardians: [{ name: 'Sam Test', phone: '9822099002', relation: 'Neighbour', canCollect: true, isPrimary: true }] } })).status).toBe(400);
     expect((await h.call('PUT', `/v1/students/${made.json.id}/guardians`, { token, body: { guardians: [{ name: 'No One', phone: '9822099003', relation: 'Aunt', canCollect: true, isPrimary: false }] } })).status).toBe(400);
     await h.setSettings({ 'students.required': ['address'] });
     expect((await h.call('PATCH', `/v1/students/${made.json.id}`, { token, body: { address: '' } })).status).toBe(400);
