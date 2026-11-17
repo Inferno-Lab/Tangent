@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fmtNumber, fmtMoney, fmtDate, dayLabel, schoolToday, listLabel, type ListItem, type StudentRow } from '@tangent/contracts';
-import { EmptyCard, Menu, PageScope, Select, ToastSlot, rollDigits, tintFor, useToast, Icon, type IconName, currentLanguage, t as tr } from '@tangent/web-ui';
+import { fmtNumber, fmtMoney, fmtDate, dayLabel, schoolToday, listLabel, type CustomFieldsSetting, type ListItem, type StudentRow } from '@tangent/contracts';
+import { EmptyCard, Menu, PageScope, Select, ToastSlot, rollDigits, tintFor, useToast, Icon, type IconName, currentLanguage, customLines, t as tr } from '@tangent/web-ui';
 import type { StudentListQuery } from '@tangent/api-client';
 import { useApp } from '../../app/context';
 import { useShellChrome } from '../../app/Layout';
@@ -51,6 +51,7 @@ function StudentList({ tabs }: { tabs: React.ReactNode }) { const app = useApp()
   const [house, setHouse] = useState('');
   const houses = useSetting<{ key: string; name: string }[]>('people.houses', []);
   const rels = useSetting<ListItem[]>('lists.relationships', []);
+  const own = useSetting<CustomFieldsSetting>('fields.custom', {}).student ?? [];
   const goal = useSetting<number>('attendance.goalPct', 95);
   const [fee, setFee] = useState<'' | 'paid' | 'due' | 'overdue'>('');
   const [att, setAtt] = useState<'' | 'low' | 'perfect'>('');
@@ -215,6 +216,7 @@ function StudentList({ tabs }: { tabs: React.ReactNode }) { const app = useApp()
     // A student who left: when and why, and (for someone who manages the year) bringing them back on the roll.
     left: detail.data?.left ? { line: tr('admin.students_page.left_on', { fmtDate: fmtDate(detail.data.left.on, 'dayYear'), p1: detail.data.left.reason ? `: ${detail.data.left.reason}` : '' }),
       back: app.user.permissions.includes('year.manage') ? () => void app.api.year.rejoin(detail.data!.id).then(() => { say(tr('admin.students_page.is_back_on_the_roll', { name: detail.data!.name })); refreshAll(); }).catch((e: Error) => say(e.message)) : null } : null,
+    own: customLines(own, detail.data?.custom),
     edit: () => setDialog({ kind: 'edit' }), editGuardians: () => setDialog({ kind: 'guardians' }), leave: () => setDialog({ kind: 'leave' }),
     guardians: (detail.data?.guardians ?? []).map((g) => ({ n: g.name, ini: g.name.split(' ').map((w) => w[0]).slice(0, 2).join(''), primary: g.isPrimary,
       line: [listLabel(rels, g.relation, currentLanguage()), g.isPrimary ? tr('admin.students_page.contacted_first') : '', g.canCollect ? tr('admin.students_page.may_collect_from_school') : tr('admin.students_page.may_not_collect'), g.hasApp ? tr('admin.students_page.uses_the_app') : ''].filter(Boolean).join(' · '),

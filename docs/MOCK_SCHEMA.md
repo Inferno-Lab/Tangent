@@ -77,7 +77,7 @@ Aarav (`stu_aarav`) has an overdue lab fee and a Term 2 fee inside the due windo
 
 **User:** `id`, `role`, `name`, `email`, `phone`, `avatarUrl`, `password`, `childIds`, optional `studentId`, optional `teacherId`.
 
-**Student:** `id`, `userId`, `name`, `classId`, `rollNo`, `dob`, `bloodGroup`, `house`, `avatarUrl`, `guardianName`, `guardianPhone`, `address`.
+**Student:** `id`, `userId`, `name`, `classId`, `rollNo`, `dob`, `bloodGroup`, `house`, `avatarUrl`, `guardianName`, `guardianPhone`, `address`, and optional `fields` (the school's own fields it shows in the app, label → value; `{}` when none).
 
 **Class:** `id`, `name`, `section`, `classTeacherId`, `room`, `studentIds`.
 

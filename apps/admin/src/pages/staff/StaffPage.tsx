@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { StaffRow } from '@tangent/contracts';
-import { Dialog, Field, Segmented, Select, SelectField, useShake, EmptyState, EmptyNote, t as tr } from '@tangent/web-ui';
+import type { CustomFieldsSetting, CustomValues, StaffRow } from '@tangent/contracts';
+import { CustomFieldInputs, Dialog, Field, Segmented, Select, SelectField, useShake, EmptyState, EmptyNote, t as tr } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
-import { AddBtn, Avatar, Ico, problem, useSchoolConfig } from '../../app/kit';
+import { AddBtn, Avatar, Ico, problem, useSchoolConfig, useSetting } from '../../app/kit';
 import { ImportDialog } from '../students/StudentDialogs';
 
 const refresh = (qc: ReturnType<typeof useQueryClient>) => void qc.invalidateQueries({ predicate: (q) => ['staff', 'dashboard', 'shell', 'roles', 'activation'].includes(String(q.queryKey[0])) });
@@ -122,15 +122,17 @@ function StaffDialog({ person, onClose, onDone }: { person: StaffRow | null; onC
   // A new person starts as a teacher where the school has that role, else in the first one.
   const roleId = f.roleId || (roles.data?.find((r) => r.key === 'teacher') ?? roles.data?.[0])?.id || '';
   const [subs, setSubs] = useState<string[]>(person?.subjects.map((s) => s.id) ?? []);
+  const own = useSetting<CustomFieldsSetting>('fields.custom', {}).staff ?? [];
+  const [custom, setCustom] = useState<CustomValues>(person?.custom ?? {});
   const [err, setErr] = useState<Record<string, string>>({});
   const shake = useShake();
   const set = (k: keyof typeof f) => (v: string) => { setF((x) => ({ ...x, [k]: v })); setErr((e) => ({ ...e, [k]: '', _: '' })); };
   const fail = (e: unknown) => { setErr(problem(e)); shake.hit(); };
-  const save = useMutation({ mutationFn: () => { if (!person) return app.api.staff.create({ name: f.name.trim(), email: f.email.trim(), phone: f.phone.trim(), designation: f.designation.trim() || tr('admin.staff_page.teacher'), department: f.department.trim() || undefined, subjectIds: subs, roleId });
+  const save = useMutation({ mutationFn: () => { if (!person) return app.api.staff.create({ name: f.name.trim(), email: f.email.trim(), phone: f.phone.trim(), designation: f.designation.trim() || tr('admin.staff_page.teacher'), department: f.department.trim() || undefined, subjectIds: subs, roleId, custom });
       // Only what changed: a person with two roles keeps both unless the role is changed here.
       const changed = <T,>(now: T, was: T) => (now !== was ? now : undefined);
       return app.api.staff.patch(person.id, { name: changed(f.name.trim(), person.name), email: changed(f.email.trim().toLowerCase(), person.email ?? ''), phone: changed(f.phone.trim(), person.phone ?? ''),
-        designation: f.designation.trim(), department: f.department.trim() || null, subjectIds: subs, ...(me || roleId === person.roles[0]?.id ? {} : { roleId }) });
+        designation: f.designation.trim(), department: f.department.trim() || null, subjectIds: subs, custom, ...(me || roleId === person.roles[0]?.id ? {} : { roleId }) });
     },
     onSuccess: (r) => onDone(person ? tr('admin.staff_page.was_updated', { name: r.name }) : tr('admin.staff_page.was_added_invite_sent_to', { name: r.name, email: r.email })),
     onError: fail });
@@ -170,6 +172,7 @@ function StaffDialog({ person, onClose, onDone }: { person: StaffRow | null; onC
             })}
           </div>
         </div>
+        <CustomFieldInputs defs={own} values={custom} onChange={setCustom} errors={err} />
         {person && person.status === 'active' && person.access !== 'signed_in' && !me && (
           <div className="help" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <span style={{ flex: '1 1 240px' }}>{person.access === 'invited' ? tr('admin.staff_page.invited_not_signed_in_yet') : tr('admin.staff_page.not_invited_yet')}</span>

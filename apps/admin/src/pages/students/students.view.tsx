@@ -300,6 +300,12 @@ export function StudentsView({ v }: { v: any }) {
                 </div>
                 ))}
               </div>
+              {v.own.length > 0 && (
+              <div>
+                <h3>{tr('admin.students.view.the_school_s_own_fields')}</h3>
+                {v.own.map((l: { label: string; text: string }) => <div className="kv" key={l.label}><span>{l.label}</span><b style={{ textAlign: 'end' } as CSSProperties}>{l.text}</b></div>)}
+              </div>
+              )}
               {v.files}
               <div>
                 <h3>{tr('admin.students.view.activity')}</h3>

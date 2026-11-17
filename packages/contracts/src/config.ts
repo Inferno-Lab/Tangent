@@ -2,6 +2,8 @@ import { z } from 'zod';
 import type { AppMode } from './theme.js';
 import { COUNTRIES, isCurrency, isLocale, isZone } from './locale.js';
 import { localizedLabels, VOCAB_CONCEPTS, isLanguage, type Vocabulary } from './i18n.js';
+import { DEFAULT_BLOOD_GROUPS, DEFAULT_GENDERS, DEFAULT_RELATIONSHIPS, schoolList } from './lists.js';
+import { CustomFieldsSetting } from './fields.js';
 
 
 /** Attendance marks the data model knows; a school picks which it uses (`attendance.statuses`). */
@@ -42,45 +44,6 @@ export const CATEGORY_TONES = ['v', 'g', 'a', 'c'] as const;
 export const CATEGORY_TONE_LABELS: Record<(typeof CATEGORY_TONES)[number], string> = localizedLabels({ v: 'Violet', g: 'Green', a: 'Amber', c: 'Coral' });
 const CATEGORY = z.object({ key: z.string().regex(/^[a-z0-9-]{1,24}$/), name: z.string().trim().min(1).max(24), tone: z.enum(CATEGORY_TONES) });
 export type Category = z.infer<typeof CATEGORY>;
-
-/**
- * One item of a school list (docs/one-shot-plan.md §3.6.5): genders, relationships, blood groups and every list a module
- * declares. Records keep the key; people read the name, in their language when the school wrote one (`names`). An item the
- * school retires (`active: false`) still names old records but is no longer offered.
- */
-export const ListItem = z.object({
-  key: z.string().regex(/^[A-Za-z0-9+\-_]{1,32}$/, 'Keys use letters, digits, + - and _'),
-  name: z.string().trim().min(1, 'Name the item').max(40),
-  names: z.record(z.string().refine(isLanguage), z.string().trim().max(40)).optional(),
-  code: z.string().trim().max(8).optional(),
-  active: z.boolean().optional(),
-});
-export type ListItem = z.infer<typeof ListItem>;
-const item = (key: string, name: string): ListItem => ({ key, name });
-// A list saved as plain words (before lists had keys) reads as items named by those words.
-const schoolList = (defaults: ListItem[], min = 1, max = 40) => z.preprocess(
-  (v) => (Array.isArray(v) ? v.map((x) => (typeof x === 'string' ? { key: x.toLowerCase().replace(/[^a-z0-9+\-_]+/g, '-').slice(0, 32) || 'item', name: x } : x)) : v),
-  z.array(ListItem).min(min).max(max).refine((l) => new Set(l.map((i) => i.key)).size === l.length, 'Two items have the same key'),
-).default(defaults);
-/** The items a form offers: the active ones, plus the record's own value if it was retired since. */
-export const listOptions = (list: readonly ListItem[] | undefined, current?: string | null): ListItem[] =>
-  (list ?? []).filter((i) => i.active !== false || i.key === current);
-/** What a person reads for a stored value: the item's name in their language, else its name, else the value as it was typed. */
-export function listLabel(list: readonly ListItem[] | undefined, value: string | null | undefined, lang = 'en'): string {
-  if (!value) return '';
-  const v = value.toLowerCase();
-  const it = (list ?? []).find((i) => i.key.toLowerCase() === v || i.name.toLowerCase() === v);
-  return it ? it.names?.[lang] || it.name : value;
-}
-/** The key a typed value stands for (an import's "F" or "Female"), or null when the list has no such item. */
-export function listKey(list: readonly ListItem[] | undefined, typed: string): string | null {
-  const v = typed.trim().toLowerCase();
-  const it = (list ?? []).find((i) => i.key.toLowerCase() === v || i.name.toLowerCase() === v || (i.code && i.code.toLowerCase() === v) || Object.values(i.names ?? {}).some((n) => n.toLowerCase() === v));
-  return it?.key ?? null;
-}
-export const DEFAULT_GENDERS = [item('female', 'Female'), item('male', 'Male'), item('other', 'Another gender'), item('unsaid', 'Prefer not to say')];
-export const DEFAULT_RELATIONSHIPS = [item('mother', 'Mother'), item('father', 'Father'), item('parent', 'Parent'), item('guardian', 'Guardian'), item('grandparent', 'Grandparent'), item('carer', 'Carer'), item('sibling', 'Brother or sister'), item('other', 'Other')];
-export const DEFAULT_BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((g) => item(g, g));
 
 /** The app's roles (config-engine's APP_ROLES is the same list). */
 export const APP_ROLE_KEYS = ['parent', 'student', 'teacher', 'driver'] as const;
@@ -213,6 +176,8 @@ export const SchoolSettingsSchema = z.object({
   'lists.genders': schoolList(DEFAULT_GENDERS),
   'lists.relationships': schoolList(DEFAULT_RELATIONSHIPS),
   'lists.bloodGroups': schoolList(DEFAULT_BLOOD_GROUPS),
+  // The school's own fields on its records (§3.6.3), per kind of record.
+  'fields.custom': CustomFieldsSetting.default({}),
   'people.houses': z.array(z.object({ key: z.string().regex(/^[a-z0-9-]{1,24}$/), name: z.string().min(1).max(24), color: z.string().regex(/^#[0-9a-fA-F]{6}$/) })).max(12).default([]),
   // The first column of every week grid (attendance, leave, the app's calendars).
   'calendar.weekStarts': z.enum(['mon', 'sun']).default('mon'),

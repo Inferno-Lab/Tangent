@@ -76,6 +76,8 @@ class ProfileView extends GetView<ProfileController> {
                         ('profile.house'.tr, student.house),
                         ('profile.born'.tr, _dob(student.dob)),
                         ('profile.blood'.tr, student.bloodGroup),
+                        // The school's own fields it shows families (named in their language by the server).
+                        for (final f in student.fields.entries) (f.key, f.value),
                       ],
                       code:
                           'GIS-${controller.schoolClass?.name.replaceAll(RegExp('[^0-9]'), '') ?? ''}${controller.schoolClass?.section ?? ''}-${student.rollNo}',

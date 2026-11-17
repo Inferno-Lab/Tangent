@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { currencySymbol, schoolToday, type ClassInfo } from '@tangent/contracts';
+import { currencySymbol, schoolToday, type ClassInfo, type CustomValues } from '@tangent/contracts';
 import { DateField, Dialog, ErrorLine, Field, FilePick, SelectField, useShake, t as tr } from '@tangent/web-ui';
 import { DialogActions as Actions, fieldsOf, messageOf, useFeeHeads } from '../../app/kit';
 import { useApp } from '../../app/context';
@@ -16,6 +16,7 @@ export function AddStudentDialog({ classes, defaultClass, onClose, onDone }: { c
   const [general, setGeneral] = useState('');
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof f) => (v: string) => { setF((s) => ({ ...s, [k]: v })); setErr((e) => ({ ...e, [k]: '' })); };
+  const [custom, setCustom] = useState<CustomValues>({});
   const submit = async (e: React.FormEvent) => { e.preventDefault();
     const local: Record<string, string> = {};
     if (f.name.trim().length < 2) local.name = tr('admin.student_dialogs.enter_the_full_name');
@@ -25,7 +26,7 @@ export function AddStudentDialog({ classes, defaultClass, onClose, onDone }: { c
     if (!f.guardianPhone.trim()) local.guardianPhone = tr('admin.student_dialogs.enter_a_phone_number');
     if (Object.keys(local).length) { setErr(local); shake.hit(); return; }
     setBusy(true);
-    try { const s = await api.students.create({ ...f, rollNo: f.rollNo || undefined, bloodGroup: f.bloodGroup || undefined, address: f.address || undefined, gender: f.gender || undefined, house: f.house || undefined, admissionNo: f.admissionNo || undefined });
+    try { const s = await api.students.create({ ...f, rollNo: f.rollNo || undefined, bloodGroup: f.bloodGroup || undefined, address: f.address || undefined, gender: f.gender || undefined, house: f.house || undefined, admissionNo: f.admissionNo || undefined, custom });
       onDone(tr('admin.student_dialogs.was_added_to', { name: s.name, className: s.className }), s.id);
     } catch (x) { setBusy(false); setErr(fieldsOf(x)); setGeneral(Object.keys(fieldsOf(x)).length ? '' : messageOf(x)); shake.hit();
     }
@@ -41,7 +42,7 @@ export function AddStudentDialog({ classes, defaultClass, onClose, onDone }: { c
         <div className="two">
           <DateField label={tr('admin.student_dialogs.date_of_birth')} value={f.dob} onChange={set('dob')} error={err.dob} max={schoolToday()} />
         </div>
-        <RecordFields f={f} set={set} err={err} adding />
+        <RecordFields f={f} set={set} err={err} adding custom={custom} onCustom={setCustom} />
         <Field label={tr('admin.student_dialogs.guardian')} value={f.guardianName} onChange={set('guardianName')} error={err.guardianName} />
         <Field label={tr('admin.student_dialogs.guardian_s_phone')} value={f.guardianPhone} onChange={set('guardianPhone')} error={err.guardianPhone} type="tel" hint={tr('admin.student_dialogs.they_sign_in_to_the')} />
         {general && <ErrorLine>{general}</ErrorLine>}

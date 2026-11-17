@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { languageLabel, LANGUAGE_LIST, listKey, listLabel, listOptions, schoolToday, type ListItem, type ClassInfo, type GuardianRow, type StudentDetail } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, ErrorLine, Field, SelectField, currentLanguage, useShake, t } from '@tangent/web-ui';
+import { languageLabel, LANGUAGE_LIST, listKey, listLabel, listOptions, schoolToday, type CustomFieldsSetting, type CustomValues, type ListItem, type ClassInfo, type GuardianRow, type StudentDetail } from '@tangent/contracts';
+import { Checkbox, CustomFieldInputs, DateField, Dialog, ErrorLine, Field, SelectField, currentLanguage, useShake, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { AreaField, problem, useSetting } from '../../app/kit';
 
@@ -16,7 +16,10 @@ export const choices = (list: ListItem[], current: string) => {
  * The parts of a student's record beyond name, class and birth date. Which of them the school must fill is the console's
  * `students.required`; the rest say "optional". Houses are offered only when the school has them.
  */
-export function RecordFields({ f, set, err, adding }: { f: Rec; set: (k: keyof Rec) => (v: string) => void; err: Record<string, string>; adding?: boolean }) {
+export function RecordFields({ f, set, err, adding, custom, onCustom }: {
+  f: Rec; set: (k: keyof Rec) => (v: string) => void; err: Record<string, string>; adding?: boolean; custom: CustomValues; onCustom: (v: CustomValues) => void;
+}) {
+  const own = useSetting<CustomFieldsSetting>('fields.custom', {}).student ?? [];
   const need = useSetting<string[]>('students.required', []);
   const houses = useSetting<{ key: string; name: string }[]>('people.houses', []);
   const genders = useSetting<ListItem[]>('lists.genders', []);
@@ -33,6 +36,7 @@ export function RecordFields({ f, set, err, adding }: { f: Rec; set: (k: keyof R
         <SelectField label={opt('bloodGroup', t('admin.student_record.blood_group'))} value={f.bloodGroup} onChange={set('bloodGroup')} error={err.bloodGroup} options={[{ value: '', label: t('admin.student_record.not_given') }, ...choices(blood, f.bloodGroup)]} />
       </div>
       <Field label={opt('address', t('admin.student_record.address'))} value={f.address} onChange={set('address')} error={err.address} maxLength={200} />
+      <CustomFieldInputs defs={own} values={custom} onChange={onCustom} errors={err} />
     </>
   );
 }
@@ -45,11 +49,12 @@ export function EditStudentDialog({ s, classes, onClose, onDone }: { s: StudentD
   const [err, setErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof f) => (v: string) => { setF((x) => ({ ...x, [k]: v })); setErr((e) => ({ ...e, [k]: '' })); };
+  const [custom, setCustom] = useState<CustomValues>(s.custom ?? {});
   const save = async () => {
     if (f.name.trim().length < 2) { setErr({ name: t('admin.student_record.enter_the_full_name') }); shake.hit(); return; }
     setBusy(true);
     try {
-      const next = await api.students.update(s.id, { ...f, gender: f.gender || undefined });
+      const next = await api.students.update(s.id, { ...f, gender: f.gender || undefined, custom });
       onDone(next.className !== s.className ? t('admin.student_record.moved_to_their_marks_and', { name: next.name, className: next.className }) : t('admin.student_record.s_record_was_saved', { name: next.name }));
     } catch (e) { setBusy(false); setErr(problem(e)); shake.hit(); }
   };
@@ -62,7 +67,7 @@ export function EditStudentDialog({ s, classes, onClose, onDone }: { s: StudentD
           <Field label={t('admin.student_record.roll_number')} value={f.rollNo} onChange={set('rollNo')} error={err.rollNo} maxLength={10} />
         </div>
         <DateField label={t('admin.student_record.date_of_birth')} value={f.dob} onChange={set('dob')} error={err.dob} max={schoolToday()} />
-        <RecordFields f={f} set={set} err={err} />
+        <RecordFields f={f} set={set} err={err} custom={custom} onCustom={setCustom} />
         {err._ && <ErrorLine>{err._}</ErrorLine>}
         <div className="tgrow" style={{ justifyContent: 'flex-end' }}>
           <button className="btn" onClick={onClose}>{t('admin.student_record.cancel')}</button>

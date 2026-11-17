@@ -17,7 +17,7 @@ type User = { id: string; name: string };
 
 interface StaffSql {
   id: string; name: string; email: string | null; phone: string | null; status: string; designation: string; department: string | null; joined_on: string | null; max_periods: number; periods: string;
-  invited: boolean; signed_in: boolean;
+  invited: boolean; signed_in: boolean; custom: StaffRow['custom'] | null;
 }
 
 /** Staff, the admissions pipeline and the roles that decide what each person may do. */
@@ -40,7 +40,7 @@ export class PeopleService {
 
   async staff(t: TenantCtx, q: { query?: string; id?: string } = {}): Promise<StaffRow[]> {
     const { rows } = await t.pool.query<StaffSql>(
-      `select u.id, u.name, u.email, u.phone, u.status, s.designation, s.department, s.joined_on::text, s.max_periods_per_week max_periods,
+      `select u.id, u.name, u.email, u.phone, u.status, s.designation, s.department, s.joined_on::text, s.max_periods_per_week max_periods, s.custom,
          u.invited_at is not null or u.password_hash is not null invited, u.last_login_at is not null signed_in,
          (select count(*) from timetable_slots ts where ts.teacher_id = u.id) periods
        from users u join staff s on s.user_id = u.id
@@ -57,7 +57,7 @@ export class PeopleService {
       subjects: subs.rows.filter((s) => s.user_id === r.id).map((s) => ({ id: s.id, name: s.name })),
       roles: roles.rows.filter((x) => x.user_id === r.id).map((x) => ({ id: x.id, name: x.name })),
       periodsPerWeek: Number(r.periods), maxPeriods: r.max_periods, status: r.status === 'active' ? 'active' : 'inactive', joinedOn: r.joined_on,
-      access: r.signed_in ? 'signed_in' : r.invited ? 'invited' : 'none',
+      access: r.signed_in ? 'signed_in' : r.invited ? 'invited' : 'none', custom: r.custom ?? {},
     }));
   }
 
@@ -72,6 +72,7 @@ export class PeopleService {
     }
     const dup = await t.pool.query('select 1 from users where lower(email) = $1', [body.email]);
     if (dup.rowCount) throw new ApiError('validation', 'Someone already uses that email.', { fields: { email: 'Someone already uses that email.' } });
+    const custom = await this.settings.custom(t, 'staff', body.custom ?? {}, true);
     const id = newId('usr');
     const temp = tempPassword();
     const known = body.subjectIds.length ? (await t.pool.query<{ id: string }>('select id from subjects where id = any($1)', [body.subjectIds])).rows.map((s) => s.id) : [];
@@ -79,7 +80,7 @@ export class PeopleService {
     try {
       await client.query('begin');
       await client.query("insert into users (id, kind, name, email, phone, password_hash, invited_at) values ($1,'staff',$2,$3,$4,$5,now())", [id, body.name, body.email, this.settings.phone(t, body.phone), await hashPassword(temp)]);
-      await client.query('insert into staff (user_id, designation, department, joined_on) values ($1,$2,$3,current_date)', [id, body.designation, body.department ?? null]);
+      await client.query('insert into staff (user_id, designation, department, joined_on, custom) values ($1,$2,$3,current_date,$4)', [id, body.designation, body.department ?? null, JSON.stringify(custom)]);
       for (const s of known) await client.query('insert into staff_subjects (user_id, subject_id) values ($1,$2)', [id, s]);
       if (role.id) await client.query('insert into user_roles (user_id, role_id) values ($1,$2)', [id, role.id]);
       await client.query('commit');
@@ -101,6 +102,7 @@ export class PeopleService {
     const cur = (await t.pool.query<{ designation: string }>('select designation from staff where user_id = $1', [id])).rows[0];
     if (!cur) throw notFound('That person');
     if (body.roleId && !(await this.schoolAssignsRoles(t))) throw forbidden('Tangent assigns roles at your school. Ask Tangent to change this person’s role.');
+    const custom = body.custom ? await this.settings.custom(t, 'staff', body.custom, false) : null;
     const client = await t.pool.connect();
     try {
       await client.query('begin');
@@ -112,6 +114,7 @@ export class PeopleService {
         await client.query('update staff set designation = coalesce($2, designation), department = case when $3 then $4 else department end where user_id = $1',
           [id, body.designation ?? null, body.department !== undefined, body.department ?? null]);
       }
+      if (custom) await client.query('update staff set custom = custom || $2::jsonb where user_id = $1', [id, JSON.stringify(custom)]);
       if (body.status) {
         await client.query('update users set status = $2 where id = $1', [id, body.status]);
         if (body.status === 'inactive') await client.query('update sessions set revoked_at = now() where user_id = $1 and revoked_at is null', [id]);

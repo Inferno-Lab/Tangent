@@ -1,8 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
-import { type AttendanceMarkDef, MESSAGE_EVENTS, addDays, schoolToday, type AttendanceStatus, type NoticeCreate, type PeriodMarksPut } from '@tangent/contracts';
+import { customText, type CustomFieldsSetting, type CustomValues, type FieldDef, type AttendanceMarkDef, MESSAGE_EVENTS, addDays, schoolToday, type AttendanceStatus, type NoticeCreate, type PeriodMarksPut } from '@tangent/contracts';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
-import type { Registry } from '@tangent/tenancy';
+import { schoolContext, type Registry } from '@tangent/tenancy';
 import { REGISTRY, type AuthedUser, type TenantCtx } from '../tenancy/tenant.js';
 import { AttendanceService } from './attendance.service.js';
 import { ApprovalsService } from './approvals.service.js';
@@ -177,15 +177,23 @@ export class FamilyService {
   }
 
   /** Guardian contact, birth date and address go to the family and to staff whose role reads students; never to the rest. */
-  private studentJson(w: Who, r: { id: string; user_id: string | null; name: string; class_id: string; roll_no: string; dob: string; blood_group: string | null; house: string | null; address: string | null; g_name: string | null; g_phone: string | null; photo: string | null }) {
+  private studentJson(w: Who, r: { id: string; user_id: string | null; name: string; class_id: string; roll_no: string; dob: string; blood_group: string | null; house: string | null; address: string | null; g_name: string | null; g_phone: string | null; photo: string | null; custom: CustomValues | null }, own: FieldDef[]) {
     const full = w.children.includes(r.id) || (w.kind === 'staff' && w.perms.includes('students.read'));
+    // The school's own fields it shows in the app (§3.6.3), named and written in the reader's language; only to those who see the full record.
+    const lang = schoolContext.getStore()?.lang ?? 'en';
+    const fields = full ? Object.fromEntries(own.map((f) => [f.names?.[lang] || f.label, customText(f, r.custom?.[f.key], lang)]).filter(([, v]) => v)) : {};
     return {
+      fields,
       id: r.id, userId: r.user_id, name: r.name, classId: r.class_id, rollNo: r.roll_no, dob: full ? r.dob : '', bloodGroup: r.blood_group ?? '', house: r.house ?? '', avatarUrl: '',
       photoFileId: r.photo, guardianName: full ? r.g_name ?? '' : '', guardianPhone: full ? r.g_phone ?? '' : '', address: full ? r.address ?? '' : '',
     };
   }
 
-  private readonly studentSql = `select s.id, s.user_id, s.name, s.class_id, s.roll_no, s.dob::text, s.blood_group, s.house, s.address, g.name g_name, g.phone g_phone,
+  private async appFields(t: TenantCtx): Promise<FieldDef[]> {
+    return ((await this.settings.value<CustomFieldsSetting>(t, 'fields.custom', {})).student ?? []).filter((f) => f.app);
+  }
+
+  private readonly studentSql = `select s.id, s.user_id, s.name, s.class_id, s.roll_no, s.dob::text, s.blood_group, s.house, s.address, s.custom, g.name g_name, g.phone g_phone,
       (select f.id from files f where f.kind = 'student_photo' and f.owner_id = s.id and f.status = 'clean' and f.deleted_at is null order by f.created_at desc limit 1) photo
     from students s left join student_guardians sg on sg.student_id = s.id and sg.is_primary left join guardians g on g.id = sg.guardian_id`;
 
@@ -194,7 +202,7 @@ export class FamilyService {
     await this.mayStudent(w, id, t);
     const r = (await t.pool.query(`${this.studentSql} where s.id = $1`, [id])).rows[0];
     if (!r) throw notFound('That student');
-    return this.studentJson(w, r);
+    return this.studentJson(w, r, await this.appFields(t));
   }
 
   /**
@@ -209,7 +217,8 @@ export class FamilyService {
       throw forbidden('That class is not yours to look at.');
     }
     const { rows } = await t.pool.query(`${this.studentSql} where s.class_id = $1 and s.status = 'active' order by s.roll_no, s.name`, [classId]);
-    const list = rows.map((r) => this.studentJson(w, r));
+    const own = await this.appFields(t);
+    const list = rows.map((r) => this.studentJson(w, r, own));
     if (w.kind !== 'staff') return list;
     const today = schoolToday();
     const from = (await t.pool.query<{ d: string }>('select starts_on::text d from terms where starts_on <= $1 order by starts_on desc limit 1', [today])).rows[0]?.d ?? addDays(today, -120);

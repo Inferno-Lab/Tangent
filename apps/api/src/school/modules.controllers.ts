@@ -8,7 +8,7 @@ import {
 } from '@tangent/contracts';
 import { z } from 'zod';
 import { ZodPipe } from '@tangent/nest-kit';
-import { templateXlsx } from '@tangent/db';
+import { ownKind, templateXlsx } from '@tangent/db';
 import { Core, CurrentUser, Require, RequireModule } from '../auth/guards.js';
 import { Tenant, type AuthedUser, type TenantCtx } from '../tenancy/tenant.js';
 import { LearningService } from './learning.service.js';
@@ -122,8 +122,8 @@ export class PeopleController {
   }
 
   @Get('staff/template') @Require('staff.write') @Header('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-  staffTemplate(): Buffer {
-    return templateXlsx('staff');
+  async staffTemplate(@Tenant() t: TenantCtx): Promise<Buffer> {
+    return templateXlsx((await ownKind(t.pool, 'staff'))!);
   }
 
   @Post('staff/import') @HttpCode(200) @Require('staff.write')

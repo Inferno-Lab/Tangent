@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, hasKey, type AppRole } from '@tangent/config-engine';
-import { rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
+import { rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, CUSTOM_ENTITIES, FIELD_KINDS, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
 import { Checkbox, DateField, FilePick, NumberField, TimeField } from './fields';
 import { ColourField } from './ColourPicker';
 import { ErrorLine, Field, SelectField } from './forms';
@@ -91,6 +91,11 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
       const v = ctx.values ?? {};
       const others = (Array.isArray(v['app.languages']) ? (v['app.languages'] as string[]) : []).filter((l) => l !== String(v['school.language'] ?? 'en'));
       return box(<ListItemsEditor value={(Array.isArray(value) ? value : []) as ListItem[]} languages={others} max={meta.max ?? 40} disabled={disabled} onChange={onChange} />);
+    }
+    case 'customFields': {
+      const v = ctx.values ?? {};
+      const others = (Array.isArray(v['app.languages']) ? (v['app.languages'] as string[]) : []).filter((l) => l !== String(v['school.language'] ?? 'en'));
+      return box(<CustomFieldsEditor value={(value ?? {}) as CustomFieldsSetting} languages={others} disabled={disabled} onChange={onChange} />);
     }
     case 'gradingScale':
       return box(<GradingEditor value={(Array.isArray(value) ? value : []) as { grade: string; minPct: number }[]} max={meta.max ?? 12} disabled={disabled} onChange={onChange} />);
@@ -288,6 +293,55 @@ function ListItemsEditor({ value, languages, max, disabled, onChange }: { value:
         onChange([...value, { key: `item-${n}`, name: tr('ui.settings.new_item') }]);
       }}>{tr('ui.settings.add_an_item')}</button>}
       <div className="help">{tr('ui.settings.an_item_keeps_its_key')}</div>
+    </div>
+  );
+}
+
+const ENTITY_LABEL: Record<CustomEntity, string> = { student: tr('ui.settings.student_records'), staff: tr('ui.settings.staff_records') };
+const KIND_LABEL: Record<FieldKind, string> = {
+  text: tr('ui.settings.kind_text'), longText: tr('ui.settings.kind_long_text'), number: tr('ui.settings.kind_number'), date: tr('ui.settings.kind_date'), choice: tr('ui.settings.kind_choice'),
+  multi: tr('ui.settings.kind_multi'), yesno: tr('ui.settings.kind_yesno'), phone: tr('ui.settings.kind_phone'), email: tr('ui.settings.kind_email'),
+};
+
+/** The school's own fields (§3.6.3), per kind of record: name, kind, choices, whether it is needed and whether families see it. */
+function CustomFieldsEditor({ value, languages, disabled, onChange }: { value: CustomFieldsSetting; languages: string[]; disabled: boolean; onChange: (v: unknown) => void }) {
+  const [entity, setEntity] = useState<CustomEntity>('student');
+  const list = value[entity] ?? [];
+  const setList = (next: FieldDef[]) => onChange({ ...value, [entity]: next });
+  const put = (i: number, patch: Partial<FieldDef>) => setList(list.map((f, j) => (j === i ? { ...f, ...patch } : f)));
+  const add = () => {
+    let n = list.length + 1;
+    while (list.some((f) => f.key === `field_${n}`)) n++;
+    setList([...list, { key: `field_${n}`, label: tr('ui.settings.new_field'), kind: 'text' }]);
+  };
+  return (
+    <div>
+      <div style={{ maxWidth: 260 }}><Select value={entity} onChange={(e) => setEntity(e as CustomEntity)} aria-label={tr('ui.settings.records')} options={CUSTOM_ENTITIES.map((e) => ({ value: e, label: ENTITY_LABEL[e] }))} /></div>
+      {!list.length && <div className="help">{tr('ui.settings.no_fields_yet')}</div>}
+      {list.map((f, i) => (
+        <div key={f.key} className="card" style={{ padding: 12, marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 160 }}><Field label={tr('ui.settings.field_name')} value={f.label} maxLength={40} disabled={disabled} onChange={(v) => put(i, { label: v })} /></div>
+            <div style={{ width: 180 }}><SelectField label={tr('ui.settings.field_kind')} value={f.kind} disabled={disabled} onChange={(k) => put(i, { kind: k as FieldKind, options: k === 'choice' || k === 'multi' ? f.options ?? [{ key: 'one', name: tr('ui.settings.first_choice') }] : undefined })} options={FIELD_KINDS.map((k) => ({ value: k, label: KIND_LABEL[k] }))} /></div>
+            <button type="button" className="btn sm" disabled={disabled} onClick={() => setList(list.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
+          </div>
+          <div className="tgrow" style={{ marginTop: 8 }}>
+            <Checkbox checked={!!f.required} disabled={disabled} label={tr('ui.settings.needed')} onChange={(on) => put(i, { required: on || undefined })} />
+            <Checkbox checked={!!f.app} disabled={disabled} label={tr('ui.settings.shown_in_the_app')} onChange={(on) => put(i, { app: on || undefined })} />
+          </div>
+          <div style={{ marginTop: 6 }}><Field label={tr('ui.settings.field_hint')} value={f.hint ?? ''} maxLength={120} disabled={disabled} onChange={(v) => put(i, { hint: v || undefined })} /></div>
+          {languages.length > 0 && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>{languages.map((l) => (
+            <div key={l} style={{ flex: 1, minWidth: 160 }}><Field label={languageLabel(l)} value={f.names?.[l] ?? ''} maxLength={40} disabled={disabled} onChange={(v) => {
+              const names = { ...f.names, [l]: v };
+              if (!v) delete names[l];
+              put(i, { names: Object.keys(names).length ? names : undefined });
+            }} /></div>
+          ))}</div>}
+          {(f.kind === 'choice' || f.kind === 'multi') && <div style={{ marginTop: 8 }}><div className="help" style={{ margin: 0 }}><b>{tr('ui.settings.choices')}</b></div><ListItemsEditor value={f.options ?? []} languages={languages} max={40} disabled={disabled} onChange={(o) => put(i, { options: o as ListItem[] })} /></div>}
+        </div>
+      ))}
+      {list.length < 30 && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={add}>{tr('ui.settings.add_a_field')}</button>}
+      <div className="help">{tr('ui.settings.removing_a_field_keeps')}</div>
     </div>
   );
 }

@@ -1651,6 +1651,7 @@
  "admin.students.view.students_table": "{@Students} table",
  "admin.students.view.students_view": "{@Students} view",
  "admin.students.view.summary": "Summary",
+ "admin.students.view.the_school_s_own_fields": "The school’s own fields",
  "admin.students.view.vs_the_12_days_before": "vs the 12 days before",
  "admin.students_page.a_page": "{n} a page",
  "admin.students_page.add_one_student": "Add one {@student}",

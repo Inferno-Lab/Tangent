@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import { rawOf, IMPORT_KINDS, importKind, type ImportBatchRow, type ImportInput, type ImportKind, type ImportPreview, type ImportRowCheck, tx } from '@tangent/contracts';
+import { checkCustom, customText, rawOf, IMPORT_KINDS, importKind, type CustomEntity, type FieldDef, type ImportBatchRow, type ImportInput, type ImportKind, type ImportPreview, type ImportRowCheck, tx } from '@tangent/contracts';
 import { ImportError, readTable, toCsv, xlsx, zip } from './files.js';
 import { KINDS, type Impl, type Row, type Write } from './kinds.js';
 import { savedSetting } from '../numbers.js';
@@ -53,12 +53,13 @@ function autoMap(kind: ImportKind, headers: string[], source: string): Record<st
 
 const signature = (kind: string, headers: string[]) => `${kind}:${headers.map(norm).sort().join('|')}`;
 
-interface Checked { preview: ImportPreview; valid: Row[]; impl: Impl<unknown>; lookups: unknown }
+interface Checked { preview: ImportPreview; valid: Row[]; impl: Impl<unknown>; lookups: unknown; own: FieldDef[] }
 
 async function check(db: Q, input: ImportInput): Promise<Checked> {
-  const kind = importKind(input.kind);
+  const kind = await ownKind(db, input.kind);
   const impl = KINDS[input.kind] as Impl<unknown> | undefined;
   if (!kind || !impl) throw new ImportError(tx('There is no import for “{kind}”.', { kind: input.kind }));
+  const own = await ownFields(db, input.kind);
   const { headers, data } = readInput(kind, input);
   const source = input.rows ? 'typed' : detectSource(kind, headers);
   const remembered = input.mapping ? null : (await db.query<{ mapping: Record<string, string> }>('select mapping from import_mappings where signature = $1', [signature(kind.key, headers)])).rows[0]?.mapping;
@@ -79,6 +80,9 @@ async function check(db: Q, input: ImportInput): Promise<Checked> {
     const errors = kind.columns.filter((c) => c.required && !r[c.key]).map((c) => tx('{column} is empty.', { column: c.label }));
     const res = errors.length ? { key: '', errors: [], exists: false } : impl.check(r, lookups);
     errors.push(...res.errors);
+    // The school's own fields: an empty cell leaves the record's value as it is, so only typed ones are checked.
+    const typed = Object.fromEntries(own.filter((f) => r[customKey(f)]).map((f) => [f.key, r[customKey(f)]]));
+    for (const [k, m] of Object.entries(checkCustom(own, typed, false).errors)) errors.push(`${own.find((f) => f.key === k)!.label}: ${m}`);
     if (!errors.length && res.key) {
       const before = seen.get(res.key);
       if (before) errors.push(tx('Same {columns} as line {line}.', { columns: kind.matchOn.map((k) => kind.columns.find((c) => c.key === k)?.label.toLowerCase()).join(' / '), line: before }));
@@ -88,7 +92,7 @@ async function check(db: Q, input: ImportInput): Promise<Checked> {
   });
   const valid = rows.filter((_, i) => checks[i]!.action !== 'skip');
   const counts = { create: checks.filter((c) => c.action === 'create').length, update: checks.filter((c) => c.action === 'update').length, skip: checks.filter((c) => c.action === 'skip').length, total: checks.length };
-  return { preview: { kind: kind.key, source, headers, mapping, missing, rows: checks, counts, totals: impl.totals(valid, lookups) }, valid, impl, lookups };
+  return { preview: { kind: kind.key, source, headers, mapping, missing, rows: checks, counts, totals: impl.totals(valid, lookups), columns: kind.columns.map((c) => ({ ...rawOf(c), label: c.label })) }, valid, impl, lookups, own };
 }
 
 /** Reads, matches and checks a file without changing anything: what would be added, changed and left out, and the totals. */
@@ -101,6 +105,9 @@ const CHUNK = 5000;
 async function chunks<T>(list: T[], fn: (part: T[]) => Promise<unknown>): Promise<void> {
   for (let i = 0; i < list.length; i += CHUNK) await fn(list.slice(i, i + CHUNK));
 }
+
+const differs = (a: unknown, b: unknown) => (typeof a === 'object' && a !== null) || (typeof b === 'object' && b !== null)
+  ? JSON.stringify(a ?? {}) !== JSON.stringify(b ?? {}) : String(a ?? '') !== String(b ?? '');
 
 /** Adds the rows that are new and changes `cols` of the ones that exist, in a few statements, remembering what it did. */
 async function apply(client: pg.PoolClient, w: Write): Promise<Change> {
@@ -121,7 +128,7 @@ async function apply(client: pg.PoolClient, w: Write): Promise<Change> {
   for (const r of w.rows) {
     const before = existing.get(keyOf(r));
     if (!before) fresh.push(r);
-    else if (w.cols.some((c) => String(before[c] ?? '') !== String(r[c] ?? ''))) { changed.push(r); change.updated.push(before); }
+    else if (w.cols.some((c) => differs(before[c], r[c]))) { changed.push(r); change.updated.push(before); }
   }
   if (fresh.length) {
     const cols = Object.keys(fresh[0]!).map(ident).join(', ');
@@ -138,6 +145,21 @@ async function apply(client: pg.PoolClient, w: Write): Promise<Change> {
 
 const LOCK = "select pg_advisory_xact_lock(hashtext('imports'))";
 
+/** Adds each row's own-field values to the record it writes, on top of what the record already had. */
+async function withCustom(client: pg.PoolClient, kind: string, w: Write, rows: Row[], own: FieldDef[]): Promise<Write> {
+  const c = CUSTOM[kind];
+  if (!c || w.table !== c.table || w.rows.length !== rows.length) return w;
+  const ids = w.rows.map((r) => String(r[c.pk]));
+  const had = new Map((await client.query<{ id: string; custom: Record<string, unknown> }>(`select ${ident(c.pk)} id, custom from ${ident(c.table)} where ${ident(c.pk)} = any($1)`, [ids])).rows.map((x) => [x.id, x.custom]));
+  return {
+    ...w, cols: [...w.cols, 'custom'],
+    rows: w.rows.map((rec, i) => {
+      const typed = Object.fromEntries(own.filter((f) => rows[i]![customKey(f)]).map((f) => [f.key, rows[i]![customKey(f)]]));
+      return { ...rec, custom: { ...had.get(String(rec[c.pk])), ...checkCustom(own, typed, false).values } };
+    }),
+  };
+}
+
 /** Imports the rows that passed the checks as one batch, in one transaction, and records how to undo it. Rows with problems are left out. */
 export async function commitImport(pool: pg.Pool, input: ImportInput, byName: string): Promise<ImportBatchRow> {
   const client = await pool.connect();
@@ -145,11 +167,11 @@ export async function commitImport(pool: pg.Pool, input: ImportInput, byName: st
     await client.query('begin');
     await client.query('set local statement_timeout = 0');
     await client.query(LOCK);
-    const { preview, valid, impl, lookups } = await check(client, input);
+    const { preview, valid, impl, lookups, own } = await check(client, input);
     if (preview.missing.length) throw new ImportError(tx('Match a column to {p0} first.', { p0: preview.missing.join(', ') }));
     if (!valid.length) throw new ImportError('Nothing to import: every row has a problem. Fix them in the grid and check again.');
     const changes: Change[] = [];
-    for (const w of impl.writes(valid, lookups)) changes.push(await apply(client, w));
+    for (const w of impl.writes(valid, lookups)) changes.push(await apply(client, own.length ? await withCustom(client, input.kind, w, valid, own) : w));
     const notes = impl.notes ? await impl.notes(client, valid, lookups) : [];
     const id = `imp_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
     const report = { totals: preview.totals, notes, skipped: preview.rows.filter((r) => r.action === 'skip').slice(0, 500).map((r) => ({ line: r.line, errors: r.errors })) };
@@ -231,10 +253,10 @@ export function templateCsv(key: string): string {
  * The template as an .xlsx: the columns by their names with an example row, a dropdown on every column that takes fixed
  * values, and a second sheet that says what each column is, whether it is needed and what it takes.
  */
-export function templateXlsx(key: string, own: Record<string, readonly string[]> = {}): Buffer {
-  const kind = importKind(key);
-  if (!kind) throw new ImportError(tx('There is no import for “{key}”.', { key }));
-  const opts = (c: (typeof kind.columns)[number]) => own[c.key] ?? c.options;
+export function templateXlsx(of: string | ImportKind): Buffer {
+  const kind = typeof of === 'string' ? importKind(of) : of;
+  if (!kind) throw new ImportError(tx('There is no import for “{key}”.', { key: String(of) }));
+  const opts = (c: (typeof kind.columns)[number]) => c.options;
   const lists = Object.fromEntries(kind.columns.flatMap((c, i) => (opts(c) && c.key !== 'relation' ? [[i, opts(c)!]] : [])));
   const help = [[tx('Column'), tx('Needed'), tx('Example'), tx('What it takes')], ...kind.columns.map((c) => [c.label, c.required ? tx('Yes') : tx('No'), c.example, opts(c) ? opts(c)!.join(', ') : c.aliases?.length ? tx('Also read as: {names}', { names: c.aliases.join(', ') }) : ''])];
   return xlsx([
@@ -243,21 +265,50 @@ export function templateXlsx(key: string, own: Record<string, readonly string[]>
   ]);
 }
 
-/** The school's own choices for a kind's list columns (its genders, blood groups…), for `templateXlsx`. */
-export async function ownOptions(db: Q, key: string): Promise<Record<string, string[]>> {
-  const out: Record<string, string[]> = {};
-  for (const c of importKind(key)?.columns ?? []) {
-    if (c.list) out[c.key] = (await savedSetting(db, c.list)).filter((i) => i.active !== false).map((i) => i.name);
+/**
+ * Records that take the school's own fields (§3.6.3): which kind imports them, the table they are kept in, its key, and the
+ * column that finds a record again in an export (the kind's match column).
+ */
+const CUSTOM: Record<string, { entity: CustomEntity; table: string; pk: string; find: string; sql: string }> = {
+  students: { entity: 'student', table: 'students', pk: 'id', find: 'admission_no', sql: 'select admission_no k, custom from students' },
+  staff: { entity: 'staff', table: 'staff', pk: 'user_id', find: 'email', sql: 'select lower(u.email) k, s.custom from staff s join users u on u.id = s.user_id' },
+};
+const customKey = (f: FieldDef) => `custom.${f.key}`;
+async function ownFields(db: Q, key: string): Promise<FieldDef[]> {
+  const c = CUSTOM[key];
+  return c ? (await savedSetting(db, 'fields.custom'))[c.entity] ?? [] : [];
+}
+
+/** A kind as this school has it: its lists in the dropdowns, and a column for each of its own fields. */
+export async function ownKind(db: Q, key: string): Promise<ImportKind | undefined> {
+  const kind = importKind(key);
+  if (!kind) return undefined;
+  const columns = [];
+  for (const c of kind.columns) {
+    columns.push(c.list ? { ...c, options: (await savedSetting(db, c.list)).filter((i) => i.active !== false).map((i) => i.name) } : c);
   }
-  return out;
+  for (const f of await ownFields(db, key)) {
+    columns.push({ key: customKey(f), label: f.label, example: '', required: false, options: f.options?.filter((o) => o.active !== false).map((o) => o.name), aliases: [f.key] });
+  }
+  return { ...kind, columns };
 }
 
 /** Everything the school has, in the same templates it can be imported from: one CSV per kind in a ZIP. Leaving is easy too. */
 export async function exportAll(db: Q, kinds: string[] = IMPORT_KINDS.map((k) => k.key)): Promise<Buffer> {
   const files: { name: string; content: string }[] = [];
-  for (const kind of IMPORT_KINDS.filter((k) => kinds.includes(k.key))) {
+  for (const base of IMPORT_KINDS.filter((k) => kinds.includes(k.key))) {
+    const kind = (await ownKind(db, base.key))!;
     const rows = await KINDS[kind.key]!.export(db);
-    files.push({ name: `${String(IMPORT_KINDS.indexOf(kind) + 1).padStart(2, '0')}-${kind.key}.csv`, content: toCsv([kind.columns.map((c) => c.key), ...rows.map((r) => kind.columns.map((c) => r[c.key] ?? ''))]) });
+    const c = CUSTOM[kind.key];
+    const own = c ? await ownFields(db, kind.key) : [];
+    if (c && own.length) {
+      const values = new Map((await db.query<{ k: string; custom: Record<string, never> }>(c.sql)).rows.map((x) => [String(x.k).toLowerCase(), x.custom]));
+      for (const r of rows) {
+        const v = values.get(String(r[c.find] ?? '').toLowerCase()) ?? {};
+        for (const f of own) r[customKey(f)] = customText(f, v[f.key]);
+      }
+    }
+    files.push({ name: `${String(IMPORT_KINDS.indexOf(base) + 1).padStart(2, '0')}-${kind.key}.csv`, content: toCsv([kind.columns.map((c) => c.key), ...rows.map((r) => kind.columns.map((c) => r[c.key] ?? ''))]) });
   }
   return zip(files);
 }

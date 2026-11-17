@@ -168,10 +168,12 @@ function BatchRow({ b, kinds, canUndo, busy, onUndo }: { b: ImportBatchRow; kind
   );
 }
 
-function PreviewPanel({ kind, src, preview: p, loading, error, onMap, onRows, onCancel, onCommit, committing }: {
+function PreviewPanel({ kind: base, src, preview: p, loading, error, onMap, onRows, onCancel, onCommit, committing }: {
   kind: ImportKind; src: Source; preview: ImportPreview | undefined; loading: boolean; error: string;
   onMap: (m: Record<string, string>) => void; onRows: (rows: Record<string, string>[]) => void; onCancel: () => void; onCommit: () => void; committing: boolean;
 }) {
+  // The school's own columns (its lists, its own fields) once the server has read the file.
+  const kind = p?.columns ? { ...base, columns: p.columns } : base;
   const [onlyBad, setOnlyBad] = useState(true);
   const rows = useMemo(() => (p?.rows ?? []).map((r, i) => ({ ...r, i })), [p]);
   const bad = rows.filter((r) => r.errors.length);

@@ -36,4 +36,5 @@ export * from './useMedia';
 export * from './reportErrors';
 export * from './empty/EmptyState';
 export * from './settings';
+export * from './custom-fields';
 export * from './i18n';

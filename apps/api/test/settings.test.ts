@@ -115,3 +115,44 @@ describe('the school changes its own settings', () => {
     }
   });
 });
+
+describe('the school’s own fields on its records', () => {
+  it('keeps what the school adds to a student, checks it, and imports it', async () => {
+    const fields = { student: [
+      { key: 'passport', label: 'Passport number', kind: 'text' },
+      { key: 'bus_pass', label: 'Bus pass', kind: 'yesno' },
+      { key: 'diet', label: 'Diet', kind: 'choice', options: [{ key: 'veg', name: 'Vegetarian' }, { key: 'any', name: 'No restriction' }] },
+    ] };
+    expect((await change({ 'fields.custom': fields })).status).toBe(200);
+    const body = { name: 'Field Child', classId: 'cls_8a', dob: '2014-03-04', guardianName: 'Field Parent', guardianPhone: '9822099301' };
+    // A choice not on the field's list is refused with the field named.
+    const bad = await h.call('POST', '/v1/students', { token: principal, body: { ...body, custom: { diet: 'Halal' } } });
+    expect(bad.status).toBe(400);
+    expect(bad.json.fields['custom.diet']).toBeTruthy();
+    const made = await h.call('POST', '/v1/students', { token: principal, body: { ...body, custom: { passport: 'X1234567', diet: 'Vegetarian', bus_pass: true } } });
+    expect(made.status).toBe(201);
+    expect(made.json.custom).toEqual({ passport: 'X1234567', diet: 'veg', bus_pass: true });
+    // A change sends only what changes; the rest stays.
+    const edited = await h.call('PATCH', `/v1/students/${made.json.id}`, { token: principal, body: { custom: { bus_pass: false } } });
+    expect(edited.json.custom).toEqual({ passport: 'X1234567', diet: 'veg', bus_pass: false });
+    // The import reads the fields by their names; an empty cell leaves the value as it was.
+    const csv = `admission_no,name,class,dob,guardian,phone,Diet,Passport number\n${made.json.admissionNo},Field Child,8 A,2014-03-04,Field Parent,9822099301,No restriction,\n`;
+    const r = (await h.call('POST', '/v1/students/import', { token: principal, body: { csv } })).json;
+    expect(r.errors).toEqual([]);
+    const after = (await h.call('GET', `/v1/students/${made.json.id}`, { token: principal })).json;
+    expect(after.custom).toEqual({ passport: 'X1234567', diet: 'any', bus_pass: false });
+    await change({ 'fields.custom': {} });
+  });
+
+  it('shows a family only the fields the school marks for the app, in the reader’s words', async () => {
+    const parent = await h.login('priya.sharma@example.com');
+    await change({ 'fields.custom': { student: [
+      { key: 'bus_pass', label: 'Bus pass', kind: 'yesno', app: true },
+      { key: 'note', label: 'Office note', kind: 'text' },
+    ] } });
+    await h.call('PATCH', '/v1/students/stu_aarav', { token: principal, body: { custom: { bus_pass: true, note: 'Private' } } });
+    const s = (await h.call('GET', '/v1/f/students/stu_aarav', { token: parent })).json;
+    expect(s.fields).toEqual({ 'Bus pass': 'Yes' });
+    await change({ 'fields.custom': {} });
+  });
+});

@@ -17,6 +17,7 @@ class Student {
     required this.guardianPhone,
     required this.address,
     this.userId,
+    this.fields = const {},
   });
 
   factory Student.fromJson(Map<String, dynamic> json) => _$StudentFromJson(json);
@@ -33,6 +34,10 @@ class Student {
   final String guardianName;
   final String guardianPhone;
   final String address;
+
+  /// The school's own fields it shows in the app, by their name in the reader's language (label → value).
+  @JsonKey(defaultValue: <String, String>{})
+  final Map<String, String> fields;
 
   Map<String, dynamic> toJson() => _$StudentToJson(this);
 }

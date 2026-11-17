@@ -209,7 +209,7 @@ export class StudentsService {
       this.activity(t, id),
       t.pool.query<{ phone: string | null; email: string | null; last_login_at: Date | null }>('select u.phone, u.email, u.last_login_at from students s join users u on u.id = s.user_id where s.id = $1', [id]),
     ]);
-    const extra = (await t.pool.query<{ gender: StudentDetail['gender']; status: string; left_on: string | null; reason: string | null }>("select gender, status, left_on::text, leaving_reason reason from students where id = $1", [id])).rows[0];
+    const extra = (await t.pool.query<{ gender: StudentDetail['gender']; status: string; left_on: string | null; reason: string | null; custom: StudentDetail['custom'] }>("select gender, status, left_on::text, leaving_reason reason, custom from students where id = $1", [id])).rows[0];
     const has = await this.has(t);
     const acc = account.rows[0];
     const base = this.mask(this.row(r, ticks.get(id)!), has);
@@ -221,7 +221,7 @@ export class StudentsService {
         homework: has.homework ? { onTime: Number(hw.rows[0]!.on_time), total: Number(hw.rows[0]!.total) } : { onTime: 0, total: 0 }, libraryOut: has.library ? Number(lib.rows[0]!.n) : 0,
       },
       chips: { house: r.house }, recentActivity: acts, roll24: has.attendance ? roll24 : roll24.map(() => null),
-      gender: extra?.gender ?? null, guardians: await this.guardians(t, id), left: extra?.status === 'left' && extra.left_on ? { on: extra.left_on, reason: extra.reason ?? '' } : null,
+      gender: extra?.gender ?? null, custom: extra?.custom ?? {}, guardians: await this.guardians(t, id), left: extra?.status === 'left' && extra.left_on ? { on: extra.left_on, reason: extra.reason ?? '' } : null,
       appAccount: acc ? { phone: acc.phone ? maskPhone(acc.phone) : '', email: acc.email ?? '', lastSignIn: acc.last_login_at?.toISOString() ?? null } : null,
     };
   }
@@ -276,7 +276,11 @@ export class StudentsService {
 
   async create(t: TenantCtx, body: StudentCreate, user: { id: string; name: string }): Promise<StudentDetail> {
     const need = await this.settings.value<string[]>(t, 'students.required', []);
-    await this.required(t, Object.fromEntries(need.map((k) => [k, (body as Record<string, unknown>)[k] ?? ''])) as StudentPatch);
+    const checked = { ...Object.fromEntries(need.map((k) => [k, (body as Record<string, unknown>)[k] ?? ''])), gender: body.gender, bloodGroup: body.bloodGroup } as StudentPatch;
+    await this.required(t, checked);
+    body.gender = checked.gender;
+    body.bloodGroup = checked.bloodGroup;
+    const custom = await this.settings.custom(t, 'student', body.custom ?? {}, true);
     if (body.admissionNo && (await t.pool.query('select 1 from students where lower(admission_no) = lower($1)', [body.admissionNo])).rowCount) {
       throw new ApiError('validation', 'Another student has that admission number.', { fields: { admissionNo: 'Already used.' } });
     }
@@ -297,8 +301,8 @@ export class StudentsService {
     try {
       await client.query('begin');
       const admissionNo = body.admissionNo || (await nextNumber(client, { pattern, start, day: schoolToday(), ay, table: 'students', column: 'admission_no' }));
-      await client.query('insert into students (id, admission_no, name, class_id, roll_no, dob, blood_group, address, gender, house, admitted_on) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, $11)',
-        [id, admissionNo, body.name, body.classId, roll, body.dob, body.bloodGroup ?? null, body.address ?? null, body.gender ?? null, body.house || null, schoolToday()]);
+      await client.query('insert into students (id, admission_no, name, class_id, roll_no, dob, blood_group, address, gender, house, admitted_on, custom) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, $11, $12)',
+        [id, admissionNo, body.name, body.classId, roll, body.dob, body.bloodGroup ?? null, body.address ?? null, body.gender ?? null, body.house || null, schoolToday(), JSON.stringify(custom)]);
       // One family, one guardian: a brother or sister joins the guardian who already has that phone number.
       let g = (await client.query<{ id: string; user_id: string | null }>(`select id, user_id from guardians where ${byPhone} limit 1`, [digits])).rows[0];
       if (!g) {
@@ -331,12 +335,14 @@ export class StudentsService {
     const was = (await t.pool.query<{ class_id: string }>("select class_id from students where id = $1 and status = 'active'", [id])).rows[0];
     if (!was) throw notFound('That student');
     await this.required(t, b);
+    const custom = b.custom ? await this.settings.custom(t, 'student', b.custom, false) : null;
     if (b.classId && !(await t.pool.query('select 1 from classes where id = $1', [b.classId])).rowCount) throw new ApiError('validation', 'Choose a class from the list.', { fields: { classId: 'Choose a class from the list.' } });
     if (b.admissionNo && (await t.pool.query('select 1 from students where lower(admission_no) = lower($1) and id <> $2', [b.admissionNo, id])).rowCount) {
       throw new ApiError('validation', 'Another student has that admission number.', { fields: { admissionNo: 'Already used.' } });
     }
-    const cols: Record<keyof StudentPatch, string> = { name: 'name', classId: 'class_id', rollNo: 'roll_no', dob: 'dob', gender: 'gender', house: 'house', admissionNo: 'admission_no', bloodGroup: 'blood_group', address: 'address' };
-    const set = (Object.keys(cols) as (keyof StudentPatch)[]).filter((k) => b[k] !== undefined);
+    if (custom) await t.pool.query('update students set custom = custom || $2::jsonb where id = $1', [id, JSON.stringify(custom)]);
+    const cols: Record<Exclude<keyof StudentPatch, 'custom'>, string> = { name: 'name', classId: 'class_id', rollNo: 'roll_no', dob: 'dob', gender: 'gender', house: 'house', admissionNo: 'admission_no', bloodGroup: 'blood_group', address: 'address' };
+    const set = (Object.keys(cols) as (keyof typeof cols)[]).filter((k) => b[k] !== undefined);
     if (set.length) {
       await t.pool.query(`update students set ${set.map((k, i) => `${cols[k]} = $${i + 2}`).join(', ')} where id = $1`, [id, ...set.map((k) => (b[k] === '' ? null : b[k]))]);
     }

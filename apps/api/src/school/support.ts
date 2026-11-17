@@ -3,7 +3,7 @@ import { StaleSettings, newId, recordSettingsVersion, writeSettings } from '@tan
 import { checkSchoolChanges, resolveConfig, validateSettingsChanges } from '@tangent/config-engine';
 import { ApiError } from '@tangent/nest-kit';
 import type { Registry } from '@tangent/tenancy';
-import { rawOf, toE164, phoneProblem, MESSAGE_EVENTS, SETTINGS_META, gradeFor, schoolMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type SchoolSettingsPatch, type SchoolSettingsView, type SettingsDoc } from '@tangent/contracts';
+import { checkCustom, type CustomEntity, type CustomFieldsSetting, type CustomValues, rawOf, toE164, phoneProblem, MESSAGE_EVENTS, SETTINGS_META, gradeFor, schoolMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type SchoolSettingsPatch, type SchoolSettingsView, type SettingsDoc } from '@tangent/contracts';
 import { REGISTRY, type TenantCtx } from '../tenancy/tenant.js';
 import { HubService } from './hub.service.js';
 import { serverCatalogue } from '@tangent/tenancy';
@@ -132,6 +132,16 @@ export class SettingsService {
     const e164 = toE164(raw, t.info.country);
     if (!e164) throw new ApiError('validation', phoneProblem(raw, t.info.country)!, { fields: { [field]: phoneProblem(raw, t.info.country)! } });
     return e164;
+  }
+
+  /** A record's custom-field values checked against the school's fields (§3.6.3); `whole` for a new record (required ones needed). */
+  async custom(t: TenantCtx, entity: CustomEntity, input: Record<string, unknown>, whole: boolean): Promise<CustomValues> {
+    const defs = (await this.value<CustomFieldsSetting>(t, 'fields.custom', {}))[entity] ?? [];
+    const { values, errors } = checkCustom(defs, input, whole);
+    if (Object.keys(errors).length) {
+      throw new ApiError('validation', 'Check the school’s own fields.', { fields: Object.fromEntries(Object.entries(errors).map(([k, m]) => [`custom.${k}`, m])) });
+    }
+    return values;
   }
 
   /** One setting as it applies (a lock wins); the fallback only when the setting does not exist at all. */

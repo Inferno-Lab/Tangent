@@ -122,6 +122,8 @@ export interface ImportPreview {
   counts: { create: number; update: number; skip: number; total: number };
   /** Totals to check against the old system: rows per class, rupees per fee head, and so on. */
   totals: { label: string; value: string }[];
+  /** The kind's columns as this school has them: its lists and its own fields (§3.6.3). */
+  columns: ImportColumn[];
 }
 
 export interface ImportBatchRow {

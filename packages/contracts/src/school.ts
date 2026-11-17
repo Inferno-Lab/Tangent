@@ -3,6 +3,7 @@ import { isLanguage, type Vocabulary } from './i18n.js';
 import { z } from 'zod';
 import { Money } from './locale.js';
 import { IsoDate } from './common.js';
+import { CustomValues } from './fields.js';
 
 export const AttendanceStatus = z.enum(ATTENDANCE_MARKS);
 export type AttendanceStatus = z.infer<typeof AttendanceStatus>;
@@ -53,6 +54,8 @@ export interface StudentDetail extends StudentRow {
   admittedOn: string | null;
   recentActivity: { id: string; at: string; label: string; sub: string; tone: 'g' | 'v' | 'a' }[];
   roll24: (AttendanceStatus | null)[];
+  /** The school's own fields (fields.custom.student), by key. */
+  custom: CustomValues;
   gender: string | null;
   /** When and why a student who left the school left (null while on the roll). */
   left: { on: string; reason: string } | null;
@@ -156,6 +159,7 @@ const StudentFields = {
   admissionNo: z.string().trim().max(30).optional(),
   bloodGroup: z.string().trim().max(4).optional(),
   address: z.string().trim().max(200).optional(),
+  custom: CustomValues.optional(),
 };
 export const StudentCreate = z.object({
   ...StudentFields,
