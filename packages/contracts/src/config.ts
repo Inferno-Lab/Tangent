@@ -196,6 +196,8 @@ export const SchoolSettingsSchema = z.object({
   'fields.custom': CustomFieldsSetting.default({}),
   // How addresses are written in the school's country (§3.3.5): its parts, names and postal code format.
   'people.addressFormat': AddressFormat.default(DEFAULT_ADDRESS_FORMAT),
+  // Which name comes first when a student's given and family names make the full name.
+  'people.nameOrder': z.enum(['given-family', 'family-given']).default('given-family'),
   'people.houses': z.array(z.object({ key: z.string().regex(/^[a-z0-9-]{1,24}$/), name: z.string().min(1).max(24), color: z.string().regex(/^#[0-9a-fA-F]{6}$/) })).max(12).default([]),
   // The first column of every week grid (attendance, leave, the app's calendars).
   'calendar.weekStarts': z.enum(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']).default('mon'),

@@ -97,7 +97,7 @@ export class AttendanceService {
       const away = marks.filter((m) => m.meaning === 'absent' || m.meaning === 'late');
       if (away.length) {
         const g = await t.pool.query<{ phone: string | null; name: string; student_id: string }>(
-          'select g.phone, s.name, s.id student_id from students s join student_guardians sg on sg.student_id = s.id and sg.is_primary join guardians g on g.id = sg.guardian_id where s.id = any($1)', [away.map((a) => a.studentId)]);
+          'select g.phone, s.name, s.id student_id from students s join student_guardians sg on sg.student_id = s.id and sg.gets_messages join guardians g on g.id = sg.guardian_id where s.id = any($1)', [away.map((a) => a.studentId)]);
         const status = new Map(away.map((a) => [a.studentId, a.meaning]));
         await this.messenger.notify(t, 'attendance.absent', g.rows.filter((r) => r.phone).map((r) => ({ to: r.phone!, vars: { student: r.name, status: status.get(r.student_id) === 'late' ? 'late' : 'absent' } })));
       }
@@ -151,7 +151,7 @@ export class AttendanceService {
       && ['present', 'late', 'half_day'].includes(markMeaning(used, roll.students.find((s) => s.studentId === m.studentId)?.day ?? '') ?? ''));
     if (missing.length && body.date === schoolToday() && (await this.settings.value<boolean>(t, 'attendance.notifyParents', true))) {
       const g = await t.pool.query<{ phone: string | null; name: string }>(
-        'select g.phone, s.name from students s join student_guardians sg on sg.student_id = s.id and sg.is_primary join guardians g on g.id = sg.guardian_id where s.id = any($1)', [missing.map((m) => m.studentId)]);
+        'select g.phone, s.name from students s join student_guardians sg on sg.student_id = s.id and sg.gets_messages join guardians g on g.id = sg.guardian_id where s.id = any($1)', [missing.map((m) => m.studentId)]);
       await this.messenger.notify(t, 'attendance.absent', g.rows.filter((r) => r.phone).map((r) => ({ to: r.phone!, vars: { student: r.name, status: `absent from ${p.subject} (${p.label})` } })));
     }
     return this.periods(t, user, body.classId, body.date);

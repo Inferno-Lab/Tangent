@@ -35,7 +35,7 @@ class ChildrenCache {
   }
 }
 
-String shortClass(SchoolClass c) => '${c.name.replaceAll(RegExp('[^0-9]'), '')} ${c.section}';
+String shortClass(SchoolClass c) => c.label;
 
 /// Glass capsule with stacked child avatars. Tap to open the switcher,
 /// swipe sideways to switch straight away.

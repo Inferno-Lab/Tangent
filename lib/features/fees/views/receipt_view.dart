@@ -25,7 +25,7 @@ Map<String, Object?> receiptArgs(Receipt r, FeesController controller) => {
   'roll': controller.student?.rollNo,
   'class': controller.schoolClass == null
       ? null
-      : '${controller.schoolClass!.name.replaceAll(RegExp('[^0-9]'), '')} ${controller.schoolClass!.section}',
+      : controller.schoolClass!.label,
 };
 
 /// Receipt: the stored receipt printed on a perforated slip.

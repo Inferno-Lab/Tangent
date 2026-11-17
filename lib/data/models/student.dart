@@ -19,6 +19,7 @@ class Student {
     this.userId,
     this.fields = const {},
     this.admissionNo = '',
+    this.nameLocal = '',
   });
 
   factory Student.fromJson(Map<String, dynamic> json) => _$StudentFromJson(json);
@@ -43,6 +44,10 @@ class Student {
   /// The school's own number for the child (its admission series); empty in sample data.
   @JsonKey(defaultValue: '')
   final String admissionNo;
+
+  /// The child's name in a second script (Arabic, Devanagari…), shown under the name; empty when the school keeps none.
+  @JsonKey(defaultValue: '')
+  final String nameLocal;
 
   Map<String, dynamic> toJson() => _$StudentToJson(this);
 }
@@ -134,4 +139,15 @@ class SchoolInfo {
   final String about;
 
   Map<String, dynamic> toJson() => _$SchoolInfoToJson(this);
+}
+
+/// A class as the school writes it: "8 A", "Year 7 Blue", "Grade 3 – Rose". The section is added only when the name does not
+/// end with it already; nothing is stripped from the school's own name.
+extension SchoolClassLabel on SchoolClass {
+  String get label {
+    final n = name.trim();
+    final s = section.trim();
+    if (s.isEmpty || n.toLowerCase().endsWith(s.toLowerCase())) return n;
+    return n.isEmpty ? s : '$n $s';
+  }
 }

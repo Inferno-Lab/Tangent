@@ -102,7 +102,7 @@ class AppSearchController extends GetxController {
 
   String? classLabel(String classId) {
     final c = _classes[classId];
-    return c == null ? null : '${c.name.replaceAll(RegExp('[^0-9]'), '')} ${c.section}';
+    return c?.label;
   }
 
   void remember() {

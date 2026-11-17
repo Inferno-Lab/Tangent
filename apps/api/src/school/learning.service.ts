@@ -112,7 +112,7 @@ export class LearningService {
     // Families hear about homework when it is set, not while it is a draft, and not again for a correction.
     if (status === 'set' && was === 'draft') {
       const g = await t.pool.query<{ phone: string | null; name: string }>(
-        `select g.phone, s.name from students s join student_guardians sg on sg.student_id = s.id and sg.is_primary join guardians g on g.id = sg.guardian_id where s.class_id = $1 and s.status = 'active'`, [body.classId]);
+        `select g.phone, s.name from students s join student_guardians sg on sg.student_id = s.id and sg.gets_messages join guardians g on g.id = sg.guardian_id where s.class_id = $1 and s.status = 'active'`, [body.classId]);
       await this.messenger.notify(t, 'homework.new', g.rows.filter((r) => r.phone).map((r) => ({ to: r.phone!, vars: { student: r.name, subject: sub.rows[0]!.name, title: body.title, due: body.dueOn } })));
     }
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: isNew ? `homework.${status === 'draft' ? 'drafted' : 'set'}` : 'homework.changed', entity: 'homework', entityId: id, detail: { class: cls.rows[0].name, title: body.title } });
@@ -358,7 +358,7 @@ export class LearningService {
       client.release();
     }
     const g = await t.pool.query<{ phone: string | null; name: string }>(
-      `select g.phone, s.name from students s join student_guardians sg on sg.student_id = s.id and sg.is_primary join guardians g on g.id = sg.guardian_id where s.class_id = $1 and s.status = 'active'`, [res.exam.classId]);
+      `select g.phone, s.name from students s join student_guardians sg on sg.student_id = s.id and sg.gets_messages join guardians g on g.id = sg.guardian_id where s.class_id = $1 and s.status = 'active'`, [res.exam.classId]);
     // Results going out again after a correction say what changed.
     const again = !!res.exam.reopenedNote;
     const families = await this.messenger.notify(t, again ? 'exam.reopened' : 'exam.results', g.rows.filter((r) => r.phone).map((r) => ({ to: r.phone!, vars: { student: r.name, exam: res.exam.name, note: res.exam.reopenedNote } })));

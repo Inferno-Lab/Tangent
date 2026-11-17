@@ -312,7 +312,7 @@ export class TransportService implements OnModuleInit {
       if (!claimed.rowCount) continue;
       const fams = (await t.pool.query<{ phone: string | null; student: string }>(
         `select g.phone, st.name student from transport_assignments a join students st on st.id = a.student_id and st.status = 'active'
-         join student_guardians sg on sg.student_id = st.id and sg.is_primary join guardians g on g.id = sg.guardian_id where a.stop_id = $1`, [s.id])).rows;
+         join student_guardians sg on sg.student_id = st.id and sg.gets_messages join guardians g on g.id = sg.guardian_id where a.stop_id = $1`, [s.id])).rows;
       told += await this.messenger.notify(t, 'bus.near', fams.filter((f) => f.phone).map((f) => ({ to: f.phone!, vars: { student: f.student, stop: s.name, minutes: String(eta.minutes) } })));
     }
     return told;

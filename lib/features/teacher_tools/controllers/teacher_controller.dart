@@ -19,7 +19,7 @@ import 'package:tangent/data/repositories/directory_repository.dart';
 import 'package:tangent/core/utils/clock.dart';
 
 /// "8 A" from a class.
-String classLabel(SchoolClass c) => '${c.name.replaceAll(RegExp('[^0-9]'), '')} ${c.section}';
+String classLabel(SchoolClass c) => c.label;
 
 /// A teacher's period today, with the class it is in.
 class TeacherPeriod {

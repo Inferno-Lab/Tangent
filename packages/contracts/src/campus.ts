@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Money, MoneyOrZero } from './locale.js';
+import { LEAVING_KINDS, type LeavingKind } from './school.js';
 
 // Phase 4: files, online payments and refunds, library, transport, gallery and year-end, as the admin and the app see them.
 
@@ -132,9 +133,14 @@ export const PromotionInput = z.object({
 export type PromotionInput = z.infer<typeof PromotionInput>;
 export interface PromotionPreview { classes: { fromClassId: string; fromName: string; toClassId: string | null; toName: string | null; students: number }[]; dues: number; duesStudents: number }
 export interface PromotionRunRow { id: string; fromYear: string; toYear: string; students: number; createdAt: string; undoneAt: string | null }
-export const LeaverInput = z.object({ studentId: z.string().min(1), leftOn: day, reason: z.string().trim().min(2).max(200) });
+export const LeaverInput = z.object({
+  studentId: z.string().min(1), leftOn: day, reason: z.string().trim().min(2).max(200),
+  kind: z.enum(LEAVING_KINDS).default('withdrawn'),
+  // The school they moved to, for a transfer.
+  transferTo: z.string().trim().max(120).optional(),
+}).refine((b) => b.kind !== 'transferred' || !!b.transferTo, { message: 'Enter the school they moved to', path: ['transferTo'] });
 export type LeaverInput = z.infer<typeof LeaverInput>;
-export interface LeaverRow { id: string; name: string; admissionNo: string; leftOn: string; reason: string; eraseAfter: string; due: boolean }
+export interface LeaverRow { id: string; name: string; admissionNo: string; leftOn: string; reason: string; kind: LeavingKind; transferTo: string | null; eraseAfter: string; due: boolean }
 export interface YearView { years: YearRow[]; runs: PromotionRunRow[]; leavers: LeaverRow[]; retentionMonths: number }
 
 // ── Background jobs (the console's Health page) ───────────────────────────────

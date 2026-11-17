@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
-import { currencySymbol, schoolToday, type ClassInfo, type AddressParts, type CustomValues } from '@tangent/contracts';
+import { currencySymbol, readAmount, schoolToday, type ClassInfo, type AddressParts, type CustomValues } from '@tangent/contracts';
 import { DateField, Dialog, ErrorLine, Field, FilePick, SelectField, useShake, t as tr } from '@tangent/web-ui';
 import { DialogActions as Actions, fieldsOf, messageOf, useFeeHeads } from '../../app/kit';
 import { useApp } from '../../app/context';
-import { RecordFields, emptyRec } from './StudentRecord';
+import { NameFields, RecordFields, checkNames, emptyRec } from './StudentRecord';
+import { useSetting } from '../../app/kit';
 
 type Done = (message: string, openId?: string) => void;
 
 export function AddStudentDialog({ classes, defaultClass, onClose, onDone }: { classes: ClassInfo[]; defaultClass?: string; onClose: () => void; onDone: Done }) { const { api } = useApp();
   const shake = useShake();
-  const [f, setF] = useState({ name: '', classId: defaultClass ?? classes[0]?.id ?? '', rollNo: '', dob: '', guardianName: '', guardianPhone: '', ...emptyRec });
+  const order = useSetting<string>('people.nameOrder', 'given-family');
+  const [f, setF] = useState({ name: '', givenName: '', familyName: '', nameLocal: '', classId: defaultClass ?? classes[0]?.id ?? '', rollNo: '', dob: '', guardianName: '', guardianPhone: '', ...emptyRec });
   // Opened before the classes arrived: take the first one when they do, as if it had been there.
   useEffect(() => { if (classes[0]) setF((s) => (s.classId ? s : { ...s, classId: classes[0]!.id })); }, [classes]);
   const [err, setErr] = useState<Record<string, string>>({});
@@ -19,15 +21,16 @@ export function AddStudentDialog({ classes, defaultClass, onClose, onDone }: { c
   const [custom, setCustom] = useState<CustomValues>({});
   const [address, setAddress] = useState<AddressParts>({});
   const submit = async (e: React.FormEvent) => { e.preventDefault();
-    const local: Record<string, string> = {};
-    if (f.name.trim().length < 2) local.name = tr('admin.student_dialogs.enter_the_full_name');
+    const named = checkNames(f, order);
+    const local: Record<string, string> = { ...named.errors };
     if (!f.classId) local.classId = tr('admin.student_dialogs.choose_a_class');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(f.dob)) local.dob = tr('admin.student_dialogs.choose_the_date_of_birth');
     if (f.guardianName.trim().length < 2) local.guardianName = tr('admin.student_dialogs.enter_the_guardian_s_name');
     if (!f.guardianPhone.trim()) local.guardianPhone = tr('admin.student_dialogs.enter_a_phone_number');
     if (Object.keys(local).length) { setErr(local); shake.hit(); return; }
     setBusy(true);
-    try { const s = await api.students.create({ ...f, rollNo: f.rollNo || undefined, bloodGroup: f.bloodGroup || undefined, address: f.address || undefined, gender: f.gender || undefined, house: f.house || undefined, admissionNo: f.admissionNo || undefined, custom, addressParts: address });
+    try { const both = !!(f.givenName.trim() && f.familyName.trim());
+      const s = await api.students.create({ ...f, name: named.name, givenName: both ? f.givenName.trim() : undefined, familyName: both ? f.familyName.trim() : undefined, nameLocal: f.nameLocal.trim() || undefined, rollNo: f.rollNo || undefined, bloodGroup: f.bloodGroup || undefined, address: f.address || undefined, gender: f.gender || undefined, house: f.house || undefined, admissionNo: f.admissionNo || undefined, custom, addressParts: address });
       onDone(tr('admin.student_dialogs.was_added_to', { name: s.name, className: s.className }), s.id);
     } catch (x) { setBusy(false); setErr(fieldsOf(x)); setGeneral(Object.keys(fieldsOf(x)).length ? '' : messageOf(x)); shake.hit();
     }
@@ -35,7 +38,7 @@ export function AddStudentDialog({ classes, defaultClass, onClose, onDone }: { c
   return (
     <Dialog title={tr('admin.student_dialogs.add_a_student')} onClose={onClose} shake={shake.cls} width={520}>
       <form onSubmit={submit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <Field label={tr('admin.student_dialogs.full_name')} value={f.name} onChange={set('name')} error={err.name} autoComplete="off" />
+        <NameFields f={f} set={set} err={err} />
         <div className="two">
           <SelectField label={tr('admin.student_dialogs.class')} value={f.classId} onChange={set('classId')} options={classes.map((c) => ({ value: c.id, label: c.name }))} error={err.classId} />
           <Field label={tr('admin.student_dialogs.roll_no_optional')} value={f.rollNo} onChange={set('rollNo')} maxLength={10} />
@@ -151,11 +154,11 @@ export function AssignFeeDialog({ ids, label, onClose, onDone }: { ids: string[]
   const submit = async (e: React.FormEvent) => { e.preventDefault();
     const local: Record<string, string> = {};
     if (f.title.trim().length < 3) local.title = tr('admin.student_dialogs.name_the_fee');
-    if (!(Number(f.amount) > 0)) local.amount = tr('admin.student_dialogs.enter_an_amount');
+    if (!(readAmount(f.amount) > 0)) local.amount = tr('admin.student_dialogs.enter_an_amount');
     if (!f.dueOn) local.dueOn = tr('admin.student_dialogs.choose_the_due_date');
     if (Object.keys(local).length) { setErr(local); shake.hit(); return; }
     setBusy(true);
-    try { const r = await api.students.assignFee({ ids, head, title: f.title, amount: Math.round(Number(f.amount)), dueOn: f.dueOn }); onDone(tr('admin.student_dialogs.added_for', { title: f.title, created: r.created })); }
+    try { const r = await api.students.assignFee({ ids, head, title: f.title, amount: readAmount(f.amount), dueOn: f.dueOn }); onDone(tr('admin.student_dialogs.added_for', { title: f.title, created: r.created })); }
     catch (x) { setBusy(false); setErr({ ...fieldsOf(x), title: fieldsOf(x).title ?? (Object.keys(fieldsOf(x)).length ? '' : messageOf(x)) }); shake.hit(); }
   };
   return (

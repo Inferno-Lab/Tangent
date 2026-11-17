@@ -126,6 +126,9 @@ export interface StaffRow {
   maxPeriods: number;
   status: 'active' | 'inactive';
   joinedOn: string | null;
+  /** Their line manager (workflow steps can go to them). */
+  managerId: string | null;
+  managerName: string | null;
   /** invited: sent a first password, not signed in yet; none: never invited (brought in by an import). */
   access: 'none' | 'invited' | 'signed_in';
   /** The school's own fields (fields.custom.staff), by key. */
@@ -140,6 +143,7 @@ export const StaffCreate = z.object({
   department: z.string().trim().max(60).optional(),
   subjectIds: z.array(z.string()).max(8).default([]),
   roleId: z.string().min(1, 'Choose a role'),
+  managerId: z.string().min(1).nullable().optional(),
   custom: CustomValues.optional(),
 });
 export type StaffCreate = z.infer<typeof StaffCreate>;
@@ -153,6 +157,7 @@ export const StaffPatch = z.object({
   subjectIds: z.array(z.string()).max(8).optional(),
   roleId: z.string().min(1).optional(),
   status: z.enum(['active', 'inactive']).optional(),
+  managerId: z.string().min(1).nullable().optional(),
   custom: CustomValues.optional(),
 });
 export type StaffPatch = z.infer<typeof StaffPatch>;

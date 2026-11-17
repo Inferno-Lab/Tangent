@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { nextNumber, commitImport, newId, previewImport } from '@tangent/db';
-import { schoolInstant, addDays, dayLabel, initials, schoolToday, latestSchoolDay, schoolDaysEnding, type AssignFee, type AttendanceStatus, type ContactReveal, type FeeStatus, type ImportResult, type MessageRequest, type GuardianRow, type GuardiansPut, type Paged, type StudentCreate, type StudentDetail, type StudentPatch, type StudentQuery, type StudentRow, type StudentSummary, type StudentViews, type ListItem, listKey, tx, addressProblems, joinAddress, type AddressFormat } from '@tangent/contracts';
+import { schoolInstant, addDays, dayLabel, initials, schoolToday, latestSchoolDay, schoolDaysEnding, type AssignFee, type AttendanceStatus, type ContactReveal, type FeeStatus, type ImportResult, type MessageRequest, type GuardianRow, type GuardiansPut, type Paged, type StudentCreate, type StudentDetail, type StudentPatch, type StudentQuery, type StudentRow, type StudentSummary, type StudentViews, type ListItem, listKey, tx, addressProblems, joinAddress, type AddressFormat, composeName, type ContactChannel, type LeavingKind, type StudentLeaveInput } from '@tangent/contracts';
 import { maskPhone } from '@tangent/security';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
-import { AuditService, Messenger, SettingsService } from './support.js';
+import { AuditService, Messenger, SettingsService, checkLeaveClash } from './support.js';
 
 const FEE_HORIZON_DAYS = 30;
 
@@ -72,7 +72,7 @@ export class StudentsService {
     const where: string[] = [];
     const params: unknown[] = [today, addDays(today, FEE_HORIZON_DAYS)];
     const add = (v: unknown) => { params.push(v); return `$${params.length}`; };
-    if (q.query) where.push(`(s.name ilike ${add(`%${esc(q.query)}%`)} or s.admission_no ilike ${add(`%${esc(q.query)}%`)})`);
+    if (q.query) where.push(`(s.name ilike ${add(`%${esc(q.query)}%`)} or s.name_local ilike ${add(`%${esc(q.query)}%`)} or s.admission_no ilike ${add(`%${esc(q.query)}%`)})`);
     if (q.classId) where.push(`s.class_id = ${add(q.classId)}`);
     if (q.house) where.push(`s.house = ${add(q.house)}`);
     if (q.feeStatus === 'overdue') where.push('coalesce(fee.overdue, 0) > 0');
@@ -209,7 +209,8 @@ export class StudentsService {
       this.activity(t, id),
       t.pool.query<{ phone: string | null; email: string | null; last_login_at: Date | null }>('select u.phone, u.email, u.last_login_at from students s join users u on u.id = s.user_id where s.id = $1', [id]),
     ]);
-    const extra = (await t.pool.query<{ gender: StudentDetail['gender']; status: string; left_on: string | null; reason: string | null; custom: StudentDetail['custom']; address_parts: StudentDetail['addressParts'] }>("select gender, status, left_on::text, leaving_reason reason, custom, address_parts from students where id = $1", [id])).rows[0];
+    const extra = (await t.pool.query<{ gender: StudentDetail['gender']; status: string; left_on: string | null; reason: string | null; kind: LeavingKind | null; transfer_to: string | null; custom: StudentDetail['custom']; address_parts: StudentDetail['addressParts']; given_name: string | null; family_name: string | null; name_local: string | null }>(
+      'select gender, status, left_on::text, leaving_reason reason, leaving_kind kind, transfer_to, custom, address_parts, given_name, family_name, name_local from students where id = $1', [id])).rows[0];
     const has = await this.has(t);
     const acc = account.rows[0];
     const base = this.mask(this.row(r, ticks.get(id)!), has);
@@ -221,7 +222,9 @@ export class StudentsService {
         homework: has.homework ? { onTime: Number(hw.rows[0]!.on_time), total: Number(hw.rows[0]!.total) } : { onTime: 0, total: 0 }, libraryOut: has.library ? Number(lib.rows[0]!.n) : 0,
       },
       chips: { house: r.house }, recentActivity: acts, roll24: has.attendance ? roll24 : roll24.map(() => null),
-      gender: extra?.gender ?? null, custom: extra?.custom ?? {}, addressParts: extra?.address_parts ?? {}, guardians: await this.guardians(t, id), left: extra?.status === 'left' && extra.left_on ? { on: extra.left_on, reason: extra.reason ?? '' } : null,
+      gender: extra?.gender ?? null, custom: extra?.custom ?? {}, addressParts: extra?.address_parts ?? {}, guardians: await this.guardians(t, id),
+      givenName: extra?.given_name ?? null, familyName: extra?.family_name ?? null, nameLocal: extra?.name_local ?? null,
+      left: extra?.status === 'left' && extra.left_on ? { on: extra.left_on, reason: extra.reason ?? '', kind: extra.kind ?? 'withdrawn', transferTo: extra.transfer_to } : null,
       appAccount: acc ? { phone: acc.phone ? maskPhone(acc.phone) : '', email: acc.email ?? '', lastSignIn: acc.last_login_at?.toISOString() ?? null } : null,
     };
   }
@@ -282,6 +285,9 @@ export class StudentsService {
   }
 
   async create(t: TenantCtx, body: StudentCreate, user: { id: string; name: string }): Promise<StudentDetail> {
+    // Given and family names, when typed, make the full name; the parts are kept for the register and the second script beside it.
+    if (body.givenName && body.familyName) body.name = composeName(body.givenName, body.familyName, await this.settings.value(t, 'people.nameOrder', 'given-family'));
+    const name = body.name ?? '';
     const need = await this.settings.value<string[]>(t, 'students.required', []);
     const checked = { ...Object.fromEntries(need.map((k) => [k, (body as Record<string, unknown>)[k] ?? ''])), gender: body.gender, bloodGroup: body.bloodGroup, addressParts: body.addressParts } as StudentPatch;
     await this.required(t, checked);
@@ -309,8 +315,10 @@ export class StudentsService {
     try {
       await client.query('begin');
       const admissionNo = body.admissionNo || (await nextNumber(client, { pattern, start, day: schoolToday(), ay, table: 'students', column: 'admission_no' }));
-      await client.query('insert into students (id, admission_no, name, class_id, roll_no, dob, blood_group, address, gender, house, admitted_on, custom, address_parts) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, $11, $12, $13)',
-        [id, admissionNo, body.name, body.classId, roll, body.dob, body.bloodGroup ?? null, body.address || null, body.gender ?? null, body.house || null, schoolToday(), JSON.stringify(custom), JSON.stringify(body.addressParts ?? {})]);
+      await client.query(`insert into students (id, admission_no, name, class_id, roll_no, dob, blood_group, address, gender, house, admitted_on, custom, address_parts, given_name, family_name, name_local)
+        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+        [id, admissionNo, name, body.classId, roll, body.dob, body.bloodGroup ?? null, body.address || null, body.gender ?? null, body.house || null, schoolToday(), JSON.stringify(custom), JSON.stringify(body.addressParts ?? {}),
+          body.givenName || null, body.familyName || null, body.nameLocal || null]);
       // One family, one guardian: a brother or sister joins the guardian who already has that phone number.
       let g = (await client.query<{ id: string; user_id: string | null }>(`select id, user_id from guardians where ${byPhone} limit 1`, [digits])).rows[0];
       if (!g) {
@@ -334,7 +342,7 @@ export class StudentsService {
     } finally {
       client.release();
     }
-    await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'student.created', entity: 'student', entityId: id, detail: { name: body.name } });
+    await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'student.created', entity: 'student', entityId: id, detail: { name } });
     return this.detail(t, id);
   }
 
@@ -342,6 +350,12 @@ export class StudentsService {
   async update(t: TenantCtx, id: string, b: StudentPatch, user: { id: string; name: string }): Promise<StudentDetail> {
     const was = (await t.pool.query<{ class_id: string }>("select class_id from students where id = $1 and status = 'active'", [id])).rows[0];
     if (!was) throw notFound('That student');
+    if (b.givenName !== undefined || b.familyName !== undefined) {
+      const cur = (await t.pool.query<{ given_name: string | null; family_name: string | null }>('select given_name, family_name from students where id = $1', [id])).rows[0]!;
+      const given = b.givenName ?? cur.given_name ?? '', family = b.familyName ?? cur.family_name ?? '';
+      if (given && family) b.name = composeName(given, family, await this.settings.value(t, 'people.nameOrder', 'given-family'));
+      else if (given || family) throw new ApiError('validation', 'Enter both the given and the family name, or neither.', { fields: { [given ? 'familyName' : 'givenName']: 'Enter this too.' } });
+    } else if (b.name !== undefined) { b.givenName = ''; b.familyName = ''; }
     await this.required(t, b);
     const custom = b.custom ? await this.settings.custom(t, 'student', b.custom, false) : null;
     if (b.classId && !(await t.pool.query('select 1 from classes where id = $1', [b.classId])).rowCount) throw new ApiError('validation', 'Choose a class from the list.', { fields: { classId: 'Choose a class from the list.' } });
@@ -350,7 +364,10 @@ export class StudentsService {
     }
     if (custom) await t.pool.query('update students set custom = custom || $2::jsonb where id = $1', [id, JSON.stringify(custom)]);
     if (b.addressParts) await t.pool.query('update students set address_parts = $2 where id = $1', [id, JSON.stringify(b.addressParts)]);
-    const cols: Record<Exclude<keyof StudentPatch, 'custom' | 'addressParts'>, string> = { name: 'name', classId: 'class_id', rollNo: 'roll_no', dob: 'dob', gender: 'gender', house: 'house', admissionNo: 'admission_no', bloodGroup: 'blood_group', address: 'address' };
+    const cols: Record<Exclude<keyof StudentPatch, 'custom' | 'addressParts'>, string> = {
+      name: 'name', classId: 'class_id', rollNo: 'roll_no', dob: 'dob', gender: 'gender', house: 'house', admissionNo: 'admission_no', bloodGroup: 'blood_group', address: 'address',
+      givenName: 'given_name', familyName: 'family_name', nameLocal: 'name_local',
+    };
     const set = (Object.keys(cols) as (keyof typeof cols)[]).filter((k) => b[k] !== undefined);
     if (set.length) {
       await t.pool.query(`update students set ${set.map((k, i) => `${cols[k]} = $${i + 2}`).join(', ')} where id = $1`, [id, ...set.map((k) => (b[k] === '' ? null : b[k]))]);
@@ -360,10 +377,13 @@ export class StudentsService {
   }
 
   async guardians(t: TenantCtx, studentId: string): Promise<GuardianRow[]> {
-    const { rows } = await t.pool.query<{ id: string; name: string; phone: string | null; email: string | null; relation: string | null; language: string | null; can_collect: boolean; is_primary: boolean; user_id: string | null; login: Date | null }>(
-      `select g.id, g.name, g.phone, g.email, g.relation, g.language, sg.can_collect, sg.is_primary, g.user_id, u.last_login_at login from student_guardians sg join guardians g on g.id = sg.guardian_id
-       left join users u on u.id = g.user_id where sg.student_id = $1 order by sg.is_primary desc, g.name`, [studentId]);
-    return rows.map((r) => ({ id: r.id, name: r.name, phone: r.phone ? maskPhone(r.phone) : '', email: r.email ?? '', relation: r.relation ?? 'Parent', language: r.language ?? '', canCollect: r.can_collect, isPrimary: r.is_primary, hasApp: !!r.login }));
+    const { rows } = await t.pool.query<{ id: string; name: string; phone: string | null; email: string | null; relation: string | null; language: string | null; can_collect: boolean; is_primary: boolean; gets_messages: boolean; gets_bills: boolean; channels_off: ContactChannel[]; user_id: string | null; login: Date | null }>(
+      `select g.id, g.name, g.phone, g.email, g.relation, g.language, sg.can_collect, sg.is_primary, sg.gets_messages, sg.gets_bills, g.channels_off, g.user_id, u.last_login_at login
+       from student_guardians sg join guardians g on g.id = sg.guardian_id left join users u on u.id = g.user_id where sg.student_id = $1 order by sg.is_primary desc, g.name`, [studentId]);
+    return rows.map((r) => ({
+      id: r.id, name: r.name, phone: r.phone ? maskPhone(r.phone) : '', email: r.email ?? '', relation: r.relation ?? 'Parent', language: r.language ?? '', canCollect: r.can_collect, isPrimary: r.is_primary, hasApp: !!r.login,
+      getsMessages: r.gets_messages, getsBills: r.gets_bills, channelsOff: r.channels_off ?? [],
+    }));
   }
 
   /**
@@ -381,6 +401,10 @@ export class StudentsService {
       else if (!was.has(g.relation.toLowerCase())) throw new ApiError('validation', 'Choose how each guardian is related from the list.', { fields: { [`guardians.${i}.relation`]: 'Choose from the list.' } });
     });
     const byPhone = 'phone = $1';
+    // The same phone twice would be one guardian saved twice with different answers.
+    const phones = b.guardians.map((g) => (g.id && /[^\d\s+()-]/.test(g.phone) ? `id:${g.id}` : this.settings.phone(t, g.phone)));
+    const twice = phones.findIndex((p, i) => phones.indexOf(p) !== i);
+    if (twice >= 0) throw new ApiError('validation', 'Two guardians have the same phone number.', { fields: { [`guardians.${twice}.phone`]: 'Already given above.' } });
     const client = await t.pool.connect();
     try {
       await client.query('begin');
@@ -391,10 +415,13 @@ export class StudentsService {
         const phone = known && /[^\d\s+()-]/.test(g.phone) ? known.phone ?? '' : this.settings.phone(t, g.phone);
         const digits = phone;
         let id = known?.id ?? (await client.query<{ id: string }>(`select id from guardians where ${byPhone} limit 1`, [digits])).rows[0]?.id;
-        if (id) await client.query('update guardians set name = $2, phone = $3, email = $4, relation = $5, language = case when $7 then $6 else language end where id = $1', [id, g.name, phone, g.email || null, g.relation, g.language || null, g.language !== undefined]);
+        if (id) {
+          await client.query('update guardians set name = $2, phone = $3, email = $4, relation = $5, language = case when $7 then $6 else language end, channels_off = coalesce($8, channels_off) where id = $1',
+            [id, g.name, phone, g.email || null, g.relation, g.language || null, g.language !== undefined, g.channelsOff ? JSON.stringify(g.channelsOff) : null]);
+        }
         else {
           id = newId('gdn');
-          await client.query('insert into guardians (id, name, phone, email, relation, language) values ($1,$2,$3,$4,$5,$6)', [id, g.name, phone, g.email || null, g.relation, g.language || null]);
+          await client.query('insert into guardians (id, name, phone, email, relation, language, channels_off) values ($1,$2,$3,$4,$5,$6,$7)', [id, g.name, phone, g.email || null, g.relation, g.language || null, JSON.stringify(g.channelsOff ?? [])]);
         }
         const d = digits;
         const has = (await client.query<{ user_id: string | null }>('select user_id from guardians where id = $1', [id])).rows[0]?.user_id;
@@ -403,8 +430,10 @@ export class StudentsService {
           if (!uid) { uid = newId('usr'); await client.query("insert into users (id, kind, name, phone) values ($1,'guardian',$2,$3)", [uid, g.name, phone]); }
           await client.query('update guardians set user_id = $2 where id = $1', [id, uid]);
         }
-        await client.query(`insert into student_guardians (student_id, guardian_id, is_primary, can_collect) values ($1,$2,$3,$4)
-          on conflict (student_id, guardian_id) do update set is_primary = excluded.is_primary, can_collect = excluded.can_collect`, [studentId, id, g.isPrimary, g.canCollect]);
+        // Left out (an older app or sheet), only the guardian contacted first gets the messages and the bills.
+        await client.query(`insert into student_guardians (student_id, guardian_id, is_primary, can_collect, gets_messages, gets_bills) values ($1,$2,$3,$4,$5,$6)
+          on conflict (student_id, guardian_id) do update set is_primary = excluded.is_primary, can_collect = excluded.can_collect, gets_messages = excluded.gets_messages, gets_bills = excluded.gets_bills`,
+          [studentId, id, g.isPrimary, g.canCollect, g.getsMessages ?? g.isPrimary, g.getsBills ?? g.isPrimary]);
         keep.push(id);
       }
       await client.query('delete from student_guardians where student_id = $1 and guardian_id <> all($2)', [studentId, keep]);
@@ -417,6 +446,25 @@ export class StudentsService {
     }
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'student.guardians', entity: 'student', entityId: studentId, detail: { count: b.guardians.length } });
     return this.guardians(t, studentId);
+  }
+
+  /** Leave the office records itself: approved at once, so the roll call starts with it and the family sees it in the app. */
+  async recordLeave(t: TenantCtx, studentId: string, b: StudentLeaveInput, user: { id: string; name: string }): Promise<{ id: string }> {
+    const s = (await t.pool.query<{ name: string }>("select name from students where id = $1 and status = 'active'", [studentId])).rows[0];
+    if (!s) throw notFound('That student');
+    const to = b.halfDay ? b.from : b.to;
+    if (to < b.from) throw new ApiError('validation', tx('The last day cannot be before the first day.'), { fields: { to: tx('Before the first day.') } });
+    if (addDays(b.from, 366) < to) throw new ApiError('validation', tx('Leave can be at most a year. Record a longer absence as leaving the school.'), { fields: { to: tx('Too far.') } });
+    await checkLeaveClash(t.pool, studentId, b.from, to, b.halfDay);
+    const id = newId('apr');
+    const when = b.halfDay ? `${b.from} (${b.halfDay === 'am' ? 'morning' : 'afternoon'})` : b.from === to ? b.from : `${b.from} – ${to}`;
+    await t.pool.query(
+      `insert into approvals (id, kind, title, subtitle, requester_name, requested_by, subject_ref, payload, status, decided_by, decided_at)
+       values ($1,'leave',$2,$3,$4,$5,$6,$7,'approved',$5,now())`,
+      [id, `Leave for ${s.name}`, `${when} · ${b.reason.slice(0, 60)}`, user.name, user.id, studentId,
+        JSON.stringify({ studentLeave: true, studentId, from: b.from, to, halfDay: b.halfDay ?? null, reason: b.reason, note: '', fileIds: [], byOffice: true })]);
+    await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'student.leave', entity: 'student', entityId: studentId, detail: { from: b.from, to } });
+    return { id };
   }
 
   /** The school's own sheet of students, through the same engine as Migration: bad lines are reported, the rest go in as one batch. */
@@ -445,7 +493,7 @@ export class StudentsService {
 
   async message(t: TenantCtx, body: MessageRequest, user: { id: string; name: string }): Promise<{ sent: number }> {
     const { rows } = await t.pool.query<{ student_id: string; phone: string | null; name: string }>(
-      'select sg.student_id, g.phone, s.name from student_guardians sg join guardians g on g.id = sg.guardian_id join students s on s.id = sg.student_id where sg.student_id = any($1) and sg.is_primary', [body.ids]);
+      'select sg.student_id, g.phone, s.name from student_guardians sg join guardians g on g.id = sg.guardian_id join students s on s.id = sg.student_id where sg.student_id = any($1) and sg.gets_messages', [body.ids]);
     const targets = rows.filter((r) => r.phone);
     // How it travels (the app, SMS, WhatsApp, email) is the console's rule for "A message from the office", not the sender's pick.
     const sent = await this.messenger.notify(t, 'office.message', targets.map((r) => ({ to: r.phone!, vars: { text: body.body } })));
@@ -483,10 +531,10 @@ export class StudentsService {
   async invite(t: TenantCtx, ids: string[], user: { id: string; name: string }): Promise<{ sent: number }> {
     const { rows } = await t.pool.query<{ phone: string; name: string }>(
       `select distinct on (g.phone) g.phone, s.name from student_guardians sg join guardians g on g.id = sg.guardian_id join students s on s.id = sg.student_id
-       where sg.student_id = any($1) and sg.is_primary and g.phone is not null order by g.phone, s.name`, [ids]);
+       where sg.student_id = any($1) and sg.gets_messages and g.phone is not null order by g.phone, s.name`, [ids]);
     const sent = await this.messenger.notify(t, 'family.invite', rows.map((r) => ({ to: r.phone, vars: { student: r.name } })));
     await t.pool.query(`update users set invited_at = coalesce(invited_at, now()) where id in
-      (select g.user_id from student_guardians sg join guardians g on g.id = sg.guardian_id where sg.student_id = any($1) and sg.is_primary)`, [ids]);
+      (select g.user_id from student_guardians sg join guardians g on g.id = sg.guardian_id where sg.student_id = any($1) and sg.gets_messages)`, [ids]);
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'family.invited', entity: 'student', detail: { families: sent } });
     return { sent };
   }

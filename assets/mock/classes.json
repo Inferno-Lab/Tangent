@@ -1,7 +1,7 @@
 [
   {
     "id": "cls_8a",
-    "name": "Class 8",
+    "name": "8",
     "section": "A",
     "classTeacherId": "tch_kavita",
     "room": "B-204",
@@ -20,7 +20,7 @@
   },
   {
     "id": "cls_5b",
-    "name": "Class 5",
+    "name": "5",
     "section": "B",
     "classTeacherId": "tch_meera",
     "room": "A-102",
@@ -34,7 +34,7 @@
   },
   {
     "id": "cls_7b",
-    "name": "Class 7",
+    "name": "7",
     "section": "B",
     "classTeacherId": "tch_rahul",
     "room": "A-118",
@@ -49,7 +49,7 @@
   },
   {
     "id": "cls_6a",
-    "name": "Class 6",
+    "name": "6",
     "section": "A",
     "classTeacherId": "tch_rahul",
     "room": "A-210",
@@ -64,7 +64,7 @@
   },
   {
     "id": "cls_9c",
-    "name": "Class 9",
+    "name": "9",
     "section": "C",
     "classTeacherId": "tch_arjun",
     "room": "C-101",

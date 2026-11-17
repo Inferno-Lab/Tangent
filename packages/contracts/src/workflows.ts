@@ -14,9 +14,10 @@ export const PROCESS_LABELS: Record<WorkflowProcess, string> = localizedLabels({
 });
 
 /** Who takes a step: whoever may decide the kind (its permissions), a role, one named person, or the child's class teacher. */
-export const STEP_ACTORS = ['permission', 'role', 'person', 'classTeacher'] as const;
+export const STEP_ACTORS = ['permission', 'role', 'person', 'classTeacher', 'lineManager'] as const;
 export const STEP_ACTOR_LABELS: Record<(typeof STEP_ACTORS)[number], string> = localizedLabels({
   permission: 'Anyone allowed to decide it', role: 'Someone with a role', person: 'One person', classTeacher: 'The child’s class teacher',
+  lineManager: 'The line manager of the person who asked',
 });
 /** When a step waits longer than its days: remind whoever takes it, let anyone allowed to decide the kind take it, or approve it. */
 export const STEP_TIMEOUTS = ['remind', 'escalate', 'approve'] as const;

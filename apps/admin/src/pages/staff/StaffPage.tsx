@@ -117,8 +117,9 @@ export function StaffPage() { const app = useApp();
 function StaffDialog({ person, onClose, onDone }: { person: StaffRow | null; onClose: () => void; onDone: (msg: string) => void }) { const app = useApp();
   const subjects = useQuery({ queryKey: ['subjects'], queryFn: app.api.subjects, staleTime: 10 * 60_000 });
   const roles = useQuery({ queryKey: ['roles'], queryFn: app.api.roles.list, staleTime: 60_000 });
+  const staff = useQuery({ queryKey: ['staff'], queryFn: () => app.api.staff.list() });
   const me = person?.id === app.user.id;
-  const [f, setF] = useState({ name: person?.name ?? '', email: person?.email ?? '', phone: person?.phone ?? '', designation: person?.designation ?? tr('admin.staff_page.teacher'), department: person?.department ?? '', roleId: person?.roles[0]?.id ?? '' });
+  const [f, setF] = useState({ name: person?.name ?? '', email: person?.email ?? '', phone: person?.phone ?? '', designation: person?.designation ?? tr('admin.staff_page.teacher'), department: person?.department ?? '', roleId: person?.roles[0]?.id ?? '', managerId: person?.managerId ?? '' });
   // A new person starts as a teacher where the school has that role, else in the first one.
   const roleId = f.roleId || (roles.data?.find((r) => r.key === 'teacher') ?? roles.data?.[0])?.id || '';
   const [subs, setSubs] = useState<string[]>(person?.subjects.map((s) => s.id) ?? []);
@@ -128,11 +129,11 @@ function StaffDialog({ person, onClose, onDone }: { person: StaffRow | null; onC
   const shake = useShake();
   const set = (k: keyof typeof f) => (v: string) => { setF((x) => ({ ...x, [k]: v })); setErr((e) => ({ ...e, [k]: '', _: '' })); };
   const fail = (e: unknown) => { setErr(problem(e)); shake.hit(); };
-  const save = useMutation({ mutationFn: () => { if (!person) return app.api.staff.create({ name: f.name.trim(), email: f.email.trim(), phone: f.phone.trim(), designation: f.designation.trim() || tr('admin.staff_page.teacher'), department: f.department.trim() || undefined, subjectIds: subs, roleId, custom });
+  const save = useMutation({ mutationFn: () => { if (!person) return app.api.staff.create({ name: f.name.trim(), email: f.email.trim(), phone: f.phone.trim(), designation: f.designation.trim() || tr('admin.staff_page.teacher'), department: f.department.trim() || undefined, subjectIds: subs, roleId, custom, managerId: f.managerId || null });
       // Only what changed: a person with two roles keeps both unless the role is changed here.
       const changed = <T,>(now: T, was: T) => (now !== was ? now : undefined);
       return app.api.staff.patch(person.id, { name: changed(f.name.trim(), person.name), email: changed(f.email.trim().toLowerCase(), person.email ?? ''), phone: changed(f.phone.trim(), person.phone ?? ''),
-        designation: f.designation.trim(), department: f.department.trim() || null, subjectIds: subs, custom, ...(me || roleId === person.roles[0]?.id ? {} : { roleId }) });
+        designation: f.designation.trim(), department: f.department.trim() || null, subjectIds: subs, custom, managerId: changed(f.managerId || null, person.managerId), ...(me || roleId === person.roles[0]?.id ? {} : { roleId }) });
     },
     onSuccess: (r) => onDone(person ? tr('admin.staff_page.was_updated', { name: r.name }) : tr('admin.staff_page.was_added_invite_sent_to', { name: r.name, email: r.email })),
     onError: fail });
@@ -161,6 +162,8 @@ function StaffDialog({ person, onClose, onDone }: { person: StaffRow | null; onC
           <Field label={tr('admin.staff_page.designation')} value={f.designation} onChange={set('designation')} error={err.designation} maxLength={60} />
           <Field label={tr('admin.staff_page.department_optional')} value={f.department} onChange={set('department')} maxLength={60} />
         </div>
+        <SelectField label={tr('admin.staff_page.line_manager')} value={f.managerId} onChange={set('managerId')} error={err.managerId}
+          options={[{ value: '', label: tr('admin.staff_page.no_line_manager') }, ...(staff.data ?? []).filter((x) => x.id !== person?.id && (x.status === 'active' || x.id === f.managerId)).map((x) => ({ value: x.id, label: `${x.name} · ${x.designation}` }))]} />
         <SelectField label={tr('admin.staff_page.role')} value={roleId} onChange={set('roleId')} disabled={me} error={err.roleId} options={(roles.data ?? []).map((r) => ({ value: r.id, label: r.name }))} />
         {me && <div className="help">{tr('admin.staff_page.you_cannot_change_your_own')}</div>}
         {person && person.roles.length > 1 && !me && <div className="help">{tr('admin.staff_page.also')}{' '}{person.roles.slice(1).map((r) => r.name).join(', ')}{tr('admin.staff_page.choosing_a_role_here_replaces')}</div>}

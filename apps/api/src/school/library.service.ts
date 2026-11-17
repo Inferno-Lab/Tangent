@@ -131,13 +131,13 @@ export class LibraryService {
     if (b.outcome === 'lost' && l.book_id) await t.pool.query('update library_books set copies = greatest(copies - 1, 0) where id = $1', [l.book_id]);
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: `library.${b.outcome}`, entity: 'loan', entityId: loanId, detail: { fine, note } });
     if (l.book_id && b.outcome !== 'lost') {
-      const next = (await t.pool.query<{ id: string; student: string; phone: string | null; title: string }>(
-        `select r.id, s.name student, g.phone, b.title from library_reservations r join students s on s.id = r.student_id join library_books b on b.id = r.book_id
-         left join student_guardians sg on sg.student_id = s.id and sg.is_primary left join guardians g on g.id = sg.guardian_id
+      const next = (await t.pool.query<{ id: string; student_id: string; student: string; title: string }>(
+        `select r.id, s.id student_id, s.name student, b.title from library_reservations r join students s on s.id = r.student_id join library_books b on b.id = r.book_id
          where r.book_id = $1 and r.status = 'waiting' order by r.created_at limit 1`, [l.book_id])).rows[0];
       if (next) {
         await t.pool.query("update library_reservations set status = 'ready' where id = $1", [next.id]);
-        if (next.phone) await this.messenger.notify(t, 'library.ready', [{ to: next.phone, vars: { student: next.student, title: next.title } }]);
+        const fams = (await t.pool.query<{ phone: string | null }>('select g.phone from student_guardians sg join guardians g on g.id = sg.guardian_id where sg.student_id = $1 and sg.gets_messages', [next.student_id])).rows;
+        await this.messenger.notify(t, 'library.ready', fams.filter((f) => f.phone).map((f) => ({ to: f.phone!, vars: { student: next.student, title: next.title } })));
       }
     }
     return { fine, billed: !!invoiceId };
@@ -171,9 +171,9 @@ export class LibraryService {
     if (!r.rowCount) throw notFound('That reservation');
     if (!studentIds && reason) {
       const who = (await t.pool.query<{ phone: string | null; student: string; title: string }>(
-        `select g.phone, s.name student, b.title from students s join library_books b on b.id = $2 left join student_guardians sg on sg.student_id = s.id and sg.is_primary
-         left join guardians g on g.id = sg.guardian_id where s.id = $1`, [r.rows[0]!.student_id, r.rows[0]!.book_id])).rows[0];
-      if (who?.phone) await this.messenger.notify(t, 'library.cancelled', [{ to: who.phone, vars: { student: who.student, title: who.title, reason } }]);
+        `select g.phone, s.name student, b.title from students s join library_books b on b.id = $2 join student_guardians sg on sg.student_id = s.id and sg.gets_messages
+         join guardians g on g.id = sg.guardian_id where s.id = $1`, [r.rows[0]!.student_id, r.rows[0]!.book_id])).rows;
+      await this.messenger.notify(t, 'library.cancelled', who.filter((w) => w.phone).map((w) => ({ to: w.phone!, vars: { student: w.student, title: w.title, reason } })));
     }
   }
 

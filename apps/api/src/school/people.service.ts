@@ -17,7 +17,7 @@ type User = { id: string; name: string };
 
 interface StaffSql {
   id: string; name: string; email: string | null; phone: string | null; status: string; designation: string; department: string | null; joined_on: string | null; max_periods: number; periods: string;
-  invited: boolean; signed_in: boolean; custom: StaffRow['custom'] | null;
+  invited: boolean; signed_in: boolean; custom: StaffRow['custom'] | null; manager_id: string | null; manager_name: string | null;
 }
 
 /** Staff, the admissions pipeline and the roles that decide what each person may do. */
@@ -43,12 +43,25 @@ export class PeopleService {
 
   // Staff
 
+  /** A line manager is another member of staff, and the chain never comes back round to the person (A → B → A). */
+  private async checkManager(t: TenantCtx, id: string | null, managerId: string | null | undefined): Promise<void> {
+    if (!managerId) return;
+    if (managerId === id) throw new ApiError('validation', tx('Someone cannot be their own line manager.'), { fields: { managerId: tx('Choose someone else.') } });
+    if (!(await t.pool.query('select 1 from staff s join users u on u.id = s.user_id where s.user_id = $1', [managerId])).rowCount) throw new ApiError('validation', tx('Choose a line manager from the staff list.'), { fields: { managerId: tx('Choose from the list.') } });
+    if (!id) return;
+    const loop = await t.pool.query(
+      `with recursive up(uid, depth) as (select manager_id, 1 from staff where user_id = $1
+         union all select s.manager_id, up.depth + 1 from staff s join up on s.user_id = up.uid where up.depth < 50)
+       select 1 from up where uid = $2 limit 1`, [managerId, id]);
+    if (loop.rowCount) throw new ApiError('validation', tx('That would make them each other’s line manager.'), { fields: { managerId: tx('Choose someone else.') } });
+  }
+
   async staff(t: TenantCtx, q: { query?: string; id?: string } = {}): Promise<StaffRow[]> {
     const { rows } = await t.pool.query<StaffSql>(
       `select u.id, u.name, u.email, u.phone, u.status, s.designation, s.department, s.joined_on::text, s.max_periods_per_week max_periods, s.custom,
-         u.invited_at is not null or u.password_hash is not null invited, u.last_login_at is not null signed_in,
+         u.invited_at is not null or u.password_hash is not null invited, u.last_login_at is not null signed_in, s.manager_id, m.name manager_name,
          (select count(*) from timetable_slots ts where ts.teacher_id = u.id) periods
-       from users u join staff s on s.user_id = u.id
+       from users u join staff s on s.user_id = u.id left join users m on m.id = s.manager_id
        where ($1::text is null or u.id = $1) and ($2::text is null or u.name ilike '%' || $2 || '%' or s.designation ilike '%' || $2 || '%' or s.department ilike '%' || $2 || '%')
        order by (s.designation = 'Principal') desc, u.name limit 300`, [q.id ?? null, q.query?.replace(/[\\%_]/g, (c) => `\\${c}`) ?? null]);
     if (!rows.length) return [];
@@ -62,7 +75,7 @@ export class PeopleService {
       subjects: subs.rows.filter((s) => s.user_id === r.id).map((s) => ({ id: s.id, name: s.name })),
       roles: roles.rows.filter((x) => x.user_id === r.id).map((x) => ({ id: x.id, name: x.name })),
       periodsPerWeek: Number(r.periods), maxPeriods: r.max_periods, status: r.status === 'active' ? 'active' : 'inactive', joinedOn: r.joined_on,
-      access: r.signed_in ? 'signed_in' : r.invited ? 'invited' : 'none', custom: r.custom ?? {},
+      access: r.signed_in ? 'signed_in' : r.invited ? 'invited' : 'none', custom: r.custom ?? {}, managerId: r.manager_id, managerName: r.manager_name,
     }));
   }
 
@@ -78,6 +91,7 @@ export class PeopleService {
     const dup = await t.pool.query('select 1 from users where lower(email) = $1', [body.email]);
     if (dup.rowCount) throw new ApiError('validation', 'Someone already uses that email.', { fields: { email: 'Someone already uses that email.' } });
     const custom = await this.settings.custom(t, 'staff', body.custom ?? {}, true);
+    await this.checkManager(t, null, body.managerId);
     const id = newId('usr');
     const temp = tempPassword();
     const known = body.subjectIds.length ? (await t.pool.query<{ id: string }>('select id from subjects where id = any($1)', [body.subjectIds])).rows.map((s) => s.id) : [];
@@ -85,7 +99,7 @@ export class PeopleService {
     try {
       await client.query('begin');
       await client.query("insert into users (id, kind, name, email, phone, password_hash, invited_at) values ($1,'staff',$2,$3,$4,$5,now())", [id, body.name, body.email, this.settings.phone(t, body.phone), await hashPassword(temp)]);
-      await client.query('insert into staff (user_id, designation, department, joined_on, custom) values ($1,$2,$3,current_date,$4)', [id, body.designation, body.department ?? null, JSON.stringify(custom)]);
+      await client.query('insert into staff (user_id, designation, department, joined_on, custom, manager_id) values ($1,$2,$3,current_date,$4,$5)', [id, body.designation, body.department ?? null, JSON.stringify(custom), body.managerId ?? null]);
       for (const s of known) await client.query('insert into staff_subjects (user_id, subject_id) values ($1,$2)', [id, s]);
       if (role.id) await client.query('insert into user_roles (user_id, role_id) values ($1,$2)', [id, role.id]);
       await client.query('commit');
@@ -108,9 +122,11 @@ export class PeopleService {
     if (!cur) throw notFound('That person');
     if (body.roleId && !(await this.schoolAssignsRoles(t))) throw forbidden('Tangent assigns roles at your school. Ask Tangent to change this person’s role.');
     const custom = body.custom ? await this.settings.custom(t, 'staff', body.custom, false) : null;
+    await this.checkManager(t, id, body.managerId);
     const client = await t.pool.connect();
     try {
       await client.query('begin');
+      if (body.managerId !== undefined) await client.query('update staff set manager_id = $2 where user_id = $1', [id, body.managerId]);
       if (body.name || body.email || body.phone) {
         // A changed email is how they sign in from now on.
         await client.query('update users set name = coalesce($2, name), email = coalesce($3, email), phone = coalesce($4, phone) where id = $1', [id, body.name ?? null, body.email ?? null, body.phone ? this.settings.phone(t, body.phone) : null]);

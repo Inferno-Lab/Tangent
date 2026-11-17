@@ -229,6 +229,7 @@ export function StudentsView({ v }: { v: any }) {
                   <div className="fd" style={{ fontSize: "28px", letterSpacing: "-.03em", lineHeight: "1.1" } as CSSProperties}>
                     {v.d.n}
                   </div>
+                  {v.d.local && <div dir="auto" style={{ font: "600 15px var(--fb)", color: "var(--ink2)", marginTop: "2px" } as CSSProperties}>{v.d.local}</div>}
                   <div style={{ font: "600 13px var(--fb)", color: "var(--ink3)", marginTop: "4px" } as CSSProperties}>
                     {tr('admin.students.view.adm')}{' '}{v.d.adm} {tr('admin.students.view.class_2')}{' '}{v.d.cls} {tr('admin.students.view.roll')}{' '}{v.d.roll}
                   </div>
@@ -331,6 +332,10 @@ export function StudentsView({ v }: { v: any }) {
               {v.canCollect && (
                 <button className="btn" onClick={v.collect}>
                   {tr('admin.students.view.collect_fee')}</button>
+              )}
+              {v.may.edit && (
+                <button className="btn" data-tip={tr('admin.students.view.record_days_away')} onClick={v.away}>
+                  {tr('admin.students.view.record_leave')}</button>
               )}
               {v.may.leave && (
                 <button className="btn" data-tip={tr('admin.students.view.record_that_this_student_left')} onClick={v.leave}>

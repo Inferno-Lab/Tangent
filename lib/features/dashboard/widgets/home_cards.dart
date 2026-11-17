@@ -311,7 +311,7 @@ class ChildrenStrip extends StatelessWidget {
                                   children: [
                                     TextSpan(
                                       text:
-                                          ' · ${child.schoolClass.name.replaceAll(RegExp('[^0-9]'), '')} ${child.schoolClass.section}',
+                                          ' · ${child.schoolClass.label}',
                                       style: context.type.cap,
                                     ),
                                   ],

@@ -47,7 +47,8 @@ describe('who is signed in', () => {
   });
   it('lists the classes and teachers the way the app expects', async () => {
     const cls = (await f(parent, '/classes/cls_8a')).json;
-    expect(cls).toMatchObject({ name: 'Class 8', section: 'A' });
+    // The school's own name for the class, not one the app makes up.
+    expect(cls).toMatchObject({ name: '8 A', section: 'A' });
     expect(cls.studentIds.length).toBeGreaterThan(30);
     const mine = (await f(teacher, '/teachers/' + (await f(teacher, '/me')).json.id + '/classes')).json;
     expect(mine.map((c: any) => c.id)).toContain('cls_8a');

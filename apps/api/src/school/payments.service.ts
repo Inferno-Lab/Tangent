@@ -176,8 +176,8 @@ export class PaymentsService implements OnModuleInit {
       await t.pool.query('update payments set refunded = refunded + $2 where id = $1', [r.payment_id, r.amount]);
       await t.pool.query("update payment_orders set status = case when (select amount - refunded from payments where id = $1) <= 0 then 'refunded' else 'partial_refund' end where payment_id = $1", [r.payment_id]);
       await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'refund.sent', entity: 'payment', entityId: r.payment_id, detail: { amount: r.amount, refundId: out.refundId } });
-      const g = (await t.pool.query<{ phone: string | null; email: string | null }>('select g.phone, g.email from student_guardians sg join guardians g on g.id = sg.guardian_id where sg.student_id = $1 and sg.is_primary', [r.student_id])).rows[0];
-      if (g?.phone) await this.messenger.notify(t, 'fees.refunded', [{ to: g.phone, email: g.email, vars: { receipt: r.receipt_no, amount: fmtMoney(r.amount) } }]);
+      const g = (await t.pool.query<{ phone: string | null; email: string | null }>('select g.phone, g.email from student_guardians sg join guardians g on g.id = sg.guardian_id where sg.student_id = $1 and sg.gets_bills', [r.student_id])).rows;
+      await this.messenger.notify(t, 'fees.refunded', g.filter((x) => x.phone).map((x) => ({ to: x.phone!, email: x.email, vars: { receipt: r.receipt_no, amount: fmtMoney(r.amount) } })));
     } catch (e) {
       await t.pool.query("update refunds set status = 'failed', error = $2, approved_by = $3 where id = $1", [id, (e as Error).message.slice(0, 300), user.id]);
     }

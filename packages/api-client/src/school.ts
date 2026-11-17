@@ -1,6 +1,6 @@
 import type {
   ChangeRequestCreate, ChangeRequestRow, PasswordChange, ReportQuery, EventReply, InvoiceDetail, WaiverRequest, ReceiptCancel, SlotCreate, WeekOf, StudentPatch, GuardiansPut, GuardianRow, DataRequestCreate, DataRequestDecision, DataRequestRow, EnquiryCreate, EnquiryEnrol, EnquiryPatch, EnquiryRow, EventRow, EventSave, ExamCreate, ExamMarksPut, ExamMarksView, ExamResults, ExamRow,
-  HomeworkCreate, HomeworkDetail, HomeworkMarks, HomeworkRow, InvoiceListQuery, InvoiceListRow, InvoiceListSummary, ReceiptRow, ReportData, ReportInfo, RoleDefSave, RoleRow, StaffCreate, StaffPatch, StaffRow,
+  HomeworkCreate, HomeworkDetail, HomeworkMarks, HomeworkRow, InvoiceListQuery, InvoiceListRow, InvoiceListSummary, ReceiptRow, ReportData, ReportInfo, RoleDefSave, RoleRow, StudentLeaveInput, StaffCreate, StaffPatch, StaffRow,
   ThreadCreate, ThreadDetail, ThreadPatch, ThreadReply, ThreadRow,
   AttendanceDayPut, PeriodMarksPut, PeriodRoll, GalleryReportRow, ApprovalDecision, ApprovalKind, ApprovalRow, AssignFee, AttendanceDay, AuditRow, ClassInfo, ContactReveal, CoverRequest, DashboardData, EffectiveConfig, FeeHead, FeeHeadsPut, FeeSummary, ImportResult, InvoiceRow,
   LoginChallenge, LoginRequest, LoginResponse, MessageRequest, NoticeCreate, NoticeRow, Paged, PaymentCreate, SearchHit, SchoolSettingsPatch, SchoolSettingsView, SessionUser, SettingsResponse, ShellData, SlotPatch, StudentCreate, StudentDetail,
@@ -45,6 +45,7 @@ export function schoolApi(h: Http) {
       appAccount: (id: string, b: { phone?: string; email?: string }) => h.post<{ sent: boolean }>(`/v1/students/${id}/app-account`, b),
       update: (id: string, b: StudentPatch) => h.patch<StudentDetail>(`/v1/students/${id}`, b),
       setGuardians: (id: string, b: GuardiansPut) => h.put<GuardianRow[]>(`/v1/students/${id}/guardians`, b),
+      recordLeave: (id: string, b: StudentLeaveInput) => h.post<{ id: string }>(`/v1/students/${id}/leave`, b),
       list: (q: StudentListQuery) => h.get<Paged<StudentRow>>('/v1/students', q as Query),
       summary: (q: Pick<StudentListQuery, 'classId' | 'house'>) => h.get<StudentSummary>('/v1/students/summary', q as Query),
       views: () => h.get<StudentViews>('/v1/students/views'),

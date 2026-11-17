@@ -71,8 +71,9 @@ class ProfileView extends GetView<ProfileController> {
                       facts: [
                         (
                           SchoolConfig.classWord.isEmpty ? 'profile.class'.tr : SchoolConfig.classWord,
-                          '${controller.schoolClass?.name.replaceAll(RegExp('[^0-9]'), '') ?? ''} ${controller.schoolClass?.section ?? ''} · ${'fees.roll'.trp({'n': student.rollNo})}',
+                          '${controller.schoolClass?.label ?? ''} · ${'fees.roll'.trp({'n': student.rollNo})}',
                         ),
+                        if (student.nameLocal.isNotEmpty) ('profile.also_written'.tr, student.nameLocal),
                         ('profile.house'.tr, student.house),
                         ('profile.born'.tr, _dob(student.dob)),
                         ('profile.blood'.tr, student.bloodGroup),
@@ -82,7 +83,7 @@ class ProfileView extends GetView<ProfileController> {
                       // The school's own admission number; sample content shows the class and roll number.
                       code: student.admissionNo.isNotEmpty
                           ? student.admissionNo
-                          : '${controller.schoolClass?.name.replaceAll(RegExp('[^0-9]'), '') ?? ''}${controller.schoolClass?.section ?? ''}-${student.rollNo}',
+                          : '${(controller.schoolClass?.label ?? '').replaceAll(' ', '')}-${student.rollNo}',
                       onPhoto: role == UserRole.student ? () => unawaited(controller.editPhoto()) : null,
                     ),
                   )
@@ -97,7 +98,7 @@ class ProfileView extends GetView<ProfileController> {
                         (
                           'profile.classes'.tr,
                           controller.teaching
-                              .map((c) => '${c.name.replaceAll(RegExp('[^0-9]'), '')} ${c.section}')
+                              .map((c) => c.label)
                               .join(', '),
                         ),
                         ('profile.phone'.tr, teacher.phone),

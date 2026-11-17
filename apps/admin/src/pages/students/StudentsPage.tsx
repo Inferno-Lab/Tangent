@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fmtNumber, fmtMoney, fmtDate, dayLabel, schoolToday, listLabel, type CustomFieldsSetting, type ListItem, type StudentRow } from '@tangent/contracts';
+import { fmtNumber, fmtMoney, fmtDate, dayLabel, schoolToday, listLabel, LEAVING_KIND_LABELS, type CustomFieldsSetting, type ListItem, type StudentRow } from '@tangent/contracts';
 import { EmptyCard, Menu, PageScope, Select, ToastSlot, rollDigits, tintFor, useToast, Icon, type IconName, currentLanguage, customLines, t as tr } from '@tangent/web-ui';
 import type { StudentListQuery } from '@tangent/api-client';
 import { useApp } from '../../app/context';
@@ -11,7 +11,7 @@ import { StudentsView } from './students.view';
 import { OnTheApp } from './OnTheApp';
 import { StudentAccount } from './StudentAccount';
 import { usePageTabs } from '../../app/tabs';
-import { EditStudentDialog, GuardiansDialog, LeaveDialog } from './StudentRecord';
+import { AwayDialog, EditStudentDialog, GuardiansDialog, LeaveDialog } from './StudentRecord';
 import { StudentFiles } from './StudentFiles';
 
 const IC_OK = 'check';
@@ -24,7 +24,7 @@ const PILL_ICON = { cls: 'columns',
 const fmtFee = (s: StudentRow) => (s.feeStatus === 'paid' ? tr('admin.students_page.paid') : s.feeStatus === 'due' ? tr('admin.students_page.due', { fmtMoney: fmtMoney(s.amountDue) }) : tr('admin.students_page.overdue', { fmtMoney: fmtMoney(s.amountDue) }));
 const tickClass = (st: string | null) => (st === 'late' ? 'l' : st === 'present' ? '' : st ? 'a' : 'h');
 
-type Dialog = null | { kind: 'add' } | { kind: 'import' } | { kind: 'message'; ids: string[]; label: string } | { kind: 'fee'; ids: string[]; label: string } | { kind: 'edit' } | { kind: 'guardians' } | { kind: 'leave' };
+type Dialog = null | { kind: 'add' } | { kind: 'import' } | { kind: 'message'; ids: string[]; label: string } | { kind: 'fee'; ids: string[]; label: string } | { kind: 'edit' } | { kind: 'guardians' } | { kind: 'leave' } | { kind: 'away' };
 
 function Pill({ id, open, setOpen, on, icon, children, menu }: { id: string; open: string; setOpen: (v: string) => void; on?: boolean; icon: IconName; children: ReactNode; menu: ReactNode }) { const btn = useRef<HTMLButtonElement>(null);
   return (
@@ -171,7 +171,7 @@ function StudentList({ tabs }: { tabs: React.ReactNode }) { const app = useApp()
     allOn: allOnPage ? 'on' : '', allSel: allOnPage ? 'true' : sel.size ? 'mixed' : 'false',
     toggleAll: () => setSel((s) => { const n = new Set(s); if (allOnPage) rows.forEach((r) => n.delete(r.id)); else rows.forEach((r) => n.add(r.id)); return n; }),
     rows: rows.map((r) => { const t = tintFor(r.name);
-      return { n: r.name, ini: r.initials, bg: t.bg, fg: t.fg, adm: r.admissionNo, house: r.house ?? '', cls: r.className.replace(' ', ''), roll: r.rollNo, g: r.guardianName,
+      return { n: r.name, ini: r.initials, bg: t.bg, fg: t.fg, adm: r.admissionNo, house: r.house ?? '', cls: r.className, roll: r.rollNo, g: r.guardianName,
         att: r.attendancePct, tk: r.attendance10.map((a, k) => ({ k, c: tickClass(a) })),
         fcls: r.feeStatus === 'paid' ? 'paid' : r.feeStatus === 'due' ? 'due' : 'over', fic: r.feeStatus === 'paid' ? IC_OK : r.feeStatus === 'due' ? IC_CLK : IC_AL, fees: has.fees ? fmtFee(r) : '–', pp: '',
         sel: sel.has(r.id) ? 'sel' : '', cbOn: sel.has(r.id) ? 'on' : '', checked: sel.has(r.id) ? 'true' : 'false',
@@ -199,7 +199,7 @@ function StudentList({ tabs }: { tabs: React.ReactNode }) { const app = useApp()
       if (!s) return { n: '…', ini: '', bg: 'var(--s2)', fg: 'var(--ink3)', adm: '', roll: '', cls: '', house: null, route: null, fcls: 'due', fees: '', att: 0, exam: '–', examName: tr('admin.students_page.latest_test'), homework: '–', library: 0, show: { att: false, exam: false, hw: false, lib: false }, rollTitle: '', rollAria: '', gi: '', g: '', activity: [] as { label: string; sub: string; color: string }[] };
       const t = tintFor(s.name);
       const p = s.roll24.filter((x) => x === 'present').length, l = s.roll24.filter((x) => x === 'late').length, a = s.roll24.filter((x) => x === 'absent' || x === 'leave').length;
-      return { n: s.name, ini: s.initials, bg: t.bg, fg: t.fg, adm: s.admissionNo, roll: s.rollNo, cls: s.className, house: s.house, route: s.routeName, fcls: s.feeStatus === 'paid' ? 'paid' : s.feeStatus === 'due' ? 'due' : 'over', fees: fmtFee(s), att: s.facts.attendancePct,
+      return { n: s.name, local: s.nameLocal, ini: s.initials, bg: t.bg, fg: t.fg, adm: s.admissionNo, roll: s.rollNo, cls: s.className, house: s.house, route: s.routeName, fcls: s.feeStatus === 'paid' ? 'paid' : s.feeStatus === 'due' ? 'due' : 'over', fees: fmtFee(s), att: s.facts.attendancePct,
         exam: s.facts.exam ? `${s.facts.exam.grade} · ${s.facts.exam.pct}%` : '–', examName: s.facts.exam?.name ?? tr('admin.students_page.latest_test'),
         homework: s.facts.homework.total ? tr('admin.students_page.of_2', { onTime: s.facts.homework.onTime, total: s.facts.homework.total }) : '–', library: s.facts.libraryOut,
         show: { att: has.attendance, exam: mods.includes('exams'), hw: mods.includes('homework'), lib: mods.includes('library') },
@@ -214,12 +214,12 @@ function StudentList({ tabs }: { tabs: React.ReactNode }) { const app = useApp()
     collect: () => openId && app.go(`/fees?collect=${openId}`),
     may: { edit: app.user.permissions.includes('students.write') && !detail.data?.left, leave: app.user.permissions.includes('year.manage') && !detail.data?.left },
     // A student who left: when and why, and (for someone who manages the year) bringing them back on the roll.
-    left: detail.data?.left ? { line: tr('admin.students_page.left_on', { fmtDate: fmtDate(detail.data.left.on, 'dayYear'), p1: detail.data.left.reason ? `: ${detail.data.left.reason}` : '' }),
+    left: detail.data?.left ? { line: [LEAVING_KIND_LABELS[detail.data.left.kind], detail.data.left.transferTo, tr('admin.students_page.left_on', { fmtDate: fmtDate(detail.data.left.on, 'dayYear'), p1: detail.data.left.reason ? `: ${detail.data.left.reason}` : '' })].filter(Boolean).join(' · '),
       back: app.user.permissions.includes('year.manage') ? () => void app.api.year.rejoin(detail.data!.id).then(() => { say(tr('admin.students_page.is_back_on_the_roll', { name: detail.data!.name })); refreshAll(); }).catch((e: Error) => say(e.message)) : null } : null,
     own: customLines(own, detail.data?.custom),
-    edit: () => setDialog({ kind: 'edit' }), editGuardians: () => setDialog({ kind: 'guardians' }), leave: () => setDialog({ kind: 'leave' }),
+    edit: () => setDialog({ kind: 'edit' }), editGuardians: () => setDialog({ kind: 'guardians' }), leave: () => setDialog({ kind: 'leave' }), away: () => setDialog({ kind: 'away' }),
     guardians: (detail.data?.guardians ?? []).map((g) => ({ n: g.name, ini: g.name.split(' ').map((w) => w[0]).slice(0, 2).join(''), primary: g.isPrimary,
-      line: [listLabel(rels, g.relation, currentLanguage()), g.isPrimary ? tr('admin.students_page.contacted_first') : '', g.canCollect ? tr('admin.students_page.may_collect_from_school') : tr('admin.students_page.may_not_collect'), g.hasApp ? tr('admin.students_page.uses_the_app') : ''].filter(Boolean).join(' · '),
+      line: [listLabel(rels, g.relation, currentLanguage()), g.isPrimary ? tr('admin.students_page.contacted_first') : '', g.canCollect ? tr('admin.students_page.may_collect_from_school') : tr('admin.students_page.may_not_collect'), g.getsMessages ? tr('admin.students_page.gets_messages') : '', g.getsBills ? tr('admin.students_page.gets_bills') : '', g.hasApp ? tr('admin.students_page.uses_the_app') : ''].filter(Boolean).join(' · '),
       phone: g.isPrimary ? rev ?? g.phone : g.phone })),
     dialog: (
       <>
@@ -229,6 +229,7 @@ function StudentList({ tabs }: { tabs: React.ReactNode }) { const app = useApp()
         {dialog?.kind === 'fee' && <AssignFeeDialog ids={dialog.ids} label={dialog.label} onClose={() => setDialog(null)} onDone={(m) => { done(m); setSel(new Set()); }} />}
         {dialog?.kind === 'edit' && detail.data && <EditStudentDialog s={detail.data} classes={classes.data ?? []} onClose={() => setDialog(null)} onDone={done} />}
         {dialog?.kind === 'guardians' && detail.data && <GuardiansDialog s={detail.data} onClose={() => setDialog(null)} onDone={done} />}
+        {dialog?.kind === 'away' && detail.data && <AwayDialog s={detail.data} onClose={() => setDialog(null)} onDone={done} />}
         {dialog?.kind === 'leave' && detail.data && <LeaveDialog s={detail.data} onClose={() => setDialog(null)} onDone={(m) => { done(m); closeDrawer(); }} />}
       </>
     ) };

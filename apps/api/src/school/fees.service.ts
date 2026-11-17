@@ -223,8 +223,8 @@ export class FeesService {
       client.release();
     }
     await this.audit.record(t, { actorId: online ? null : user.id, actorName: user.name, action: 'payment.recorded', entity: 'invoice', entityId: inv.id, detail: { amount: body.amount, receipt: receiptNo } });
-    const g = await t.pool.query<{ phone: string | null }>('select g.phone from student_guardians sg join guardians g on g.id = sg.guardian_id where sg.student_id = $1 and sg.is_primary', [body.studentId]);
-    if (g.rows[0]?.phone) await this.messenger.notify(t, 'fees.receipt', [{ to: g.rows[0].phone, vars: { receipt: receiptNo, amount: fmtMoney(body.amount), title: inv.title } }]);
+    const g = await t.pool.query<{ phone: string | null }>('select g.phone from student_guardians sg join guardians g on g.id = sg.guardian_id where sg.student_id = $1 and sg.gets_bills', [body.studentId]);
+    await this.messenger.notify(t, 'fees.receipt', g.rows.filter((r) => r.phone).map((r) => ({ to: r.phone!, vars: { receipt: receiptNo, amount: fmtMoney(body.amount), title: inv.title } })));
     return { receiptNo, amount: body.amount, outstanding: roundMoney(outstanding - body.amount), paymentId };
   }
 
@@ -235,7 +235,7 @@ export class FeesService {
     const days = await this.settings.value<number>(t, 'fees.remindDaysBefore', 3);
     const { rows } = await t.pool.query<{ id: string; phone: string | null; name: string }>(
       `select i.id, g.phone, s.name from fee_invoices i join students s on s.id = i.student_id and s.status = 'active'
-       join student_guardians sg on sg.student_id = s.id and sg.is_primary join guardians g on g.id = sg.guardian_id
+       join student_guardians sg on sg.student_id = s.id and sg.gets_bills join guardians g on g.id = sg.guardian_id
        where i.due_on = $1::date + $2::int and i.amount - i.waived_amount > coalesce((select sum(amount - refunded) from payments where invoice_id = i.id), 0)
          and not exists (select 1 from fee_reminders r where r.invoice_id = i.id and r.day = $1::date)`, [day, days]);
     for (const r of rows) await t.pool.query('insert into fee_reminders (invoice_id, day) values ($1,$2) on conflict do nothing', [r.id, day]);
@@ -285,7 +285,7 @@ export class FeesService {
          where i.due_on < $1 and i.amount - i.waived_amount - coalesce(paid.p, 0) > 0`, [schoolToday()])).rows.map((r) => r.id);
     }
     const { rows } = await t.pool.query<{ phone: string | null; name: string }>(
-      `select g.phone, s.name from students s join student_guardians sg on sg.student_id = s.id and sg.is_primary join guardians g on g.id = sg.guardian_id where s.id = any($1)`, [ids]);
+      `select g.phone, s.name from students s join student_guardians sg on sg.student_id = s.id and sg.gets_bills join guardians g on g.id = sg.guardian_id where s.id = any($1)`, [ids]);
     const list = rows.filter((r) => r.phone).map((r) => ({ to: r.phone!, vars: { student: r.name } }));
     await this.messenger.notify(t, 'fees.reminder', list);
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'fee.reminded', entity: 'student', detail: { count: list.length } });

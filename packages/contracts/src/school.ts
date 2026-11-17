@@ -1,5 +1,5 @@
 import { ATTENDANCE_MARKS, type MenuGroup } from './config.js';
-import { isLanguage, type Vocabulary } from './i18n.js';
+import { isLanguage, localizedLabels, type Vocabulary } from './i18n.js';
 import { z } from 'zod';
 import { Money } from './locale.js';
 import { IsoDate } from './common.js';
@@ -60,8 +60,11 @@ export interface StudentDetail extends StudentRow {
   custom: CustomValues;
   addressParts: AddressParts;
   gender: string | null;
+  givenName: string | null;
+  familyName: string | null;
+  nameLocal: string | null;
   /** When and why a student who left the school left (null while on the roll). */
-  left: { on: string; reason: string } | null;
+  left: { on: string; reason: string; kind: LeavingKind; transferTo: string | null } | null;
   /** Every guardian (phones masked: the reveal call shows one in full). */
   guardians: GuardianRow[];
   /** The student's own app account (when the school uses the student role): how they sign in, and whether they have yet. */
@@ -149,10 +152,19 @@ export const AssignFee = z.object({
 });
 export type AssignFee = z.infer<typeof AssignFee>;
 
+/** The channels a school reaches families on, and which a guardian may turn off for themselves. */
+export const CONTACT_CHANNELS = ['sms', 'whatsapp', 'email', 'push'] as const;
+export type ContactChannel = (typeof CONTACT_CHANNELS)[number];
+
 /** The fields of a student's record a school may require (console: People → fields the office must fill). */
 export const STUDENT_FIELDS = ['gender', 'house', 'admissionNo', 'bloodGroup', 'address'] as const;
 const StudentFields = {
   name: z.string().trim().min(2, 'Enter the full name').max(80),
+  // Given and family names: when either is sent, the server writes `name` from both in the school's order (people.nameOrder).
+  givenName: z.string().trim().max(60).optional(),
+  familyName: z.string().trim().max(60).optional(),
+  // The name in a second script (Arabic, Devanagari…), shown beside the name and found by search.
+  nameLocal: z.string().trim().max(80).optional(),
   classId: z.string().min(1, 'Choose a class'),
   rollNo: z.string().trim().max(10).optional(),
   dob: IsoDate,
@@ -168,9 +180,11 @@ const StudentFields = {
 };
 export const StudentCreate = z.object({
   ...StudentFields,
+  // The full name, or a given and a family name to make it from.
+  name: StudentFields.name.optional(),
   guardianName: z.string().trim().min(2).max(80),
   guardianPhone: z.string().trim().min(1, 'Enter a phone number').max(24),
-});
+}).refine((b) => !!b.name || (!!b.givenName && !!b.familyName), { message: 'Enter the full name, or the given and family names', path: ['name'] });
 export type StudentCreate = z.infer<typeof StudentCreate>;
 /** Changes to a student's own record; a change of class keeps their marks and attendance. */
 export const StudentPatch = z.object(StudentFields).partial();
@@ -181,10 +195,39 @@ export const GuardiansPut = z.object({
     id: z.string().optional(), name: z.string().trim().min(2, 'Enter the name').max(80), phone: z.string().trim().min(1, 'Enter the phone number').max(24),
     email: z.string().trim().email('Check the email').max(120).or(z.literal('')).optional(), relation: z.string().trim().min(1, 'Choose how they are related').max(30), canCollect: z.boolean(), isPrimary: z.boolean(),
     language: z.string().refine((l) => !l || isLanguage(l), 'Pick a language from the list').optional(),
+    // Separated parents: each guardian can get the messages, the bills, both or neither. Left out: only the first one does.
+    getsMessages: z.boolean().optional(),
+    getsBills: z.boolean().optional(),
+    // Channels this guardian asked not to be reached on; a message always keeps at least one of the school's channels.
+    channelsOff: z.array(z.enum(CONTACT_CHANNELS)).max(4).optional(),
   })).min(1, 'A student needs at least one guardian').max(4),
-}).refine((b) => b.guardians.filter((g) => g.isPrimary).length === 1, { message: 'Choose one guardian to contact first.', path: ['guardians'] });
+}).refine((b) => b.guardians.filter((g) => g.isPrimary).length === 1, { message: 'Choose one guardian to contact first.', path: ['guardians'] })
+  .refine((b) => b.guardians.some((g) => g.getsMessages ?? g.isPrimary), { message: 'Choose at least one guardian to get the school’s messages.', path: ['guardians'] })
+  .refine((b) => b.guardians.some((g) => g.getsBills ?? g.isPrimary), { message: 'Choose at least one guardian to get the bills.', path: ['guardians'] });
 export type GuardiansPut = z.infer<typeof GuardiansPut>;
-export interface GuardianRow { id: string; name: string; phone: string; email: string; relation: string; canCollect: boolean; isPrimary: boolean; hasApp: boolean; /** The language they read; '' for the school's own. */ language: string }
+export interface GuardianRow {
+  id: string; name: string; phone: string; email: string; relation: string; canCollect: boolean; isPrimary: boolean; hasApp: boolean; /** The language they read; '' for the school's own. */ language: string;
+  getsMessages: boolean; getsBills: boolean; channelsOff: ContactChannel[];
+}
+
+/** A full name from a given and a family name, in the school's order (people.nameOrder). */
+export function composeName(given: string, family: string, order: 'given-family' | 'family-given' = 'given-family'): string {
+  const [a, b] = order === 'family-given' ? [family, given] : [given, family];
+  return `${a.trim()} ${b.trim()}`.trim();
+}
+
+/** Why a student left: the school's records and reports (and, for graduates, its alumni) count them apart. */
+export const LEAVING_KINDS = ['withdrawn', 'transferred', 'graduated', 'other'] as const;
+export type LeavingKind = (typeof LEAVING_KINDS)[number];
+export const LEAVING_KIND_LABELS: Record<LeavingKind, string> = localizedLabels({ withdrawn: 'Withdrawn', transferred: 'Moved to another school', graduated: 'Finished school', other: 'Other' });
+
+/** Leave the office records itself (a long illness, a family move abroad): approved at once, the roll call starts with it. */
+export const StudentLeaveInput = z.object({
+  from: IsoDate, to: IsoDate,
+  halfDay: z.enum(['am', 'pm']).optional(),
+  reason: z.string().trim().min(2, 'Give a reason').max(200),
+});
+export type StudentLeaveInput = z.infer<typeof StudentLeaveInput>;
 
 export const BulkStudentAction = z.object({
   ids: z.array(z.string()).min(1).max(500),

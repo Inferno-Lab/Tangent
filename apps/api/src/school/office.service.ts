@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
-import { fmtNumber, fmtMoney, fmtDate, addDays, dayMonth, schoolToday, latestSchoolDay, type DataRequestCreate, type DataRequestDecision, type DataRequestRow, type EventReply, type EventRow, type EventSave, type FeeStatus, type InvoiceListQuery, type InvoiceListRow, type InvoiceListSummary, type Paged, type ReceiptRow, type ReportData, type ReportInfo, type ReportQuery, type ThreadCreate, type ThreadDetail, type ThreadPatch, type ThreadReply, type ThreadRow } from '@tangent/contracts';
+import { tx, fmtNumber, fmtMoney, fmtDate, addDays, dayMonth, schoolToday, latestSchoolDay, type DataRequestCreate, type DataRequestDecision, type DataRequestRow, type EventReply, type EventRow, type EventSave, type FeeStatus, type InvoiceListQuery, type InvoiceListRow, type InvoiceListSummary, type Paged, type ReceiptRow, type ReportData, type ReportInfo, type ReportQuery, type ThreadCreate, type ThreadDetail, type ThreadPatch, type ThreadReply, type ThreadRow } from '@tangent/contracts';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
@@ -96,7 +96,7 @@ export class OfficeService {
     if (q.classId && !cls) throw notFound('That class');
     const dated = !!(q.from || q.to);
     const period = (dflt: [string, string]): [string, string] => [q.from ?? dflt[0], q.to ?? dflt[1]];
-    const scope = (p?: [string, string]) => [cls ? `Class ${cls}` : 'Whole school', p ? `${dayMonth(p[0])} to ${dayMonth(p[1])}` : ''].filter(Boolean).join(', ');
+    const scope = (p?: [string, string]) => [cls ?? tx('Whole school'), p ? tx('{from} to {to}', { from: dayMonth(p[0]), to: dayMonth(p[1]) }) : ''].filter(Boolean).join(', ');
     const base = { id, title: info.title };
     if (id === 'attendance-class') {
       const p = period([addDays(last, -42), last]);

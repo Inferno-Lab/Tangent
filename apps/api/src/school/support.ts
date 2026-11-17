@@ -3,7 +3,7 @@ import { StaleSettings, newId, recordSettingsVersion, writeSettings } from '@tan
 import { checkSchoolChanges, resolveConfig, validateSettingsChanges } from '@tangent/config-engine';
 import { ApiError } from '@tangent/nest-kit';
 import type { Registry } from '@tangent/tenancy';
-import { checkCustom, roundToCurrency, type CustomEntity, type CustomFieldsSetting, type CustomValues, rawOf, toE164, phoneProblem, MESSAGE_EVENTS, SETTINGS_META, schoolMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type GradingScheme, gradeIn, schemeFor, type SchoolSettingsPatch, type SchoolSettingsView, type SettingsDoc } from '@tangent/contracts';
+import { tx, checkCustom, roundToCurrency, type CustomEntity, type CustomFieldsSetting, type CustomValues, rawOf, toE164, phoneProblem, MESSAGE_EVENTS, SETTINGS_META, schoolMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type GradingScheme, gradeIn, schemeFor, type SchoolSettingsPatch, type SchoolSettingsView, type SettingsDoc } from '@tangent/contracts';
 import { REGISTRY, type TenantCtx } from '../tenancy/tenant.js';
 import { HubService } from './hub.service.js';
 import { serverCatalogue } from '@tangent/tenancy';
@@ -187,6 +187,18 @@ const OPENS: Record<string, string> = Object.fromEntries(MESSAGE_EVENTS.filter((
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /** One email layout for every school: its name across the top in its brand colour, the message, and who sent it. */
+/**
+ * Refuses leave that overlaps leave already asked for or given (a family asking twice, the office recording what a parent
+ * already sent). Half days of the same date only clash when they are the same half.
+ */
+export async function checkLeaveClash(q: { query: TenantCtx['pool']['query'] }, studentId: string, from: string, to: string, halfDay: string | null | undefined): Promise<void> {
+  const r = await q.query(
+    `select 1 from approvals where kind = 'leave' and status in ('pending','approved') and payload->>'studentId' = $1
+       and (payload->>'from')::date <= $3::date and (payload->>'to')::date >= $2::date
+       and not ($4::text is not null and payload->>'halfDay' is not null and payload->>'halfDay' <> $4)`, [studentId, from, to, halfDay ?? null]);
+  if (r.rowCount) throw new ApiError('conflict', tx('There is already leave for some of these days.'), { fields: { from: tx('Overlaps other leave.') } });
+}
+
 export function emailHtml(school: string, color: string, body: string): string {
   // An email is not a page: mail clients need literal colours, so the school's brand colour is written in.
   const c = /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#3D5AFE';
@@ -283,6 +295,9 @@ export class Messenger {
         where g.phone = any($1) and coalesce(p.value #>> '{}', g.language) is not null
        union all select u.phone, p.value #>> '{}' from users u join user_prefs p on p.user_id = u.id and p.key = 'language' where u.phone = any($1)`,
       [who.map((w) => digits(w.to))])).rows.map((r) => [r.phone, r.lang]));
+    // Channels a guardian asked the office not to use (urgent messages go on every channel the school chose).
+    const offChannels = ev.urgent || !who.length ? new Map<string, string[]>() : new Map((await t.pool.query<{ phone: string; off: string[] }>(
+      "select phone, channels_off off from guardians where phone = any($1) and jsonb_array_length(channels_off) > 0", [who.map((w) => digits(w.to))])).rows.map((r) => [r.phone, r.off]));
     let reached = 0;
     const out: OutMsg[] = [];
     for (const w of who.filter((x) => !off.has(digits(x.to)))) {
@@ -291,10 +306,15 @@ export class Messenger {
       const body = textIn(lang).replace(/\{(\w+)\}/g, (_, k: string) => vars[k] ?? '');
       const m = { key, vars, body, sendAfter };
       const before = out.length;
-      if (rule.push) out.push({ ...m, channel: 'push', to: w.to, subject: school });
-      if (rule.sms) out.push({ ...m, channel: 'sms', to: w.to });
-      if (rule.whatsapp) out.push({ ...m, channel: 'whatsapp', to: w.to });
-      if (rule.email && w.email) out.push({ ...m, channel: 'email', to: w.email, subject: (lang !== 'en' && serverCatalogue(lang)[english.label]) || english.label });
+      // What the school sends on, less what this person turned off; never nothing: then the school's first channel stays.
+      const school4 = (['push', 'sms', 'whatsapp', 'email'] as const).filter((c) => rule[c] && (c !== 'email' || !!w.email));
+      const off = offChannels.get(digits(w.to)) ?? [];
+      const use = school4.filter((c) => !off.includes(c));
+      const send = new Set(use.length ? use : school4.slice(0, 1));
+      if (send.has('push')) out.push({ ...m, channel: 'push', to: w.to, subject: school });
+      if (send.has('sms')) out.push({ ...m, channel: 'sms', to: w.to });
+      if (send.has('whatsapp')) out.push({ ...m, channel: 'whatsapp', to: w.to });
+      if (send.has('email') && w.email) out.push({ ...m, channel: 'email', to: w.email, subject: (lang !== 'en' && serverCatalogue(lang)[english.label]) || english.label });
       if (out.length > before) reached++;
     }
     await this.sendMany(t, out);

@@ -67,7 +67,7 @@ export class MovingInService {
     // Families sign in by phone, so each needs a login first: an existing one with that phone (a teacher who is also a parent), or a new one.
     const loose = await t.pool.query<{ id: string; name: string; phone: string; existing: string | null }>(
       `select distinct g.id, g.name, g.phone, (select u.id from users u where u.phone = g.phone limit 1) existing
-       from students s join student_guardians sg on sg.student_id = s.id and sg.is_primary join guardians g on g.id = sg.guardian_id
+       from students s join student_guardians sg on sg.student_id = s.id and sg.gets_messages join guardians g on g.id = sg.guardian_id
        where s.status = 'active' and g.user_id is null and g.phone is not null and ($1::text is null or s.class_id = $1)`, [classId ?? null]);
     const made = new Map<string, string>();
     for (const g of loose.rows) {
@@ -81,7 +81,7 @@ export class MovingInService {
       await t.pool.query('update guardians set user_id = $2 where id = $1', [g.id, id]);
     }
     const { rows } = await t.pool.query<{ user_id: string; phone: string; student: string }>(
-      `select distinct on (u.id) u.id user_id, g.phone, s.name student from students s join student_guardians sg on sg.student_id = s.id and sg.is_primary
+      `select distinct on (u.id) u.id user_id, g.phone, s.name student from students s join student_guardians sg on sg.student_id = s.id and sg.gets_messages
        join guardians g on g.id = sg.guardian_id join users u on u.id = g.user_id
        where s.status = 'active' and g.phone is not null and ($1::text is null or s.class_id = $1)
          and (case when $2 then u.invited_at is not null and u.last_login_at is null else u.invited_at is null end) order by u.id, s.name`, [classId ?? null, remind]);

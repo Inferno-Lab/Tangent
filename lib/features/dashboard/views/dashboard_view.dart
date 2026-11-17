@@ -199,7 +199,7 @@ class _ProfileCapsule extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = Get.find<AuthService>().user.value;
     final name = data?.student.name ?? user?.name ?? '';
-    final cls = data == null ? '' : '${data!.schoolClass.name} ${data!.schoolClass.section}';
+    final cls = data == null ? '' : data!.schoolClass.label;
     return GlassPress(
       onTap: () => Get.toNamed<void>(AppRoutes.profile),
       child: Semantics(

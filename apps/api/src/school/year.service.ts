@@ -7,7 +7,7 @@ import { HubService } from './hub.service.js';
 import { AuditService, SettingsService } from './support.js';
 
 type User = { id: string; name: string };
-type Move = { studentId: string; fromClassId: string; toClassId: string | null; status: string };
+type Move = { studentId: string; fromClassId: string; toClassId: string | null; status: string; kind?: 'graduated' | 'withdrawn' };
 
 /**
  * Year-end. Classes are lasting sections (Grade 5 A is Grade 5 A every year): promotion moves students up to the next grade's
@@ -32,14 +32,14 @@ export class YearService implements OnModuleInit {
       t.pool.query(`select y.*, y.starts_on::text s, y.ends_on::text e, (select count(*) from classes c where c.year_id = y.id)::int classes,
           (select count(*) from students s join classes c on c.id = s.class_id where c.year_id = y.id and s.status = 'active')::int students from academic_years y order by y.starts_on desc`),
       t.pool.query('select r.*, jsonb_array_length(r.moves) n, fy.label from_label, ty.label to_label from promotion_runs r left join academic_years fy on fy.id = r.from_year left join academic_years ty on ty.id = r.to_year order by r.created_at desc limit 20'),
-      t.pool.query(`select id, name, admission_no, left_on::text left_on, coalesce(leaving_reason, '') reason, (left_on + make_interval(months => $1))::date::text erase_after
+      t.pool.query(`select id, name, admission_no, left_on::text left_on, coalesce(leaving_reason, '') reason, coalesce(leaving_kind, 'withdrawn') kind, transfer_to, (left_on + make_interval(months => $1))::date::text erase_after
           from students where status = 'left' and erased_at is null and left_on is not null order by left_on desc limit 500`, [months]),
     ]);
     const today = schoolToday();
     return {
       years: years.rows.map((y) => ({ id: y.id, label: y.label, startsOn: y.s, endsOn: y.e, status: y.status, classes: y.classes, students: y.students })),
       runs: runs.rows.map((r) => ({ id: r.id, fromYear: r.from_label ?? r.from_year, toYear: r.to_label ?? r.to_year, students: r.n, createdAt: r.created_at.toISOString(), undoneAt: r.undone_at?.toISOString() ?? null })),
-      leavers: leavers.rows.map((l) => ({ id: l.id, name: l.name, admissionNo: l.admission_no, leftOn: l.left_on, reason: l.reason, eraseAfter: l.erase_after, due: l.erase_after <= today })),
+      leavers: leavers.rows.map((l) => ({ id: l.id, name: l.name, admissionNo: l.admission_no, leftOn: l.left_on, reason: l.reason, kind: l.kind, transferTo: l.transfer_to ?? null, eraseAfter: l.erase_after, due: l.erase_after <= today })),
       retentionMonths: months,
     };
   }
@@ -116,8 +116,9 @@ export class YearService implements OnModuleInit {
     const map = new Map(b.moves.map((m) => [m.fromClassId, m.toClassId]));
     const students = (await t.pool.query<{ id: string; class_id: string }>("select id, class_id from students where status = 'active' and class_id = any($1)", [[...map.keys()]])).rows;
     const moves: Move[] = students.map((s) => {
-      const leaving = b.leaving.includes(s.id) || (!b.detained.includes(s.id) && map.get(s.class_id) === null);
-      return { studentId: s.id, fromClassId: s.class_id, toClassId: b.detained.includes(s.id) || leaving ? s.class_id : map.get(s.class_id)!, status: leaving ? 'left' : 'active' };
+      const finished = !b.detained.includes(s.id) && map.get(s.class_id) === null;
+      const leaving = b.leaving.includes(s.id) || finished;
+      return { studentId: s.id, fromClassId: s.class_id, toClassId: b.detained.includes(s.id) || leaving ? s.class_id : map.get(s.class_id)!, status: leaving ? 'left' : 'active', ...(leaving ? { kind: finished ? 'graduated' : 'withdrawn' } : {}) };
     });
     const leftOn = from?.ends_on ?? schoolToday();
     const runId = newId('prm');
@@ -126,8 +127,9 @@ export class YearService implements OnModuleInit {
       await client.query('begin');
       await client.query(
         `update students s set class_id = m."toClassId", status = m.status, left_on = case when m.status = 'left' then $2::date else s.left_on end,
-           leaving_reason = case when m.status = 'left' then 'Completed the school' else s.leaving_reason end
-         from jsonb_to_recordset($1::jsonb) as m("studentId" text, "toClassId" text, status text) where s.id = m."studentId"`, [JSON.stringify(moves), leftOn]);
+           leaving_reason = case when m.kind = 'graduated' then 'Completed the school' when m.status = 'left' then 'Left at the end of the year' else s.leaving_reason end,
+           leaving_kind = case when m.status = 'left' then m.kind else s.leaving_kind end
+         from jsonb_to_recordset($1::jsonb) as m("studentId" text, "toClassId" text, status text, kind text) where s.id = m."studentId"`, [JSON.stringify(moves), leftOn]);
       await client.query('insert into promotion_runs (id, from_year, to_year, moves, created_by) values ($1,$2,$3,$4,$5)', [runId, from?.id ?? '', b.toYear, JSON.stringify(moves), user.id]);
       await client.query('commit');
     } catch (e) {
@@ -151,7 +153,8 @@ export class YearService implements OnModuleInit {
       await client.query('begin');
       await client.query(
         `update students s set class_id = m."fromClassId", status = 'active', left_on = case when m.status = 'left' then null else s.left_on end,
-           leaving_reason = case when m.status = 'left' then null else s.leaving_reason end
+           leaving_reason = case when m.status = 'left' then null else s.leaving_reason end,
+           leaving_kind = case when m.status = 'left' then null else s.leaving_kind end
          from jsonb_to_recordset($1::jsonb) as m("studentId" text, "fromClassId" text, status text) where s.id = m."studentId"`, [JSON.stringify(latest.moves)]);
       await client.query('update promotion_runs set undone_at = now() where id = $1', [runId]);
       await client.query('commit');
@@ -165,14 +168,15 @@ export class YearService implements OnModuleInit {
   }
 
   async leaver(t: TenantCtx, user: User, b: LeaverInput): Promise<void> {
-    const r = await t.pool.query("update students set status = 'left', left_on = $2, leaving_reason = $3 where id = $1 and status = 'active'", [b.studentId, b.leftOn, b.reason]);
+    const r = await t.pool.query("update students set status = 'left', left_on = $2, leaving_reason = $3, leaving_kind = $4, transfer_to = $5 where id = $1 and status = 'active'",
+      [b.studentId, b.leftOn, b.reason, b.kind, b.kind === 'transferred' ? b.transferTo ?? null : null]);
     if (!r.rowCount) throw notFound('That student');
     await t.pool.query('delete from transport_assignments where student_id = $1', [b.studentId]);
-    await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'student.left', entity: 'student', entityId: b.studentId, detail: { leftOn: b.leftOn, reason: b.reason } });
+    await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'student.left', entity: 'student', entityId: b.studentId, detail: { leftOn: b.leftOn, reason: b.reason, kind: b.kind } });
   }
 
   async rejoin(t: TenantCtx, user: User, studentId: string): Promise<void> {
-    const r = await t.pool.query("update students set status = 'active', left_on = null, leaving_reason = null where id = $1 and status = 'left' and erased_at is null", [studentId]);
+    const r = await t.pool.query("update students set status = 'active', left_on = null, leaving_reason = null, leaving_kind = null, transfer_to = null where id = $1 and status = 'left' and erased_at is null", [studentId]);
     if (!r.rowCount) throw notFound('That student');
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'student.rejoined', entity: 'student', entityId: studentId });
   }

@@ -95,7 +95,19 @@ export class ApprovalsService implements OnModuleInit {
     if (s.who === 'classTeacher') {
       return !!r.subject_ref && !!(await t.pool.query('select 1 from students s join classes c on c.id = s.class_id where s.id = $1 and c.class_teacher_id = $2', [r.subject_ref, user.id])).rowCount;
     }
+    // The line manager of whoever asked; someone with no manager goes to anyone allowed to decide it.
+    if (s.who === 'lineManager') {
+      const manager = await this.managerOf(t, r);
+      return manager ? manager === user.id : allowed;
+    }
     return allowed;
+  }
+
+  private async managerOf(t: TenantCtx, r: Row): Promise<string | null> {
+    // Who asked; a member of staff's own leave from before requests named their asker is about them.
+    const asker = r.requested_by || (r.kind === 'leave' && !(r.payload as { studentLeave?: boolean }).studentLeave ? r.subject_ref : null);
+    if (!asker) return null;
+    return (await t.pool.query<{ manager_id: string | null }>("select s.manager_id from staff s join users u on u.id = s.manager_id and u.status = 'active' where s.user_id = $1", [asker])).rows[0]?.manager_id ?? null;
   }
 
   private rolesOf(t: TenantCtx, userId: string): () => Promise<string[]> {
@@ -261,7 +273,9 @@ export class ApprovalsService implements OnModuleInit {
   /** The people who take a step (or, escalated, everyone allowed to decide the kind). */
   private async takers(t: TenantCtx, r: Row, s: StepDef, anyAllowed: boolean): Promise<{ name: string; phone: string | null; email: string | null }[]> {
     const base = "select distinct u.name, u.phone, u.email from users u where u.status = 'active' and u.kind = 'staff'";
-    if (anyAllowed || s.who === 'permission') {
+    const manager = s.who === 'lineManager' && !anyAllowed ? await this.managerOf(t, r) : null;
+    if (manager) return (await t.pool.query(`${base} and u.id = $1`, [manager])).rows;
+    if (anyAllowed || s.who === 'permission' || s.who === 'lineManager') {
       return (await t.pool.query(`${base} and exists (select 1 from user_roles ur join roles ro on ro.id = ur.role_id where ur.user_id = u.id and ro.permissions @> $1::jsonb)`, [JSON.stringify(NEEDS[r.kind])])).rows;
     }
     if (s.who === 'role') return (await t.pool.query(`${base} and exists (select 1 from user_roles ur join roles ro on ro.id = ur.role_id where ur.user_id = u.id and ro.key = $1)`, [s.ref])).rows;
@@ -336,7 +350,7 @@ export class ApprovalsService implements OnModuleInit {
     const p = r.payload as { studentLeave?: boolean; from?: string; to?: string };
     const who = p.studentLeave
       ? await t.pool.query<{ phone: string | null; email: string | null; name: string }>(
-        'select g.phone, g.email, s.name from students s join student_guardians sg on sg.student_id = s.id join guardians g on g.id = sg.guardian_id where s.id = $1', [r.subject_ref])
+        'select g.phone, g.email, s.name from students s join student_guardians sg on sg.student_id = s.id and sg.gets_messages join guardians g on g.id = sg.guardian_id where s.id = $1', [r.subject_ref])
       : await t.pool.query<{ phone: string | null; email: string | null; name: string }>("select phone, email, 'you' as name from users where id = $1", [r.subject_ref]);
     await this.messenger.notify(t, 'leave.decided', who.rows.filter((w) => w.phone || w.email).map((w) => ({
       to: w.phone ?? '', email: w.email, vars: { who: w.name, from: p.from ?? '', to: p.to ?? '', status },

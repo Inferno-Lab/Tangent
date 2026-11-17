@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Header, HttpCode, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import {
-  SchoolSettingsPatch, type SchoolSettingsView,
+  SchoolSettingsPatch, type SchoolSettingsView, StudentLeaveInput,
   ApprovalDecision, AssignFee, FeeHeadsPut, AttendanceDayPut, PeriodMarksPut, CoverRequest, SlotCreate, WaiverRequest, ReceiptCancel, IsoDate, MessageRequest, NoticeCreate, PaymentCreate, SlotPatch, StudentCreate, StudentImport, StudentPatch, GuardiansPut, StudentQuery,
   type ApprovalRow, type AttendanceDay, type AttendanceWeekPoint, type PeriodRoll, type AuditRow, type ClassInfo, type ContactReveal, type DashboardData, type FeeHead, type FeeSummary, type ImportResult, type InvoiceRow, type InvoiceDetail,
   type NoticeRow, type SearchHit, type SettingsResponse, type ShellData, type GuardianRow, type StudentDetail, type StudentRow, type StudentSummary, type StudentViews, type TeacherLoad, type TeacherOption, type TimetableView, type WeekOf, type Paged,
@@ -95,6 +95,12 @@ export class StudentsController {
   @Put(':id/guardians') @Require('students.write')
   guardians(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(GuardiansPut)) body: GuardiansPut): Promise<GuardianRow[]> {
     return this.students.setGuardians(t, id, body, u);
+  }
+
+  // Leave the office records itself (approved at once; the roll call starts with it).
+  @Post(':id/leave') @Require('students.write')
+  recordLeave(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(StudentLeaveInput)) body: StudentLeaveInput): Promise<{ id: string }> {
+    return this.students.recordLeave(t, id, body, u);
   }
 
   @Post(':id/app-account') @HttpCode(200) @Require('students.write')

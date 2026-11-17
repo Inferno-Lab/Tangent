@@ -12,7 +12,7 @@ import { LearningService } from './learning.service.js';
 import { LibraryService } from './library.service.js';
 import { ChatService, type ChatSender } from './chat.service.js';
 import { NoticesService } from './notices.service.js';
-import { AuditService, Messenger, SettingsService } from './support.js';
+import { AuditService, Messenger, SettingsService, checkLeaveClash } from './support.js';
 import { TransportService } from './transport.service.js';
 
 const DAYS = ['', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -223,13 +223,13 @@ export class FamilyService {
   }
 
   /** Guardian contact, birth date and address go to the family and to staff whose role reads students; never to the rest. */
-  private studentJson(w: Who, r: { id: string; user_id: string | null; name: string; class_id: string; roll_no: string; admission_no: string | null; dob: string; blood_group: string | null; house: string | null; address: string | null; g_name: string | null; g_phone: string | null; photo: string | null; custom: CustomValues | null }, own: FieldDef[]) {
+  private studentJson(w: Who, r: { id: string; user_id: string | null; name: string; name_local?: string | null; class_id: string; roll_no: string; admission_no: string | null; dob: string; blood_group: string | null; house: string | null; address: string | null; g_name: string | null; g_phone: string | null; photo: string | null; custom: CustomValues | null }, own: FieldDef[]) {
     const full = w.children.includes(r.id) || (w.kind === 'staff' && w.perms.includes('students.read'));
     // The school's own fields it shows in the app (§3.6.3), named and written in the reader's language; only to those who see the full record.
     const lang = schoolContext.getStore()?.lang ?? 'en';
     const fields = full ? Object.fromEntries(own.map((f) => [f.names?.[lang] || f.label, customText(f, r.custom?.[f.key], lang)]).filter(([, v]) => v)) : {};
     return {
-      fields, admissionNo: r.admission_no ?? '',
+      fields, admissionNo: r.admission_no ?? '', nameLocal: r.name_local ?? '',
       id: r.id, userId: r.user_id, name: r.name, classId: r.class_id, rollNo: r.roll_no, dob: full ? r.dob : '', bloodGroup: r.blood_group ?? '', house: r.house ?? '', avatarUrl: '',
       photoFileId: r.photo, guardianName: full ? r.g_name ?? '' : '', guardianPhone: full ? r.g_phone ?? '' : '', address: full ? r.address ?? '' : '',
     };
@@ -239,7 +239,7 @@ export class FamilyService {
     return ((await this.settings.value<CustomFieldsSetting>(t, 'fields.custom', {})).student ?? []).filter((f) => f.app);
   }
 
-  private readonly studentSql = `select s.id, s.user_id, s.name, s.class_id, s.roll_no, s.admission_no, s.dob::text, s.blood_group, s.house, s.address, s.custom, g.name g_name, g.phone g_phone,
+  private readonly studentSql = `select s.id, s.user_id, s.name, s.name_local, s.class_id, s.roll_no, s.admission_no, s.dob::text, s.blood_group, s.house, s.address, s.custom, g.name g_name, g.phone g_phone,
       (select f.id from files f where f.kind = 'student_photo' and f.owner_id = s.id and f.status = 'clean' and f.deleted_at is null order by f.created_at desc limit 1) photo
     from students s left join student_guardians sg on sg.student_id = s.id and sg.is_primary left join guardians g on g.id = sg.guardian_id`;
 
@@ -285,11 +285,12 @@ export class FamilyService {
   }
 
   private async classJson(t: TenantCtx, id: string) {
-    const c = (await t.pool.query<{ id: string; grade: number; section: string; class_teacher_id: string | null; room: string | null }>(
-      `select c.id, c.grade, c.section, c.class_teacher_id, (select room from timetable_slots ts where ts.class_id = c.id and room is not null limit 1) room from classes c where c.id = $1`, [id])).rows[0];
+    const c = (await t.pool.query<{ id: string; name: string; grade: number; section: string; class_teacher_id: string | null; room: string | null }>(
+      `select c.id, c.name, c.grade, c.section, c.class_teacher_id, (select room from timetable_slots ts where ts.class_id = c.id and room is not null limit 1) room from classes c where c.id = $1`, [id])).rows[0];
     if (!c) throw notFound('That class');
     const ids = (await t.pool.query<{ id: string }>("select id from students where class_id = $1 and status = 'active' order by roll_no", [id])).rows.map((r) => r.id);
-    return { id: c.id, name: `Class ${c.grade}`, section: c.section, classTeacherId: c.class_teacher_id ?? '', room: c.room ?? '', studentIds: ids };
+    // The school's own name for the class ("8 A", "Year 7 Blue"); the app adds the section only when the name lacks it.
+    return { id: c.id, name: c.name, section: c.section, classTeacherId: c.class_teacher_id ?? '', room: c.room ?? '', studentIds: ids };
   }
 
   async schoolClass(t: TenantCtx, user: AuthedUser, id: string) {
@@ -488,7 +489,7 @@ export class FamilyService {
     await this.learning.markHomework(t, user, id, { marks: [{ studentId: b.studentId, handed: true, score: b.marks, feedback: b.feedback ?? '' }] });
     const h = (await t.pool.query<{ title: string; subject: string; subject_id: string; yr: number | null; max_marks: number }>(
       'select h.title, s.name subject, h.subject_id, c.grade yr, h.max_marks from homework h join subjects s on s.id = h.subject_id left join classes c on c.id = h.class_id where h.id = $1', [id])).rows[0]!;
-    const fam = (await t.pool.query<{ phone: string | null; name: string }>('select g.phone, st.name from students st join student_guardians sg on sg.student_id = st.id and sg.is_primary join guardians g on g.id = sg.guardian_id where st.id = $1', [b.studentId])).rows;
+    const fam = (await t.pool.query<{ phone: string | null; name: string }>('select g.phone, st.name from students st join student_guardians sg on sg.student_id = st.id and sg.gets_messages join guardians g on g.id = sg.guardian_id where st.id = $1', [b.studentId])).rows;
     const grade = b.marks == null ? tx('checked') : (await this.settings.grading(t, { grade: h.yr, subject: h.subject_id })).grade(Math.round((b.marks / h.max_marks) * 100)) || `${b.marks}/${h.max_marks}`;
     await this.messenger.notify(t, 'homework.graded', fam.filter((f) => f.phone).map((f) => ({ to: f.phone!, vars: { student: f.name, subject: h.subject, title: h.title, grade } })));
     return { ok: true };
@@ -914,6 +915,7 @@ export class FamilyService {
     const s = (await t.pool.query<{ name: string }>('select name from students where id = $1', [b.studentId])).rows[0];
     if (!s) throw notFound('That student');
     const leave = await this.checkLeave(t, b);
+    await checkLeaveClash(t.pool, b.studentId, leave.from, leave.to, b.halfDay);
     const id = newId('apr');
     await t.pool.query("insert into approvals (id, kind, title, subtitle, requester_name, requested_by, subject_ref, payload) values ($1,'leave',$2,$3,$4,$5,$6,$7)",
       [id, `Leave for ${s.name}`, leave.subtitle, user.name, user.id, b.studentId, JSON.stringify({ studentLeave: true, studentId: b.studentId, from: leave.from, to: leave.to, halfDay: b.halfDay ?? null, reason: b.reason, note: b.note ?? '', fileIds: b.fileIds ?? [] })]);
