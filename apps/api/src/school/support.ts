@@ -32,14 +32,16 @@ export class SettingsService {
 
   /** What the school's admin edits: every setting in force, Tangent's locks and the lists the editors pick from. */
   async view(t: TenantCtx): Promise<SchoolSettingsView> {
-    const [cfg, doc, classes, heads] = await Promise.all([
+    const [cfg, doc, classes, heads, roles, staff] = await Promise.all([
       this.effective(t), this.doc(t),
       t.pool.query<{ id: string; name: string }>('select id, name from classes order by grade, section'),
       t.pool.query<{ key: string; name: string }>('select key, name from fee_heads order by sort, name'),
+      t.pool.query<{ key: string; name: string }>('select key, name from roles order by name'),
+      t.pool.query<{ id: string; name: string }>("select u.id, u.name from users u join staff s on s.user_id = u.id where u.status = 'active' order by u.name"),
     ]);
     const ent = t.info.entitlement;
     return {
-      version: doc.version, values: cfg.settings, entitled: cfg.modules, features: cfg.features, classes: classes.rows, feeHeads: heads.rows,
+      version: doc.version, values: cfg.settings, entitled: cfg.modules, features: cfg.features, classes: classes.rows, feeHeads: heads.rows, roles: roles.rows, staff: staff.rows,
       locks: (ent.locks ?? []).map((key) => ({ key, value: ent.overrides?.[key] ?? null, note: ent.lockNotes?.[key] ?? '' })),
     };
   }

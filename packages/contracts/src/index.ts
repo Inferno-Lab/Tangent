@@ -5,6 +5,7 @@ export * from './school.js';
 export * from './config.js';
 export * from './lists.js';
 export * from './fields.js';
+export * from './workflows.js';
 export * from './modules.js';
 export * from './console.js';
 export * from './dates.js';

@@ -904,11 +904,10 @@ export class FamilyService {
   async reviewLeave(t: TenantCtx, user: AuthedUser, id: string, b: { status: string; note?: string }) {
     const row = (await t.pool.query<{ payload: Record<string, unknown>; subject_ref: string | null; status: string }>("select payload, subject_ref, status from approvals where id = $1 and kind = 'leave' and payload->>'studentLeave' = 'true'", [id])).rows[0];
     if (!row) throw notFound('That request');
-    const isClassTeacher = (await t.pool.query('select 1 from students s join classes c on c.id = s.class_id where s.id = $1 and c.class_teacher_id = $2', [row.subject_ref, user.id])).rowCount;
-    if (!isClassTeacher && !user.permissions.includes('approvals.decide')) throw forbidden('Only the class teacher can decide this.');
     if (b.status !== 'approved' && b.status !== 'rejected') throw new ApiError('validation', 'Choose approved or rejected.');
-    await t.pool.query('update approvals set status = $2, decided_by = $3, decided_at = now(), payload = $4 where id = $1', [id, b.status, user.id, JSON.stringify({ ...row.payload, reviewer: user.name, reviewNote: b.note ?? '' })]);
-    await this.approvals.tellLeave(t, row, b.status);
+    // The school's steps decide who takes it (ApprovalsService.takes: the class teacher may decide a child's leave by default).
+    const r = await this.approvals.decide(t, user, id, { decision: b.status === 'approved' ? 'approve' : 'reject', note: b.note });
+    if (r.status !== 'pending') await t.pool.query('update approvals set payload = payload || $2 where id = $1', [id, JSON.stringify({ reviewer: user.name, reviewNote: b.note ?? '' })]);
     return { ok: true };
   }
 

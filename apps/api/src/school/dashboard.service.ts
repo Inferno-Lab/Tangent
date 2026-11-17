@@ -42,8 +42,8 @@ export class DashboardService {
       t.pool.query<{ name: string; role_name: string | null }>("select u.name, (select string_agg(r.name, ', ') from user_roles ur join roles r on r.id = ur.role_id where ur.user_id = u.id) role_name from users u where u.id = $1", [user.id]),
       on('attendance', () => this.attendance.week(t, count), []),
       on('fees', () => this.fees.summary(t, count), NO_FEES),
-      this.approvals.needsYou(t, user.permissions),
-      this.approvals.counts(t, user.permissions),
+      this.approvals.needsYou(t, user),
+      this.approvals.counts(t, user),
       on('attendance', () => this.attendance.unmarked(t), []),
       on('attendance', () => t.pool.query<{ present: string }>("select count(*) filter (where m.status in ('present','late','half_day')) present from attendance_sessions s join attendance_marks m on m.session_id = s.id where s.date = $1", [last]), { rows: [{ present: '0' }] }),
       on('attendance', () => t.pool.query<{ pct: number | null }>("select avg(case when m.status in ('present','late','half_day') then 1.0 else 0.0 end) pct from attendance_sessions s join attendance_marks m on m.session_id = s.id where s.date = $1", [addDays(last, -7)]), { rows: [{ pct: null }] }),
@@ -140,9 +140,10 @@ export class DashboardService {
   }
 
   /** The small slice every page needs for the menu. */
-  async shell(t: TenantCtx, modules: string[], features: string[], perms: readonly string[]): Promise<ShellData> {
+  async shell(t: TenantCtx, modules: string[], features: string[], user: { id: string; name: string; permissions: readonly string[] }): Promise<ShellData> {
+    const perms = user.permissions;
     const v = (await this.settings.doc(t)).values;
-    const [unmarked, counts] = await Promise.all([modules.includes('attendance') && perms.includes('attendance.read') ? this.attendance.unmarked(t) : Promise.resolve([]), this.approvals.counts(t, perms)]);
+    const [unmarked, counts] = await Promise.all([modules.includes('attendance') && perms.includes('attendance.read') ? this.attendance.unmarked(t) : Promise.resolve([]), this.approvals.counts(t, user)]);
     const term = await this.term(t, schoolToday(), modules.includes('exams'));
     return {
       school: { name: String(v['school.name'] ?? t.info.name), shortName: String(v['school.shortName'] ?? t.info.shortName), logoText: String(v['brand.logoText'] ?? '') || String(v['school.shortName'] ?? t.info.shortName).slice(0, 1).toUpperCase(), logoUrl: await this.files.logoUrl(t), place: String(v['school.place'] ?? ''),

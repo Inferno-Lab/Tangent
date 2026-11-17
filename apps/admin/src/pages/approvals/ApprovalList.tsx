@@ -53,6 +53,8 @@ export function useApprovalList(view: ApprovalView, kind: ApprovalKind | undefin
             <b style={{ font: '700 15px var(--fb)', display: 'block', overflowWrap: 'anywhere' }}>{r.title}</b>
             <small style={{ display: 'block' }}>{r.subtitle}</small>
             <small style={{ display: 'block' }}>{r.requesterName ? t('admin.approval_list.asked_by', { requesterName: r.requesterName }) : ''}{when(r.createdAt)}</small>
+            {r.step && r.step.of > 1 && r.status === 'pending' && <small style={{ display: 'block' }}>{t('admin.approval_list.step_of', { at: r.step.at, of: r.step.of, name: r.step.name })}</small>}
+            {r.step && r.step.of > 1 && r.step.done.map((d) => <small key={`${d.key}-${d.at}`} style={{ display: 'block' }}>{t('admin.approval_list.step_done', { name: d.name, by: d.by })} · {when(d.at)}{d.note ? ` · “${d.note}”` : ''}</small>)}
             {r.decidedAt && <small style={{ display: 'block' }}>{STATUS[r.status].text}{r.decidedByName ? t('admin.approval_list.by', { decidedByName: r.decidedByName }) : ''} · {when(r.decidedAt)}{r.decisionNote ? ` · “${r.decisionNote}”` : ''}</small>}
           </div>
           {/* The status and the buttons centre on one line, beside the first line of the text. */}

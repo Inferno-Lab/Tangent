@@ -4,6 +4,7 @@ import { COUNTRIES, isCurrency, isLocale, isZone } from './locale.js';
 import { localizedLabels, VOCAB_CONCEPTS, isLanguage, type Vocabulary } from './i18n.js';
 import { DEFAULT_BLOOD_GROUPS, DEFAULT_GENDERS, DEFAULT_RELATIONSHIPS, schoolList } from './lists.js';
 import { CustomFieldsSetting } from './fields.js';
+import { WorkflowsSetting } from './workflows.js';
 
 
 /** Attendance marks the data model knows; a school picks which it uses (`attendance.statuses`). */
@@ -108,6 +109,8 @@ export const SchoolSettingsSchema = z.object({
   'brand.color': z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a colour like #6A4CF5'),
   'brand.logoText': z.string().max(2).default(''),
   'approvals.notice': z.enum(['required', 'off']).default('required'),
+  // The school's own steps for each kind of request (§3.6.1); a kind without any is decided in one step.
+  'workflows.steps': WorkflowsSetting.default({}),
   'attendance.notifyParents': z.boolean().default(true),
   'attendance.lockAfterDays': z.number().int().min(0).max(30).default(2),
   'fees.lateFeePct': z.number().min(0).max(25).default(0),

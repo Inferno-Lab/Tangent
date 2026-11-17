@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { Money } from './locale.js';
 import { IsoDate } from './common.js';
 import { CustomValues } from './fields.js';
+import type { StepDone } from './workflows.js';
 
 export const AttendanceStatus = z.enum(ATTENDANCE_MARKS);
 export type AttendanceStatus = z.infer<typeof AttendanceStatus>;
@@ -354,6 +355,8 @@ export interface ApprovalRow {
   requesterName?: string;
   decidedByName?: string | null;
   decisionNote?: string;
+  /** Where it is in the school's steps (§3.6.1): the step waiting now, how many there are, and the ones already taken. */
+  step?: { name: string; at: number; of: number; done: StepDone[] };
 }
 export const ApprovalDecision = z.object({ decision: z.enum(['approve', 'reject', 'undo']), note: z.string().trim().max(300).optional() })
   .refine((d) => d.decision !== 'reject' || !!d.note, { message: 'Say why, so the person who asked knows what to do next.', path: ['note'] });

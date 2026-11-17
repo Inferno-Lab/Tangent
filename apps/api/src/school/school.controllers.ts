@@ -218,7 +218,7 @@ export class ApprovalsController {
 
   @Get('needs-you') @Require('approvals.read')
   needsYou(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser): Promise<ApprovalRow[]> {
-    return this.approvals.needsYou(t, u.permissions);
+    return this.approvals.needsYou(t, u);
   }
 
   @Get('approvals') @Require('approvals.read')
@@ -226,7 +226,8 @@ export class ApprovalsController {
     return this.approvals.list(t, u, q.view, q.kind);
   }
 
-  @Post('approvals/:id/decision') @HttpCode(200) @Require('approvals.decide')
+  // Who may take a request's step is the school's steps (ApprovalsService.takes): a step can name a role without approvals.decide.
+  @Post('approvals/:id/decision') @HttpCode(200) @Require('approvals.read')
   decide(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(ApprovalDecision)) body: ApprovalDecision): Promise<ApprovalRow> {
     return this.approvals.decide(t, u, id, body);
   }
@@ -337,7 +338,7 @@ export class DashboardController {
   @Get('shell')
   async shell(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser): Promise<ShellData> {
     const cfg = await this.settings.effective(t, u.permissions);
-    return this.dash.shell(t, cfg.modules, cfg.features, u.permissions);
+    return this.dash.shell(t, cfg.modules, cfg.features, u);
   }
 
   @Get('search')

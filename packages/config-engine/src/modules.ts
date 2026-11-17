@@ -120,7 +120,7 @@ export const MODULES: ModuleManifest[] = localized([
     features: [],
     pages: [
       P('dash', 'Dashboard', 'dashboard', 'G D', '/', 'Home', []),
-      P('appr', 'Approvals', 'approvals', 'G Q', '/approvals', 'Home', ['approvals.read'], { tabs: [{ key: 'waiting', label: 'Waiting for me' }, { key: 'sent', label: 'Sent by me' }, { key: 'decided', label: 'Decided' }] }),
+      P('appr', 'Approvals', 'approvals', 'G Q', '/approvals', 'Home', ['approvals.read'], { settings: ['workflows.steps'], tabs: [{ key: 'waiting', label: 'Waiting for me' }, { key: 'sent', label: 'Sent by me' }, { key: 'decided', label: 'Decided' }] }),
       P('rep', 'Reports', 'reports', 'G R', '/reports', 'Home', ['reports.read'], { tabs: [{ key: 'attendance', label: 'Attendance', feature: 'attendance' }, { key: 'money', label: 'Money', feature: 'fees' }, { key: 'learning', label: 'Learning' }, { key: 'people', label: 'People' }] }),
       P('year', 'Academic year', 'year', 'G Y', '/year', 'School', ['settings.read', 'setup.write', 'year.manage'], {
         settings: ['calendar.weeklyOff', 'calendar.weekStarts', 'dashboard.rollClasses', 'classes.schoolEdits', 'calendar.schoolEdits'],
@@ -134,9 +134,9 @@ export const MODULES: ModuleManifest[] = localized([
       P('move', 'Moving in', 'moving', 'G U', '/moving-in', 'School', ['setup.write'], { untilLive: true }),
     ],
     app: [A('dock', 'home', 'Home', EVERYONE)],
-    settings: ['classes.schoolEdits', 'calendar.weeklyOff', 'calendar.weekStarts', 'calendar.schoolEdits', 'dashboard.rollClasses'],
+    settings: ['classes.schoolEdits', 'calendar.weeklyOff', 'calendar.weekStarts', 'calendar.schoolEdits', 'dashboard.rollClasses', 'workflows.steps'],
     permissions: ['approvals.read', 'approvals.decide', 'settings.read', 'settings.manage', 'privacy.manage', 'audit.read', 'reports.read', 'setup.write', 'year.manage'],
-    messages: ['privacy.answered'],
+    messages: ['privacy.answered', 'approval.waiting'],
     imports: ['years', 'terms', 'holidays', 'subjects', 'periods', 'classes'],
     approvals: ['settings'],
     dashboard: [],

@@ -49,7 +49,7 @@ export class HubService implements OnModuleInit, OnApplicationShutdown {
     for (const s of rows) {
       const today = schoolToday(now, s.timezone);
       const runAt = new Date(Math.max(now.getTime(), schoolInstant(today, '09:00', s.timezone).getTime()));
-      for (const kind of ['fees.reminders', 'fees.lateFines', 'payments.reconcile'] as const) {
+      for (const kind of ['fees.reminders', 'fees.lateFines', 'payments.reconcile', 'approvals.timeLimits'] as const) {
         if (await enqueue(this.registry.pool as never, kind, s.id, { day: today }, runAt)) n++;
       }
     }

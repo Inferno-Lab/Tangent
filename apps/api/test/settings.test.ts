@@ -156,3 +156,37 @@ describe('the school’s own fields on its records', () => {
     await change({ 'fields.custom': {} });
   });
 });
+
+describe('the school’s own steps for a request', () => {
+  it('takes a leave request through the office and then the head, each a different person, and undoes back to the start', async () => {
+    const office = await h.login('meera.nair@greenfield.edu.in');
+    await change({ 'workflows.steps': { leave: [{ key: 'office', name: 'Office checks', who: 'role', ref: 'office' }, { key: 'head', name: 'Head decides', who: 'permission' }] } });
+    const decide = (token: string, decision: string, note?: string) => h.call('POST', '/v1/approvals/apr_leave_kavita/decision', { token, body: { decision, note } });
+    // The first step is the office's: the principal waits for it.
+    expect((await decide(principal, 'approve')).status).toBe(403);
+    const waiting = (await h.call('GET', '/v1/approvals?view=waiting', { token: office })).json;
+    expect(waiting.find((a: any) => a.id === 'apr_leave_kavita').step).toMatchObject({ at: 1, of: 2, name: 'Office checks' });
+    const one = await decide(office, 'approve', 'Cover arranged');
+    expect(one.json).toMatchObject({ status: 'pending', step: { at: 2, of: 2, name: 'Head decides' } });
+    // The one who took a step does not take the next.
+    expect((await decide(office, 'approve')).status).toBe(403);
+    const two = await decide(principal, 'approve');
+    expect(two.json.status).toBe('approved');
+    expect(two.json.step.done.map((d: any) => d.name)).toEqual(['Office checks', 'Head decides']);
+    const back = await decide(principal, 'undo');
+    expect(back.json).toMatchObject({ status: 'pending', step: { at: 1, done: [] } });
+  });
+
+  it('approves a step that waited past its days when the school says so', async () => {
+    await change({ 'workflows.steps': { leave: [{ key: 'decide', name: 'Decide', who: 'permission', days: 2, then: 'approve' }] } });
+    const { ApprovalsService } = await import('../src/school/approvals.service.js');
+    const { TenantService } = await import('../src/tenancy/tenant.js');
+    const t = await h.app.get(TenantService).resolve(h.slug);
+    await t.pool.query("update approvals set step_at = now() - interval '3 days' where id = 'apr_leave_kavita'");
+    expect(await h.app.get(ApprovalsService).timeLimits(t)).toMatch(/1 approved/);
+    expect((await t.pool.query("select status from approvals where id = 'apr_leave_kavita'")).rows[0].status).toBe('approved');
+    await decide0(principal);
+    await change({ 'workflows.steps': {} });
+  });
+});
+const decide0 = (token: string) => h.call('POST', '/v1/approvals/apr_leave_kavita/decision', { token, body: { decision: 'undo' } });

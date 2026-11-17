@@ -111,6 +111,8 @@
  "admin.approval_list.declining": "Declining…",
  "admin.approval_list.put_it_back_in_the": "Put it back in the waiting list",
  "admin.approval_list.say_why_so_the_person": "Say why, so the person who asked knows what to do next.",
+ "admin.approval_list.step_done": "{name}: {by}",
+ "admin.approval_list.step_of": "Step {at} of {of}: {name}",
  "admin.approval_list.that_did_not_go_through": "That did not go through. Try again.",
  "admin.approval_list.that_didn_t_load": "That didn’t load",
  "admin.approval_list.the_dates_clash_with_the": "The dates clash with the exams. Ask again for the week after.",

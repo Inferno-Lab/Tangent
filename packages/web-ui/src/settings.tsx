@@ -1,10 +1,11 @@
 import { useState, type ReactNode } from 'react';
 import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, hasKey, type AppRole } from '@tangent/config-engine';
-import { rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, CUSTOM_ENTITIES, FIELD_KINDS, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
+import { rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
 import { Checkbox, DateField, FilePick, NumberField, TimeField } from './fields';
 import { ColourField } from './ColourPicker';
 import { ErrorLine, Field, SelectField } from './forms';
 import { Select } from './Select';
+import { Icon } from './Icon';
 import { t as tr } from './i18n';
 
 /** What a setting's editor picks from: the school's classes and fee heads, and what it has, so the app's choices fit its modules. */
@@ -15,6 +16,9 @@ export interface SettingCtx {
   features: readonly string[];
   /** The settings as they apply now: the words editor offers the school's languages. */
   values?: Record<string, unknown>;
+  /** Who a request's step can name: the school's roles (by key) and its staff. */
+  roles?: { key: string; name: string }[];
+  staff?: { id: string; name: string }[];
 }
 
 /** The channels a message can go through, as the Hub sends them. */
@@ -96,6 +100,11 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
       const v = ctx.values ?? {};
       const others = (Array.isArray(v['app.languages']) ? (v['app.languages'] as string[]) : []).filter((l) => l !== String(v['school.language'] ?? 'en'));
       return box(<CustomFieldsEditor value={(value ?? {}) as CustomFieldsSetting} languages={others} disabled={disabled} onChange={onChange} />);
+    }
+    case 'workflows': {
+      const v = ctx.values ?? {};
+      const others = (Array.isArray(v['app.languages']) ? (v['app.languages'] as string[]) : []).filter((l) => l !== String(v['school.language'] ?? 'en'));
+      return box(<WorkflowsEditor value={(value ?? {}) as WorkflowsSetting} languages={others} roles={ctx.roles ?? []} staff={ctx.staff ?? []} disabled={disabled} onChange={onChange} />);
     }
     case 'gradingScale':
       return box(<GradingEditor value={(Array.isArray(value) ? value : []) as { grade: string; minPct: number }[]} max={meta.max ?? 12} disabled={disabled} onChange={onChange} />);
@@ -342,6 +351,56 @@ function CustomFieldsEditor({ value, languages, disabled, onChange }: { value: C
       ))}
       {list.length < 30 && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={add}>{tr('ui.settings.add_a_field')}</button>}
       <div className="help">{tr('ui.settings.removing_a_field_keeps')}</div>
+    </div>
+  );
+}
+
+/** The school's steps for each kind of request (§3.6.1): in order, who takes each, above which amount, and what a long wait does. */
+function WorkflowsEditor({ value, languages, roles, staff, disabled, onChange }: {
+  value: WorkflowsSetting; languages: string[]; roles: { key: string; name: string }[]; staff: { id: string; name: string }[]; disabled: boolean; onChange: (v: unknown) => void;
+}) {
+  const [kind, setKind] = useState<WorkflowProcess>('leave');
+  const own = value[kind];
+  const steps = own?.length ? own : [DEFAULT_STEP];
+  const setSteps = (next: StepDef[]) => onChange({ ...value, [kind]: next.length === 1 && next[0]!.who === 'permission' && next[0]!.above === undefined && !next[0]!.days && next[0]!.key === 'decide' ? undefined : next });
+  const put = (i: number, patch: Partial<StepDef>) => setSteps(steps.map((s, j) => (j === i ? { ...s, ...patch } : s)));
+  const move = (i: number, d: number) => { const next = [...steps]; [next[i], next[i + d]] = [next[i + d]!, next[i]!]; setSteps(next); };
+  const add = () => {
+    let n = steps.length + 1;
+    while (steps.some((s) => s.key === `step-${n}`)) n++;
+    setSteps([...steps, { key: `step-${n}`, name: tr('ui.settings.new_step'), who: 'permission' }]);
+  };
+  return (
+    <div>
+      <div style={{ maxWidth: 320 }}><Select value={kind} onChange={(k) => setKind(k as WorkflowProcess)} aria-label={tr('ui.settings.kind_of_request')} options={WORKFLOW_PROCESSES.map((p) => ({ value: p, label: PROCESS_LABELS[p] }))} /></div>
+      {steps.map((s, i) => (
+        <div key={s.key} className="card" style={{ padding: 12, marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <span className="chip" style={{ marginBottom: 10 }}>{i + 1}</span>
+            <div style={{ flex: 1, minWidth: 160 }}><Field label={tr('ui.settings.step')} value={s.name} maxLength={40} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
+            <div style={{ width: 230 }}><SelectField label={tr('ui.settings.who_takes_it')} value={s.who} disabled={disabled} onChange={(w) => put(i, { who: w as StepDef['who'], ref: undefined })} options={STEP_ACTORS.map((a) => ({ value: a, label: STEP_ACTOR_LABELS[a] }))} /></div>
+            {s.who === 'role' && <div style={{ width: 200 }}><SelectField label={tr('ui.settings.role')} value={s.ref ?? ''} disabled={disabled} onChange={(r) => put(i, { ref: r })} options={[{ value: '', label: tr('ui.settings.choose') }, ...roles.map((r) => ({ value: r.key, label: r.name }))]} /></div>}
+            {s.who === 'person' && <div style={{ width: 200 }}><SelectField label={tr('ui.settings.person')} value={s.ref ?? ''} disabled={disabled} onChange={(r) => put(i, { ref: r })} options={[{ value: '', label: tr('ui.settings.choose') }, ...staff.map((p) => ({ value: p.id, label: p.name }))]} /></div>}
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 6 }}>
+            {(kind === 'fee_waiver' || kind === 'receipt_cancel') && <div style={{ width: 200 }}><NumberField label={tr('ui.settings.only_above_amount')} min={0} value={s.above === undefined ? '' : String(s.above)} disabled={disabled} onChange={(v) => put(i, { above: v === '' ? undefined : Math.round(Number(v)) })} /></div>}
+            <div style={{ width: 160 }}><NumberField label={tr('ui.settings.days_to_answer')} min={1} max={60} value={s.days === undefined ? '' : String(s.days)} disabled={disabled} onChange={(v) => put(i, { days: v === '' ? undefined : Number(v), then: v === '' ? undefined : s.then ?? 'remind' })} /></div>
+            {s.days !== undefined && <div style={{ width: 260 }}><SelectField label={tr('ui.settings.then')} value={s.then ?? 'remind'} disabled={disabled} onChange={(v) => put(i, { then: v as StepDef['then'] })} options={STEP_TIMEOUTS.map((x) => ({ value: x, label: STEP_TIMEOUT_LABELS[x] }))} /></div>}
+            <button type="button" className="btn sm" aria-label={tr('ui.settings.move_up')} disabled={disabled || i === 0} onClick={() => move(i, -1)}><Icon name="caretUp" /></button>
+            <button type="button" className="btn sm" aria-label={tr('ui.settings.move_down')} disabled={disabled || i === steps.length - 1} onClick={() => move(i, 1)}><Icon name="caretDown" /></button>
+            <button type="button" className="btn sm" disabled={disabled || steps.length <= 1} onClick={() => setSteps(steps.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
+          </div>
+          {languages.length > 0 && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>{languages.map((l) => (
+            <div key={l} style={{ flex: 1, minWidth: 160 }}><Field label={languageLabel(l)} value={s.names?.[l] ?? ''} maxLength={40} disabled={disabled} onChange={(v) => {
+              const names = { ...s.names, [l]: v };
+              if (!v) delete names[l];
+              put(i, { names: Object.keys(names).length ? names : undefined });
+            }} /></div>
+          ))}</div>}
+        </div>
+      ))}
+      {steps.length < 6 && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={add}>{tr('ui.settings.add_a_step')}</button>}
+      <div className="help">{tr('ui.settings.steps_help')}</div>
     </div>
   );
 }
