@@ -190,3 +190,18 @@ describe('the school’s own steps for a request', () => {
   });
 });
 const decide0 = (token: string) => h.call('POST', '/v1/approvals/apr_leave_kavita/decision', { token, body: { decision: 'undo' } });
+
+describe('addresses written the country’s way', () => {
+  it('keeps an address in the country’s parts, checks its postcode, and writes it as one line', async () => {
+    const { COUNTRY_PACKS } = await import('@tangent/contracts');
+    expect((await change({ 'people.addressFormat': COUNTRY_PACKS.GB!['people.addressFormat'] })).status).toBe(200);
+    const body = { name: 'Address Child', classId: 'cls_8a', dob: '2014-05-06', guardianName: 'Address Parent', guardianPhone: '9822099401' };
+    const bad = await h.call('POST', '/v1/students', { token: principal, body: { ...body, addressParts: { line1: '10 High Street', postcode: '12345' } } });
+    expect(bad.status).toBe(400);
+    expect(bad.json.fields['address.postcode']).toBe('Like SW1A 1AA.');
+    const ok = await h.call('POST', '/v1/students', { token: principal, body: { ...body, addressParts: { line1: '10 High Street', city: 'York', region: 'North Yorkshire', postcode: 'YO1 7HH' } } });
+    expect(ok.status).toBe(201);
+    expect(ok.json).toMatchObject({ address: '10 High Street, York, North Yorkshire YO1 7HH', addressParts: { city: 'York' } });
+    await change({ 'people.addressFormat': (await import('@tangent/contracts')).DEFAULT_ADDRESS_FORMAT });
+  });
+});

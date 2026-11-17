@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { Money } from './locale.js';
 import { IsoDate } from './common.js';
 import { CustomValues } from './fields.js';
+import { AddressParts } from './address.js';
 import type { StepDone } from './workflows.js';
 
 export const AttendanceStatus = z.enum(ATTENDANCE_MARKS);
@@ -57,6 +58,7 @@ export interface StudentDetail extends StudentRow {
   roll24: (AttendanceStatus | null)[];
   /** The school's own fields (fields.custom.student), by key. */
   custom: CustomValues;
+  addressParts: AddressParts;
   gender: string | null;
   /** When and why a student who left the school left (null while on the roll). */
   left: { on: string; reason: string } | null;
@@ -160,6 +162,8 @@ const StudentFields = {
   admissionNo: z.string().trim().max(30).optional(),
   bloodGroup: z.string().trim().max(4).optional(),
   address: z.string().trim().max(200).optional(),
+  // The address in the country's parts (people.addressFormat); the service writes `address` from them.
+  addressParts: AddressParts.optional(),
   custom: CustomValues.optional(),
 };
 export const StudentCreate = z.object({

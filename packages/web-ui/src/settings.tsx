@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, hasKey, type AppRole } from '@tangent/config-engine';
-import { rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
+import { rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, ADDRESS_PARTS, ADDRESS_PART_LABELS, type AddressFormat, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
 import { Checkbox, DateField, FilePick, NumberField, TimeField } from './fields';
 import { ColourField } from './ColourPicker';
 import { ErrorLine, Field, SelectField } from './forms';
@@ -119,6 +119,22 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
           </div>
         ))}
         {parts.length < 4 && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={() => onChange([...parts, { name: tr('ui.settings.part_n', { n: parts.length + 1 }), sharePct: parts.length ? 0 : 100 }])}>{tr('ui.settings.add_a_part')}</button>}
+      </div>);
+    }
+    case 'addressFormat': {
+      const fmt = (Array.isArray(value) ? value : []) as AddressFormat;
+      return box(<div>
+        {ADDRESS_PARTS.map((k) => {
+          const at = fmt.findIndex((p) => p.key === k);
+          const on = at >= 0;
+          return (
+            <div key={k} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 6, flexWrap: 'wrap' }}>
+              <div style={{ width: 150, paddingBottom: 10 }}><Checkbox checked={on} disabled={disabled || (on && fmt.length <= 1)} label={ADDRESS_PART_LABELS[k]}
+                onChange={(v) => onChange(v ? ADDRESS_PARTS.flatMap((x) => (x === k ? [{ key: k, label: ADDRESS_PART_LABELS[k] }] : fmt.filter((p) => p.key === x))) : fmt.filter((p) => p.key !== k))} /></div>
+              {on && <div style={{ flex: 1, minWidth: 160 }}><Field label={tr('ui.settings.called')} value={fmt[at]!.label} maxLength={30} disabled={disabled} onChange={(v) => onChange(fmt.map((p) => (p.key === k ? { ...p, label: v } : p)))} /></div>}
+            </div>
+          );
+        })}
       </div>);
     }
     case 'gradingScale':

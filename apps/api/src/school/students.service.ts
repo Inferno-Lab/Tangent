@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { nextNumber, commitImport, newId, previewImport } from '@tangent/db';
-import { schoolInstant, addDays, dayLabel, initials, schoolToday, latestSchoolDay, schoolDaysEnding, type AssignFee, type AttendanceStatus, type ContactReveal, type FeeStatus, type ImportResult, type MessageRequest, type GuardianRow, type GuardiansPut, type Paged, type StudentCreate, type StudentDetail, type StudentPatch, type StudentQuery, type StudentRow, type StudentSummary, type StudentViews, type ListItem, listKey, tx } from '@tangent/contracts';
+import { schoolInstant, addDays, dayLabel, initials, schoolToday, latestSchoolDay, schoolDaysEnding, type AssignFee, type AttendanceStatus, type ContactReveal, type FeeStatus, type ImportResult, type MessageRequest, type GuardianRow, type GuardiansPut, type Paged, type StudentCreate, type StudentDetail, type StudentPatch, type StudentQuery, type StudentRow, type StudentSummary, type StudentViews, type ListItem, listKey, tx, addressProblems, joinAddress, type AddressFormat } from '@tangent/contracts';
 import { maskPhone } from '@tangent/security';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
@@ -209,7 +209,7 @@ export class StudentsService {
       this.activity(t, id),
       t.pool.query<{ phone: string | null; email: string | null; last_login_at: Date | null }>('select u.phone, u.email, u.last_login_at from students s join users u on u.id = s.user_id where s.id = $1', [id]),
     ]);
-    const extra = (await t.pool.query<{ gender: StudentDetail['gender']; status: string; left_on: string | null; reason: string | null; custom: StudentDetail['custom'] }>("select gender, status, left_on::text, leaving_reason reason, custom from students where id = $1", [id])).rows[0];
+    const extra = (await t.pool.query<{ gender: StudentDetail['gender']; status: string; left_on: string | null; reason: string | null; custom: StudentDetail['custom']; address_parts: StudentDetail['addressParts'] }>("select gender, status, left_on::text, leaving_reason reason, custom, address_parts from students where id = $1", [id])).rows[0];
     const has = await this.has(t);
     const acc = account.rows[0];
     const base = this.mask(this.row(r, ticks.get(id)!), has);
@@ -221,7 +221,7 @@ export class StudentsService {
         homework: has.homework ? { onTime: Number(hw.rows[0]!.on_time), total: Number(hw.rows[0]!.total) } : { onTime: 0, total: 0 }, libraryOut: has.library ? Number(lib.rows[0]!.n) : 0,
       },
       chips: { house: r.house }, recentActivity: acts, roll24: has.attendance ? roll24 : roll24.map(() => null),
-      gender: extra?.gender ?? null, custom: extra?.custom ?? {}, guardians: await this.guardians(t, id), left: extra?.status === 'left' && extra.left_on ? { on: extra.left_on, reason: extra.reason ?? '' } : null,
+      gender: extra?.gender ?? null, custom: extra?.custom ?? {}, addressParts: extra?.address_parts ?? {}, guardians: await this.guardians(t, id), left: extra?.status === 'left' && extra.left_on ? { on: extra.left_on, reason: extra.reason ?? '' } : null,
       appAccount: acc ? { phone: acc.phone ? maskPhone(acc.phone) : '', email: acc.email ?? '', lastSignIn: acc.last_login_at?.toISOString() ?? null } : null,
     };
   }
@@ -261,6 +261,13 @@ export class StudentsService {
 
   /** The fields the school requires beyond the always-needed ones (console: students.required), checked on add and edit. */
   private async required(t: TenantCtx, body: StudentPatch): Promise<void> {
+    // An address typed in the country's parts is checked and written as one line too (§3.3.5).
+    if (body.addressParts) {
+      const format = await this.settings.value<AddressFormat>(t, 'people.addressFormat', []);
+      const bad = addressProblems(format, body.addressParts);
+      if (Object.keys(bad).length) throw new ApiError('validation', 'Check the address.', { fields: Object.fromEntries(Object.entries(bad).map(([k, m]) => [`address.${k}`, m])) });
+      body.address = joinAddress(format, body.addressParts);
+    }
     const need = await this.settings.value<string[]>(t, 'students.required', []);
     const missing = need.filter((k) => k in body ? !String((body as Record<string, unknown>)[k] ?? '').trim() : false);
     if (missing.length) throw new ApiError('validation', 'Fill in the fields your school keeps for every student.', { fields: Object.fromEntries(missing.map((k) => [k, 'Your school needs this.'])) });
@@ -276,10 +283,11 @@ export class StudentsService {
 
   async create(t: TenantCtx, body: StudentCreate, user: { id: string; name: string }): Promise<StudentDetail> {
     const need = await this.settings.value<string[]>(t, 'students.required', []);
-    const checked = { ...Object.fromEntries(need.map((k) => [k, (body as Record<string, unknown>)[k] ?? ''])), gender: body.gender, bloodGroup: body.bloodGroup } as StudentPatch;
+    const checked = { ...Object.fromEntries(need.map((k) => [k, (body as Record<string, unknown>)[k] ?? ''])), gender: body.gender, bloodGroup: body.bloodGroup, addressParts: body.addressParts } as StudentPatch;
     await this.required(t, checked);
     body.gender = checked.gender;
     body.bloodGroup = checked.bloodGroup;
+    if (checked.addressParts) body.address = checked.address;
     const custom = await this.settings.custom(t, 'student', body.custom ?? {}, true);
     if (body.admissionNo && (await t.pool.query('select 1 from students where lower(admission_no) = lower($1)', [body.admissionNo])).rowCount) {
       throw new ApiError('validation', 'Another student has that admission number.', { fields: { admissionNo: 'Already used.' } });
@@ -301,8 +309,8 @@ export class StudentsService {
     try {
       await client.query('begin');
       const admissionNo = body.admissionNo || (await nextNumber(client, { pattern, start, day: schoolToday(), ay, table: 'students', column: 'admission_no' }));
-      await client.query('insert into students (id, admission_no, name, class_id, roll_no, dob, blood_group, address, gender, house, admitted_on, custom) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, $11, $12)',
-        [id, admissionNo, body.name, body.classId, roll, body.dob, body.bloodGroup ?? null, body.address ?? null, body.gender ?? null, body.house || null, schoolToday(), JSON.stringify(custom)]);
+      await client.query('insert into students (id, admission_no, name, class_id, roll_no, dob, blood_group, address, gender, house, admitted_on, custom, address_parts) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, $11, $12, $13)',
+        [id, admissionNo, body.name, body.classId, roll, body.dob, body.bloodGroup ?? null, body.address || null, body.gender ?? null, body.house || null, schoolToday(), JSON.stringify(custom), JSON.stringify(body.addressParts ?? {})]);
       // One family, one guardian: a brother or sister joins the guardian who already has that phone number.
       let g = (await client.query<{ id: string; user_id: string | null }>(`select id, user_id from guardians where ${byPhone} limit 1`, [digits])).rows[0];
       if (!g) {
@@ -341,7 +349,8 @@ export class StudentsService {
       throw new ApiError('validation', 'Another student has that admission number.', { fields: { admissionNo: 'Already used.' } });
     }
     if (custom) await t.pool.query('update students set custom = custom || $2::jsonb where id = $1', [id, JSON.stringify(custom)]);
-    const cols: Record<Exclude<keyof StudentPatch, 'custom'>, string> = { name: 'name', classId: 'class_id', rollNo: 'roll_no', dob: 'dob', gender: 'gender', house: 'house', admissionNo: 'admission_no', bloodGroup: 'blood_group', address: 'address' };
+    if (b.addressParts) await t.pool.query('update students set address_parts = $2 where id = $1', [id, JSON.stringify(b.addressParts)]);
+    const cols: Record<Exclude<keyof StudentPatch, 'custom' | 'addressParts'>, string> = { name: 'name', classId: 'class_id', rollNo: 'roll_no', dob: 'dob', gender: 'gender', house: 'house', admissionNo: 'admission_no', bloodGroup: 'blood_group', address: 'address' };
     const set = (Object.keys(cols) as (keyof typeof cols)[]).filter((k) => b[k] !== undefined);
     if (set.length) {
       await t.pool.query(`update students set ${set.map((k, i) => `${cols[k]} = $${i + 2}`).join(', ')} where id = $1`, [id, ...set.map((k) => (b[k] === '' ? null : b[k]))]);

@@ -1,4 +1,4 @@
-import { customText, listLabel, listOptions, type CustomValue, type CustomValues, type FieldDef } from '@tangent/contracts';
+import { customText, listLabel, listOptions, type AddressFormat, type AddressParts, type CustomValue, type CustomValues, type FieldDef } from '@tangent/contracts';
 import { Checkbox, DateField, NumberField } from './fields';
 import { Field, SelectField } from './forms';
 import { currentLanguage, t as tr } from './i18n';
@@ -55,4 +55,21 @@ export function CustomFieldInputs({ defs, values, onChange, errors = {}, disable
 /** A record's custom values as lines to read (only the fields that have a value). */
 export function customLines(defs: readonly FieldDef[], values: CustomValues | undefined): { label: string; text: string }[] {
   return defs.map((f) => ({ label: labelOf(f), text: customText(f, values?.[f.key], currentLanguage()) })).filter((l) => l.text);
+}
+
+/**
+ * An address in the country's parts (people.addressFormat), under the names people there know. `errors` are the server's,
+ * keyed `address.<part>`.
+ */
+export function AddressFields({ format, parts, onChange, errors = {}, optional }: {
+  format: AddressFormat; parts: AddressParts; onChange: (v: AddressParts) => void; errors?: Record<string, string>; optional?: boolean;
+}) {
+  return (
+    <div className="two" style={{ flexWrap: 'wrap' }}>
+      {format.map((p) => (
+        <Field key={p.key} label={optional ? tr('ui.custom_fields.optional', { label: p.label }) : p.label} value={parts[p.key] ?? ''} maxLength={120}
+          error={errors[`address.${p.key}`]} hint={p.patternHint} onChange={(v) => onChange({ ...parts, [p.key]: v })} />
+      ))}
+    </div>
+  );
 }

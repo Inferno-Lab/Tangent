@@ -5,6 +5,7 @@ import { localizedLabels, VOCAB_CONCEPTS, isLanguage, type Vocabulary } from './
 import { DEFAULT_BLOOD_GROUPS, DEFAULT_GENDERS, DEFAULT_RELATIONSHIPS, schoolList } from './lists.js';
 import { CustomFieldsSetting } from './fields.js';
 import { WorkflowsSetting } from './workflows.js';
+import { AddressFormat, DEFAULT_ADDRESS_FORMAT } from './address.js';
 
 
 /** Attendance marks the data model knows; a school picks which it uses (`attendance.statuses`). */
@@ -188,6 +189,8 @@ export const SchoolSettingsSchema = z.object({
   'lists.bloodGroups': schoolList(DEFAULT_BLOOD_GROUPS),
   // The school's own fields on its records (§3.6.3), per kind of record.
   'fields.custom': CustomFieldsSetting.default({}),
+  // How addresses are written in the school's country (§3.3.5): its parts, names and postal code format.
+  'people.addressFormat': AddressFormat.default(DEFAULT_ADDRESS_FORMAT),
   'people.houses': z.array(z.object({ key: z.string().regex(/^[a-z0-9-]{1,24}$/), name: z.string().min(1).max(24), color: z.string().regex(/^#[0-9a-fA-F]{6}$/) })).max(12).default([]),
   // The first column of every week grid (attendance, leave, the app's calendars).
   'calendar.weekStarts': z.enum(['mon', 'sun']).default('mon'),

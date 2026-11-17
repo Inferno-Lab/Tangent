@@ -1,5 +1,6 @@
 import type { GradingScale, PaymentMethod } from './config.js';
 import type { FieldDef } from './fields.js';
+import type { AddressFormat } from './address.js';
 import { localized } from './i18n.js';
 
 /**
@@ -31,6 +32,7 @@ export const CURRICULA: Curriculum[] = localized([
 
 const method = (key: string, name: string, kind: PaymentMethod['kind']): PaymentMethod => ({ key, name, kind });
 /** An identity number a country's schools keep (§3.3.6), as one of the school's own fields with the format it must have. */
+const part = (key: AddressFormat[number]['key'], label: string, pattern?: string, patternHint?: string) => ({ key, label, ...(pattern ? { pattern, patternHint } : {}) });
 const id = (key: string, label: string, pattern?: string, patternHint?: string): FieldDef => ({ key, label, kind: 'text', ...(pattern ? { pattern, patternHint } : {}) });
 
 /** A country's ways: how money is taken there, the school week and the words families expect. */
@@ -41,6 +43,7 @@ export const COUNTRY_PACKS: Record<string, Record<string, unknown>> = {
     'fees.refundApprovalAbove': 5000, 'app.languages': ['en', 'hi', 'mr'],
     'tax.name': 'GST', 'tax.numberLabel': 'GSTIN', 'tax.code': '999293', 'tax.codeLabel': 'SAC', 'tax.ratePct': 18, 'tax.inclusive': true,
     'tax.split': [{ name: 'CGST', sharePct: 50 }, { name: 'SGST', sharePct: 50 }],
+    'people.addressFormat': [part('line1', 'House and street'), part('line2', 'Area or locality'), part('city', 'City or town'), part('region', 'State'), part('postcode', 'PIN code', '^\\d{6}$', 'A PIN code has 6 digits.')],
     'fields.custom': {
       student: [id('aadhaar', 'Aadhaar number', '^\\d{12}$', 'An Aadhaar number has 12 digits.'), id('apaar', 'APAAR ID', '^\\d{12}$', 'An APAAR ID has 12 digits.'), id('passport', 'Passport number')],
       staff: [id('pan', 'PAN', '^[A-Z]{5}\\d{4}[A-Z]$', 'A PAN has 10 characters, like ABCDE1234F.'), id('aadhaar', 'Aadhaar number', '^\\d{12}$', 'An Aadhaar number has 12 digits.')],
@@ -51,6 +54,7 @@ export const COUNTRY_PACKS: Record<string, Record<string, unknown>> = {
     'calendar.weekStarts': 'mon', 'calendar.weeklyOff': ['sat', 'sun'], 'leave.reasons': ['Illness', 'Medical appointment', 'Family', 'Religious observance', 'Other'],
     'vocab.words': { en: { student: { one: 'Pupil' }, guardian: { one: 'parent' }, principal: { one: 'head teacher' }, class: { one: 'form' } } }, 'fees.refundApprovalAbove': 100,
     'tax.name': 'VAT', 'tax.numberLabel': 'VAT registration number', 'tax.ratePct': 20, 'tax.inclusive': true,
+    'people.addressFormat': [part('line1', 'Address line 1'), part('line2', 'Address line 2'), part('city', 'Town'), part('region', 'County'), part('postcode', 'Postcode', '^[A-Z]{1,2}\\d[A-Z\\d]? ?\\d[A-Z]{2}$', 'Like SW1A 1AA.')],
     'fields.custom': {
       student: [id('upn', 'UPN', '^[A-Z]\\d{11}[0-9A-Z]$', 'A UPN has 13 characters: a letter, 11 digits and a last digit or letter.'), id('uln', 'ULN', '^\\d{10}$', 'A ULN has 10 digits.')],
       staff: [id('ni', 'National Insurance number', '^[A-Z]{2}\\d{6}[A-D]$', 'Like QQ123456C.')],
@@ -60,6 +64,7 @@ export const COUNTRY_PACKS: Record<string, Record<string, unknown>> = {
     'fees.paymentMethods': [method('cash', 'Cash', 'cash'), method('card', 'Card', 'card'), method('check', 'Check', 'cheque'), method('ach', 'ACH transfer', 'bank')],
     'calendar.weekStarts': 'sun', 'calendar.weeklyOff': ['sat', 'sun'], 'leave.reasons': ['Sick', 'Medical appointment', 'Family', 'Religious holiday', 'Other'],
     'fees.refundApprovalAbove': 100, 'app.languages': ['en', 'es'], 'tax.name': 'Sales tax', 'tax.numberLabel': 'Tax ID',
+    'people.addressFormat': [part('line1', 'Street address'), part('line2', 'Apartment, suite'), part('city', 'City'), part('region', 'State'), part('postcode', 'ZIP code', '^\\d{5}(-\\d{4})?$', 'A ZIP code has 5 digits, or 5 and 4.')],
     'fields.custom': { student: [id('state_id', 'State student ID')] },
   },
   AE: {
@@ -67,6 +72,7 @@ export const COUNTRY_PACKS: Record<string, Record<string, unknown>> = {
     'calendar.weekStarts': 'mon', 'calendar.weeklyOff': ['sat', 'sun'], 'leave.reasons': ['Illness', 'Medical appointment', 'Family', 'Travel', 'Religious observance', 'Other'],
     'fees.refundApprovalAbove': 500, 'app.languages': ['en', 'ar'],
     'tax.name': 'VAT', 'tax.numberLabel': 'TRN', 'tax.ratePct': 5, 'tax.inclusive': true,
+    'people.addressFormat': [part('line1', 'Building and street'), part('line2', 'Area'), part('city', 'City'), part('region', 'Emirate'), part('postcode', 'P.O. Box')],
     'fields.custom': {
       student: [id('emirates_id', 'Emirates ID', '^784\\d{12}$', 'An Emirates ID has 15 digits and starts 784.'), id('passport', 'Passport number'), id('visa', 'Residence visa number')],
       staff: [id('emirates_id', 'Emirates ID', '^784\\d{12}$', 'An Emirates ID has 15 digits and starts 784.'), id('passport', 'Passport number')],
