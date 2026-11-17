@@ -45,6 +45,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
     body = { ...body, message: tx(body.message), ...(body.fields ? { fields: Object.fromEntries(Object.entries(body.fields).map(([k, v]) => [k, tx(v)])) } : {}) };
     body.requestId = req.id;
     if (body.retryAfter) void reply.header('retry-after', String(body.retryAfter));
-    void reply.status(status).send(body);
+    // A route that sets its own type (a CSV, a PDF) would otherwise refuse the JSON and hide the real error.
+    void reply.status(status).header('content-type', 'application/json; charset=utf-8').send(body);
   }
 }
