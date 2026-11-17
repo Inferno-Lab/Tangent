@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError, uploadFile } from '@tangent/api-client';
-import type { Category, NoticeRow } from '@tangent/contracts';
+import { schoolToday, type Category, type NoticeRow } from '@tangent/contracts';
 import { Checkbox, DateField, Dialog, Field, SelectField, TimeField, useShake, Icon, EmptyState, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
@@ -75,8 +75,8 @@ export function NoticesPage() {
   );
 }
 
-/** Today in IST as YYYY-MM-DD, for the earliest day a notice can be scheduled. */
-const today = () => new Date(Date.now() + 5.5 * 3600_000).toISOString().slice(0, 10);
+/** The school's today, for the earliest day a notice can be scheduled. */
+const today = () => schoolToday();
 
 function Compose({ n, onClose, onDone }: { n?: NoticeRow; onClose: () => void; onDone: (msg: string) => void }) {
   const app = useApp();

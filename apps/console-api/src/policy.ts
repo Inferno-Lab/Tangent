@@ -15,7 +15,7 @@ export const DEFAULT_POLICY: PolicyDoc = {
   freeze: false,
   freezeReason: '',
   naming: { slugPattern: '^[a-z][a-z0-9-]{2,30}[a-z0-9]$', bundlePrefix: 'com.tangent.' },
-  maintenanceWindow: 'Sun 01:00–03:00 IST',
+  maintenanceWindow: 'Sun 19:30–21:30 UTC',
 };
 
 /** Rules the console runs on: which actions need a second person, how a release rolls, and the freeze switch. All data, all editable. */

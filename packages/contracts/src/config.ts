@@ -108,7 +108,7 @@ export const SchoolSettingsSchema = z.object({
   'school.country': z.string().trim().refine((c) => c === '' || COUNTRIES.includes(c), 'Choose a country from the list').default(''),
   'school.timezone': z.string().refine(isZone, 'Choose a time zone from the list').default('UTC'),
   'school.locale': z.string().refine(isLocale, 'Write a locale like en-GB').default('en'),
-  'school.currency': z.string().trim().toUpperCase().refine(isCurrency, 'Write a currency code like USD or INR').default('USD'),
+  'school.currency': z.string().trim().toUpperCase().refine(isCurrency, 'Write a currency code like USD or EUR').default('USD'),
   'brand.color': z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a colour like #6A4CF5'),
   'brand.logoText': z.string().max(2).default(''),
   'approvals.notice': z.enum(['required', 'off']).default('required'),

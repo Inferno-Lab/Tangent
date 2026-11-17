@@ -161,8 +161,8 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = localized({
   'tax.inclusive': { group: 'fees', label: 'Fees include the tax', kind: 'bool', help: 'On: the receipt shows the tax inside each fee. Off: the tax is added on top of the fee when it is billed.' },
   'tax.split': { group: 'fees', label: 'Parts of the tax on a receipt', kind: 'taxSplit', help: 'Where a country shows the tax in parts (central and state GST in India), each part and its share. Empty: one line.' },
   'tax.heads': { group: 'fees', label: 'Fee heads that carry tax', kind: 'multi', help: 'From the school’s own fee heads.' },
-  'fees.refundApprovalAbove': { group: 'fees', label: 'Refunds above this need a second person (₹)', kind: 'number', min: 0, max: 10_000_000 },
-  'fees.dailyTarget': { group: 'fees', label: 'Daily fee collection target (₹)', kind: 'number', min: 0, max: 100_000_000, help: 'The dashboard measures each day’s collection against it.' },
+  'fees.refundApprovalAbove': { group: 'fees', label: 'Refunds above this need a second person (in the school’s currency)', kind: 'number', min: 0, max: 10_000_000 },
+  'fees.dailyTarget': { group: 'fees', label: 'Daily fee collection target (in the school’s currency)', kind: 'number', min: 0, max: 100_000_000, help: 'The dashboard measures each day’s collection against it.' },
   'feeStructures.schoolEdits': { group: 'fees', label: 'The school may edit its fee heads and fee structures', kind: 'bool', help: 'Off: only Tangent changes what each grade pays. Who approves a fee waiver is whoever’s role may waive fees (Roles).' },
 
   // Notices
@@ -175,7 +175,7 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = localized({
 
   // Library
   'library.loanDays': { group: 'library', label: 'Loan (days)', kind: 'number', min: 1, max: 60 },
-  'library.finePerDay': { group: 'library', label: 'Fine per late day (₹)', kind: 'number', min: 0, max: 100 },
+  'library.finePerDay': { group: 'library', label: 'Fine per late day (in the school’s currency)', kind: 'number', min: 0, max: 100 },
   'library.maxRenewals': { group: 'library', label: 'Renewals per loan', kind: 'number', min: 0, max: 5, help: 'A book someone is waiting for cannot be renewed.' },
   'library.maxLoans': { group: 'library', label: 'Books a student may have out', kind: 'number', min: 1, max: 20 },
   'library.staffMaxLoans': { group: 'library', label: 'Books a member of staff may have out', kind: 'number', min: 1, max: 50 },
