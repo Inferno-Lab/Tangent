@@ -1,12 +1,12 @@
 import { useState, type ReactNode } from 'react';
 import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, hasKey, type AppRole } from '@tangent/config-engine';
-import { AdmissionStages, DEFAULT_ADMISSION_STAGES, TimetableCycle, type AdmissionStage, rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, ADDRESS_PARTS, ADDRESS_PART_LABELS, SCHEME_KINDS, SCHEME_KIND_LABELS, BLOCK_KINDS, BLOCK_KIND_LABELS, DEFAULT_TEMPLATES, DOC_KINDS, DOC_KIND_LABELS, DOC_PLACEHOLDERS, PAGE_SIZES, type Block, type DocKind, type DocTemplate, type DocTemplates, type GradeBand, type GradingScheme, type AddressFormat, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
+import { AdmissionStages, DEFAULT_ADMISSION_STAGES, TimetableCycle, listLabel, type AdmissionStage, rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, ADDRESS_PARTS, ADDRESS_PART_LABELS, SCHEME_KINDS, SCHEME_KIND_LABELS, BLOCK_KINDS, BLOCK_KIND_LABELS, DEFAULT_TEMPLATES, DOC_KINDS, DOC_KIND_LABELS, DOC_PLACEHOLDERS, PAGE_SIZES, type Block, type DocKind, type DocTemplate, type DocTemplates, type GradeBand, type GradingScheme, type AddressFormat, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
 import { Checkbox, DateField, FilePick, NumberField, TimeField } from './fields';
 import { ColourField } from './ColourPicker';
 import { ErrorLine, Field, SelectField } from './forms';
 import { Select } from './Select';
 import { Icon } from './Icon';
-import { t as tr } from './i18n';
+import { currentLanguage, t as tr } from './i18n';
 
 /** What a setting's editor picks from: the school's classes and fee heads, and what it has, so the app's choices fit its modules. */
 export interface SettingCtx {
@@ -140,6 +140,18 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
           );
         })}
       </div>);
+    }
+    case 'weights': {
+      // One number for each of the school's kinds of exam (exams.types); a kind left empty counts nothing.
+      const kinds = (Array.isArray(ctx.values?.['exams.types']) ? (ctx.values!['exams.types'] as ListItem[]) : []).filter((i) => i.active !== false);
+      const w = (value ?? {}) as Record<string, number>;
+      return box(
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {kinds.map((k) => <div key={k.key} style={{ width: 170 }}><NumberField label={listLabel(kinds, k.key, currentLanguage())} min={0} max={100} value={w[k.key] === undefined ? '' : String(w[k.key])} disabled={disabled}
+            onChange={(v) => { const next = { ...w }; if (v === '') delete next[k.key]; else next[k.key] = Math.min(100, Math.max(0, Number(v) || 0)); onChange(next); }} /></div>)}
+          {!kinds.length && <div className="help" style={{ margin: 0 }}>{tr('ui.settings.add_kinds_of_exam_first')}</div>}
+        </div>,
+      );
     }
     case 'timetableCycle': {
       const c = TimetableCycle.safeParse(value).data ?? { kind: 'week' as const, length: 6 };

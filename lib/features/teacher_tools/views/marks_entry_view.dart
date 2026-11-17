@@ -40,7 +40,7 @@ class _MarksEntryViewState extends State<MarksEntryView> {
   void _edit(Student s) {
     controller.active.value = s.id;
     final v = controller.values[s.id];
-    _input.text = v == null ? '' : (v == MarksEntryController.absentMark ? 'Ab' : '$v');
+    _input.text = v == null ? '' : (v == MarksEntryController.absentMark ? 'Ab' : controller.graded ? controller.grades[v] : '$v');
     _input.selection = TextSelection(baseOffset: 0, extentOffset: _input.text.length);
     _focus.requestFocus();
   }
@@ -53,6 +53,14 @@ class _MarksEntryViewState extends State<MarksEntryView> {
       controller.put(id, null);
     } else if (t == 'ab' || t == 'a') {
       controller.put(id, MarksEntryController.absentMark);
+    } else if (controller.graded) {
+      // A subject graded without marks takes one of its grades, typed as written.
+      final i = controller.grades.indexWhere((g) => g.toLowerCase() == t);
+      if (i < 0) {
+        ToastHelper.show('teacher.grade_one_of'.trp({'grades': controller.grades.join(', ')}), kind: ToastKind.error);
+        return;
+      }
+      controller.put(id, i);
     } else {
       final n = int.tryParse(t);
       if (n == null || n < 0 || n > controller.maxMarks) {
@@ -90,7 +98,7 @@ class _MarksEntryViewState extends State<MarksEntryView> {
       return PageFrame(
         leading: const BackGlass(),
         actions: [
-          Chip2('teacher.marks_chip'.trp({'max': '${controller.maxMarks}'})),
+          Chip2(controller.graded ? 'teacher.graded_chip'.tr : 'teacher.marks_chip'.trp({'max': '${controller.maxMarks}'})),
         ],
         edgeBar: true,
         bottomBar: controller.students.isEmpty
@@ -150,6 +158,7 @@ class _MarksEntryViewState extends State<MarksEntryView> {
                         _MarkRow(
                           student: s,
                           value: controller.values[s.id],
+                          grades: controller.grades,
                           active: active == s.id,
                           input: _input,
                           focus: _focus,
@@ -251,10 +260,15 @@ class _MarkRow extends StatelessWidget {
     required this.onTap,
     required this.onSubmit,
     required this.onChanged,
+    this.grades = const [],
   });
 
   final Student student;
   final int? value;
+
+  /// A subject graded without marks: [value] is the grade's place in this list.
+  final List<String> grades;
+  String get shown => grades.isNotEmpty && value != null && value! >= 0 && value! < grades.length ? grades[value!] : '$value';
   final bool active;
   final TextEditingController input;
   final FocusNode focus;
@@ -273,7 +287,7 @@ class _MarkRow extends StatelessWidget {
               ? 'teacher.no_marks'.tr
               : absent
               ? 'teacher.absent'.tr
-              : '$value'}',
+              : shown}',
       child: Pressable(
         onTap: active ? null : onTap,
         child: AnimatedContainer(
@@ -305,10 +319,10 @@ class _MarkRow extends StatelessWidget {
                         focusNode: focus,
                         autofocus: true,
                         textAlign: TextAlign.center,
-                        keyboardType: const TextInputType.numberWithOptions(),
+                        keyboardType: grades.isEmpty ? const TextInputType.numberWithOptions() : TextInputType.text,
                         textInputAction: TextInputAction.next,
                         inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp('[0-9aAbB]')),
+                          if (grades.isEmpty) FilteringTextInputFormatter.allow(RegExp('[0-9aAbB]')),
                           LengthLimitingTextInputFormatter(3),
                         ],
                         onSubmitted: onSubmit,
@@ -328,7 +342,7 @@ class _MarkRow extends StatelessWidget {
                             ? '—'
                             : absent
                             ? 'Ab'
-                            : '$value',
+                            : shown,
                         style: value == null
                             ? AppText.s(color: c.ink3, height: 1)
                             : AppText.t(color: absent ? c.badText : c.ink, height: 1),

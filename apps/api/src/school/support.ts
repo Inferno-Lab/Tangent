@@ -135,6 +135,7 @@ export class SettingsService {
    */
   async grading(t: TenantCtx, at: { grade?: number | null; subject?: string | null } = {}): Promise<{
     pass: number; scheme: GradingScheme; grade: (pct: number) => string; of: (pct: number, subject?: string | null) => ReturnType<typeof gradeIn>;
+    schemeOf: (subject: string) => GradingScheme;
   }> {
     const v = await this.settingsOf(t);
     const scale = v['grading.scale'] as GradingScale;
@@ -144,6 +145,7 @@ export class SettingsService {
     return {
       pass: scheme.passPct, scheme, grade: (pct) => gradeIn(scheme, pct).grade,
       of: (pct, subject) => gradeIn(subject ? schemeFor(schemes, fallback, { ...at, subject }) : scheme, pct),
+      schemeOf: (subject) => schemeFor(schemes, fallback, { ...at, subject }),
     };
   }
 

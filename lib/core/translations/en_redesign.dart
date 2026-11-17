@@ -552,6 +552,8 @@ const enRedesign = <String, String>{
   'profile.born': 'Born',
   'profile.also_written': 'Also written',
   'timetable.cycle_day': 'Day @n',
+  'teacher.grade_one_of': 'Type one of the grades: @grades',
+  'teacher.graded_chip': 'Graded',
   'profile.blood': 'Blood',
   'profile.subject': 'Subject',
   'profile.classes': 'Classes',

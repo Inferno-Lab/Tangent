@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { addDays, schoolToday, type ExamRow } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, Field, Segmented, Select, SelectField, TimeField, useShake, EmptyState, t } from '@tangent/web-ui';
+import { addDays, listLabel, listOptions, schoolToday, type ExamRow, type ListItem } from '@tangent/contracts';
+import { Checkbox, DateField, Dialog, Field, Segmented, Select, SelectField, TimeField, currentLanguage, useShake, EmptyState, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { AddBtn, Avatar, dateLabel, problem, useOpenParam, useSetting } from '../../app/kit';
@@ -66,7 +66,7 @@ function ExamCard({ e, onOpen }: { e: ExamRow; onOpen: () => void }) { const p =
   );
 }
 
-type Paper = { on: string; from: string; to: string; room: string; max: string };
+type Paper = { on: string; from: string; to: string; room: string; max: string; invigilator: string };
 
 /** One form to add an exam or change it while its results are not out: each paper with its day, time, room and marks. */
 function ExamDialog({ exam, defaultClass, onClose, onDone }: { exam?: ExamRow; defaultClass: string; onClose: () => void; onDone: (e: ExamRow) => void }) { const app = useApp();
@@ -74,13 +74,15 @@ function ExamDialog({ exam, defaultClass, onClose, onDone }: { exam?: ExamRow; d
   const subjects = useQuery({ queryKey: ['subjects'], queryFn: app.api.subjects, staleTime: 10 * 60_000 });
   const lead = useSetting<number>('exams.leadDays', 7);
   const outOf = useSetting<number>('exams.defaultMaxMarks', 100);
-  const [f, setF] = useState({ name: exam?.name ?? '', classId: exam?.classId ?? defaultClass, startsOn: exam?.startsOn ?? addDays(schoolToday(), lead), endsOn: exam?.endsOn ?? addDays(schoolToday(), lead + 4) });
+  const types = useSetting<ListItem[]>('exams.types', []);
+  const staff = useQuery({ queryKey: ['staff'], queryFn: () => app.api.staff.list() });
+  const [f, setF] = useState({ name: exam?.name ?? '', kind: exam?.kind ?? '', classId: exam?.classId ?? defaultClass, startsOn: exam?.startsOn ?? addDays(schoolToday(), lead), endsOn: exam?.endsOn ?? addDays(schoolToday(), lead + 4) });
   const [also, setAlso] = useState<string[]>([]);
-  const [picked, setPicked] = useState<Record<string, Paper>>(() => Object.fromEntries((exam?.subjects ?? []).map((s) => [s.subjectId, { on: s.onDate ?? '', from: s.startsAt ?? '', to: s.endsAt ?? '', room: s.room, max: String(s.maxMarks) }])));
+  const [picked, setPicked] = useState<Record<string, Paper>>(() => Object.fromEntries((exam?.subjects ?? []).map((s) => [s.subjectId, { on: s.onDate ?? '', from: s.startsAt ?? '', to: s.endsAt ?? '', room: s.room, max: String(s.maxMarks), invigilator: s.invigilatorId ?? '' }])));
   const [err, setErr] = useState<Record<string, string>>({});
   const shake = useShake();
-  const save = useMutation({ mutationFn: () => { const body = { name: f.name.trim(), classId: f.classId, alsoClassIds: exam ? [] : also.filter((c) => c !== f.classId), startsOn: f.startsOn, endsOn: f.endsOn,
-        subjects: Object.entries(picked).map(([subjectId, v]) => ({ subjectId, onDate: v.on || null, startsAt: v.from || null, endsAt: v.to || null, room: v.room.trim(), maxMarks: Number(v.max) || outOf })) };
+  const save = useMutation({ mutationFn: () => { const body = { name: f.name.trim(), kind: f.kind, classId: f.classId, alsoClassIds: exam ? [] : also.filter((c) => c !== f.classId), startsOn: f.startsOn, endsOn: f.endsOn,
+        subjects: Object.entries(picked).map(([subjectId, v]) => ({ subjectId, onDate: v.on || null, startsAt: v.from || null, endsAt: v.to || null, room: v.room.trim(), maxMarks: Number(v.max) || outOf, invigilatorId: v.invigilator || null })) };
       return exam ? app.api.exams.update(exam.id, body) : app.api.exams.create(body);
     },
     onSuccess: onDone, onError: (e) => { setErr(problem(e)); shake.hit(); } });
@@ -93,12 +95,16 @@ function ExamDialog({ exam, defaultClass, onClose, onDone }: { exam?: ExamRow; d
     setErr(p);
     if (Object.keys(p).length) shake.hit(); else save.mutate();
   };
-  const toggle = (id: string) => { setErr({ ...err, subjects: '' }); setPicked((x) => { const n = { ...x }; if (n[id]) delete n[id]; else n[id] = { on: f.startsOn, from: '', to: '', room: '', max: String(outOf) }; return n; }); };
+  const toggle = (id: string) => { setErr({ ...err, subjects: '' }); setPicked((x) => { const n = { ...x }; if (n[id]) delete n[id]; else n[id] = { on: f.startsOn, from: '', to: '', room: '', max: String(outOf), invigilator: '' }; return n; }); };
   const put = (id: string, patch: Partial<Paper>) => setPicked((x) => ({ ...x, [id]: { ...x[id]!, ...patch } }));
   return (
     <Dialog title={exam ? t('admin.exams_page.change', { name: exam.name }) : t('admin.exams_page.new_exam')} onClose={onClose} width={760} shake={shake.cls}>
       <div className="stack">
-        <Field label={t('admin.exams_page.name')} value={f.name} onChange={(name) => { setF({ ...f, name }); setErr({ ...err, name: '' }); }} error={err.name} placeholder={t('admin.exams_page.mid_term_exams')} maxLength={80} />
+        <div className="two">
+          <Field label={t('admin.exams_page.name')} value={f.name} onChange={(name) => { setF({ ...f, name }); setErr({ ...err, name: '' }); }} error={err.name} placeholder={t('admin.exams_page.mid_term_exams')} maxLength={80} />
+          <SelectField label={t('admin.exams_page.kind_of_exam')} value={f.kind} onChange={(kind) => { setF({ ...f, kind }); setErr({ ...err, kind: '' }); }} error={err.kind}
+            options={[{ value: '', label: t('admin.exams_page.no_kind') }, ...listOptions(types, f.kind).map((i) => ({ value: i.key, label: listLabel(types, i.key, currentLanguage()) }))]} />
+        </div>
         {!exam && <SelectField label={t('admin.exams_page.class')} value={f.classId} onChange={(classId) => { setF({ ...f, classId }); setErr({ ...err, classId: '' }); }} error={err.classId} options={[{ value: '', label: t('admin.exams_page.pick_a_class') }, ...(classes.data ?? []).map((c) => ({ value: c.id, label: t('admin.exams_page.class_2', { name: c.name }) }))]} />}
         {!exam && f.classId && (classes.data?.length ?? 0) > 1 && (
           <div className="fld">
@@ -125,6 +131,8 @@ function ExamDialog({ exam, defaultClass, onClose, onDone }: { exam?: ExamRow; d
                     <TimeField label={t('admin.exams_page.starts', { name: s.name })} value={on.from} onChange={(v) => put(s.id, { from: v })} />
                     <TimeField label={t('admin.exams_page.ends', { name: s.name })} value={on.to} onChange={(v) => put(s.id, { to: v })} />
                     <Field label={t('admin.exams_page.room', { name: s.name })} value={on.room} onChange={(v) => put(s.id, { room: v })} placeholder={t('admin.exams_page.hall_a')} maxLength={40} />
+                    <Select compact aria-label={t('admin.exams_page.invigilator', { name: s.name })} value={on.invigilator} onChange={(v) => put(s.id, { invigilator: v })}
+                      options={[{ value: '', label: t('admin.exams_page.no_invigilator') }, ...(staff.data ?? []).filter((x) => x.status === 'active' || x.id === on.invigilator).map((x) => ({ value: x.id, label: x.name }))]} />
                     <input className="hws" inputMode="numeric" aria-label={t('admin.exams_page.marks_out_of', { name: s.name })} value={on.max} onChange={(e) => put(s.id, { max: e.target.value.replace(/\D/g, '').slice(0, 3) })} />
                     <small>{t('admin.exams_page.marks')}</small>
                   </>}
@@ -144,10 +152,12 @@ function ExamDialog({ exam, defaultClass, onClose, onDone }: { exam?: ExamRow; d
   );
 }
 
-type Cell = { score: string; absent: boolean };
+type Cell = { score: string; absent: boolean; grade: string };
 
 function ExamSheet({ id, onClose, onChange, onChanged, onRemoved }: { id: string; onClose: () => void; onChange: (e: ExamRow) => void; onChanged: (msg?: string) => void; onRemoved: () => void }) { const app = useApp();
-  const [tab, setTab] = useState<'marks' | 'results'>('marks');
+  const [tab, setTab] = useState<'marks' | 'results' | 'remarks'>('marks');
+  const bank = useSetting<ListItem[]>('exams.remarks', []);
+  const [said, setSaid] = useState<Record<string, string>>({});
   const marks = useQuery({ queryKey: ['exams', 'marks', id], queryFn: () => app.api.exams.marks(id) });
   const results = useQuery({ queryKey: ['exams', 'results', id], queryFn: () => app.api.exams.results(id), enabled: tab === 'results' });
   const [draft, setDraft] = useState<Record<string, Cell>>({});
@@ -161,11 +171,16 @@ function ExamSheet({ id, onClose, onChange, onChanged, onRemoved }: { id: string
   const canWrite = app.user.permissions.includes('exams.write');
   const canPublish = app.user.permissions.includes('exams.publish');
   const key = (stu: string, sub: string) => `${stu}|${sub}`;
-  const saved = (stu: string, sub: string): Cell => { const x = m?.students.find((s) => s.studentId === stu)?.marks[sub]; return { score: x?.score == null ? '' : String(x.score), absent: !!x?.absent }; };
+  const saved = (stu: string, sub: string): Cell => { const x = m?.students.find((s) => s.studentId === stu)?.marks[sub]; return { score: x?.score == null ? '' : String(x.score), absent: !!x?.absent, grade: x?.grade ?? '' }; };
   const cell = (stu: string, sub: string): Cell => draft[key(stu, sub)] ?? saved(stu, sub);
-  useEffect(() => { setDraft({}); }, [m]);
-  const dirty = Object.keys(draft).filter((k) => { const [a, b] = k.split('|') as [string, string]; const s = saved(a, b); const d = draft[k]!; return s.score !== d.score || s.absent !== d.absent; });
-  const save = useMutation({ mutationFn: () => app.api.exams.putMarks(id, { marks: dirty.map((k) => { const [studentId, subjectId] = k.split('|') as [string, string]; const d = draft[k]!; return { studentId, subjectId, score: d.absent || d.score === '' ? null : Number(d.score), absent: d.absent }; }) }),
+  useEffect(() => { setDraft({}); setSaid({}); }, [m]);
+  const remarkOf = (stu: string) => said[stu] ?? m?.students.find((s) => s.studentId === stu)?.remark ?? '';
+  const remarksDirty = Object.keys(said).filter((k) => said[k]!.trim() !== (m?.students.find((s) => s.studentId === k)?.remark ?? ''));
+  const saveRemarks = useMutation({ mutationFn: () => app.api.exams.putRemarks(id, { remarks: remarksDirty.map((studentId) => ({ studentId, remark: said[studentId]!.trim() })) }),
+    onSuccess: () => { setErr(''); void marks.refetch(); onChanged(t('admin.exams_page.remarks_saved')); },
+    onError: (e) => { setErr(problem(e)._ ?? t('admin.exams_page.could_not_save')); shake.hit(); } });
+  const dirty = Object.keys(draft).filter((k) => { const [a, b] = k.split('|') as [string, string]; const s = saved(a, b); const d = draft[k]!; return s.score !== d.score || s.absent !== d.absent || s.grade !== d.grade; });
+  const save = useMutation({ mutationFn: () => app.api.exams.putMarks(id, { marks: dirty.map((k) => { const [studentId, subjectId] = k.split('|') as [string, string]; const d = draft[k]!; return { studentId, subjectId, score: d.absent || d.score === '' ? null : Number(d.score), absent: d.absent, grade: d.absent || !d.grade ? undefined : d.grade }; }) }),
     onSuccess: () => { setErr(''); void marks.refetch(); void results.refetch(); onChanged(t('admin.exams_page.marks_saved')); },
     onError: (e) => { setErr(problem(e)._ ?? t('admin.exams_page.could_not_save')); shake.hit(); } });
   const publish = useMutation({ mutationFn: () => app.api.exams.publish(id),
@@ -190,7 +205,7 @@ function ExamSheet({ id, onClose, onChange, onChanged, onRemoved }: { id: string
       {!m || !ex ? <div className="skc" style={{ height: 280, borderRadius: 16 }} /> : (
         <>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', margin: '4px 0 12px' }}>
-            <Segmented value={tab} onChange={setTab} label={t('admin.exams_page.exam_view')} options={[{ value: 'marks', label: t('admin.exams_page.marks_2') }, { value: 'results', label: t('admin.exams_page.results') }]} />
+            <Segmented value={tab} onChange={setTab} label={t('admin.exams_page.exam_view')} options={[{ value: 'marks', label: t('admin.exams_page.marks_2') }, { value: 'results', label: t('admin.exams_page.results') }, { value: 'remarks', label: t('admin.exams_page.remarks') }]} />
             <span className="chip">{ex.entered} {t('admin.exams_page.of')}{' '}{ex.expected} {t('admin.exams_page.marks_entered_2')}</span>
           </div>
           {tab === 'marks' ? (
@@ -198,7 +213,7 @@ function ExamSheet({ id, onClose, onChange, onChanged, onRemoved }: { id: string
               <div style={{ minWidth: 120 + ex.subjects.length * 96 + 220 }}>
                 <div className="mkh" style={{ '--n': ex.subjects.length } as React.CSSProperties}>
                   <span>{t('admin.exams_page.roll')}</span><span>{t('admin.exams_page.student')}</span>
-                  {ex.subjects.map((s) => <span key={s.subjectId} data-tip={t('admin.exams_page.out_of', { name: s.name, maxMarks: s.maxMarks })} style={{ textAlign: 'center' }}>{s.name}<small>/ {s.maxMarks}</small></span>)}
+                  {ex.subjects.map((s) => <span key={s.subjectId} data-tip={s.grades.length ? t('admin.exams_page.graded', { name: s.name }) : t('admin.exams_page.out_of', { name: s.name, maxMarks: s.maxMarks })} style={{ textAlign: 'center' }}>{s.name}<small>{s.grades.length ? t('admin.exams_page.grade_word') : `/ ${s.maxMarks}`}</small></span>)}
                 </div>
                 {m.students.map((s) => (
                   <div className="mkr" key={s.studentId} style={{ '--n': ex.subjects.length } as React.CSSProperties}>
@@ -208,16 +223,34 @@ function ExamSheet({ id, onClose, onChange, onChanged, onRemoved }: { id: string
                       const over = c.score !== '' && Number(c.score) > sub.maxMarks;
                       return (
                         <span key={sub.subjectId} className="mkc">
+                          {sub.grades.length ? (
+                            <Select compact aria-label={`${s.name}, ${sub.name}`} value={c.absent ? '' : c.grade} disabled={!editable || c.absent}
+                              onChange={(grade) => setDraft({ ...draft, [key(s.studentId, sub.subjectId)]: { score: '', absent: false, grade } })}
+                              options={[{ value: '', label: c.absent ? t('admin.exams_page.abs') : '–' }, ...sub.grades.map((g) => ({ value: g, label: g }))]} />
+                          ) : (
                           <input data-col={sub.subjectId} inputMode="decimal" aria-label={`${s.name}, ${sub.name}`} className={`hws ${over ? 'bad' : ''}`} disabled={!editable || c.absent} placeholder={c.absent ? t('admin.exams_page.abs') : '–'} value={c.score}
-                            onKeyDown={onKey} onChange={(e) => setDraft({ ...draft, [key(s.studentId, sub.subjectId)]: { score: e.target.value.replace(/[^\d.]/g, '').slice(0, 5), absent: false } })} />
+                            onKeyDown={onKey} onChange={(e) => setDraft({ ...draft, [key(s.studentId, sub.subjectId)]: { score: e.target.value.replace(',', '.').replace(/[^\d.]/g, '').slice(0, 5), absent: false, grade: '' } })} />
+                          )}
                           {editable && <button type="button" className={`abs ${c.absent ? 'on' : ''}`} data-tip={c.absent ? t('admin.exams_page.marked_absent_click_to_undo') : t('admin.exams_page.mark_absent')} aria-label={t('admin.exams_page.absent', { name: s.name, name1: sub.name })} aria-pressed={c.absent}
-                            onClick={() => setDraft({ ...draft, [key(s.studentId, sub.subjectId)]: { score: '', absent: !c.absent } })}>A</button>}
+                            onClick={() => setDraft({ ...draft, [key(s.studentId, sub.subjectId)]: { score: '', absent: !c.absent, grade: '' } })}>A</button>}
                         </span>
                       );
                     })}
                   </div>
                 ))}
               </div>
+            </div>
+          ) : tab === 'remarks' ? (
+            <div className="lscroll" style={{ maxHeight: 'min(50dvh,440px)', border: '1px solid var(--line)', borderRadius: 16, padding: 12 }}>
+              <p className="help" style={{ marginTop: 0 }}>{t('admin.exams_page.remarks_help')}</p>
+              {m.students.map((s) => (
+                <div key={s.studentId} className="kv" style={{ alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+                  <span style={{ minWidth: 160 }}>{s.name}</span>
+                  <span style={{ flex: 1, minWidth: 220 }}><Field label={t('admin.exams_page.remark_for', { name: s.name })} value={remarkOf(s.studentId)} disabled={!editable} maxLength={400} onChange={(v) => setSaid({ ...said, [s.studentId]: v })} /></span>
+                  {editable && listOptions(bank).length > 0 && <Select compact aria-label={t('admin.exams_page.pick_a_remark', { name: s.name })} value="" onChange={(k) => k && setSaid({ ...said, [s.studentId]: listLabel(bank, k, currentLanguage()) })}
+                    options={[{ value: '', label: t('admin.exams_page.pick_a_remark_short') }, ...listOptions(bank).map((i) => ({ value: i.key, label: listLabel(bank, i.key, currentLanguage()) }))]} />}
+                </div>
+              ))}
             </div>
           ) : (
             !results.data ? <div className="skc" style={{ height: 240, borderRadius: 16 }} /> : results.data.rows.length === 0 ? <div className="help" style={{ padding: 16 }}>{t('admin.exams_page.results_appear_here_as_marks')}</div> : (
@@ -251,7 +284,8 @@ function ExamSheet({ id, onClose, onChange, onChanged, onRemoved }: { id: string
             <span style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
               {confirm === 'publish' && <span className="help">{t('admin.exams_page.families_will_see_these_results')}</span>}
               <button className="btn" onClick={onClose}>{t('admin.exams_page.close')}</button>
-              {editable && <button className="btn" disabled={!dirty.length || save.isPending} onClick={() => save.mutate()}>{save.isPending ? t('admin.exams_page.saving') : dirty.length ? t('admin.exams_page.save', { length: dirty.length }) : t('admin.exams_page.save_marks')}</button>}
+              {editable && tab === 'remarks' && <button className="btn" disabled={!remarksDirty.length || saveRemarks.isPending} onClick={() => saveRemarks.mutate()}>{saveRemarks.isPending ? t('admin.exams_page.saving') : t('admin.exams_page.save_remarks')}</button>}
+              {editable && tab !== 'remarks' && <button className="btn" disabled={!dirty.length || save.isPending} onClick={() => save.mutate()}>{save.isPending ? t('admin.exams_page.saving') : dirty.length ? t('admin.exams_page.save', { length: dirty.length }) : t('admin.exams_page.save_marks')}</button>}
               {canPublish && ex.status !== 'published' && (confirm === 'publish'
                 ? <button className="btn pri" disabled={publish.isPending || dirty.length > 0} onClick={() => publish.mutate()}>{publish.isPending ? t('admin.exams_page.publishing') : t('admin.exams_page.yes_publish')}</button>
                 : <button className="btn pri" disabled={dirty.length > 0} data-tip={dirty.length ? t('admin.exams_page.save_the_marks_first') : undefined} onClick={() => setConfirm('publish')}>{ex.reopenedNote ? t('admin.exams_page.publish_the_correction') : t('admin.exams_page.publish_results')}</button>)}

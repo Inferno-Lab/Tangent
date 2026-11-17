@@ -65,6 +65,8 @@ export interface HomeworkDetail extends HomeworkRow {
 
 export const ExamCreate = z.object({
   name: z.string().trim().min(3, 'Name the exam').max(80),
+  /** The kind of exam, a key of the school's list (exams.types): a unit test, a term exam… Weighting and reports go by it. */
+  kind: z.string().trim().max(32).default(''),
   classId: z.string().min(1, 'Choose a class'),
   /** More classes sitting the same papers (a school-wide mid-term): one exam is made for each, together. */
   alsoClassIds: z.array(z.string().min(1)).max(60).default([]),
@@ -73,12 +75,15 @@ export const ExamCreate = z.object({
   subjects: z.array(z.object({
     subjectId: z.string().min(1), onDate: IsoDate.nullable().optional(), maxMarks: z.number().int().min(1).max(200).default(100),
     startsAt: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(), endsAt: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(), room: z.string().trim().max(40).default(''),
+    /** Who watches the room while the paper is sat. */
+    invigilatorId: z.string().min(1).nullable().optional(),
   })).min(1, 'Pick at least one subject').max(12),
 });
 export type ExamCreate = z.infer<typeof ExamCreate>;
 
 export const ExamMarksPut = z.object({
-  marks: z.array(z.object({ studentId: z.string().min(1), subjectId: z.string().min(1), score: z.number().min(0).max(200).nullable(), absent: z.boolean().default(false) })).min(1).max(2000),
+  // A subject graded without marks (its scheme's entry is "grade") takes `grade`, one of the scheme's grades, and no score.
+  marks: z.array(z.object({ studentId: z.string().min(1), subjectId: z.string().min(1), score: z.number().min(0).max(200).nullable(), absent: z.boolean().default(false), grade: z.string().trim().max(12).optional() })).min(1).max(2000),
 });
 export type ExamMarksPut = z.infer<typeof ExamMarksPut>;
 
@@ -90,7 +95,13 @@ export interface ExamRow {
   startsOn: string;
   endsOn: string;
   status: 'upcoming' | 'marking' | 'published';
-  subjects: { subjectId: string; name: string; onDate: string | null; maxMarks: number; startsAt: string | null; endsAt: string | null; room: string }[];
+  /** The kind of exam (a key of exams.types), '' when none was given. */
+  kind: string;
+  subjects: {
+    subjectId: string; name: string; onDate: string | null; maxMarks: number; startsAt: string | null; endsAt: string | null; room: string; invigilatorId: string | null; invigilatorName: string | null;
+    /** The grades a teacher picks from when this subject is graded without marks; none when it takes marks. */
+    grades: string[];
+  }[];
   /** Why published results were reopened (empty unless they were). */
   reopenedNote: string;
   /** Marks entered out of marks expected (students × subjects). */
@@ -100,8 +111,12 @@ export interface ExamRow {
 
 export interface ExamMarksView {
   exam: ExamRow;
-  students: { studentId: string; name: string; rollNo: string; marks: Record<string, { score: number | null; absent: boolean }> }[];
+  students: { studentId: string; name: string; rollNo: string; marks: Record<string, { score: number | null; absent: boolean; grade: string | null }>; remark: string }[];
 }
+
+/** Each student's remark on an exam, written or picked from the school's remarks (exams.remarks); empty removes it. */
+export const ExamRemarksPut = z.object({ remarks: z.array(z.object({ studentId: z.string().min(1), remark: z.string().trim().max(400) })).min(1).max(200) });
+export type ExamRemarksPut = z.infer<typeof ExamRemarksPut>;
 
 export interface ExamResults {
   exam: ExamRow;

@@ -607,16 +607,28 @@ export class FamilyService {
     if (!user.permissions.includes('exams.read')) throw forbidden('You are not allowed to see marks.');
     // The marks so far, and what the open exam marks this subject out of (the school's default before there is one).
     const e = await this.openExam(t, classId, subject);
-    if (!e) return { marks: {}, maxMarks: await this.settings.value<number>(t, 'exams.defaultMaxMarks', 100) };
-    const { rows } = await t.pool.query<{ student_id: string; score: string }>('select student_id, score from exam_marks where exam_id = $1 and subject_id = $2 and score is not null', [e.id, `sub_${subject}`]);
-    return { marks: Object.fromEntries(rows.map((r) => [r.student_id, Math.round(Number(r.score))])), maxMarks: e.max_marks };
+    if (!e) return { marks: {}, maxMarks: await this.settings.value<number>(t, 'exams.defaultMaxMarks', 100), grades: [], gradeMarks: {} };
+    const { rows } = await t.pool.query<{ student_id: string; score: string | null; absent: boolean; grade: string | null }>(
+      'select student_id, score, absent, grade from exam_marks where exam_id = $1 and subject_id = $2', [e.id, `sub_${subject}`]);
+    // A subject the school grades without marks sends its grades to pick from; an absent student is -1, as the app keeps it.
+    const grades = (await this.learning.examSubjects(t, e.id)).find((s) => s.subjectId === `sub_${subject}`)?.grades ?? [];
+    return {
+      marks: Object.fromEntries(rows.filter((r) => r.absent || r.score !== null).map((r) => [r.student_id, r.absent ? -1 : Math.round(Number(r.score))])),
+      maxMarks: e.max_marks, grades,
+      gradeMarks: Object.fromEntries(rows.filter((r) => r.grade).map((r) => [r.student_id, r.grade!])),
+    };
   }
 
-  async saveMarks(t: TenantCtx, user: AuthedUser, classId: string, b: { subject: string; values: Record<string, number> }) {
+  async saveMarks(t: TenantCtx, user: AuthedUser, classId: string, b: { subject: string; values: Record<string, number>; grades?: Record<string, string> }) {
     if (!user.permissions.includes('exams.write')) throw forbidden('You are not allowed to enter marks.');
     const e = await this.openExam(t, classId, b.subject);
     if (!e) throw new ApiError('conflict', 'No exam is open for marks in this subject. Add one under Exams in the admin.');
-    const marks = Object.entries(b.values).map(([studentId, score]) => ({ studentId, subjectId: `sub_${b.subject}`, score, absent: false }));
+    const subjectId = `sub_${b.subject}`;
+    // The app keeps whole marks: one that comes back as the rounded mark already kept (45.5 shown as 46) is not a change.
+    const kept = new Map((await t.pool.query<{ student_id: string; score: string | null }>('select student_id, score from exam_marks where exam_id = $1 and subject_id = $2', [e.id, subjectId])).rows.map((r) => [r.student_id, r.score]));
+    const marks = Object.entries(b.values).filter(([studentId, score]) => { const k = kept.get(studentId); return !(k != null && score >= 0 && Math.round(Number(k)) === score && Number(k) !== score); })
+      .map(([studentId, score]) => (score < 0 ? { studentId, subjectId, score: null, absent: true } : { studentId, subjectId, score, absent: false }));
+    for (const [studentId, grade] of Object.entries(b.grades ?? {})) marks.push({ studentId, subjectId, score: null, absent: false, grade } as (typeof marks)[number]);
     if (marks.length) await this.learning.putMarks(t, user, e.id, { marks });
     return { ok: true };
   }

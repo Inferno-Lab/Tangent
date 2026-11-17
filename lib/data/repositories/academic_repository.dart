@@ -266,13 +266,15 @@ abstract class ExamRepository {
 
   Future<List<ExamResult>> resultsFor(String studentId);
 
-  /// The marks entered so far and what the subject is marked out of.
-  Future<({Map<String, int> marks, int maxMarks})> marksDraft(String classId, String subject);
+  /// The marks entered so far and what the subject is marked out of; a subject graded without marks also has its grades
+  /// to pick from and the grades given so far.
+  Future<({Map<String, int> marks, int maxMarks, List<String> grades, Map<String, String> gradeMarks})> marksDraft(String classId, String subject);
 
   Future<void> saveMarks({
     required String classId,
     required String subject,
     required Map<String, int> values,
+    Map<String, String> grades = const {},
   });
 }
 
@@ -303,14 +305,15 @@ class MockExamRepository implements ExamRepository {
   );
 
   @override
-  Future<({Map<String, int> marks, int maxMarks})> marksDraft(String classId, String subject) =>
-      _ds.guard(() => (marks: {...?_ds.marks['$classId|$subject']}, maxMarks: SchoolConfig.defaultMaxMarks));
+  Future<({Map<String, int> marks, int maxMarks, List<String> grades, Map<String, String> gradeMarks})> marksDraft(String classId, String subject) =>
+      _ds.guard(() => (marks: {...?_ds.marks['$classId|$subject']}, maxMarks: SchoolConfig.defaultMaxMarks, grades: const <String>[], gradeMarks: const <String, String>{}));
 
   @override
   Future<void> saveMarks({
     required String classId,
     required String subject,
     required Map<String, int> values,
+    Map<String, String> grades = const {},
   }) => _ds.guard(
     () => _ds.saveMarks(classId: classId, subject: subject, values: values),
   );
@@ -349,11 +352,13 @@ class RemoteExamRepository implements ExamRepository {
   }
 
   @override
-  Future<({Map<String, int> marks, int maxMarks})> marksDraft(String classId, String subject) async {
+  Future<({Map<String, int> marks, int maxMarks, List<String> grades, Map<String, String> gradeMarks})> marksDraft(String classId, String subject) async {
     final json = Map<String, dynamic>.from(await _remote.get('/classes/$classId/marks', query: {'subject': subject}) as Map);
     return (
       marks: {for (final e in (json['marks'] as Map? ?? const {}).entries) e.key as String: (e.value as num).toInt()},
       maxMarks: (json['maxMarks'] as num?)?.toInt() ?? SchoolConfig.defaultMaxMarks,
+      grades: [for (final g in (json['grades'] as List? ?? const []) ) '$g'],
+      gradeMarks: {for (final e in (json['gradeMarks'] as Map? ?? const {}).entries) e.key as String: '${e.value}'},
     );
   }
 
@@ -362,8 +367,10 @@ class RemoteExamRepository implements ExamRepository {
     required String classId,
     required String subject,
     required Map<String, int> values,
+    Map<String, String> grades = const {},
   }) => _remote.post('/classes/$classId/marks', {
     'subject': subject,
     'values': values,
+    if (grades.isNotEmpty) 'grades': grades,
   });
 }

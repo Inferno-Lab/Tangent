@@ -1,6 +1,6 @@
 import type {
   ChangeRequestCreate, ChangeRequestRow, PasswordChange, ReportQuery, EventReply, InvoiceDetail, WaiverRequest, ReceiptCancel, SlotCreate, WeekOf, StudentPatch, GuardiansPut, GuardianRow, DataRequestCreate, DataRequestDecision, DataRequestRow, EnquiryCreate, EnquiryEnrol, EnquiryPatch, EnquiryRow, EventRow, EventSave, ExamCreate, ExamMarksPut, ExamMarksView, ExamResults, ExamRow,
-  HomeworkCreate, HomeworkDetail, HomeworkMarks, HomeworkRow, InvoiceListQuery, InvoiceListRow, InvoiceListSummary, ReceiptRow, ReportData, ReportInfo, RoleDefSave, RoleRow, StudentLeaveInput, ApplyInfo, EnquiryApply, RegisterPart, RoomRow, RoomSave, RoomDay, RoomBookingCreate, PeriodTimesRow, PeriodTimesPut, StaffCreate, StaffPatch, StaffRow,
+  HomeworkCreate, HomeworkDetail, HomeworkMarks, HomeworkRow, InvoiceListQuery, InvoiceListRow, InvoiceListSummary, ReceiptRow, ReportData, ReportInfo, RoleDefSave, RoleRow, StudentLeaveInput, ApplyInfo, EnquiryApply, RegisterPart, RoomRow, RoomSave, RoomDay, RoomBookingCreate, PeriodTimesRow, PeriodTimesPut, ExamRemarksPut, StaffCreate, StaffPatch, StaffRow,
   ThreadCreate, ThreadDetail, ThreadPatch, ThreadReply, ThreadRow,
   AttendanceDayPut, PeriodMarksPut, PeriodRoll, GalleryReportRow, ApprovalDecision, ApprovalKind, ApprovalRow, AssignFee, AttendanceDay, AuditRow, ClassInfo, ContactReveal, CoverRequest, DashboardData, EffectiveConfig, FeeHead, FeeHeadsPut, FeeSummary, ImportResult, InvoiceRow,
   LoginChallenge, LoginRequest, LoginResponse, MessageRequest, NoticeCreate, NoticeRow, Paged, PaymentCreate, SearchHit, SchoolSettingsPatch, SchoolSettingsView, SessionUser, SettingsResponse, ShellData, SlotPatch, StudentCreate, StudentDetail,
@@ -124,6 +124,7 @@ export function schoolApi(h: Http) {
       reopen: (id: string, note: string) => h.post<ExamRow>(`/v1/exams/${id}/reopen`, { note }),
       marks: (id: string) => h.get<ExamMarksView>(`/v1/exams/${id}/marks`),
       putMarks: (id: string, b: ExamMarksPut) => h.put<ExamMarksView>(`/v1/exams/${id}/marks`, b),
+      putRemarks: (id: string, b: ExamRemarksPut) => h.put<ExamMarksView>(`/v1/exams/${id}/remarks`, b),
       results: (id: string) => h.get<ExamResults>(`/v1/exams/${id}/results`),
       publish: (id: string) => h.post<{ families: number; exam: ExamRow }>(`/v1/exams/${id}/publish`),
       remove: (id: string) => h.del<void>(`/v1/exams/${id}`),

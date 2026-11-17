@@ -119,6 +119,14 @@ export const SchoolSettingsSchema = z.object({
   'workflows.steps': WorkflowsSetting.default({}),
   'attendance.notifyParents': z.boolean().default(true),
   'attendance.lockAfterDays': z.number().int().min(0).max(30).default(2),
+  // The kinds of exam the school sets (a school list): what weighting and reports go by.
+  'exams.types': schoolList([{ key: 'unit', name: 'Unit test' }, { key: 'term', name: 'Term exam' }, { key: 'final', name: 'Final exam' }], 1, 12),
+  // How much each kind of exam counts towards the year's result (by its key, out of any total); none: every exam the same.
+  'exams.weights': z.record(z.string().max(32), z.number().min(0).max(100)).default({}),
+  // Remarks a teacher picks from for a student's report (a school list, each in the school's languages).
+  'exams.remarks': schoolList([], 0, 60),
+  // Where a student's rank is counted: in their class, or across every class of their year sitting the same exam.
+  'results.rankWithin': z.enum(['class', 'year']).default('class'),
   // How the timetable repeats: every week, A and B weeks, or a cycle of school days (cycles.ts).
   'timetable.cycle': TimetableCycle.default({ kind: 'week', length: 6 }),
   // One roll call a day, or a morning and an afternoon register (counted as sessions, as schools in England do).

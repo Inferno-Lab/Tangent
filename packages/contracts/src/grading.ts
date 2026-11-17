@@ -30,6 +30,8 @@ export const GradingScheme = z.object({
   grades: z.array(z.number().int().min(-3).max(20)).max(20).optional(),
   /** The subjects (ids) it is for; none: every subject. */
   subjects: z.array(z.string()).max(40).optional(),
+  /** How a teacher enters it: marks (graded by percentage), or the grade itself (early years, descriptors). */
+  entry: z.enum(['marks', 'grade']).optional(),
 }).refine((s) => s.kind === 'passfail' || s.bands.length > 0, { message: 'Add the grades', path: ['bands'] })
   .refine((s) => s.kind !== 'points' || s.bands.every((b) => b.points !== undefined), { message: 'Give every grade its points', path: ['bands'] });
 export type GradingScheme = z.infer<typeof GradingScheme>;
@@ -54,6 +56,18 @@ export function gradeIn(s: GradingScheme, pct: number): { grade: string; points:
   const band = [...s.bands].sort((a, b) => b.minPct - a.minPct).find((b) => pct >= b.minPct);
   return { grade: band?.grade ?? '', points: s.kind === 'points' ? band?.points ?? 0 : null, descriptor: band?.descriptor ?? '', pass };
 }
+
+/**
+ * A grade given straight away, as a percentage for totals and averages: the bottom of its band (a pass or fail as the pass
+ * mark or 0); null when it is not one of the scheme's grades.
+ */
+export function pctOfGrade(s: GradingScheme, grade: string): number | null {
+  if (s.kind === 'passfail') return grade === tx('Pass') || grade.toLowerCase() === 'pass' ? s.passPct : grade === tx('Fail') || grade.toLowerCase() === 'fail' ? 0 : null;
+  return s.bands.find((b) => b.grade.toLowerCase() === grade.toLowerCase())?.minPct ?? null;
+}
+
+/** The grades a teacher picks from in a scheme entered by grade. */
+export const gradesOf = (s: GradingScheme): string[] => (s.kind === 'passfail' ? [tx('Pass'), tx('Fail')] : [...s.bands].sort((a, b) => b.minPct - a.minPct).map((b) => b.grade));
 
 /** A grade point average of subjects' points, to two places (null when no subject earned points). */
 export function gpaOf(points: readonly (number | null)[]): number | null {

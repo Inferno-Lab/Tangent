@@ -479,6 +479,11 @@ class MarksEntryController extends GetxController with Loadable {
   /// What the open exam marks this subject out of (sent with the draft).
   var maxMarks = SchoolConfig.defaultMaxMarks;
 
+  /// The grades a subject graded without marks takes (empty when it takes marks). A grade is kept in [values] as its place
+  /// in this list, so the rest of the screen works the same.
+  final grades = <String>[].obs;
+  bool get graded => grades.isNotEmpty;
+
   @override
   bool get watchRevision => false;
 
@@ -523,9 +528,14 @@ class MarksEntryController extends GetxController with Loadable {
     if (id == null) return;
     final draft = await Get.find<ExamRepository>().marksDraft(id, subject.value);
     maxMarks = draft.maxMarks;
+    grades.assignAll(draft.grades);
     values
       ..clear()
       ..addAll(draft.marks);
+    for (final e in draft.gradeMarks.entries) {
+      final i = draft.grades.indexWhere((g) => g.toLowerCase() == e.value.toLowerCase());
+      if (i >= 0) values[e.key] = i;
+    }
     active.value = students.where((s) => !values.containsKey(s.id)).firstOrNull?.id;
   }
 
@@ -556,7 +566,18 @@ class MarksEntryController extends GetxController with Loadable {
     if (id == null) return;
     saving.value = true;
     try {
-      await Get.find<ExamRepository>().saveMarks(classId: id, subject: subject.value, values: Map.of(values));
+      final repo = Get.find<ExamRepository>();
+      if (graded) {
+        // Graded: absences as marks, everything else as the grade itself.
+        await repo.saveMarks(
+          classId: id,
+          subject: subject.value,
+          values: {for (final e in values.entries) if (e.value < 0) e.key: e.value},
+          grades: {for (final e in values.entries) if (e.value >= 0 && e.value < grades.length) e.key: grades[e.value]},
+        );
+      } else {
+        await repo.saveMarks(classId: id, subject: subject.value, values: Map.of(values));
+      }
     } on AppException catch (error) {
       ToastHelper.show(error.message, kind: ToastKind.error);
     } finally {
@@ -576,9 +597,9 @@ class MarksEntryController extends GetxController with Loadable {
 
   Iterable<int> get _scored => values.values.where((v) => v >= 0);
 
-  double? get average => _scored.isEmpty ? null : _scored.reduce((a, b) => a + b) / _scored.length;
+  double? get average => graded || _scored.isEmpty ? null : _scored.reduce((a, b) => a + b) / _scored.length;
 
-  int? get highest => _scored.isEmpty ? null : _scored.reduce((a, b) => a > b ? a : b);
+  int? get highest => graded || _scored.isEmpty ? null : _scored.reduce((a, b) => a > b ? a : b);
 
   int get missing => students.where((s) => !values.containsKey(s.id)).length;
 

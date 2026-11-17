@@ -19,6 +19,7 @@ const REPORTS: ReportInfo[] = [
   { id: 'fees-defaulters', title: 'Overdue families', blurb: 'Families with an unpaid fee past its due date, largest first.', area: 'Fees', filters: ['class'], needs: 'fees' },
   { id: 'strength', title: 'Class strength', blurb: 'Students in every class, with the class teacher.', area: 'People', filters: [], needs: null },
   { id: 'results', title: 'Exam results by class', blurb: 'Average and pass rate of every published exam.', area: 'Learning', filters: ['class'], needs: 'exams' },
+  { id: 'results-year', title: 'Year result', blurb: 'Each student’s result for the year so far: every published exam, each kind counting as much as Exams → Settings says.', area: 'Learning', filters: ['class'], needs: 'exams' },
   { id: 'homework', title: 'Homework hand-in', blurb: 'How much homework was set and how much came in on time, by class (homework set in the period, if one is chosen).', area: 'Learning', filters: ['dates', 'class'], needs: 'homework' },
 ];
 
@@ -168,6 +169,31 @@ export class OfficeService {
       return { ...base, scope: scope(), summary: [{ label: 'Classes', value: String(rows.length) }, { label: 'Students', value: fmtNumber(rows.reduce((a, r) => a + Number(r.n), 0)) }],
         columns: [{ key: 'class', label: 'Class' }, { key: 'teacher', label: 'Class teacher' }, { key: 'students', label: 'Students', align: 'right' }],
         rows: rows.map((r) => ({ class: r.name, teacher: r.teacher ?? 'Not assigned', students: Number(r.n) })) };
+    }
+    if (id === 'results-year') {
+      // Published exams of this school year; each kind of exam counts as its weight (exams.weights), or every exam alike when none are set.
+      const weights = await this.settings.value<Record<string, number>>(t, 'exams.weights', {});
+      const weighted = Object.keys(weights).length > 0;
+      const { rows } = await t.pool.query<{ id: string; name: string; class_name: string; grade: number; kind: string; pct: number }>(
+        `select s.id, s.name, c.name class_name, c.grade, e.kind, r.pct from exams e join classes c on c.id = e.class_id
+         join students s on s.class_id = c.id and s.status = 'active' join exam_results r on r.student_id = s.id and r.exam = e.name
+         where e.status = 'published' and e.starts_on >= coalesce((select starts_on from academic_years where current limit 1), '1900-01-01') and ($1::text is null or c.id = $1)`, [q.classId ?? null]);
+      const by = new Map<string, { name: string; cls: string; grade: number; sum: number; w: number; n: number }>();
+      for (const r of rows) {
+        const w = weighted ? weights[r.kind] ?? 0 : 1;
+        const cur = by.get(r.id) ?? { name: r.name, cls: r.class_name, grade: r.grade, sum: 0, w: 0, n: 0 };
+        cur.n++;
+        if (w > 0) { cur.sum += w * r.pct; cur.w += w; }
+        by.set(r.id, cur);
+      }
+      const out = [];
+      for (const [studentId, v] of [...by].sort((a, b) => a[1].cls.localeCompare(b[1].cls) || a[1].name.localeCompare(b[1].name))) {
+        const pct = v.w ? Math.round(v.sum / v.w) : null;
+        out.push({ _student: studentId, student: v.name, class: v.cls, exams: v.n, pct: pct === null ? '–' : `${pct}%`, grade: pct === null ? '–' : (await this.settings.grading(t, { grade: v.grade })).grade(pct) });
+      }
+      return { ...base, scope: scope(), summary: [{ label: tx('Students'), value: String(out.length) }, { label: tx('Counted'), value: weighted ? tx('By kind of exam') : tx('Every exam alike') }],
+        columns: [{ key: 'student', label: tx('Student') }, { key: 'class', label: tx('Class') }, { key: 'exams', label: tx('Exams'), align: 'right' }, { key: 'pct', label: tx('Result'), align: 'right' }, { key: 'grade', label: tx('Grade'), align: 'right' }],
+        rows: out };
     }
     if (id === 'results') {
       const grading = await this.settings.grading(t);

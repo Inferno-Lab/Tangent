@@ -21,7 +21,7 @@ export const BLOCK_KIND_LABELS: Record<BlockKind, string> = localizedLabels({
 /** What each kind of document can fill in, as {placeholder}: the editor offers them, the server fills them. */
 export const DOC_PLACEHOLDERS: Record<DocKind, string[]> = {
   receipt: ['school', 'student', 'class', 'admissionNo', 'receiptNo', 'date', 'title', 'amount', 'method', 'reference', 'taxName', 'taxNumber'],
-  reportCard: ['school', 'student', 'class', 'admissionNo', 'rollNo', 'exam', 'percent', 'grade', 'gpa', 'result', 'rank', 'classSize'],
+  reportCard: ['school', 'student', 'class', 'admissionNo', 'rollNo', 'exam', 'percent', 'grade', 'gpa', 'result', 'rank', 'classSize', 'remark'],
 };
 
 export const Block = z.object({
@@ -78,6 +78,7 @@ export const DEFAULT_TEMPLATES: Record<DocKind, DocTemplate> = {
       { kind: 'fact', text: 'Grade point average', value: '{gpa}', when: 'gpa' },
       { kind: 'fact', text: 'Result', value: '{result}' },
       { kind: 'fact', text: 'Rank in class', value: '{rank} of {classSize}', when: 'rank' },
+      { kind: 'text', text: '{remark}', when: 'remark' },
       { kind: 'signatures', value: 'Class teacher\n{@Principal}\n{@Guardian}' },
     ],
   },

@@ -12,7 +12,8 @@ const Today = z.object({ students: z.string().default('') });
 const Day = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'A date like 2026-06-01').optional() });
 const Roll = z.object({ classId: z.string().min(1), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'A date like 2026-06-01') });
 const Subject = z.object({ subject: z.string().min(1).max(40) });
-const Marks = z.object({ subject: z.string().min(1).max(40), values: z.record(z.string(), z.number().min(0).max(200)) });
+// -1 is the app's mark for an absent student; `grades` carries a grade for a subject the school grades without marks.
+const Marks = z.object({ subject: z.string().min(1).max(40), values: z.record(z.string(), z.number().min(-1).max(200)), grades: z.record(z.string(), z.string().trim().min(1).max(12)).optional() });
 const Submit = z.object({ studentId: z.string().min(1), fileName: z.string().max(200).optional(), fileIds: z.array(z.string()).max(5).default([]) });
 const Grade = z.object({ studentId: z.string().min(1), marks: z.number().int().min(0).max(100).nullable(), feedback: z.string().max(300).optional() });
 const Return = z.object({ studentId: z.string().min(1), note: z.string().trim().min(3, 'Say what to redo').max(300) });

@@ -4,7 +4,7 @@ import {
   DataRequestCreate, DataRequestDecision, EnquiryCreate, EnquiryEnrol, EnquiryPatch, EventSave, ExamCreate, ExamMarksPut, HomeworkCreate, HomeworkMarks, InvoiceListQuery, StaffCreate, StaffPatch,
   ThreadCreate, ThreadPatch, ThreadReply, ReportQuery, StudentImport, schoolToday,
   type DataRequestRow, type EnquiryRow, type EventReply, type EventRow, type ExamMarksView, type ImportResult, type ExamResults, type ExamRow, type HomeworkDetail, type HomeworkRow, type InvoiceListRow, type InvoiceListSummary, type Paged,
-  type ReceiptRow, type ReportData, type ReportInfo, RoleDefSave, type RoleRow, type StaffRow, EnquiryApply, type ApplyInfo, type StudentDetail, type ThreadDetail, type ThreadRow,
+  type ReceiptRow, type ReportData, type ReportInfo, RoleDefSave, type RoleRow, type StaffRow, EnquiryApply, type ApplyInfo, ExamRemarksPut, type StudentDetail, type ThreadDetail, type ThreadRow,
 } from '@tangent/contracts';
 import { z } from 'zod';
 import { ZodPipe } from '@tangent/nest-kit';
@@ -88,6 +88,11 @@ export class LearningController {
   @Put('exams/:id/marks') @RequireModule('exams') @Require('exams.write')
   putMarks(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(ExamMarksPut)) b: ExamMarksPut): Promise<ExamMarksView> {
     return this.learning.putMarks(t, u, id, b);
+  }
+
+  @Put('exams/:id/remarks') @RequireModule('exams') @Require('exams.write')
+  putRemarks(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(ExamRemarksPut)) b: ExamRemarksPut): Promise<ExamMarksView> {
+    return this.learning.putRemarks(t, u, id, b);
   }
 
   @Get('exams/:id/results') @RequireModule('exams') @Require('exams.read')

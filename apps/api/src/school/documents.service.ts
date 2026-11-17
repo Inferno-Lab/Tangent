@@ -5,7 +5,7 @@ import { FilesService } from './files.service.js';
 import { LearningService } from './learning.service.js';
 import { pdf, type PdfLine } from './pdf.js';
 import { SettingsService } from './support.js';
-import { DEFAULT_TEMPLATES, schoolToday, fmtDate, fmtMoney, fmtNumber, readReceiptTax, tx, type Block, type DocKind, type DocTemplate, type DocTemplates } from '@tangent/contracts';
+import { DEFAULT_TEMPLATES, gradeIn, pctOfGrade, schoolToday, fmtDate, fmtMoney, fmtNumber, readReceiptTax, tx, type Block, type DocKind, type DocTemplate, type DocTemplates } from '@tangent/contracts';
 import { schoolContext } from '@tangent/tenancy';
 
 // A receipt or report card is written in the school's own way: its currency, its dates.
@@ -101,7 +101,7 @@ export class DocumentsService {
     const school = String((await this.settings.doc(t)).values['school.name'] ?? t.info.name);
     const fill: Record<string, string> = {
       school, student: 'Alex Morgan', class: '5 A', admissionNo: '2026/0001', rollNo: '12', receiptNo: 'RCPT-2026-00001', date: date(schoolToday()), title: tx('Tuition, first term'),
-      amount: fmtMoney(1000), method: tx('Cash'), reference: '', taxName: 'none', taxNumber: '', exam: tx('Mid-term exams'), percent: '82', grade: 'A', gpa: '', result: tx('Passed'), rank: '', classSize: '30',
+      amount: fmtMoney(1000), method: tx('Cash'), reference: '', taxName: 'none', taxNumber: '', exam: tx('Mid-term exams'), percent: '82', grade: 'A', gpa: '', result: tx('Passed'), rank: '', classSize: '30', remark: tx('Works carefully and asks good questions.'),
     };
     const items: PdfLine[] = kind === 'receipt' ? [{ text: fill.title!, right: fill.amount, bold: true, gap: 22 }]
       : [{ text: tx('Subject'), right: tx('Marks · grade'), bold: true, gap: 22 }, { text: tx('Mathematics'), right: '82 / 100 · A' }, { text: tx('Science'), right: '78 / 100 · B' }];
@@ -120,20 +120,24 @@ export class DocumentsService {
     const grading = await this.settings.grading(t, { grade: s.grade });
     // A family sees the class rank only when the console says so (results.showRank); the office always does.
     const showRank = !students || (await this.settings.value<boolean>(t, 'results.showRank', false));
-    const marks = (await t.pool.query<{ subject: string; subject_id: string; score: string | null; absent: boolean; max_marks: number }>(
-      `select coalesce(sub.name, m.subject_id) subject, m.subject_id, m.score, m.absent, x.max_marks from exam_marks m join exam_subjects x on x.exam_id = m.exam_id and x.subject_id = m.subject_id
+    const marks = (await t.pool.query<{ subject: string; subject_id: string; score: string | null; absent: boolean; max_marks: number; grade: string | null }>(
+      `select coalesce(sub.name, m.subject_id) subject, m.subject_id, m.score, m.absent, x.max_marks, m.grade from exam_marks m join exam_subjects x on x.exam_id = m.exam_id and x.subject_id = m.subject_id
        left join subjects sub on sub.id = m.subject_id where m.exam_id = $1 and m.student_id = $2 order by subject`, [examId, studentId])).rows;
     const lines: PdfLine[] = [
       { text: tx('Subject'), right: tx('Marks · grade'), bold: true, gap: 22 },
       ...marks.map((m) => {
-        const g = grading.of(Math.round((Number(m.score ?? 0) / m.max_marks) * 100), m.subject_id);
-        return { text: m.subject, right: m.absent ? tx('Absent') : `${Math.round(Number(m.score ?? 0))} / ${m.max_marks} · ${g.grade}${g.descriptor ? ` (${g.descriptor})` : ''}` };
+        // A grade given straight away stands as it is (with its descriptor); marks show as the school writes numbers, halves included.
+        const scheme = grading.schemeOf(m.subject_id);
+        const g = m.grade ? gradeIn(scheme, pctOfGrade(scheme, m.grade) ?? 0) : grading.of(Math.round((Number(m.score ?? 0) / m.max_marks) * 100), m.subject_id);
+        const desc = g.descriptor ? ` (${g.descriptor})` : '';
+        return { text: m.subject, right: m.absent ? tx('Absent') : m.grade ? `${m.grade}${desc}` : `${fmtNumber(Number(m.score ?? 0))} / ${m.max_marks} · ${g.grade}${desc}` };
       }),
     ];
     const fill = {
       school: String((await this.settings.doc(t)).values['school.name'] ?? t.info.name), student: s.name, class: s.class, admissionNo: s.admission_no, rollNo: s.roll_no || '-',
       exam: res.exam.name, percent: fmtNumber(row.pct), grade: row.grade, gpa: row.gpa !== null ? fmtNumber(row.gpa) : '', result: row.pct >= grading.pass ? tx('Passed') : tx('Needs support'),
       rank: showRank ? String(row.rank) : '', classSize: String(res.rows.length),
+      remark: (await t.pool.query<{ remark: string }>('select remark from exam_remarks where exam_id = $1 and student_id = $2', [examId, studentId])).rows[0]?.remark ?? '',
     };
     return { name: `${s.admission_no}-${res.exam.name.replace(/[^\w-]+/g, '_')}.pdf`, ...(await this.render(t, 'reportCard', fill, lines, draft)) };
   }
