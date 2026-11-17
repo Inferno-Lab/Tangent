@@ -196,7 +196,7 @@ export const SchoolSettingsSchema = z.object({
   'people.addressFormat': AddressFormat.default(DEFAULT_ADDRESS_FORMAT),
   'people.houses': z.array(z.object({ key: z.string().regex(/^[a-z0-9-]{1,24}$/), name: z.string().min(1).max(24), color: z.string().regex(/^#[0-9a-fA-F]{6}$/) })).max(12).default([]),
   // The first column of every week grid (attendance, leave, the app's calendars).
-  'calendar.weekStarts': z.enum(['mon', 'sun']).default('mon'),
+  'calendar.weekStarts': z.enum(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']).default('mon'),
   // The attendance marks the school uses (present and absent always).
   'attendance.statuses': AttendanceMarks.default(DEFAULT_ATTENDANCE_MARKS),
   // Reasons a family picks when asking for leave.

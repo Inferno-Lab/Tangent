@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { schoolInstant, fmtDate, EVENT_KINDS, schoolToday, type Category, type EventKind, type EventRow, type ExamRow } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, Field, NumberField, SelectField, TimeField, useShake, EmptyState, EmptyNote, t as tr } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, Field, NumberField, SelectField, TimeField, useShake, EmptyState, EmptyNote, currentLanguage, t as tr } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { AddBtn, AreaField, Ico, problem, useSetting } from '../../app/kit';
@@ -10,7 +10,9 @@ import { usePageTabs } from '../../app/tabs';
 
 const KIND: Record<EventKind, { label: string; tone: string }> = { event: { label: tr('admin.events_page.event'), tone: 'v' }, holiday: { label: tr('admin.events_page.holiday'), tone: 'g' }, exam: { label: tr('admin.events_page.exams'), tone: 'a' }, ptm: { label: tr('admin.events_page.parent_meeting'), tone: 'k' }, routine: { label: tr('admin.events_page.routine'), tone: '' } };
 const AUDIENCE: Record<string, string> = { everyone: tr('admin.events_page.everyone'), parents: tr('admin.events_page.parents'), staff: tr('admin.events_page.staff_only'), class: 'One class' };
-const WEEK = [tr('admin.events_page.mon'), tr('admin.events_page.tue'), tr('admin.events_page.wed'), tr('admin.events_page.thu'), tr('admin.events_page.fri'), tr('admin.events_page.sat'), tr('admin.events_page.sun')];
+const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+/** A weekday's short name in the reader's language (0 is Sunday, as Date.getDay counts). */
+const shortDay = (d: number) => new Intl.DateTimeFormat(currentLanguage(), { weekday: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, 10, 15 + d)));
 const PREV = 'caretLeft';
 const NEXT = 'caretRight';
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -43,7 +45,7 @@ export function EventsPage() {
   const { shell } = useShellChrome();
   const seeExams = !!shell?.modules.includes('exams') && app.user.permissions.includes('exams.read');
   const exams = useQuery({ queryKey: ['exams', ''], queryFn: () => app.api.exams.list(), enabled: seeExams });
-  const sunday = useSetting<string>('calendar.weekStarts', 'mon') === 'sun';
+  const start = Math.max(0, DAYS.indexOf(useSetting<string>('calendar.weekStarts', 'mon')));
   const all = useMemo(() => [...(list.data ?? []).filter((e) => e.kind !== 'exam'), ...examEvents(exams.data ?? [])].sort((a, b) => a.startsAt.localeCompare(b.startsAt)), [list.data, exams.data]);
   const today = schoolToday();
   const byDay = useMemo(() => {
@@ -58,7 +60,7 @@ export function EventsPage() {
   const shown = day ? byDay.get(day) ?? [] : all.filter((e) => dayOf(e.endsAt ?? e.startsAt) >= today);
   const past = day ? [] : all.filter((e) => dayOf(e.endsAt ?? e.startsAt) < today).reverse();
   // The week starts on the school's first day (console: calendar.weekStarts).
-  const first = sunday ? month.getDay() : month.getDay() === 0 ? 6 : month.getDay() - 1;
+  const first = (month.getDay() - start + 7) % 7;
   const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
   const cells = [...Array.from({ length: first }, () => null), ...Array.from({ length: days }, (_, i) => ymd(new Date(month.getFullYear(), month.getMonth(), i + 1)))];
   return (
@@ -77,7 +79,7 @@ export function EventsPage() {
               <button className="btn sm" aria-label={tr('admin.events_page.next_month')} onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}><Ico d={NEXT} /></button>
             </div>
             <div className="cal" role="grid" aria-label={tr('admin.events_page.calendar')}>
-              {(sunday ? [tr('admin.events_page.sun'), ...WEEK.slice(0, 6)] : WEEK).map((d) => <span className="calh" key={d}>{d}</span>)}
+              {Array.from({ length: 7 }, (_, i) => shortDay((start + i) % 7)).map((d) => <span className="calh" key={d}>{d}</span>)}
               {cells.map((c, i) => c ? (
                 <button key={c} className={`calc ${c === today ? 'now' : ''} ${c === day ? 'sel' : ''}`} aria-pressed={c === day} aria-label={`${c}${byDay.get(c)?.length ? tr('admin.events_page.events_2', { length: byDay.get(c)!.length }) : ''}`} onClick={() => setDay(c === day ? null : c)}>
                   {Number(c.slice(8))}

@@ -99,7 +99,7 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = localized({
   'workflows.steps': { group: 'school', label: 'Steps for each kind of request', kind: 'workflows', help: 'Who decides each request, in order. A kind with one step is decided by anyone allowed to; add a step for a second person, a step only above an amount, and what happens when a step waits too long.' },
   'classes.schoolEdits': { group: 'school', label: 'The school may edit its classes, subjects and periods', kind: 'bool', help: 'Off: only Tangent changes them (Data, or the school asks).' },
   'calendar.weeklyOff': { group: 'school', label: 'Closed every week on', kind: 'multi', options: [['sun', 'Sunday'], ['mon', 'Monday'], ['tue', 'Tuesday'], ['wed', 'Wednesday'], ['thu', 'Thursday'], ['fri', 'Friday'], ['sat', 'Saturday']], help: 'Attendance, the dashboard, fee charts and the app’s calendars skip these days. Holidays are added under Academic year.' },
-  'calendar.weekStarts': { group: 'school', label: 'Weeks start on', kind: 'enum', options: [['mon', 'Monday'], ['sun', 'Sunday']], help: 'The first column of every week grid in the admin and the app.' },
+  'calendar.weekStarts': { group: 'school', label: 'Weeks start on', kind: 'enum', options: [['mon', 'Monday'], ['tue', 'Tuesday'], ['wed', 'Wednesday'], ['thu', 'Thursday'], ['fri', 'Friday'], ['sat', 'Saturday'], ['sun', 'Sunday']], help: 'The first column of every week grid in the admin and the app.' },
   'calendar.schoolEdits': { group: 'school', label: 'The school may edit its terms and holidays', kind: 'bool', help: 'Off: only Tangent changes them.' },
   'dashboard.rollClasses': { group: 'school', label: 'Classes on the dashboard’s roll-call card', kind: 'classes', max: 8 },
 

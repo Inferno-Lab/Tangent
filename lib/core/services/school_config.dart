@@ -124,8 +124,11 @@ abstract final class SchoolConfig {
 
   static List<String> get leaveReasons => List<String>.from(_s<List<dynamic>>('leave.reasons', const ['Other']));
 
-  /// The first weekday of every week grid: [DateTime.monday] or [DateTime.sunday].
-  static int get weekStarts => _s('calendar.weekStarts', 'mon') == 'sun' ? DateTime.sunday : DateTime.monday;
+  /// The first weekday of every week grid, any day the school chose ([DateTime.monday] is 1 … [DateTime.sunday] is 7).
+  static int get weekStarts {
+    final i = const ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].indexOf(_s('calendar.weekStarts', 'mon'));
+    return i < 0 ? DateTime.monday : i + 1;
+  }
 
   /// Grades from the lowest percentage that earns each, highest first.
   static List<(String, double)> get gradingScale => [
