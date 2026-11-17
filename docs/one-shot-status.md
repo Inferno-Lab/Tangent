@@ -68,8 +68,19 @@ visitors, certificates and ID cards, activities and trips, houses and points, al
 
 ## Gates (section 9)
 
-**Not run.** Still to run once: `tools/audit-ui.mjs` (four widths, light and dark, `--rtl`), `tools/e2e-flows.mjs`, the
-scans, every API and console-api suite, `tool/verify.sh`, app shots per role and theme.
+Run on 17 and 18 November 2026 (everything on this branch at commit `e34365f`):
+
+- Build and types: pass. Package tests: pass. API 133/133, console-api 70/70. Flutter analyze (no errors or
+  warnings) and tests: pass. Browser flows: 55/55.
+- UI audit, four widths, light and dark: clean (one page failed only on a network drop and was clean on a re-run).
+  Right-to-left: clean after fixing the Fees total on phones.
+- Scans: `scan-scroll` clean. `scan-fit` (42), `scan-gaps` (197) and `scan-cutoff` (79) still report findings; the
+  ones checked are rolling-digit counters and names shortened with an ellipsis by design, or older than this branch
+  (setup tables wider than a phone under Academic year, columns of unequal height). Not worked through one by one.
+- App shots: parent and teacher, light and dark, look right.
+- Fixed on the way: CSV and PDF errors masked as a 500; the console's Configuration card squeezed into one column
+  (also on `main`); the template block picker too narrow; the reader-language header without a root element;
+  `verify.sh` passing with no SDK.
 
 ## Needs the owner (section 10)
 
