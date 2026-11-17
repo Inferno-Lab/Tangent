@@ -79,8 +79,10 @@ class ProfileView extends GetView<ProfileController> {
                         // The school's own fields it shows families (named in their language by the server).
                         for (final f in student.fields.entries) (f.key, f.value),
                       ],
-                      code:
-                          'GIS-${controller.schoolClass?.name.replaceAll(RegExp('[^0-9]'), '') ?? ''}${controller.schoolClass?.section ?? ''}-${student.rollNo}',
+                      // The school's own admission number; sample content shows the class and roll number.
+                      code: student.admissionNo.isNotEmpty
+                          ? student.admissionNo
+                          : '${controller.schoolClass?.name.replaceAll(RegExp('[^0-9]'), '') ?? ''}${controller.schoolClass?.section ?? ''}-${student.rollNo}',
                       onPhoto: role == UserRole.student ? () => unawaited(controller.editPhoto()) : null,
                     ),
                   )

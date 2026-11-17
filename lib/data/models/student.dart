@@ -18,6 +18,7 @@ class Student {
     required this.address,
     this.userId,
     this.fields = const {},
+    this.admissionNo = '',
   });
 
   factory Student.fromJson(Map<String, dynamic> json) => _$StudentFromJson(json);
@@ -38,6 +39,10 @@ class Student {
   /// The school's own fields it shows in the app, by their name in the reader's language (label → value).
   @JsonKey(defaultValue: <String, String>{})
   final Map<String, String> fields;
+
+  /// The school's own number for the child (its admission series); empty in sample data.
+  @JsonKey(defaultValue: '')
+  final String admissionNo;
 
   Map<String, dynamic> toJson() => _$StudentToJson(this);
 }

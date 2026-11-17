@@ -190,13 +190,13 @@ export class FamilyService {
   }
 
   /** Guardian contact, birth date and address go to the family and to staff whose role reads students; never to the rest. */
-  private studentJson(w: Who, r: { id: string; user_id: string | null; name: string; class_id: string; roll_no: string; dob: string; blood_group: string | null; house: string | null; address: string | null; g_name: string | null; g_phone: string | null; photo: string | null; custom: CustomValues | null }, own: FieldDef[]) {
+  private studentJson(w: Who, r: { id: string; user_id: string | null; name: string; class_id: string; roll_no: string; admission_no: string | null; dob: string; blood_group: string | null; house: string | null; address: string | null; g_name: string | null; g_phone: string | null; photo: string | null; custom: CustomValues | null }, own: FieldDef[]) {
     const full = w.children.includes(r.id) || (w.kind === 'staff' && w.perms.includes('students.read'));
     // The school's own fields it shows in the app (§3.6.3), named and written in the reader's language; only to those who see the full record.
     const lang = schoolContext.getStore()?.lang ?? 'en';
     const fields = full ? Object.fromEntries(own.map((f) => [f.names?.[lang] || f.label, customText(f, r.custom?.[f.key], lang)]).filter(([, v]) => v)) : {};
     return {
-      fields,
+      fields, admissionNo: r.admission_no ?? '',
       id: r.id, userId: r.user_id, name: r.name, classId: r.class_id, rollNo: r.roll_no, dob: full ? r.dob : '', bloodGroup: r.blood_group ?? '', house: r.house ?? '', avatarUrl: '',
       photoFileId: r.photo, guardianName: full ? r.g_name ?? '' : '', guardianPhone: full ? r.g_phone ?? '' : '', address: full ? r.address ?? '' : '',
     };
@@ -206,7 +206,7 @@ export class FamilyService {
     return ((await this.settings.value<CustomFieldsSetting>(t, 'fields.custom', {})).student ?? []).filter((f) => f.app);
   }
 
-  private readonly studentSql = `select s.id, s.user_id, s.name, s.class_id, s.roll_no, s.dob::text, s.blood_group, s.house, s.address, s.custom, g.name g_name, g.phone g_phone,
+  private readonly studentSql = `select s.id, s.user_id, s.name, s.class_id, s.roll_no, s.admission_no, s.dob::text, s.blood_group, s.house, s.address, s.custom, g.name g_name, g.phone g_phone,
       (select f.id from files f where f.kind = 'student_photo' and f.owner_id = s.id and f.status = 'clean' and f.deleted_at is null order by f.created_at desc limit 1) photo
     from students s left join student_guardians sg on sg.student_id = s.id and sg.is_primary left join guardians g on g.id = sg.guardian_id`;
 
