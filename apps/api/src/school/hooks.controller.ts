@@ -1,6 +1,7 @@
 import { All, Body, Controller, Get, HttpCode, Inject, Param, Post, Put, Query, Req, Res } from '@nestjs/common';
 import { fmtMoney, currencyDigits, appIdFor } from '@tangent/contracts';
-import { sandboxLink } from '@tangent/integrations';
+import { readLink, sandboxLink } from '@tangent/integrations';
+import { schoolContext } from '@tangent/tenancy';
 import { ApiError, forbidden } from '@tangent/nest-kit';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { Public } from '../auth/guards.js';
@@ -8,6 +9,16 @@ import { ENV, type Env } from '../env.js';
 import { NoTenant, TenantService } from '../tenancy/tenant.js';
 import { HubService } from './hub.service.js';
 import { PaymentsService } from './payments.service.js';
+import { DocumentsService } from './documents.service.js';
+import { FamilyService } from './family.service.js';
+import { sendPdf } from './pdf.js';
+import { calendarFile, type CalEvent } from './ics.js';
+
+/** A document a family opens outside the app (docLink): the school, which document, whose children it may show, the reader's language. */
+export type DocLink = { p: 'doc'; slug: string; kind: 'receipt' | 'report'; id: string; exam?: string; kids: string[] | null; lang: string }
+  | { p: 'doc'; slug: string; kind: 'ics'; events: CalEvent[]; zone: string }
+  // A week of lessons, built when it is opened (the link only says whose).
+  | { p: 'doc'; slug: string; kind: 'lessons'; classId?: string; teacherId?: string };
 
 type Raw = FastifyRequest & { rawBody?: Buffer };
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -35,8 +46,25 @@ export class HooksController {
     private readonly hubs: HubService,
     private readonly payments: PaymentsService,
     private readonly tenants: TenantService,
+    private readonly docs: DocumentsService,
+    private readonly family: FamilyService,
     @Inject(ENV) private readonly env: Env,
   ) {}
+
+  /** A receipt or report card opened outside the app from a signed, ten-minute link the app asked for (FamilyController.docLink). */
+  @Get('doc/:token')
+  async doc(@Param('token') token: string, @Res() reply: FastifyReply): Promise<void> {
+    const d = readLink<DocLink>(this.env.SECRETS_KEY, token);
+    if (!d || d.p !== 'doc') { void reply.code(410).type('text/html').send(page('Link expired', '<h1>This link has expired</h1><p>Go back to the app and open it again.</p>')); return; }
+    // A calendar file the phone opens in its own calendar app.
+    const ics = (events: CalEvent[], zone: string) => void reply.type('text/calendar; charset=utf-8').header('content-disposition', 'attachment; filename="school.ics"').send(calendarFile(events, zone, token.slice(-12)));
+    if (d.kind === 'ics') return ics(d.events, d.zone);
+    const t = await this.tenants.resolve(d.slug);
+    if (d.kind === 'lessons') return ics(await this.family.lessonEvents(t, d), t.info.timezone);
+    const store = schoolContext.getStore();
+    if (store) store.lang = d.lang;
+    sendPdf(reply, d.kind === 'receipt' ? await this.docs.receipt(t, d.id, d.kids) : await this.docs.reportCard(t, d.exam!, d.id, d.kids ?? [d.id]));
+  }
 
   // ── The school's app, from the QR code on a welcome letter ─────────────────
 

@@ -189,6 +189,7 @@ class Homework {
     required this.teacherId,
     required this.maxMarks,
     required this.attachments,
+    this.files = const [],
     required this.submissions,
   });
 
@@ -204,6 +205,13 @@ class Homework {
   final String teacherId;
   final int maxMarks;
   final List<String> attachments;
+
+  /// The attached files with their ids (to open them); empty in sample data, which has names only.
+  @JsonKey(defaultValue: <Map<String, dynamic>>[])
+  final List<Map<String, dynamic>> files;
+
+  /// The id of the attached file called [name], when the school's server sent it.
+  String? fileId(String name) => files.where((f) => f['name'] == name).map((f) => '${f['id']}').firstOrNull;
   final List<HomeworkSubmission> submissions;
 
   HomeworkSubmission? forStudent(String studentId) {
@@ -224,6 +232,7 @@ class Homework {
     teacherId: teacherId,
     maxMarks: maxMarks,
     attachments: attachments,
+    files: files,
     submissions: submissions ?? this.submissions,
   );
 

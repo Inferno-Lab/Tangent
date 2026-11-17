@@ -166,9 +166,7 @@ const _en = <String, String>{
   'fees.processing': 'Talking to the bank',
   'fees.success': 'Payment received',
   'fees.success_body': 'The receipt is saved on this device for the demo.',
-  'fees.receipt': 'Receipt',
-  'fees.shared': 'Receipt copied for sharing',
-  'fees.downloaded': 'Receipt saved in this session',
+  'fees.receipt': 'Receipt',
   'fees.empty': 'No fee account for this child',
   'notices.title': 'Notices',
   'notices.subtitle': 'From the school office',

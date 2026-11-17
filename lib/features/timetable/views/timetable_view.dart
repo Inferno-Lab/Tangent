@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/utils/calendar.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
 import 'package:tangent/core/theme/tokens.dart';
@@ -9,7 +12,6 @@ import 'package:tangent/core/widgets/empty_kit.dart';
 import 'package:tangent/core/widgets/glass.dart';
 import 'package:tangent/core/widgets/page.dart';
 import 'package:tangent/core/widgets/states.dart';
-import 'package:tangent/core/widgets/toast.dart';
 import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/data/models/academics.dart';
 import 'package:tangent/features/timetable/controllers/timetable_controller.dart';
@@ -32,7 +34,7 @@ class TimetableView extends GetView<TimetableController> {
           GlassIconButton(
             icon: PhosphorIconsRegular.calendarPlus,
             label: 'timetable.add_calendar'.tr,
-            onTap: () => ToastHelper.show('timetable.added', kind: ToastKind.success),
+            onTap: () => unawaited(addLessonsToCalendar(classId: controller.schoolClass?.id)),
           ),
         ],
         onRefresh: controller.load,

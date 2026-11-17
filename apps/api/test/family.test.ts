@@ -465,4 +465,36 @@ describe('messages and background work through the Hub', () => {
     await h.registry.query("update schools set timezone = 'Asia/Kolkata' where slug = $1", [h.slug]);
     await h.registry.query('delete from job_queue');
   });
+
+  it('opens a receipt outside the app from a signed link, only for the family’s own children', async () => {
+    const t = (await h.app.get((await import('../src/tenancy/tenant.js')).TenantService).resolve(h.slug)).pool;
+    const mine = (await t.query("select p.id from payments p join fee_invoices i on i.id = p.invoice_id where i.student_id = 'stu_aarav' limit 1")).rows[0]?.id;
+    const other = (await t.query("select p.id from payments p join fee_invoices i on i.id = p.invoice_id where i.student_id = 'stu_diya' limit 1")).rows[0]?.id;
+    expect(mine).toBeTruthy();
+    const link = await post(parent, `/receipts/${mine}/link`);
+    expect(link.status).toBe(200);
+    const path = new URL(link.json.url).pathname;
+    const pdf = await h.call('GET', path);
+    expect(pdf.headers['content-type']).toContain('application/pdf');
+    expect((await h.call('GET', `${path}x`)).status).toBe(410);
+    if (other) expect((await post(parent, `/receipts/${other}/link`)).status).toBe(404);
+  });
+
+  it('adds an event and a week of lessons to the phone’s calendar from a calendar file', async () => {
+    const one = await post(parent, '/calendar/link', { events: [{ title: 'Sports day; bring water', start: '2026-12-04', details: 'Line 1\nLine 2', alarmMinutes: 60 }] });
+    expect(one.status).toBe(200);
+    const file = await h.call('GET', new URL(one.json.url).pathname);
+    expect(file.headers['content-type']).toContain('text/calendar');
+    expect(file.text).toContain('SUMMARY:Sports day\\; bring water');
+    expect(file.text).toContain('DESCRIPTION:Line 1\\nLine 2');
+    expect(file.text).toContain('DTSTART;VALUE=DATE:20261204');
+    expect(file.text).toContain('TRIGGER:-PT60M');
+    const week = await post(parent, '/timetable/calendar-link', { classId: 'cls_8a' });
+    const lessons = (await h.call('GET', new URL(week.json.url).pathname)).text;
+    expect(lessons).toMatch(/RRULE:FREQ=WEEKLY;UNTIL=\d{8}T235959Z/);
+    expect(lessons).toMatch(/DTSTART;TZID=Asia\/Kolkata:\d{8}T\d{6}/);
+    // A family cannot ask for another class's week.
+    expect((await post(parent, '/timetable/calendar-link', { classId: 'cls_8b' })).status).toBe(403);
+  });
 });
+

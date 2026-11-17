@@ -84,6 +84,11 @@ Notice _$NoticeFromJson(Map<String, dynamic> json) => Notice(
   attachments: (json['attachments'] as List<dynamic>)
       .map((e) => e as String)
       .toList(),
+  files:
+      (json['files'] as List<dynamic>?)
+          ?.map((e) => Map<String, dynamic>.from(e as Map))
+          .toList() ??
+      [],
   needsAck: json['needsAck'] as bool? ?? false,
   acked: json['acked'] as bool? ?? false,
 );
@@ -98,6 +103,7 @@ Map<String, dynamic> _$NoticeToJson(Notice instance) => <String, dynamic>{
   'date': instance.date.toIso8601String(),
   'author': instance.author,
   'attachments': instance.attachments,
+  'files': instance.files,
   'needsAck': instance.needsAck,
   'acked': instance.acked,
 };

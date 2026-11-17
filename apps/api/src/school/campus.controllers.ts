@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Post, Put, Query, Req, Res } from '@nestjs/common';
 import {
   AlbumInput, BookInput, BusPosition, TripDelay, TripMark, TripStart, BusRouteInput, FILE_KINDS, FileStart, IssueInput, LeaverInput, NewYearInput, PhotoTags, PromotionInput, RefundRequest, RiderInput,
   type AlbumRow, type BookRow, type BusRouteRow, type FileRow, type FileUpload, type LibraryView, type LoanRow, type OnlinePaymentRow, type PhotoRow, type PromotionPreview,
@@ -19,6 +19,17 @@ import { PaymentsService } from './payments.service.js';
 import { SettingsService } from './support.js';
 import { TransportService } from './transport.service.js';
 import { sendPdf } from './pdf.js';
+import { signLink } from '@tangent/integrations';
+import { requestLanguage } from '@tangent/tenancy';
+import { ENV, type Env } from '../env.js';
+import type { DocLink } from './hooks.controller.js';
+import type { CalEvent } from './ics.js';
+
+const When = z.string().regex(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/, 'A day like 2026-11-20, or with a time like 2026-11-20T09:30');
+const CalendarBody = z.object({ events: z.array(z.object({
+  title: z.string().trim().min(1).max(120), start: When, end: When.optional(), details: z.string().max(300).optional(), place: z.string().max(80).optional(),
+  alarmMinutes: z.number().int().min(0).max(10080).optional(),
+})).min(1).max(2) }); // the events travel inside the link, which stays under the router's 2,048 characters
 import { YearService } from './year.service.js';
 
 const ListFiles = z.object({ kind: z.enum(FILE_KINDS), owner: z.string().min(1).max(120) });
@@ -278,6 +289,7 @@ export class FamilyCampusController {
     private readonly lib: LibraryService,
     private readonly tr: TransportService,
     private readonly g: GalleryService,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
   /** The children a parent may see; null for staff (who see what their permissions allow). */
@@ -312,6 +324,47 @@ export class FamilyCampusController {
   @Get('orders/:id') @RequireModule('fees.onlinePayment')
   async orderStatus(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string) {
     return this.payments.orderStatus(t, id, await this.kids(t, u));
+  }
+
+  /**
+   * A ten-minute link to a receipt or report card the phone opens outside the app (to view, save or share it), for one the
+   * person may read here: checked now as reading it in the app would be, for the same children, in the reader's language.
+   */
+  private async link(t: TenantCtx, u: AuthedUser, lang: string | string[] | undefined, d: { kind: 'receipt' | 'report'; id: string; exam?: string }): Promise<{ url: string }> {
+    const kids = await this.kids(t, u);
+    if (d.kind === 'receipt') await this.docs.receipt(t, d.id, kids);
+    else await this.docs.reportCard(t, d.exam!, d.id, kids ?? [d.id]);
+    const token = signLink(this.env.SECRETS_KEY, { p: 'doc', slug: t.info.slug, ...d, kids, lang: requestLanguage(lang) } satisfies DocLink, 600);
+    return { url: `${this.env.API_BASE_URL.replace(/\/$/, '')}/hooks/doc/${token}` };
+  }
+
+  /** Events the app adds to the phone's calendar (a notice's day, an event, a homework's due day), as a ten-minute link. */
+  @Post('calendar/link') @Core() @HttpCode(200)
+  calendarLink(@Tenant() t: TenantCtx, @Body(new ZodPipe(CalendarBody)) b: z.infer<typeof CalendarBody>): { url: string } {
+    return this.icsLink(t, b.events);
+  }
+
+  /** The week's lessons as events that repeat until the term (or year) ends: a child's class, or a teacher's own. */
+  @Post('timetable/calendar-link') @RequireModule('timetable') @HttpCode(200)
+  async timetableLink(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(z.object({ classId: z.string().optional() }))) b: { classId?: string }): Promise<{ url: string }> {
+    const by = await this.f.lessonsOf(t, u, b.classId);
+    const token = signLink(this.env.SECRETS_KEY, { p: 'doc', slug: t.info.slug, kind: 'lessons', ...by } satisfies DocLink, 600);
+    return { url: `${this.env.API_BASE_URL.replace(/\/$/, '')}/hooks/doc/${token}` };
+  }
+
+  private icsLink(t: TenantCtx, events: CalEvent[]): { url: string } {
+    const token = signLink(this.env.SECRETS_KEY, { p: 'doc', slug: t.info.slug, kind: 'ics', events, zone: t.info.timezone } satisfies DocLink, 600);
+    return { url: `${this.env.API_BASE_URL.replace(/\/$/, '')}/hooks/doc/${token}` };
+  }
+
+  @Post('receipts/:id/link') @RequireModule('fees') @HttpCode(200)
+  receiptLink(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Req() req: { headers: Record<string, string | string[] | undefined> }): Promise<{ url: string }> {
+    return this.link(t, u, req.headers['accept-language'], { kind: 'receipt', id });
+  }
+
+  @Post('results/:examId/:studentId/link') @RequireModule('exams.resultsInApp') @HttpCode(200)
+  reportLink(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('examId') exam: string, @Param('studentId') id: string, @Req() req: { headers: Record<string, string | string[] | undefined> }): Promise<{ url: string }> {
+    return this.link(t, u, req.headers['accept-language'], { kind: 'report', id, exam });
   }
 
   @Get('receipts/:id/pdf') @RequireModule('fees')

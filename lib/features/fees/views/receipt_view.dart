@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/utils/open_link.dart';
 import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/theme/app_colors.dart';
@@ -10,7 +13,6 @@ import 'package:tangent/core/utils/formatters.dart';
 import 'package:tangent/core/widgets/glass.dart';
 import 'package:tangent/core/widgets/page.dart';
 import 'package:tangent/core/widgets/states.dart';
-import 'package:tangent/core/widgets/toast.dart';
 import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/data/models/campus.dart';
 import 'package:tangent/features/fees/controllers/fees_controller.dart';
@@ -90,7 +92,7 @@ class ReceiptView extends StatelessWidget {
                   icon: PhosphorIconsRegular.export,
                   label: 'fees.share_receipt'.tr,
                   color: AppColors.white,
-                  onTap: () => ToastHelper.show('fees.shared', kind: ToastKind.success),
+                  onTap: () => unawaited(openFromServer((s) => s.post('/receipts/${receipt.id}/link', {}))),
                 ),
               ],
             ),
@@ -128,7 +130,7 @@ class ReceiptView extends StatelessWidget {
                     kind: BtnKind.quiet,
                     icon: PhosphorIconsRegular.downloadSimple,
                     expand: true,
-                    onPressed: () => ToastHelper.show('fees.downloaded', kind: ToastKind.success),
+                    onPressed: () => unawaited(openFromServer((s) => s.post('/receipts/${receipt.id}/link', {}))),
                   ),
                 ),
                 const SizedBox(width: 10),

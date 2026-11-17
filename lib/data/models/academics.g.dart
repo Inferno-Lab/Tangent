@@ -117,6 +117,11 @@ Homework _$HomeworkFromJson(Map<String, dynamic> json) => Homework(
   attachments: (json['attachments'] as List<dynamic>)
       .map((e) => e as String)
       .toList(),
+  files:
+      (json['files'] as List<dynamic>?)
+          ?.map((e) => Map<String, dynamic>.from(e as Map))
+          .toList() ??
+      [],
   submissions: (json['submissions'] as List<dynamic>)
       .map((e) => HomeworkSubmission.fromJson(e as Map<String, dynamic>))
       .toList(),
@@ -133,6 +138,7 @@ Map<String, dynamic> _$HomeworkToJson(Homework instance) => <String, dynamic>{
   'teacherId': instance.teacherId,
   'maxMarks': instance.maxMarks,
   'attachments': instance.attachments,
+  'files': instance.files,
   'submissions': instance.submissions.map((e) => e.toJson()).toList(),
 };
 

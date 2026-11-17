@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/utils/open_link.dart';
+import 'package:tangent/core/utils/copy.dart';
 import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/theme/app_colors.dart';
@@ -14,7 +16,6 @@ import 'package:tangent/core/widgets/empty_kit.dart';
 import 'package:tangent/core/widgets/glass.dart';
 import 'package:tangent/core/widgets/page.dart';
 import 'package:tangent/core/widgets/states.dart';
-import 'package:tangent/core/widgets/toast.dart';
 import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/data/models/campus.dart';
 import 'package:tangent/data/models/user.dart';
@@ -370,7 +371,7 @@ class NoticeDetailView extends GetView<NoticeDetailController> {
             GlassIconButton(
               icon: PhosphorIconsRegular.export,
               label: 'notices.share'.tr,
-              onTap: () => ToastHelper.show('notices.shared', kind: ToastKind.success),
+              onTap: () => unawaited(copyText('${notice.title}\n\n${notice.body}')),
             ),
         ],
         topPadding: MediaQuery.paddingOf(context).top + 60,
@@ -486,7 +487,7 @@ class NoticeDetailView extends GetView<NoticeDetailController> {
                         Rise(
                           index: 5,
                           child: Pressable(
-                            onTap: () => ToastHelper.show('notices.attachment_demo'),
+                            onTap: () => unawaited(openFile(notice.fileId(file))),
                             child: Row(
                               children: [
                                 Icon(PhosphorIconsRegular.paperclip, size: 18, color: c.ink3),

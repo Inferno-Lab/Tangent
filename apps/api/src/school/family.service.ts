@@ -186,6 +186,36 @@ export class FamilyService {
     };
   }
 
+  /**
+   * Whose week of lessons a calendar link gives (§5.1.2): a class this person may see (a family's child's, a teacher's), or the
+   * teacher's own when no class is named. The lessons repeat weekly until the term (else the year) ends.
+   */
+  async lessonsOf(t: TenantCtx, user: AuthedUser, classId?: string): Promise<{ classId?: string; teacherId?: string }> {
+    const w = await this.who(t, user);
+    if (classId) { await this.mayClass(t, w, classId); return { classId }; }
+    if (w.kind !== 'staff') throw new ApiError('validation', 'Say which class.');
+    return { teacherId: w.id };
+  }
+
+  /** The lessons of `lessonsOf`, built when the calendar link is opened. */
+  async lessonEvents(t: TenantCtx, by: { classId?: string; teacherId?: string }): Promise<{ title: string; start: string; end: string; place?: string; weeklyUntil: string }[]> {
+    const classId = by.classId;
+    const today = schoolToday();
+    const until = (await t.pool.query<{ e: string }>(
+      "select ends_on::text e from terms where starts_on <= $1 and ends_on >= $1 union all select ends_on::text from academic_years where current limit 1", [today])).rows[0]?.e ?? addDays(today, 120);
+    const { rows } = await t.pool.query<{ day: number; subject: string; room: string | null; starts_at: string; ends_at: string; class_name: string }>(
+      `select ts.day, coalesce(sub.name, ts.subject_id) subject, ts.room, p.starts_at, p.ends_at, c.name class_name from timetable_slots ts join periods p on p.idx = ts.period
+         join classes c on c.id = ts.class_id left join subjects sub on sub.id = ts.subject_id
+       where ${classId ? 'ts.class_id = $1' : 'coalesce(ts.cover_teacher_id, ts.teacher_id) = $1'} order by ts.day, p.starts_at`, [classId ?? by.teacherId]);
+    // Each lesson starts on its weekday's next date from today (ISO weekday 1 is Monday, as timetable_slots counts).
+    const iso = (d: string) => { const n = new Date(`${d}T00:00:00Z`).getUTCDay(); return n === 0 ? 7 : n; };
+    const first = (dayNo: number) => addDays(today, (dayNo - iso(today) + 7) % 7);
+    return rows.map((r) => ({
+      title: classId ? r.subject : `${r.subject} · ${r.class_name}`, start: `${first(r.day)}T${r.starts_at}`, end: `${first(r.day)}T${r.ends_at}`,
+      ...(r.room ? { place: r.room } : {}), weeklyUntil: until,
+    }));
+  }
+
   async userName(t: TenantCtx, id: string): Promise<{ id: string; name: string }> {
     const r = (await t.pool.query<{ id: string; name: string }>('select id, name from users where id = $1', [id])).rows[0];
     if (!r) throw notFound('That person');

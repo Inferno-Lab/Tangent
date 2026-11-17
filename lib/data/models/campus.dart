@@ -145,6 +145,7 @@ class Notice {
     required this.date,
     required this.author,
     required this.attachments,
+    this.files = const [],
     this.needsAck = false,
     this.acked = false,
   });
@@ -160,6 +161,13 @@ class Notice {
   final DateTime date;
   final String author;
   final List<String> attachments;
+
+  /// The attached files with their ids (to open them); empty in sample data, which has names only.
+  @JsonKey(defaultValue: <Map<String, dynamic>>[])
+  final List<Map<String, dynamic>> files;
+
+  /// The id of the attached file called [name], when the school's server sent it.
+  String? fileId(String name) => files.where((f) => f['name'] == name).map((f) => '${f['id']}').firstOrNull;
 
   /// The school asks families to say they have read it; [acked] once they have.
   @JsonKey(defaultValue: false)
