@@ -131,15 +131,16 @@ export class AttendanceService {
     return this.day(t, body.classId, body.date, part);
   }
 
-  /** A class's periods on one day (from the timetable for that weekday), each with its teacher and the marks given so far. */
+  /** A class's periods on one day (from the timetable for that day of the school's cycle), each with its teacher and the marks given so far. */
   async periods(t: TenantCtx, user: { id: string }, classId: string, date: string): Promise<PeriodRoll> {
     const day = await this.day(t, classId, date);
-    const dow = new Date(`${date}T00:00:00Z`).getUTCDay() || 7;
+    // The timetable day the date falls on in the school's cycle (none when it is closed), with that day's own bell times.
+    const slotDay = (await this.settings.slotDay(t, date)) ?? 0;
     const [slots, marks, boss] = await Promise.all([
       t.pool.query<{ period: number; label: string; starts_at: string; ends_at: string; subject: string; teacher_id: string; teacher_name: string }>(
-        `select ts.period, p.label, p.starts_at, p.ends_at, s.name subject, coalesce(ts.cover_teacher_id, ts.teacher_id) teacher_id, u.name teacher_name
-         from timetable_slots ts join periods p on p.idx = ts.period join subjects s on s.id = ts.subject_id join users u on u.id = coalesce(ts.cover_teacher_id, ts.teacher_id)
-         where ts.class_id = $1 and ts.day = $2 order by p.starts_at`, [classId, dow]),
+        `select ts.period, p.label, st.starts_at, st.ends_at, s.name subject, coalesce(ts.cover_teacher_id, ts.teacher_id) teacher_id, u.name teacher_name
+         from timetable_slots ts join periods p on p.idx = ts.period join slot_times st on st.slot_id = ts.id join subjects s on s.id = ts.subject_id join users u on u.id = coalesce(ts.cover_teacher_id, ts.teacher_id)
+         where ts.class_id = $1 and ts.day = $2 order by st.starts_at`, [classId, slotDay]),
       t.pool.query<{ period: number; student_id: string; status: PeriodRoll['periods'][number]['marks'][string]; marked_by: string | null }>(
         'select pm.period, pm.student_id, pm.status, u.name marked_by from period_marks pm left join users u on u.id = pm.marked_by where pm.class_id = $1 and pm.date = $2', [classId, date]),
       this.approves(t, user.id),

@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Header, HttpCode, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import {
-  SchoolSettingsPatch, type SchoolSettingsView, StudentLeaveInput, REGISTER_PARTS,
+  SchoolSettingsPatch, type SchoolSettingsView, StudentLeaveInput, REGISTER_PARTS, RoomSave, RoomBookingCreate, PeriodTimesPut, type RoomRow, type RoomDay, type PeriodTimesRow,
   ApprovalDecision, AssignFee, FeeHeadsPut, AttendanceDayPut, PeriodMarksPut, CoverRequest, SlotCreate, WaiverRequest, ReceiptCancel, IsoDate, MessageRequest, NoticeCreate, PaymentCreate, SlotPatch, StudentCreate, StudentImport, StudentPatch, GuardiansPut, StudentQuery,
   type ApprovalRow, type AttendanceDay, type AttendanceWeekPoint, type PeriodRoll, type AuditRow, type ClassInfo, type ContactReveal, type DashboardData, type FeeHead, type FeeSummary, type ImportResult, type InvoiceRow, type InvoiceDetail,
   type NoticeRow, type SearchHit, type SettingsResponse, type ShellData, type GuardianRow, type StudentDetail, type StudentRow, type StudentSummary, type StudentViews, type TeacherLoad, type TeacherOption, type TimetableView, type WeekOf, type Paged,
@@ -301,6 +301,35 @@ export class TimetableController {
   rooms(@Tenant() t: TenantCtx): Promise<string[]> {
     return this.tt.rooms(t);
   }
+
+  // The school's rooms (Timetable → Rooms) and their bookings.
+  @Get('room-list') @Require('timetable.read')
+  roomList(@Tenant() t: TenantCtx): Promise<RoomRow[]> { return this.tt.roomList(t); }
+
+  @Post('room-list') @Require('timetable.edit')
+  addRoom(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(RoomSave)) b: RoomSave): Promise<RoomRow[]> { return this.tt.saveRoom(t, u, null, b); }
+
+  @Put('room-list/:id') @Require('timetable.edit')
+  saveRoom(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(RoomSave)) b: RoomSave): Promise<RoomRow[]> { return this.tt.saveRoom(t, u, id, b); }
+
+  @Delete('room-list/:id') @Require('timetable.edit')
+  deleteRoom(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string): Promise<RoomRow[]> { return this.tt.deleteRoom(t, u, id); }
+
+  @Get('room-list/:id/day') @Require('timetable.read')
+  roomDay(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Query(new ZodPipe(z.object({ date: IsoDate }))) q: { date: string }): Promise<RoomDay> { return this.tt.roomDay(t, u, id, q.date); }
+
+  // Anyone who can see the timetable may book a free room; the booking says who.
+  @Post('bookings') @Require('timetable.read')
+  book(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(RoomBookingCreate)) b: RoomBookingCreate): Promise<RoomDay> { return this.tt.book(t, u, b); }
+
+  @Delete('bookings/:id') @HttpCode(204) @Require('timetable.read')
+  cancelBooking(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string): Promise<void> { return this.tt.cancelBooking(t, u, id); }
+
+  @Get('times') @Require('timetable.read')
+  periodTimes(@Tenant() t: TenantCtx): Promise<PeriodTimesRow[]> { return this.tt.periodTimes(t); }
+
+  @Put('times') @Require('timetable.edit')
+  putPeriodTimes(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(PeriodTimesPut)) b: PeriodTimesPut): Promise<PeriodTimesRow[]> { return this.tt.putPeriodTimes(t, u, b); }
 
   @Post('slots') @Require('timetable.edit')
   place(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(SlotCreate)) body: SlotCreate): Promise<{ id: string }> {

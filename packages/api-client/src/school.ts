@@ -1,6 +1,6 @@
 import type {
   ChangeRequestCreate, ChangeRequestRow, PasswordChange, ReportQuery, EventReply, InvoiceDetail, WaiverRequest, ReceiptCancel, SlotCreate, WeekOf, StudentPatch, GuardiansPut, GuardianRow, DataRequestCreate, DataRequestDecision, DataRequestRow, EnquiryCreate, EnquiryEnrol, EnquiryPatch, EnquiryRow, EventRow, EventSave, ExamCreate, ExamMarksPut, ExamMarksView, ExamResults, ExamRow,
-  HomeworkCreate, HomeworkDetail, HomeworkMarks, HomeworkRow, InvoiceListQuery, InvoiceListRow, InvoiceListSummary, ReceiptRow, ReportData, ReportInfo, RoleDefSave, RoleRow, StudentLeaveInput, ApplyInfo, EnquiryApply, RegisterPart, StaffCreate, StaffPatch, StaffRow,
+  HomeworkCreate, HomeworkDetail, HomeworkMarks, HomeworkRow, InvoiceListQuery, InvoiceListRow, InvoiceListSummary, ReceiptRow, ReportData, ReportInfo, RoleDefSave, RoleRow, StudentLeaveInput, ApplyInfo, EnquiryApply, RegisterPart, RoomRow, RoomSave, RoomDay, RoomBookingCreate, PeriodTimesRow, PeriodTimesPut, StaffCreate, StaffPatch, StaffRow,
   ThreadCreate, ThreadDetail, ThreadPatch, ThreadReply, ThreadRow,
   AttendanceDayPut, PeriodMarksPut, PeriodRoll, GalleryReportRow, ApprovalDecision, ApprovalKind, ApprovalRow, AssignFee, AttendanceDay, AuditRow, ClassInfo, ContactReveal, CoverRequest, DashboardData, EffectiveConfig, FeeHead, FeeHeadsPut, FeeSummary, ImportResult, InvoiceRow,
   LoginChallenge, LoginRequest, LoginResponse, MessageRequest, NoticeCreate, NoticeRow, Paged, PaymentCreate, SearchHit, SchoolSettingsPatch, SchoolSettingsView, SessionUser, SettingsResponse, ShellData, SlotPatch, StudentCreate, StudentDetail,
@@ -98,6 +98,15 @@ export function schoolApi(h: Http) {
       rooms: () => h.get<string[]>('/v1/timetable/rooms'),
       cover: (b: CoverRequest) => h.post<void>('/v1/timetable/cover', b),
       publish: () => h.post<{ families: number; teachers: number; version: number }>('/v1/timetable/publish'),
+      roomList: () => h.get<RoomRow[]>('/v1/timetable/room-list'),
+      addRoom: (b: RoomSave) => h.post<RoomRow[]>('/v1/timetable/room-list', b),
+      saveRoom: (id: string, b: RoomSave) => h.put<RoomRow[]>(`/v1/timetable/room-list/${id}`, b),
+      deleteRoom: (id: string) => h.del<RoomRow[]>(`/v1/timetable/room-list/${id}`),
+      roomDay: (id: string, date: string) => h.get<RoomDay>(`/v1/timetable/room-list/${id}/day`, { date }),
+      book: (b: RoomBookingCreate) => h.post<RoomDay>('/v1/timetable/bookings', b),
+      cancelBooking: (id: string) => h.del<void>(`/v1/timetable/bookings/${id}`),
+      times: () => h.get<PeriodTimesRow[]>('/v1/timetable/times'),
+      putTimes: (b: PeriodTimesPut) => h.put<PeriodTimesRow[]>('/v1/timetable/times', b),
     },
     subjects: () => h.get<{ id: string; name: string; color: string }[]>('/v1/subjects'),
     homework: {

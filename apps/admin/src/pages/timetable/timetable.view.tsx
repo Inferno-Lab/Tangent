@@ -17,6 +17,7 @@ export function TimetableView({ v }: { v: any }) {
         <header className="hd rise">
           <div className="ht">
             <h1>{t('admin.timetable.view.timetable')}</h1>
+            {v.tabs && <div style={{ margin: '8px 0' } as CSSProperties}>{v.tabs}</div>}
             <p>
               {t('admin.timetable.view.class')}{' '}{v.className} · {v.term} {t('admin.timetable.view.version')}{' '}{v.version},{" "}
               <span style={{ color: v.isDraft ? "var(--warn-i)" : "var(--ok-i)", fontWeight: "700" } as CSSProperties}>{v.isDraft ? "draft" : "published"}</span>

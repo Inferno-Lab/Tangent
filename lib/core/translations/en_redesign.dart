@@ -551,6 +551,7 @@ const enRedesign = <String, String>{
   'profile.house': 'House',
   'profile.born': 'Born',
   'profile.also_written': 'Also written',
+  'timetable.cycle_day': 'Day @n',
   'profile.blood': 'Blood',
   'profile.subject': 'Subject',
   'profile.classes': 'Classes',

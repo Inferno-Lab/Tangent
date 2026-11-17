@@ -6,6 +6,7 @@ import { DEFAULT_BLOOD_GROUPS, DEFAULT_GENDERS, DEFAULT_LEAVE_REASONS, DEFAULT_R
 import { CustomFieldsSetting } from './fields.js';
 import { WorkflowsSetting } from './workflows.js';
 import { AdmissionStages, DEFAULT_ADMISSION_STAGES } from './admissions.js';
+import { TimetableCycle } from './cycles.js';
 import { AddressFormat, DEFAULT_ADDRESS_FORMAT } from './address.js';
 import { GradingSchemes } from './grading.js';
 import { DocTemplates } from './templates.js';
@@ -118,6 +119,8 @@ export const SchoolSettingsSchema = z.object({
   'workflows.steps': WorkflowsSetting.default({}),
   'attendance.notifyParents': z.boolean().default(true),
   'attendance.lockAfterDays': z.number().int().min(0).max(30).default(2),
+  // How the timetable repeats: every week, A and B weeks, or a cycle of school days (cycles.ts).
+  'timetable.cycle': TimetableCycle.default({ kind: 'week', length: 6 }),
   // One roll call a day, or a morning and an afternoon register (counted as sessions, as schools in England do).
   'attendance.registers': z.enum(['day', 'ampm']).default('day'),
   // With two registers: when the afternoon one starts (the app marks whichever it is now).
@@ -358,6 +361,8 @@ export interface EffectiveConfig {
   limits: EntitlementDoc['limits'];
   /** The app: which roles may sign in, and each role's dock, Home cards and quick buttons, already limited to what the school has. */
   app: { roles: AppRoleKey[]; layout: Record<AppRoleKey, AppLayout> };
+  /** The timetable's days (mon… / mon-a… / d1…), and for a cycle that is not weekly each nearby date's day (the apps' config only). */
+  timetable?: { keys: string[]; dates: Record<string, string> | null };
   privacy: { notice: string; officerName: string; officerEmail: string; officerPhone: string };
   /** Kill switches and rollouts the console set for this school. */
   flags: Record<string, boolean>;

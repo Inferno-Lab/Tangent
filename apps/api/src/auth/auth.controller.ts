@@ -127,8 +127,8 @@ export class MeController {
 
   /** The settings the apps and admin start from: platform defaults, plan, locks and school choices, cut to this user. */
   @Get('config')
-  config(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser): Promise<EffectiveConfig> {
-    return this.settings.effective(t, u.permissions);
+  async config(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser): Promise<EffectiveConfig> {
+    return { ...(await this.settings.effective(t, u.permissions)), timetable: await this.settings.timetableDays(t) };
   }
 
   /** Branding for the sign-in page, before anyone has signed in. */

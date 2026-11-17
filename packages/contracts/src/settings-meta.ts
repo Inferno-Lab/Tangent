@@ -14,7 +14,7 @@ const regionName = (c: string): string => {
 export type SettingKind =
   | 'text' | 'textarea' | 'number' | 'bool' | 'enum' | 'color' | 'time' | 'date' | 'language'
   | 'multi' | 'appRoles' | 'appLayout' | 'notifyRules' | 'templates' | 'classes' | 'logo'
-  | 'houses' | 'categories' | 'strings' | 'gradingScale' | 'paymentMethods' | 'attendanceMarks' | 'vocabulary' | 'list' | 'customFields' | 'workflows' | 'taxSplit' | 'addressFormat' | 'gradingSchemes' | 'documentTemplates' | 'admissionStages';
+  | 'houses' | 'categories' | 'strings' | 'gradingScale' | 'paymentMethods' | 'attendanceMarks' | 'vocabulary' | 'list' | 'customFields' | 'workflows' | 'taxSplit' | 'addressFormat' | 'gradingSchemes' | 'documentTemplates' | 'admissionStages' | 'timetableCycle';
 
 export interface SettingMeta {
   /** One of the school-wide groups, or the key of the module that owns the setting (config-engine's MODULES lists it there too). */
@@ -125,6 +125,7 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = localized({
 
   // Attendance
   'attendance.notifyParents': { group: 'attendance', label: 'Tell families when a child is absent or late', kind: 'bool' },
+  'timetable.cycle': { group: 'timetable', label: 'How the timetable repeats', kind: 'timetableCycle', help: 'Every week, two alternating weeks (A and B), or a cycle of school days (Day 1 to Day 6) that moves on only on days the school is open. Changing it keeps each lesson on the day with the same number.' },
   'attendance.registers': { group: 'attendance', label: 'Registers a day', kind: 'enum', options: [['day', 'One roll call a day'], ['ampm', 'A morning and an afternoon register']], help: 'With two, each half is marked on its own and counted as a session; screens that show one mark a day put the two together.' },
   'attendance.pmFrom': { group: 'attendance', label: 'The afternoon register starts at', kind: 'time', help: 'With two registers a day, the teachers’ app marks the morning one before this time and the afternoon one after it.' },
   'attendance.lockAfterDays': { group: 'attendance', label: 'Attendance can be corrected for this many days', kind: 'number', min: 0, max: 30, help: 'In the admin and in the teachers’ app; after that, only someone allowed to approve can change it.' },

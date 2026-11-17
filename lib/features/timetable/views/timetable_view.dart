@@ -42,11 +42,13 @@ class TimetableView extends GetView<TimetableController> {
         bottomBar: _DayPicker(controller: controller, index: index),
         children: [
           PageTitle(
-            DateFormat('EEEE').format(controller.dateOf(index)),
+            controller.dateOf(index) == null || !const ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].contains(controller.keys[index])
+                ? controller.dayLabel(index)
+                : DateFormat('EEEE').format(controller.dateOf(index)!),
             subtitle: cls == null
                 ? null
                 : 'timetable.subtitle'.trp({
-                    'class': '${cls.name} ${cls.section}',
+                    'class': cls.label,
                     'room': cls.room,
                     'n': '$classes',
                   }),
@@ -222,7 +224,7 @@ class _DayPicker extends StatelessWidget {
       radius: 999,
       child: LayoutBuilder(
         builder: (context, box) {
-          final slot = (box.maxWidth - 8) / TimetableController.keys.length;
+          final slot = (box.maxWidth - 8) / controller.keys.length;
           return Stack(
             children: [
               AnimatedPositioned(
@@ -246,12 +248,12 @@ class _DayPicker extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Row(
                   children: [
-                    for (var i = 0; i < TimetableController.keys.length; i++)
+                    for (var i = 0; i < controller.keys.length; i++)
                       Expanded(
                         child: Semantics(
                           button: true,
                           selected: i == index,
-                          label: DateFormat('EEEE d MMMM').format(controller.dateOf(i)),
+                          label: controller.dateOf(i) == null ? controller.dayLabel(i) : '${controller.dayLabel(i)} · ${DateFormat('d MMMM').format(controller.dateOf(i)!)}',
                           child: Pressable(
                             onTap: () => controller.dayIndex.value = i,
                             child: SizedBox(
@@ -260,11 +262,13 @@ class _DayPicker extends StatelessWidget {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
-                                    'day.${TimetableController.keys[i]}'.tr,
+                                    controller.dayLabel(i),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: AppText.capB(color: c.ink3, height: 1.1),
                                   ),
                                   Text(
-                                    '${controller.dateOf(i).day}',
+                                    controller.dateOf(i) == null ? '' : '${controller.dateOf(i)!.day}',
                                     style: AppText.t(color: i == index ? c.ink : c.ink2, height: 1.1),
                                   ),
                                 ],

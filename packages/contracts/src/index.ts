@@ -7,6 +7,7 @@ export * from './lists.js';
 export * from './fields.js';
 export * from './workflows.js';
 export * from './admissions.js';
+export * from './cycles.js';
 export * from './address.js';
 export * from './grading.js';
 export * from './templates.js';

@@ -7,6 +7,8 @@ import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { StudentPick, dateLabel, problem, stamp } from '../../app/kit';
 import { usePageTabs } from '../../app/tabs';
+import { useShellChrome } from '../../app/Layout';
+import { BellDays } from './BellDays';
 import { useSetupSections } from './SetupSections';
 
 const STATUS: Record<YearRow['status'], { text: string; tone: string }> = { current: { text: t('admin.year_page.current'), tone: 'g' }, draft: { text: t('admin.year_page.draft'), tone: 'a' }, archived: { text: t('admin.year_page.archived'), tone: '' } };
@@ -18,10 +20,13 @@ const SUBS: Record<string, string> = { terms: t('admin.year_page.the_school_s_ye
   classes: t('admin.year_page.every_class_and_its_class'), subjects: t('admin.year_page.what_is_taught_and_how'), bells: t('admin.year_page.when_each_period_break_and') };
 
 export function YearPage() { const { tab, tabs } = usePageTabs('/year');
+  const chrome = useShellChrome();
   const { toast, say } = useToast();
   const setup = useSetupSections(KINDS[tab] ?? [], say);
   if (tab === 'year-end') return <YearEnd tabs={tabs} />;
-  return <Page title={t('admin.year_page.academic_year')} sub={SUBS[tab] ?? ''} toast={toast} tabs={tabs} overlays={setup.overlay}>{setup.view}</Page>;
+  // Bell times: the usual ones, and (with the timetable) days that keep their own.
+  const timed = tab === 'bells' && !!chrome.shell?.modules.includes('timetable');
+  return <Page title={t('admin.year_page.academic_year')} sub={SUBS[tab] ?? ''} toast={toast} tabs={tabs} overlays={setup.overlay}>{setup.view}{timed && <BellDays say={say} />}</Page>;
 }
 
 /** Drafting the next year, promoting students into it, and starting it. */

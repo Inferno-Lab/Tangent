@@ -78,6 +78,25 @@ abstract final class SchoolConfig {
   static set debugSettings(Map<String, dynamic> settings) => _settings = settings;
 
   static T _s<T>(String key, T fallback) => _settings[key] is T ? _settings[key] as T : fallback;
+
+  /// The days the school's timetable keeps lessons under, in order: mon…sun for a week, mon-a…sun-b for A/B weeks, d1…dN for
+  /// a cycle of days (the server's `timetable.keys`; sample content: the seven weekdays).
+  static List<String> get timetableKeys {
+    final tt = _json['timetable'];
+    final keys = tt is Map ? tt['keys'] : null;
+    return keys is List && keys.isNotEmpty ? keys.map((k) => '$k').toList() : const ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  }
+
+  /// The timetable day a date uses for A/B weeks and cycles of days (which holidays move on), from the server; null for a
+  /// weekly timetable, or a date it did not send (closed, or too far away).
+  static String? cycleKey(DateTime date) {
+    final tt = _json['timetable'];
+    final dates = tt is Map ? tt['dates'] : null;
+    if (dates is! Map) return null;
+    final d = '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final k = dates[d];
+    return k is String ? k : '';
+  }
   static List<Map<String, dynamic>> _list(String key) =>
       [for (final e in (_settings[key] as List?) ?? const []) Map<String, dynamic>.from(e as Map)];
 

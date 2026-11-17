@@ -8,7 +8,7 @@ import { problem } from '../../app/kit';
 const DAY = ['', t('admin.timetable_tools.monday'), t('admin.timetable_tools.tuesday'), t('admin.timetable_tools.wednesday'), t('admin.timetable_tools.thursday'), t('admin.timetable_tools.friday'), t('admin.timetable_tools.saturday'), t('admin.timetable_tools.sunday')];
 
 /** Puts a lesson in a free period: subject, teacher (only those free then are accepted), room. */
-export function PlaceDialog({ classId, day, period, label, onClose, onDone }: { classId: string; day: number; period: number; label: string; onClose: () => void; onDone: (m: string) => void }) {
+export function PlaceDialog({ classId, day, dayName, period, label, onClose, onDone }: { classId: string; day: number; dayName: string; period: number; label: string; onClose: () => void; onDone: (m: string) => void }) {
   const { api } = useApp();
   const shake = useShake();
   const subjects = useQuery({ queryKey: ['subjects'], queryFn: api.subjects, staleTime: 5 * 60_000 });
@@ -22,7 +22,7 @@ export function PlaceDialog({ classId, day, period, label, onClose, onDone }: { 
   });
   const teachers = (staff.data ?? []).filter((s) => !f.subjectId || !s.subjects.length || s.subjects.some((x) => x.id === f.subjectId));
   return (
-    <Dialog title={t('admin.timetable_tools.place_a_lesson', { p0: DAY[day], label })} onClose={onClose} width={480} shake={shake.cls}>
+    <Dialog title={t('admin.timetable_tools.place_a_lesson', { p0: dayName, label })} onClose={onClose} width={480} shake={shake.cls}>
       <div className="stack">
         <SelectField label={t('admin.timetable_tools.subject')} value={f.subjectId} onChange={(subjectId) => { setF({ ...f, subjectId }); setErr({}); }} error={err.subjectId} options={[{ value: '', label: t('admin.timetable_tools.choose_a_subject') }, ...(subjects.data ?? []).map((s) => ({ value: s.id, label: s.name }))]} />
         <SelectField label={t('admin.timetable_tools.teacher')} value={f.teacherId} onChange={(teacherId) => { setF({ ...f, teacherId }); setErr({}); }} error={err.teacherId} options={[{ value: '', label: t('admin.timetable_tools.choose_a_teacher') }, ...teachers.map((s) => ({ value: s.id, label: s.name }))]} />
@@ -38,7 +38,7 @@ export function PlaceDialog({ classId, day, period, label, onClose, onDone }: { 
 }
 
 /** Changes a lesson's subject or room (the teacher has its own chooser), or frees the period. */
-export function ChangeDialog({ slot, onClose, onDone }: { slot: SlotRow; onClose: () => void; onDone: (m: string) => void }) {
+export function ChangeDialog({ slot, dayName, onClose, onDone }: { slot: SlotRow; dayName: string; onClose: () => void; onDone: (m: string) => void }) {
   const { api } = useApp();
   const shake = useShake();
   const subjects = useQuery({ queryKey: ['subjects'], queryFn: api.subjects, staleTime: 5 * 60_000 });
@@ -51,7 +51,7 @@ export function ChangeDialog({ slot, onClose, onDone }: { slot: SlotRow; onClose
   });
   const free = useMutation({ mutationFn: () => api.timetable.free(slot.id), onSuccess: () => onDone(t('admin.timetable_tools.the_period_is_free_now')), onError: (e) => { setErr((e as Error).message); shake.hit(); } });
   return (
-    <Dialog title={`${slot.subjectName} · ${DAY[slot.day]}`} onClose={onClose} width={480} shake={shake.cls}>
+    <Dialog title={`${slot.subjectName} · ${dayName}`} onClose={onClose} width={480} shake={shake.cls}>
       <div className="stack">
         <SelectField label={t('admin.timetable_tools.subject')} value={f.subjectId} onChange={(subjectId) => setF({ ...f, subjectId })} options={(subjects.data ?? []).map((s) => ({ value: s.id, label: s.name }))} />
         <Field label={t('admin.timetable_tools.room')} value={f.room} onChange={(room) => setF({ ...f, room })} maxLength={20} placeholder="B-204" />
@@ -76,7 +76,9 @@ export function ChangeDialog({ slot, onClose, onDone }: { slot: SlotRow; onClose
 }
 
 /** One teacher's or one room's week across every class, to read or print. */
-export function WeekDialog({ days, onClose }: { days: number[]; onClose: () => void }) {
+export function WeekDialog({ days: shown, onClose }: { days: { day: number; name: string }[]; onClose: () => void }) {
+  const days = shown.map((d) => d.day);
+  const nameOf = (d: number) => shown.find((x) => x.day === d)?.name ?? DAY[((d - 1) % 7) + 1];
   const { api } = useApp();
   const [by, setBy] = useState<'teacher' | 'room'>('teacher');
   const [pick, setPick] = useState('');
@@ -100,7 +102,7 @@ export function WeekDialog({ days, onClose }: { days: number[]; onClose: () => v
           <div className="scroll-x">
             <div style={{ display: 'grid', gridTemplateColumns: `90px repeat(${days.length}, minmax(110px,1fr))`, gap: 4, minWidth: 90 + days.length * 114 }}>
               <span></span>
-              {days.map((d) => <b key={d} style={{ font: '700 12px var(--fb)', color: 'var(--ink3)' }}>{DAY[d]}</b>)}
+              {days.map((d) => <b key={d} style={{ font: '700 12px var(--fb)', color: 'var(--ink3)' }}>{nameOf(d)}</b>)}
               {w.periods.filter((p) => p.kind === 'period').map((p) => (
                 <Fragment key={p.idx}>
                   <span style={{ font: '700 12px var(--fb)', color: 'var(--ink3)' }}>{p.label}<small style={{ display: 'block' }}>{p.starts}</small></span>

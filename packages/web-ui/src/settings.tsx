@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, hasKey, type AppRole } from '@tangent/config-engine';
-import { AdmissionStages, DEFAULT_ADMISSION_STAGES, type AdmissionStage, rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, ADDRESS_PARTS, ADDRESS_PART_LABELS, SCHEME_KINDS, SCHEME_KIND_LABELS, BLOCK_KINDS, BLOCK_KIND_LABELS, DEFAULT_TEMPLATES, DOC_KINDS, DOC_KIND_LABELS, DOC_PLACEHOLDERS, PAGE_SIZES, type Block, type DocKind, type DocTemplate, type DocTemplates, type GradeBand, type GradingScheme, type AddressFormat, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
+import { AdmissionStages, DEFAULT_ADMISSION_STAGES, TimetableCycle, type AdmissionStage, rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, ADDRESS_PARTS, ADDRESS_PART_LABELS, SCHEME_KINDS, SCHEME_KIND_LABELS, BLOCK_KINDS, BLOCK_KIND_LABELS, DEFAULT_TEMPLATES, DOC_KINDS, DOC_KIND_LABELS, DOC_PLACEHOLDERS, PAGE_SIZES, type Block, type DocKind, type DocTemplate, type DocTemplates, type GradeBand, type GradingScheme, type AddressFormat, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
 import { Checkbox, DateField, FilePick, NumberField, TimeField } from './fields';
 import { ColourField } from './ColourPicker';
 import { ErrorLine, Field, SelectField } from './forms';
@@ -140,6 +140,17 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
           );
         })}
       </div>);
+    }
+    case 'timetableCycle': {
+      const c = TimetableCycle.safeParse(value).data ?? { kind: 'week' as const, length: 6 };
+      return box(
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div style={{ width: 260 }}><SelectField label={tr('ui.settings.repeats')} value={c.kind} disabled={disabled} onChange={(k) => onChange({ ...c, kind: k })}
+            options={[{ value: 'week', label: tr('ui.settings.every_week') }, { value: 'ab', label: tr('ui.settings.a_and_b_weeks') }, { value: 'days', label: tr('ui.settings.a_cycle_of_days') }]} /></div>
+          {c.kind === 'days' && <div style={{ width: 150 }}><NumberField label={tr('ui.settings.days_in_the_cycle')} min={2} max={10} value={String(c.length)} disabled={disabled} onChange={(v) => onChange({ ...c, length: Math.min(10, Math.max(2, Number(v) || 2)) })} /></div>}
+          {c.kind !== 'week' && <div style={{ width: 220 }}><DateField label={c.kind === 'ab' ? tr('ui.settings.a_day_in_week_a') : tr('ui.settings.day_1_is')} value={c.startsOn ?? ''} disabled={disabled} onChange={(d) => onChange({ ...c, startsOn: d || undefined })} /></div>}
+        </div>,
+      );
     }
     case 'admissionStages': {
       const v = ctx.values ?? {};

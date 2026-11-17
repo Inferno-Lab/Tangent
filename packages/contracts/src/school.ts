@@ -442,7 +442,8 @@ export interface SlotRow {
 }
 export interface Clash {
   id: string;
-  kind: 'teacher';
+  /** A teacher in two classes at once, or two classes in one room (teacherId and teacherName then name the room). */
+  kind: 'teacher' | 'room';
   teacherId: string;
   teacherName: string;
   day: number;
@@ -455,6 +456,11 @@ export interface TimetableView {
   classId: string;
   className: string;
   periods: PeriodDef[];
+  /** The days of the school's cycle the grid shows, in order, and the one today is (null when the school is closed). */
+  days: TimetableDay[];
+  today: number | null;
+  /** Times that differ from the periods' own on some day (for every class or this one), by `${day}|${period}`. */
+  times: Record<string, { starts: string; ends: string }>;
   slots: SlotRow[];
   clashes: Clash[];
   unplaced: { subjectId: string; name: string; color: string; missing: number }[];
@@ -469,10 +475,38 @@ export const SlotPatch = z.object({
 });
 export type SlotPatch = z.infer<typeof SlotPatch>;
 /** Puts a lesson in a free period of a class. */
-export const SlotCreate = z.object({ classId: z.string().min(1), day: z.number().int().min(1).max(7), period: z.number().int().min(0), subjectId: z.string().min(1, 'Choose a subject'), teacherId: z.string().min(1, 'Choose a teacher'), room: z.string().max(20).nullable().optional() });
+// `day` is a timetable day of the school's cycle (1–7 for a week, 1–14 for A/B weeks, 1–N for a cycle of days).
+export const SlotCreate = z.object({ classId: z.string().min(1), day: z.number().int().min(1).max(14), period: z.number().int().min(0), subjectId: z.string().min(1, 'Choose a subject'), teacherId: z.string().min(1, 'Choose a teacher'), room: z.string().max(20).nullable().optional() });
 export type SlotCreate = z.infer<typeof SlotCreate>;
 /** One teacher's or one room's week, across classes. */
-export interface WeekOf { title: string; periods: PeriodDef[]; slots: (SlotRow & { className: string })[] }
+export interface WeekOf { title: string; periods: PeriodDef[]; days: TimetableDay[]; slots: (SlotRow & { className: string })[] }
+/** A timetable day of the school's cycle, as the grids show it. */
+export interface TimetableDay { day: number; key: string; week?: 'a' | 'b'; n?: number }
+
+/** A room the school timetables and books (Timetable → Rooms). */
+export interface RoomRow { id: string; name: string; capacity: number | null; note: string; bookable: boolean; lessons: number }
+export const RoomSave = z.object({
+  name: z.string().trim().min(1, 'Name the room').max(20),
+  capacity: z.number().int().min(1).max(5000).nullable().optional(),
+  note: z.string().trim().max(120).default(''),
+  bookable: z.boolean().default(true),
+});
+export type RoomSave = z.infer<typeof RoomSave>;
+/** A room's day: its lessons from the timetable and the bookings made for it. */
+export interface RoomDay { room: RoomRow; date: string; lessons: { start: string; end: string; label: string }[]; bookings: RoomBookingRow[] }
+export interface RoomBookingRow { id: string; roomId: string; date: string; start: string; end: string; purpose: string; bookedBy: string; mine: boolean }
+const HHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'A time like 14:30');
+export const RoomBookingCreate = z.object({ roomId: z.string().min(1), date: IsoDate, start: HHMM, end: HHMM, purpose: z.string().trim().min(2, 'Say what it is for').max(120) })
+  .refine((b) => b.end > b.start, { message: 'It must end after it starts', path: ['end'] });
+export type RoomBookingCreate = z.infer<typeof RoomBookingCreate>;
+/** A period's times on one timetable day, for every class or for one (a short Friday, the youngest leaving early). */
+export const PeriodTimesPut = z.object({
+  day: z.number().int().min(1).max(14),
+  classId: z.string().min(1).nullable(),
+  times: z.array(z.object({ period: z.number().int().min(0), starts: HHMM, ends: HHMM }).refine((x) => x.ends > x.starts, { message: 'A period must end after it starts', path: ['ends'] })).max(20),
+});
+export type PeriodTimesPut = z.infer<typeof PeriodTimesPut>;
+export interface PeriodTimesRow { day: number; classId: string | null; period: number; starts: string; ends: string }
 export const CoverRequest = z.object({ slotId: z.string(), teacherId: z.string(), date: IsoDate.optional() });
 export type CoverRequest = z.infer<typeof CoverRequest>;
 export interface TeacherLoad {

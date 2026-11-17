@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
-import { tx, schoolNow, hasReachedAge, customText, listKey, listLabel, listOptions, SchoolSettingsSchema, DEFAULT_LEAVE_REASONS, type ListItem, type CustomFieldsSetting, type CustomValues, type FieldDef, type AttendanceMarkDef, MESSAGE_EVENTS, addDays, schoolToday, type AttendanceStatus, type NoticeCreate, type PeriodMarksPut } from '@tangent/contracts';
+import { tx, schoolNow, slotDayOf, slotKey, hasReachedAge, customText, listKey, listLabel, listOptions, SchoolSettingsSchema, DEFAULT_LEAVE_REASONS, type ListItem, type CustomFieldsSetting, type CustomValues, type FieldDef, type AttendanceMarkDef, MESSAGE_EVENTS, addDays, schoolToday, type AttendanceStatus, type NoticeCreate, type PeriodMarksPut } from '@tangent/contracts';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import { schoolContext, type Registry } from '@tangent/tenancy';
 import { REGISTRY, type AuthedUser, type TenantCtx } from '../tenancy/tenant.js';
@@ -15,7 +15,6 @@ import { NoticesService } from './notices.service.js';
 import { AuditService, Messenger, SettingsService, checkLeaveClash } from './support.js';
 import { TransportService } from './transport.service.js';
 
-const DAYS = ['', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const key = (subjectId: string) => subjectId.replace(/^sub_/, '');
 
 /** What a teacher sends to set or change homework from the app. */
@@ -198,22 +197,33 @@ export class FamilyService {
   }
 
   /** The lessons of `lessonsOf`, built when the calendar link is opened. */
-  async lessonEvents(t: TenantCtx, by: { classId?: string; teacherId?: string }): Promise<{ title: string; start: string; end: string; place?: string; weeklyUntil: string }[]> {
+  async lessonEvents(t: TenantCtx, by: { classId?: string; teacherId?: string }): Promise<{ title: string; start: string; end: string; place?: string; weeklyUntil?: string }[]> {
     const classId = by.classId;
     const today = schoolToday();
     const until = (await t.pool.query<{ e: string }>(
       "select ends_on::text e from terms where starts_on <= $1 and ends_on >= $1 union all select ends_on::text from academic_years where current limit 1", [today])).rows[0]?.e ?? addDays(today, 120);
     const { rows } = await t.pool.query<{ day: number; subject: string; room: string | null; starts_at: string; ends_at: string; class_name: string }>(
-      `select ts.day, coalesce(sub.name, ts.subject_id) subject, ts.room, p.starts_at, p.ends_at, c.name class_name from timetable_slots ts join periods p on p.idx = ts.period
+      `select ts.day, coalesce(sub.name, ts.subject_id) subject, ts.room, st.starts_at, st.ends_at, c.name class_name from timetable_slots ts join slot_times st on st.slot_id = ts.id
          join classes c on c.id = ts.class_id left join subjects sub on sub.id = ts.subject_id
-       where ${classId ? 'ts.class_id = $1' : 'coalesce(ts.cover_teacher_id, ts.teacher_id) = $1'} order by ts.day, p.starts_at`, [classId ?? by.teacherId]);
-    // Each lesson starts on its weekday's next date from today (ISO weekday 1 is Monday, as timetable_slots counts).
-    const iso = (d: string) => { const n = new Date(`${d}T00:00:00Z`).getUTCDay(); return n === 0 ? 7 : n; };
-    const first = (dayNo: number) => addDays(today, (dayNo - iso(today) + 7) % 7);
-    return rows.map((r) => ({
-      title: classId ? r.subject : `${r.subject} · ${r.class_name}`, start: `${first(r.day)}T${r.starts_at}`, end: `${first(r.day)}T${r.ends_at}`,
-      ...(r.room ? { place: r.room } : {}), weeklyUntil: until,
-    }));
+       where ${classId ? 'ts.class_id = $1' : 'coalesce(ts.cover_teacher_id, ts.teacher_id) = $1'} order by ts.day, st.starts_at`, [classId ?? by.teacherId]);
+    const title = (r: (typeof rows)[number]) => (classId ? r.subject : `${r.subject} · ${r.class_name}`);
+    const cycle = await this.settings.cycle(t);
+    if (cycle.kind === 'week') {
+      // Each lesson starts on its weekday's next date from today (ISO weekday 1 is Monday, as timetable_slots counts) and repeats weekly.
+      const iso = (d: string) => { const n = new Date(`${d}T00:00:00Z`).getUTCDay(); return n === 0 ? 7 : n; };
+      const first = (dayNo: number) => addDays(today, (dayNo - iso(today) + 7) % 7);
+      return rows.map((r) => ({ title: title(r), start: `${first(r.day)}T${r.starts_at}`, end: `${first(r.day)}T${r.ends_at}`, ...(r.room ? { place: r.room } : {}), weeklyUntil: until }));
+    }
+    // A/B weeks and cycles of days do not repeat weekly: every lesson on every school day until the term ends.
+    // ponytail: dated events up to the term's end (a few thousand at most), a cycle-aware recurrence if calendars ever need less.
+    const closed = await this.settings.closed(t);
+    const out: { title: string; start: string; end: string; place?: string }[] = [];
+    for (let d = today; d <= until && out.length < 5000; d = addDays(d, 1)) {
+      const day = slotDayOf(cycle, d, closed);
+      if (day === null) continue;
+      for (const r of rows.filter((x) => x.day === day)) out.push({ title: title(r), start: `${d}T${r.starts_at}`, end: `${d}T${r.ends_at}`, ...(r.room ? { place: r.room } : {}) });
+    }
+    return out;
   }
 
   async userName(t: TenantCtx, id: string): Promise<{ id: string; name: string }> {
@@ -383,19 +393,27 @@ export class FamilyService {
 
   async timetable(t: TenantCtx, user: AuthedUser, classId: string) {
     await this.mayClass(t, await this.who(t, user), classId);
-    const [slots, periods] = await Promise.all([
+    const [slots, periods, own] = await Promise.all([
       t.pool.query<{ day: number; period: number; subject_id: string; teacher_id: string; room: string | null; starts_at: string; ends_at: string }>(
-        `select ts.day, ts.period, ts.subject_id, coalesce(ts.cover_teacher_id, ts.teacher_id) teacher_id, ts.room, p.starts_at, p.ends_at from timetable_slots ts join periods p on p.idx = ts.period where ts.class_id = $1`, [classId]),
+        `select ts.day, ts.period, ts.subject_id, coalesce(ts.cover_teacher_id, ts.teacher_id) teacher_id, ts.room, st.starts_at, st.ends_at from timetable_slots ts join slot_times st on st.slot_id = ts.id where ts.class_id = $1`, [classId]),
       t.pool.query<{ idx: number; kind: string; starts_at: string; ends_at: string }>("select idx, kind, starts_at, ends_at from periods where kind <> 'period'"),
+      // A break's own times on a day (the class's first, then the school's).
+      t.pool.query<{ day: number; period: number; starts_at: string; ends_at: string }>('select day, period, starts_at, ends_at from period_times where class_id is null or class_id = $1 order by class_id nulls first', [classId]),
     ]);
-    const days = [...new Set(slots.rows.map((s) => s.day))].sort();
-    return days.map((d) => ({
-      classId, day: DAYS[d],
-      periods: [
-        ...slots.rows.filter((s) => s.day === d).map((s) => ({ id: `${classId}-${DAYS[d]}-${s.period}`, subject: key(s.subject_id), teacherId: s.teacher_id, start: s.starts_at, end: s.ends_at, room: s.room ?? '', kind: 'class' })),
-        ...periods.rows.map((p) => ({ id: `${classId}-${DAYS[d]}-b${p.idx}`, subject: 'break', start: p.starts_at, end: p.ends_at, room: '', kind: p.kind === 'lunch' ? 'recess' : 'break' })),
-      ].sort((a, b) => a.start.localeCompare(b.start)),
-    }));
+    // Keyed by the school's cycle: mon…sun for a week, mon-a…sun-b for A/B weeks, d1…dN for a cycle of days.
+    const cycle = await this.settings.cycle(t);
+    const times = new Map(own.rows.map((r) => [`${r.day}|${r.period}`, r]));
+    const days = [...new Set(slots.rows.map((s) => s.day))].sort((a, b) => a - b);
+    return days.map((d) => {
+      const k = slotKey(cycle, d);
+      return {
+        classId, day: k,
+        periods: [
+          ...slots.rows.filter((s) => s.day === d).map((s) => ({ id: `${classId}-${k}-${s.period}`, subject: key(s.subject_id), teacherId: s.teacher_id, start: s.starts_at, end: s.ends_at, room: s.room ?? '', kind: 'class' })),
+          ...periods.rows.map((p) => { const o = times.get(`${d}|${p.idx}`); return { id: `${classId}-${k}-b${p.idx}`, subject: 'break', start: o?.starts_at ?? p.starts_at, end: o?.ends_at ?? p.ends_at, room: '', kind: p.kind === 'lunch' ? 'recess' : 'break' }; }),
+        ].sort((a, b) => a.start.localeCompare(b.start)),
+      };
+    });
   }
 
   // Homework

@@ -1,3 +1,4 @@
+import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/utils/formatters.dart';
 import 'package:tangent/data/models/academics.dart';
 import 'package:tangent/data/models/campus.dart';
@@ -58,7 +59,11 @@ class AttendanceSummary {
   }
 }
 
+/// The timetable day a date uses: its weekday for a weekly timetable, else the day of the school's A/B weeks or cycle of days
+/// (empty when the school has no lessons that day).
 String weekdayKey(DateTime date) {
+  final cycle = SchoolConfig.cycleKey(date);
+  if (cycle != null) return cycle;
   const keys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   return keys[date.weekday - 1];
 }

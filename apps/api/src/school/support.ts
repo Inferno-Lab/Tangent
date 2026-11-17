@@ -3,7 +3,7 @@ import { StaleSettings, newId, recordSettingsVersion, writeSettings } from '@tan
 import { checkSchoolChanges, resolveConfig, validateSettingsChanges } from '@tangent/config-engine';
 import { ApiError } from '@tangent/nest-kit';
 import type { Registry } from '@tangent/tenancy';
-import { tx, checkCustom, roundToCurrency, type CustomEntity, type CustomFieldsSetting, type CustomValues, rawOf, toE164, phoneProblem, MESSAGE_EVENTS, SETTINGS_META, schoolMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type GradingScheme, gradeIn, schemeFor, type SchoolSettingsPatch, type SchoolSettingsView, type SettingsDoc } from '@tangent/contracts';
+import { tx, TimetableCycle, slotDayOf, slotDays, slotKey, schoolToday, addDays, schoolZone, checkCustom, roundToCurrency, type CustomEntity, type CustomFieldsSetting, type CustomValues, rawOf, toE164, phoneProblem, MESSAGE_EVENTS, SETTINGS_META, schoolMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type GradingScheme, gradeIn, schemeFor, type SchoolSettingsPatch, type SchoolSettingsView, type SettingsDoc } from '@tangent/contracts';
 import { REGISTRY, type TenantCtx } from '../tenancy/tenant.js';
 import { HubService } from './hub.service.js';
 import { serverCatalogue } from '@tangent/tenancy';
@@ -107,6 +107,27 @@ export class SettingsService {
     return names.map((n) => ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(n)).filter((i) => i >= 0);
   }
 
+  /** How the school's timetable repeats (timetable.cycle), read through the setting's own rules. */
+  async cycle(t: TenantCtx): Promise<TimetableCycle> {
+    const read = TimetableCycle.safeParse(await this.value<unknown>(t, 'timetable.cycle', undefined));
+    return read.success ? read.data : { kind: 'week', length: 6 };
+  }
+
+  /** Whether the school is closed on a date: a weekly off day or a holiday on its calendar. */
+  async closed(t: TenantCtx): Promise<(date: string) => boolean> {
+    const off = await this.offDays(t);
+    const { rows } = await t.pool.query<{ s: string; e: string }>(
+      "select (starts_at at time zone $1)::date::text s, (coalesce(ends_at, starts_at) at time zone $1)::date::text e from events where kind = 'holiday'", [schoolZone()]);
+    const holidays = new Set<string>();
+    for (const r of rows) for (let d = r.s; d <= r.e && holidays.size < 5000; d = addDays(d, 1)) holidays.add(d);
+    return (date) => off.includes(new Date(`${date}T00:00:00Z`).getUTCDay()) || holidays.has(date);
+  }
+
+  /** The timetable day a date uses (the weekday, week B's weekday + 7, or the day of a cycle), or null when the school is closed. */
+  async slotDay(t: TenantCtx, date: string): Promise<number | null> {
+    return slotDayOf(await this.cycle(t), date, await this.closed(t));
+  }
+
   /** The school's grading scale and pass mark (console: Exams and results), with the function that turns a percentage into a grade. */
   /**
    * How a mark is graded (§3.6.6): the scheme for a subject and year group (`at`), else the school's scale. `grade` gives the
@@ -173,6 +194,23 @@ export class SettingsService {
     return (v === undefined ? fallback : v) as T;
   }
 
+  /**
+   * The timetable days the apps keep lessons under, in order, and (for A/B weeks and cycles of days, which a phone cannot work
+   * out alone: holidays move a cycle on) the day each date from two weeks back to two months ahead uses.
+   */
+  async timetableDays(t: TenantCtx): Promise<NonNullable<EffectiveConfig['timetable']>> {
+    const cycle = await this.cycle(t);
+    const keys = slotDays(cycle, (await this.offDays(t)).map((d) => d || 7)).map((d) => d.key);
+    if (cycle.kind === 'week') return { keys, dates: null };
+    const closed = await this.closed(t);
+    const dates: Record<string, string> = {};
+    for (let d = addDays(schoolToday(), -14); d <= addDays(schoolToday(), 60); d = addDays(d, 1)) {
+      const day = slotDayOf(cycle, d, closed);
+      if (day !== null) dates[d] = slotKey(cycle, day);
+    }
+    return { keys, dates };
+  }
+
   async effective(t: TenantCtx, permissions?: string[]): Promise<EffectiveConfig> {
     return resolveConfig({ settings: await this.doc(t), entitlement: t.info.entitlement, audience: permissions ? { permissions } : undefined, flags: t.info.flags, live: t.info.wentLive });
   }
@@ -186,7 +224,6 @@ const OPENS: Record<string, string> = Object.fromEntries(MESSAGE_EVENTS.filter((
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-/** One email layout for every school: its name across the top in its brand colour, the message, and who sent it. */
 /**
  * Refuses leave that overlaps leave already asked for or given (a family asking twice, the office recording what a parent
  * already sent). Half days of the same date only clash when they are the same half.
@@ -199,6 +236,7 @@ export async function checkLeaveClash(q: { query: TenantCtx['pool']['query'] }, 
   if (r.rowCount) throw new ApiError('conflict', tx('There is already leave for some of these days.'), { fields: { from: tx('Overlaps other leave.') } });
 }
 
+/** One email layout for every school: its name across the top in its brand colour, the message, and who sent it. */
 export function emailHtml(school: string, color: string, body: string): string {
   // An email is not a page: mail clients need literal colours, so the school's brand colour is written in.
   const c = /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#3D5AFE';

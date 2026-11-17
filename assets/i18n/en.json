@@ -1063,6 +1063,7 @@
  "timetable.add_calendar": "Add to calendar",
  "timetable.break": "Break",
  "timetable.break_line": "@name · @n min",
+ "timetable.cycle_day": "Day @n",
  "timetable.empty": "Timetable on its way",
  "timetable.empty_body": "The school office publishes the weekly timetable before term. Each period shows its teacher and room.",
  "timetable.empty_hint": "Published before the first day of term",
