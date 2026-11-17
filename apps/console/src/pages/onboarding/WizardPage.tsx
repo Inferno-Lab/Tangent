@@ -170,7 +170,7 @@ export function WizardPage() {
             {f('basics', 'currency', tr('console.wizard_page.currency'), { hint: tr('console.wizard_page.a_code_like_usd_gbp') })}
           </div>
           <PackLine country={str(data.basics.country)} curriculum={str(data.basics.board)} />
-          <div className="two">{f('basics', 'city', tr('console.wizard_page.town_or_city'))}{str(data.basics.country) === 'IN' ? f('basics', 'gstin', tr('console.wizard_page.gstin_optional')) : <span />}</div>
+          <div className="two">{f('basics', 'city', tr('console.wizard_page.town_or_city'))}{f('basics', 'gstin', tr('console.wizard_page.gstin_optional'))}</div>
           {f('basics', 'address', tr('console.wizard_page.address_optional'))}
           <div className="lbl" style={{ margin: '8px 0' }}>{tr('console.wizard_page.who_we_talk_to')}</div>
           <div className="two">{f('basics', 'contactName', tr('console.wizard_page.contact_name'))}{f('basics', 'contactPhone', tr('console.wizard_page.phone'), { type: 'tel' })}</div>

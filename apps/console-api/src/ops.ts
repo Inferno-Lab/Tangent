@@ -165,7 +165,7 @@ export class Admin {
     if (!s.contact?.email) throw new ApiError('validation', tx('{name} has no contact email. Add one under its details first.', { name: s.name }));
     // Tangent's own prices and invoices are in its price list's currency (PRICE_CURRENCY).
     const inr = (n: number) => fmtMoney(n, PRICE_CURRENCY);
-    const body = [`Dear ${s.contact.name},`, '', `Tangent invoice for ${s.name}, ${r.period}${s.gstin ? ` (GSTIN ${s.gstin})` : ''}:`, ...r.lines.map((l) => `  ${l.label}: ${inr(l.amount)}`), `Total: ${inr(r.amount)}`, `Due by ${dueFor(r.period)}.`, '', 'Thank you.'].join('\n');
+    const body = [`Dear ${s.contact.name},`, '', `Tangent invoice for ${s.name}, ${r.period}${s.gstin ? ` (tax number ${s.gstin})` : ''}:`, ...r.lines.map((l) => `  ${l.label}: ${inr(l.amount)}`), `Total: ${inr(r.amount)}`, `Due by ${dueFor(r.period)}.`, '', 'Thank you.'].join('\n');
     await hub.send({ schoolId: null, schoolSlug: 'console', channel: 'email', to: s.contact.email, subject: `Tangent invoice ${r.period} · ${s.name}`, body, now: true });
     await this.db.pool.query("update invoices set status = 'sent', sent_at = now(), sent_to = $2 where id = $1", [id, s.contact.email]);
     await this.db.audit(user, 'invoice.sent', 'invoice', id, { to: s.contact.email });
