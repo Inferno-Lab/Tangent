@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:tangent/features/auth/views/password_sheets.dart';
 import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/theme/app_colors.dart';
@@ -226,6 +227,12 @@ class _PasswordFieldState extends State<_PasswordField> {
                 child: Text('auth.password'.tr, style: AppText.capB(color: c.ink2, height: 1.2)),
               ),
             ),
+            Pressable(
+              onTap: () => unawaited(showForgotPassword(widget.controller.email.text)),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                child: Text('auth.forgot'.tr, style: AppText.capB(color: c.mariText, height: 1.2)),
+              ),),
             Pressable(
               onTap: () => unawaited(widget.controller.requestCode()),
               child: Padding(

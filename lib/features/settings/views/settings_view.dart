@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/features/auth/views/password_sheets.dart';
 import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/services/auth_service.dart';
+import 'package:tangent/data/models/user.dart';
 import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/services/theme_service.dart';
 import 'package:tangent/core/theme/app_colors.dart';
@@ -227,6 +229,13 @@ class SettingsView extends StatelessWidget {
                 ),
                 const Hr(indent: 46),
                 _LinkRow(icon: PhosphorIconsRegular.shieldCheck, label: 'privacy.title', onTap: () => unawaited(showPrivacy())),
+                const Hr(indent: 46),
+                // Staff sign in with a password; families sign in with a code and have none to change.
+                if (Get.find<AuthService>().role == UserRole.teacher) ...[
+                  _LinkRow(icon: PhosphorIconsRegular.password, label: 'auth.change_password', onTap: () => unawaited(showChangePassword())),
+                  const Hr(indent: 46),
+                ],
+                _LinkRow(icon: PhosphorIconsRegular.devices, label: 'auth.sign_out_everywhere', onTap: () => unawaited(signOutEverywhere())),
                 const Hr(indent: 46),
                 _LinkRow(
                   icon: PhosphorIconsRegular.signOut,
