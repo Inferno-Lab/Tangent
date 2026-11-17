@@ -24,6 +24,9 @@ export const FieldDef = z.object({
   /** Families (and the person themself) see it in the app. */
   app: z.boolean().optional(),
   hint: z.string().trim().max(120).optional(),
+  /** A format the value must have (an ID number's): a regular expression, and what to tell someone whose value does not fit. */
+  pattern: z.string().max(200).refine((p) => { try { new RegExp(p); return true; } catch { return false; } }, 'Check the pattern').optional(),
+  patternHint: z.string().trim().max(120).optional(),
 }).refine((f) => !['choice', 'multi'].includes(f.kind) || (f.options?.length ?? 0) > 0, { message: 'Give the choices', path: ['options'] });
 export type FieldDef = z.infer<typeof FieldDef>;
 
@@ -92,7 +95,9 @@ export function checkCustom(defs: readonly FieldDef[], input: Record<string, unk
         if (/^\+?[\d\s()-]{6,20}$/.test(text)) values[f.key] = text; else errors[f.key] = tx('Check the phone number.');
         break;
       default:
-        values[f.key] = text.slice(0, f.kind === 'longText' ? 2000 : 200);
+        // An ID's format is checked without the spaces and dashes people type between groups of digits.
+        if (f.pattern && !new RegExp(f.pattern).test(text.replace(/[\s-]/g, '').toUpperCase())) errors[f.key] = f.patternHint || tx('This does not look right.');
+        else values[f.key] = text.slice(0, f.kind === 'longText' ? 2000 : 200);
     }
   }
   return { values, errors };
