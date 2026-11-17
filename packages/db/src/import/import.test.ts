@@ -21,7 +21,7 @@ const n = async (sql: string) => Number((await pool.query<{ n: string }>(sql)).r
 beforeAll(async () => {
   // The school's own country, as the API and console give it: local phone numbers are read as Indian ones.
   setLocaleSource(() => ({ country: 'IN', locale: 'en-IN', currency: 'INR' }));
-  server = await startDevPostgres({ dataDir: path.join(mkdtempSync(path.join(tmpdir(), 'tangent-import-')), 'data'), fresh: true });
+  server = await startDevPostgres({ dataDir: path.join(mkdtempSync(path.join(tmpdir(), 'tangent-import-')), 'data'), fresh: true, throwaway: true });
   pool = new pg.Pool({ connectionString: await ensureDatabase(server.url, 'school_import'), max: 4 });
   await migrate(pool, 'school');
   // An empty school: settings, roles and the first admin, nothing else, the way a school starts before it moves in.

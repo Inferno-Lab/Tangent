@@ -47,7 +47,8 @@ function binDir(): string {
  * Starts a throwaway PostgreSQL from npm binaries, so tests and local development need no Docker.
  * It is started with `pg_ctl`, which drops administrator rights on Windows (PostgreSQL refuses to run with them).
  */
-export async function startDevPostgres(opts: { dataDir: string; port?: number; fresh?: boolean }): Promise<DevPostgres> {
+/** `throwaway`: a test's server, whose folder (the data directory's parent, made for it) goes when it stops. */
+export async function startDevPostgres(opts: { dataDir: string; port?: number; fresh?: boolean; throwaway?: boolean }): Promise<DevPostgres> {
   const dataDir = path.resolve(opts.dataDir);
   const bin = binDir();
   const exe = (n: string) => path.join(bin, process.platform === 'win32' ? `${n}.exe` : n);
@@ -87,6 +88,8 @@ ${tail}`);
         child.on('error', () => resolve());
         child.on('exit', () => resolve());
       });
+      // A test's database is about 100 MB: left behind by every run, they filled the disk.
+      if (opts.throwaway) fs.rmSync(path.dirname(dataDir), { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     },
   };
 }

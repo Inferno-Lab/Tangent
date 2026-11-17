@@ -32,7 +32,7 @@ export interface Harness {
 }
 
 export async function startHarness(port?: number): Promise<Harness> {
-  const server = await startDevPostgres({ dataDir: path.join(mkdtempSync(path.join(tmpdir(), 'tangent-api-')), 'data'), port, fresh: true });
+  const server = await startDevPostgres({ dataDir: path.join(mkdtempSync(path.join(tmpdir(), 'tangent-api-')), 'data'), port, fresh: true, throwaway: true });
   const regUrl = await ensureDatabase(server.url, 'registry');
   const registry = new pg.Pool({ connectionString: regUrl, max: 4 });
   await migrate(registry, 'registry');
@@ -56,8 +56,9 @@ export async function startHarness(port?: number): Promise<Harness> {
     await pool.query("insert into settings (key, value) values ('notify.quietFrom', '\"00:00\"'), ('notify.quietTo', '\"00:00\"'), ('calendar.weeklyOff', '[]') on conflict (key) do update set value = excluded.value");
     await pool.end();
     await registry.query(
-      `insert into schools (id, slug, name, short_name, color, logo_text, status, plan, cell, target, region, db_url_sealed, db_name, entitlement, contact, demo)
-       values ($1,$2,'Greenfield International School','Greenfield','#6A4CF5','G',$3,$4,'local-1','local','local',$5,$6,$7,$8,$9)`,
+      // The demo school is in India: its phones, clock and money are India's (a school without a country starts neutral).
+      `insert into schools (id, slug, name, short_name, color, logo_text, status, plan, cell, target, region, db_url_sealed, db_name, entitlement, contact, demo, country, timezone, locale, currency)
+       values ($1,$2,'Greenfield International School','Greenfield','#6A4CF5','G',$3,$4,'local-1','local','local',$5,$6,$7,$8,$9,'IN','Asia/Kolkata','en-IN','INR')`,
       [newId('sch'), slug, o.status ?? 'live', o.plan, seal(url, SECRET), dbName, JSON.stringify({ modules: plan.modules, limits: plan.limits, locks: [], overrides: {}, version: 1 }), JSON.stringify({ name: 'Neha', phone: '1', email: 'a@b.c' }), o.demoMode ?? true]);
   };
 

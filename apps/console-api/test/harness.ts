@@ -23,7 +23,7 @@ export interface Harness {
 }
 
 export async function startHarness(extra: Record<string, string> = {}): Promise<Harness> {
-  const server = await startDevPostgres({ dataDir: path.join(mkdtempSync(path.join(tmpdir(), 'tangent-console-')), 'data'), fresh: true });
+  const server = await startDevPostgres({ dataDir: path.join(mkdtempSync(path.join(tmpdir(), 'tangent-console-')), 'data'), fresh: true, throwaway: true });
   const regUrl = await ensureDatabase(server.url, 'registry');
   const base = { NODE_ENV: 'test', REGISTRY_DATABASE_URL: regUrl, SECRETS_KEY: 'test-secret-key-for-sealing-0123456789', JWT_SECRET: 'jwt-secret-for-tests-0123456789abcd', PORT: '0' };
   const env = loadEnv({ ...base, DEMO_CODE: '424242', STEP_PAUSE_MS: '0', PROBE_SECONDS: '0', ADMIN_BASE_URL: 'http://localhost:5173', ...extra });

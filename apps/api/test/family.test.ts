@@ -444,4 +444,25 @@ describe('messages and background work through the Hub', () => {
     await hub.tick();
     expect((await h.registry.query("select result from job_queue where kind = 'fees.lateFines'")).rows[0].result).toMatch(/^0 late fines/);
   });
+
+  it('queues each school’s morning jobs for 09:00 on its own clock and its own day (§3.9.9)', async () => {
+    const { HubService } = await import('../src/school/hub.service.js');
+    const hub = h.app.get(HubService);
+    await h.addSchool('dubai-clock', { plan: 'premium', data: 'empty' });
+    await h.registry.query("update schools set timezone = 'America/New_York' where slug = $1", [h.slug]);
+    await h.registry.query("update schools set timezone = 'Asia/Dubai' where slug = 'dubai-clock'");
+    await h.registry.query('delete from job_queue');
+    // 06:00 UTC: 01:00 in New York (its 09:00 is still to come) and 10:00 in Dubai (its 09:00 has passed).
+    const now = new Date('2026-11-17T06:00:00Z');
+    await hub.queueDaily(now);
+    const jobs = (await h.registry.query<{ slug: string; run_at: Date; day: string }>(
+      "select s.slug, j.run_at, j.payload->>'day' as day from job_queue j join schools s on s.id = j.school_id where j.kind = 'fees.reminders'")).rows;
+    const at = (slug: string) => jobs.find((j) => j.slug === slug)!;
+    expect(at(h.slug)).toMatchObject({ day: '2026-11-17' });
+    expect(at(h.slug).run_at.toISOString()).toBe('2026-11-17T14:00:00.000Z');
+    expect(at('dubai-clock')).toMatchObject({ day: '2026-11-17' });
+    expect(at('dubai-clock').run_at.toISOString()).toBe(now.toISOString());
+    await h.registry.query("update schools set timezone = 'Asia/Kolkata' where slug = $1", [h.slug]);
+    await h.registry.query('delete from job_queue');
+  });
 });
