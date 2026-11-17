@@ -105,7 +105,7 @@ describe('learning', () => {
     expect(mid).toBeTruthy();
     expect((await post(teacher, '/classes/cls_8a/marks', { subject: 'maths', values: { stu_aarav: 44, stu_diya: 38 } })).status).toBe(200);
     const draft = (await f(teacher, '/classes/cls_8a/marks?subject=maths')).json;
-    expect(draft).toEqual({ marks: { stu_aarav: 44, stu_diya: 38 }, maxMarks: 100 });
+    expect(draft).toEqual({ marks: { stu_aarav: 44, stu_diya: 38 }, maxMarks: 100, grades: [], gradeMarks: {} });
     expect((await post(teacher, '/classes/cls_8a/marks', { subject: 'pe', values: { stu_aarav: 10 } })).status).toBe(409);
     expect((await post(parent, '/classes/cls_8a/marks', { subject: 'maths', values: { stu_aarav: 1 } })).status).toBe(403);
   });
