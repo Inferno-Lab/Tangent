@@ -530,7 +530,7 @@ function DocumentTemplatesEditor({ value, languages, preview, disabled, onChange
       {blocks.map((b, i) => (
         <div key={i} className="card" style={{ padding: 12, marginTop: 8 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-            <div style={{ width: 240 }}><SelectField label={tr('ui.settings.block')} value={b.kind} disabled={disabled} onChange={(k) => put(i, { kind: k as Block['kind'] })} options={BLOCK_KINDS.map((k) => ({ value: k, label: BLOCK_KIND_LABELS[k] }))} /></div>
+            <div style={{ width: 320, maxWidth: '100%' }}><SelectField label={tr('ui.settings.block')} value={b.kind} disabled={disabled} onChange={(k) => put(i, { kind: k as Block['kind'] })} options={BLOCK_KINDS.map((k) => ({ value: k, label: BLOCK_KIND_LABELS[k] }))} /></div>
             {['heading', 'text', 'fact', 'signatures'].includes(b.kind) && <>
               <div style={{ width: 110 }}><NumberField label={tr('ui.settings.text_size')} min={7} max={28} value={b.size === undefined ? '' : String(b.size)} disabled={disabled} onChange={(v) => put(i, { size: v === '' ? undefined : Number(v) })} /></div>
               <div style={{ width: 150 }}><SelectField label={tr('ui.settings.align')} value={b.align ?? 'start'} disabled={disabled} onChange={(a) => put(i, { align: a === 'start' ? undefined : (a as Block['align']) })}
