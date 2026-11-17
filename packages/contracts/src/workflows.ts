@@ -32,7 +32,7 @@ export const StepDef = z.object({
   who: z.enum(STEP_ACTORS).default('permission'),
   /** The role's key or the person's id, for `role` and `person`. */
   ref: z.string().max(40).optional(),
-  /** The step is only needed when the request's amount is above this (in the currency's minor unit). */
+  /** The step is only needed when the request's amount is above this (whole units of the school's currency). */
   above: z.number().int().min(0).optional(),
   days: z.number().int().min(1).max(60).optional(),
   then: z.enum(STEP_TIMEOUTS).optional(),

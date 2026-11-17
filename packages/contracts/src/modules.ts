@@ -162,10 +162,8 @@ export const StaffPatch = z.object({
 });
 export type StaffPatch = z.infer<typeof StaffPatch>;
 
-export const ENQUIRY_STAGES = ['enquiry', 'applied', 'test', 'offer', 'enrolled', 'declined'] as const;
-export type EnquiryStage = (typeof ENQUIRY_STAGES)[number];
-/** The stages between enquiry and enrolment a school may use (console: `admissions.stages`). */
-export const OPTIONAL_STAGES = ['applied', 'test', 'offer'] as const;
+/** An enquiry's stage: 'enquiry', one of the school's own stages (admissions.stages), 'enrolled' or 'declined'. */
+export type EnquiryStage = string;
 
 export interface EnquiryRow {
   id: string;
@@ -177,7 +175,14 @@ export interface EnquiryRow {
   email: string | null;
   source: string;
   stage: EnquiryStage;
-  testOn: string | null;
+  /** The day of the stage it is in, when that stage happens on a day (a test, an interview). */
+  stageOn: string | null;
+  /** Scores written down at scored stages, by stage key. */
+  scores: Record<string, string>;
+  /** Documents received, by name, with the day each came in. */
+  docs: Record<string, string>;
+  /** The child's date of birth, when the family gave it (an online application). */
+  dob: string | null;
   note: string;
   studentId: string | null;
   createdAt: string;
@@ -203,11 +208,31 @@ export const EnquiryPatch = z.object({
   phone: z.string().trim().min(1, 'Enter a phone number').max(24).optional(),
   email: z.string().trim().email('Enter a valid email').or(z.literal('')).optional(),
   source: z.string().trim().min(1).max(40).optional(),
-  stage: z.enum(ENQUIRY_STAGES).optional(),
-  testOn: IsoDate.nullable().optional(),
+  stage: z.string().trim().min(1).max(24).optional(),
+  stageOn: IsoDate.nullable().optional(),
+  /** The score at the stage it is in (a mark, a grade, "passed"); empty clears it. */
+  score: z.string().trim().max(20).optional(),
+  /** Documents ticked (true) or unticked (false) as received. */
+  docs: z.record(z.string().trim().min(1).max(40), z.boolean()).optional(),
   note: z.string().trim().max(400).optional(),
 });
 export type EnquiryPatch = z.infer<typeof EnquiryPatch>;
+
+/** A family's own application from the school's page (admissions.onlineForm). `website` is a field people never see. */
+export const EnquiryApply = z.object({
+  childName: z.string().trim().min(2, 'Enter the child’s name').max(80),
+  gradeSought: z.number().int().min(-3, 'Choose a grade').max(14),
+  dob: IsoDate.optional(),
+  guardianName: z.string().trim().min(2, 'Enter your name').max(80),
+  phone: z.string().trim().min(1, 'Enter a phone number').max(24),
+  email: z.string().trim().email('Enter a valid email').optional().or(z.literal('')),
+  note: z.string().trim().max(400).default(''),
+  consent: z.literal(true, { message: 'Agree to the privacy notice to apply' }),
+  website: z.string().max(200).optional(),
+});
+export type EnquiryApply = z.infer<typeof EnquiryApply>;
+/** What the application page shows before anyone signs in. */
+export interface ApplyInfo { open: boolean; school: string; grades: { value: number; label: string }[] }
 
 export const EnquiryEnrol = z.object({ classId: z.string().min(1, 'Choose a class'), dob: IsoDate });
 export type EnquiryEnrol = z.infer<typeof EnquiryEnrol>;
@@ -446,6 +471,8 @@ export const MESSAGE_EVENTS: MessageEvent[] = localized([
   { key: 'exam.results', label: 'Results published', to: 'families', vars: ['student', 'exam'], text: 'Results for {exam} are out. See how {student} did in the Tangent app.', defaults: { push: true, sms: true, email: false }, opens: '/results', needs: 'exams' },
   { key: 'notice.published', label: 'New notice', to: 'families', vars: ['title', 'school'], text: 'New notice from {school}: {title}. Read it in the Tangent app.', defaults: { push: true, sms: false, email: false }, opens: '/notices', needs: 'notices' },
   { key: 'event.created', label: 'New event', to: 'families', vars: ['title', 'date'], text: '{title} on {date}. Tell us if you can come in the Tangent app.', defaults: { push: true, sms: false, email: false }, opens: '/events', needs: 'events' },
+  { key: 'admissions.stage', label: 'Admission moved to a stage the family hears about', to: 'families', vars: ['child', 'stage', 'date', 'school'], text: '{child}’s application at {school} has moved to: {stage}. {date}', defaults: { push: false, sms: true, email: true }, needs: 'people.admissions' },
+  { key: 'admissions.received', label: 'Online application received', to: 'families', vars: ['child', 'school'], text: 'Thank you. {school} has received the application for {child} and will be in touch.', defaults: { push: false, sms: true, email: true }, needs: 'people.admissions' },
   { key: 'admissions.offer', label: 'Admission offer', to: 'families', vars: ['child', 'school'], text: 'Good news: {child} has been offered a place at {school}. Please visit the office to complete admission.', defaults: { push: false, sms: true, email: true }, needs: 'people.admissions' },
   { key: 'leave.decided', label: 'Leave request answered', to: 'families', vars: ['who', 'from', 'to', 'status'], text: 'Leave for {who} from {from} to {to} was {status}.', defaults: { push: true, sms: true, email: false }, opens: '/leave', needs: 'attendance' },
   { key: 'family.invite', label: 'Invite a family to the app', to: 'families', vars: ['student', 'school'], text: '{school} now uses Tangent. Install the Tangent app and sign in with this phone number to follow {student}’s day.', defaults: { push: false, sms: true, email: false }, urgent: true, needs: 'people' },

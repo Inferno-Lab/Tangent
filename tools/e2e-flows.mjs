@@ -400,11 +400,15 @@ await flow('admin: an enquiry moves along the admissions board', { storage: admi
   await p.getByRole('button', { name: 'Add enquiry' }).click();
   await expectVisible(p.getByText('Enquiry added.'), 'the added toast');
   const card = p.locator('.admk', { hasText: 'E2E Child' });
-  await card.getByRole('button', { name: 'Mark applied' }).click();
+  await card.getByRole('button', { name: 'Move to Applied' }).click();
   await expectVisible(p.getByText(/E2E Child moved to Applied/), 'the moved toast');
-  await p.locator('.admk', { hasText: 'E2E Child' }).getByRole('button', { name: 'Book test' }).click();
-  await p.getByRole('dialog').getByRole('button', { name: 'Book the test' }).click();
-  await expectVisible(p.getByText(/E2E Child moved to Test/), 'the test toast');
+  // A stage that happens on a day asks for the day.
+  await p.locator('.admk', { hasText: 'E2E Child' }).getByRole('button', { name: 'Move to Entrance test' }).click();
+  await p.getByRole('dialog').getByRole('button', { name: 'Move on that day' }).click();
+  await expectVisible(p.getByText(/E2E Child moved to Entrance test/), 'the test toast');
+  // The application page says it is closed until the school turns it on.
+  await p.goto(A('/apply'), { waitUntil: 'networkidle' });
+  await expectVisible(p.getByText('The school is not taking applications online'), 'the closed application page');
 });
 
 await flow('admin: invoices filter, receipts open and print', { storage: adminStore }, async (p) => {

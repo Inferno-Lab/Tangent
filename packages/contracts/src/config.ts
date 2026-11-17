@@ -5,6 +5,7 @@ import { localizedLabels, VOCAB_CONCEPTS, isLanguage, type Vocabulary } from './
 import { DEFAULT_BLOOD_GROUPS, DEFAULT_GENDERS, DEFAULT_RELATIONSHIPS, schoolList } from './lists.js';
 import { CustomFieldsSetting } from './fields.js';
 import { WorkflowsSetting } from './workflows.js';
+import { AdmissionStages, DEFAULT_ADMISSION_STAGES } from './admissions.js';
 import { AddressFormat, DEFAULT_ADDRESS_FORMAT } from './address.js';
 import { GradingSchemes } from './grading.js';
 import { DocTemplates } from './templates.js';
@@ -181,8 +182,10 @@ export const SchoolSettingsSchema = z.object({
     .default({}) as unknown as z.ZodDefault<z.ZodType<Vocabulary>>,
   // Where enquiries come from, as the school counts them (Admissions and its reports).
   'admissions.sources': z.array(z.string().trim().min(1).max(40)).min(1).max(16).default(['Walk-in', 'Phone', 'Website', 'Referral', 'Event']),
-  // The stages between enquiry and enrolment the school uses (some have no entrance test).
-  'admissions.stages': z.array(z.enum(['applied', 'test', 'offer'])).max(3).default(['applied', 'test', 'offer']),
+  // The school's own stages between enquiry and enrolment, each with what it needs (a day, a score, documents, a message).
+  'admissions.stages': AdmissionStages.default(DEFAULT_ADMISSION_STAGES),
+  // Families can apply from a page on the school's address (off until the school turns it on).
+  'admissions.onlineForm': z.boolean().default(false),
   // The school's houses, if it has them: on student profiles, the roll-call grid and the app.
   /** The letters sent home to start families and students on the app (placeholders: {school} {student} {class} {guardian} {phoneEnd} {link}). */
   'letters.family': z.string().max(3000).default('Dear {guardian},\n\n{school} now has its own app. You can follow {student}’s school day on your phone: attendance, homework, results, fees and notices, as your school uses them.\n\n1. Scan the code, or open {link}, to get the {school} app.\n2. Sign in with your phone number ending {phoneEnd}.\n3. Type the code we send you. There is no password to remember.\n\nIf your phone number has changed, tell the school office.'),
@@ -315,6 +318,9 @@ export interface SchoolBrand {
   logoUrl: string | null;
   tagline: string;
   language: string;
+  /** The office's phone and email, for pages a family sees before signing in. */
+  phone?: string;
+  email?: string;
   demoMode: boolean;
   /** The seed hue (0–359) of the school's colours, from its brand colour, so the sign-in pages wear them before anyone signs in. */
   hue: number;

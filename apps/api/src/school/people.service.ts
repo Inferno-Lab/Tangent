@@ -1,8 +1,9 @@
+import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { RoleError, commitImport, deleteRole, exportRows, newId, previewImport, saveRole, toCsv } from '@tangent/db';
 import {
   PERMISSIONS, initials, permissionAvailable, type ImportResult, type RoleDefSave,
-  type EnquiryCreate, type EnquiryEnrol, type EnquiryPatch, type EnquiryRow, type EnquiryStage, type RoleRow, type StaffCreate, type StaffPatch, type StaffRow, type StudentDetail, tx } from '@tangent/contracts';
+  type EnquiryCreate, type EnquiryEnrol, type EnquiryPatch, type EnquiryRow, type EnquiryStage, type EnquiryApply, type ApplyInfo, type AdmissionStage, AdmissionStages, DEFAULT_ADMISSION_STAGES, gradeChoices, fmtDate, schoolToday, type RoleRow, type StaffCreate, type StaffPatch, type StaffRow, type StudentDetail, tx } from '@tangent/contracts';
 import { hashPassword, randomToken } from '@tangent/security';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
@@ -202,14 +203,20 @@ export class PeopleService {
 
   // Admissions
 
-  private enquiryRow(r: { id: string; child_name: string; grade_sought: number; guardian_name: string; phone: string; email: string | null; source: string; stage: EnquiryStage; test_on: string | null; note: string; student_id: string | null; created_at: Date }): EnquiryRow {
+  private enquiryRow(r: { id: string; child_name: string; grade_sought: number; guardian_name: string; phone: string; email: string | null; source: string; stage: EnquiryStage; test_on: string | null; note: string; student_id: string | null; created_at: Date; scores: Record<string, string> | null; docs: Record<string, string> | null; dob: string | null }): EnquiryRow {
     return {
       id: r.id, childName: r.child_name, initials: initials(r.child_name), gradeSought: r.grade_sought, guardianName: r.guardian_name, phone: r.phone, email: r.email, source: r.source,
-      stage: r.stage, testOn: r.test_on, note: r.note, studentId: r.student_id, createdAt: r.created_at.toISOString(),
+      stage: r.stage, stageOn: r.test_on, scores: r.scores ?? {}, docs: r.docs ?? {}, dob: r.dob, note: r.note, studentId: r.student_id, createdAt: r.created_at.toISOString(),
     };
   }
 
-  private readonly enquirySql = 'select id, child_name, grade_sought, guardian_name, phone, email, source, stage, test_on::text, note, student_id, created_at from enquiries';
+  private readonly enquirySql = 'select id, child_name, grade_sought, guardian_name, phone, email, source, stage, test_on::text, note, student_id, created_at, scores, docs, dob::text from enquiries';
+
+  /** The school's stages, read through the same rules as its settings (a list saved before stages were its own reads as the old three). */
+  private async stagesOf(t: TenantCtx): Promise<AdmissionStage[]> {
+    const parsed = AdmissionStages.safeParse(await this.settings.value<unknown>(t, 'admissions.stages', DEFAULT_ADMISSION_STAGES));
+    return parsed.success ? parsed.data : DEFAULT_ADMISSION_STAGES;
+  }
 
   async enquiries(t: TenantCtx): Promise<EnquiryRow[]> {
     const { rows } = await t.pool.query(`${this.enquirySql} order by created_at desc, id limit 300`);
@@ -230,35 +237,99 @@ export class PeopleService {
     return this.enquiry(t, id);
   }
 
+  /**
+   * Changes an application: its details, the stage it is in (with that stage's day when it happens on one), the score at a
+   * scored stage, and which documents came in. Entering a stage the family hears about tells them.
+   */
   async patchEnquiry(t: TenantCtx, user: User, id: string, body: EnquiryPatch): Promise<EnquiryRow> {
     const cur = await this.enquiry(t, id);
-    if (cur.stage === 'enrolled') throw new ApiError('conflict', 'This child is already enrolled. Change them from the Students page.');
-    if (body.stage === 'enrolled') throw new ApiError('validation', 'Use “Enrol” to turn an application into a student.');
-    const stages = await this.settings.value<string[]>(t, 'admissions.stages', ['applied', 'test', 'offer']);
-    if (body.stage && body.stage !== cur.stage && !['enquiry', 'declined', ...stages].includes(body.stage)) throw new ApiError('validation', 'Your school does not use that stage.');
+    if (cur.stage === 'enrolled') throw new ApiError('conflict', tx('This child is already enrolled. Change them from the Students page.'));
+    if (body.stage === 'enrolled') throw new ApiError('validation', tx('Use “Enrol” to turn an application into a student.'));
+    const stages = await this.stagesOf(t);
+    const moving = body.stage !== undefined && body.stage !== cur.stage;
+    // A stage the school has since removed keeps the cards still in it, but nobody moves a card into it.
+    if (moving && !['enquiry', 'declined', ...stages.map((s) => s.key)].includes(body.stage!)) throw new ApiError('validation', tx('Your school does not use that stage.'));
     const stage = body.stage ?? cur.stage;
-    if (stage === 'test' && !(body.testOn ?? cur.testOn)) throw new ApiError('validation', 'Pick the day of the entrance test.', { fields: { testOn: 'Pick the day of the test.' } });
+    const def = stages.find((s) => s.key === stage);
+    // The day belongs to the stage: moving on clears the last one's, and a stage that happens on a day needs one.
+    let stageOn = moving ? body.stageOn ?? null : body.stageOn === undefined ? cur.stageOn : body.stageOn;
+    if (def?.needsDate && !stageOn) throw new ApiError('validation', tx('Pick the day of “{stage}”.', { stage: def.name }), { fields: { stageOn: tx('Pick the day.') } });
+    if (!def?.needsDate) stageOn = null;
+    const scores = { ...cur.scores };
+    if (body.score !== undefined) {
+      if (!def?.scored) throw new ApiError('validation', tx('This stage has no score.'), { fields: { score: tx('No score here.') } });
+      if (body.score) scores[stage] = body.score; else delete scores[stage];
+    }
+    // Documents are the ones the school's stages ask for; one that is no longer asked for can still be unticked.
+    const docs = { ...cur.docs };
+    const asked = new Set(stages.flatMap((s) => s.documents));
+    for (const [name, got] of Object.entries(body.docs ?? {})) {
+      if (got && !asked.has(name)) throw new ApiError('validation', tx('“{name}” is not one of the documents your school asks for.', { name }));
+      if (got) docs[name] = docs[name] ?? schoolToday(); else delete docs[name];
+    }
     await t.pool.query(
       `update enquiries set stage = $2, test_on = $3, note = $4, child_name = coalesce($5, child_name), grade_sought = coalesce($6, grade_sought), guardian_name = coalesce($7, guardian_name),
-         phone = coalesce($8, phone), email = case when $9::text is null then email else nullif($9, '') end, source = coalesce($10, source), updated_at = now() where id = $1`,
-      [id, stage, stage === 'test' ? (body.testOn ?? cur.testOn) : (body.testOn === undefined ? cur.testOn : body.testOn), body.note ?? cur.note,
-        body.childName ?? null, body.gradeSought ?? null, body.guardianName ?? null, body.phone ?? null, body.email ?? null, body.source ?? null]);
-    if (body.stage === 'offer' && cur.stage !== 'offer' && cur.phone) {
-      await this.messenger.notify(t, 'admissions.offer', [{ to: cur.phone, email: cur.email, vars: { child: cur.childName } }]);
+         phone = coalesce($8, phone), email = case when $9::text is null then email else nullif($9, '') end, source = coalesce($10, source), scores = $11, docs = $12, updated_at = now() where id = $1`,
+      [id, stage, stageOn, body.note ?? cur.note, body.childName ?? null, body.gradeSought ?? null, body.guardianName ?? null, body.phone ? this.settings.phone(t, body.phone) : null, body.email ?? null, body.source ?? null,
+        JSON.stringify(scores), JSON.stringify(docs)]);
+    if (moving && def?.tellFamily && (cur.phone || cur.email)) {
+      const school = (await this.settings.effective(t)).school.name;
+      await this.messenger.notify(t, stage === 'offer' ? 'admissions.offer' : 'admissions.stage',
+        [{ to: cur.phone, email: cur.email, vars: { child: cur.childName, stage: def.name, date: stageOn ? fmtDate(stageOn, 'day') : '', school } }]);
     }
-    await this.audit.record(t, { actorId: user.id, actorName: user.name, action: stage === cur.stage ? 'admission.changed' : 'admission.moved', entity: 'enquiry', entityId: id, detail: { child: cur.childName, to: stage } });
+    await this.audit.record(t, { actorId: user.id, actorName: user.name, action: moving ? 'admission.moved' : 'admission.changed', entity: 'enquiry', entityId: id, detail: { child: cur.childName, to: stage } });
     return this.enquiry(t, id);
   }
 
   async enrol(t: TenantCtx, user: User, id: string, body: EnquiryEnrol): Promise<StudentDetail> {
     const e = await this.enquiry(t, id);
-    if (e.stage === 'enrolled') throw new ApiError('conflict', 'This child is already enrolled.');
-    if (e.stage === 'declined') throw new ApiError('conflict', 'This application was declined. Move it back to a stage first.');
-    if (e.phone.trim().length < 8) throw new ApiError('validation', 'Add the guardian’s phone number to the application first.');
+    if (e.stage === 'enrolled') throw new ApiError('conflict', tx('This child is already enrolled.'));
+    if (e.stage === 'declined') throw new ApiError('conflict', tx('This application was declined. Move it back to a stage first.'));
+    if (e.phone.trim().length < 8) throw new ApiError('validation', tx('Add the guardian’s phone number to the application first.'));
     const student = await this.students.create(t, { name: e.childName, classId: body.classId, dob: body.dob, guardianName: e.guardianName, guardianPhone: e.phone }, user);
     await t.pool.query("update enquiries set stage = 'enrolled', student_id = $2, updated_at = now() where id = $1", [id, student.id]);
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'admission.enrolled', entity: 'enquiry', entityId: id, detail: { child: e.childName, admissionNo: student.admissionNo } });
     return student;
+  }
+
+  // The online application (admissions.onlineForm)
+
+  private async applyOpen(t: TenantCtx): Promise<boolean> {
+    const cfg = await this.settings.effective(t);
+    return cfg.features.includes('people.admissions') && (await this.settings.value<boolean>(t, 'admissions.onlineForm', false)) === true;
+  }
+
+  async applyInfo(t: TenantCtx): Promise<ApplyInfo> {
+    const classes = (await t.pool.query<{ grade: number; name: string; section: string }>('select grade, name, section from classes c join academic_years y on y.id = c.year_id and y.current')).rows;
+    return { open: await this.applyOpen(t), school: (await this.settings.effective(t)).school.name, grades: gradeChoices(classes).map((g) => ({ value: g.value, label: g.name })) };
+  }
+
+  /**
+   * A family applies from the school's page: it lands in the first stage, found through the school's "Website" source. A form
+   * filled by a robot (the hidden field) looks accepted and is dropped; one address sends at most five an hour; the same child
+   * and phone within a month is the same application.
+   */
+  async apply(t: TenantCtx, body: EnquiryApply, from: string): Promise<{ ok: true }> {
+    if (!(await this.applyOpen(t))) throw forbidden(tx('The school is not taking applications online. Please call the office.'));
+    if (body.website) return { ok: true };
+    const info = await this.applyInfo(t);
+    if (!info.grades.some((g) => g.value === body.gradeSought)) throw new ApiError('validation', tx('Choose one of the school’s grades.'), { fields: { gradeSought: tx('Choose from the list.') } });
+    const phone = this.settings.phone(t, body.phone, 'phone');
+    const hash = createHash('sha256').update(`${t.info.id}|${from}`).digest('hex');
+    const recent = Number((await t.pool.query<{ n: string }>("select count(*) n from enquiries where from_hash = $1 and created_at > now() - interval '1 hour'", [hash])).rows[0]!.n);
+    if (recent >= 5) throw new ApiError('rate_limited', tx('Too many applications from here. Try again in an hour.'), { retryAfter: 3600 });
+    if ((await t.pool.query("select 1 from enquiries where phone = $1 and lower(child_name) = lower($2) and created_at > now() - interval '30 days'", [phone, body.childName])).rowCount) {
+      throw new ApiError('conflict', tx('We already have an application for {child} from this phone number. The school will be in touch.', { child: body.childName }));
+    }
+    const stages = await this.stagesOf(t);
+    const sources = await this.settings.value<string[]>(t, 'admissions.sources', []);
+    const source = sources.find((x) => x.toLowerCase() === 'website') ?? 'Website';
+    const id = newId('enq');
+    await t.pool.query('insert into enquiries (id, child_name, grade_sought, guardian_name, phone, email, source, note, stage, dob, from_hash) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
+      [id, body.childName, body.gradeSought, body.guardianName, phone, body.email || null, source, body.note, stages[0]?.key ?? 'enquiry', body.dob ?? null, hash]);
+    await this.audit.record(t, { actorId: null, actorName: body.guardianName, action: 'admission.applied', entity: 'enquiry', entityId: id, detail: { child: body.childName, online: true } });
+    await this.messenger.notify(t, 'admissions.received', [{ to: phone, email: body.email || null, vars: { child: body.childName, school: info.school } }]);
+    return { ok: true };
   }
 
   // Roles

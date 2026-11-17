@@ -34,7 +34,7 @@ async function consoleSession() {
   return { key: ['tangent.console', JSON.stringify({ user: t.user }), t.accessToken], school: list.find((s) => s.slug === slug)?.id };
 }
 
-const adminPaths = [...pages, '/design', '/nope'];
+const adminPaths = [...pages, '/design', '/apply', '/nope'];
 const jobs = [];
 // Sign-ins last 15 minutes and a full run takes longer: each pass signs in again.
 const fresh = [];

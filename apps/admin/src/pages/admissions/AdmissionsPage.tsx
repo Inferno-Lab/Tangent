@@ -1,20 +1,22 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { addDays, schoolToday, type EnquiryPatch, type EnquiryRow, type EnquiryStage } from '@tangent/contracts';
-import { DateField, Dialog, Field, SelectField, useShake, EmptyState, t } from '@tangent/web-ui';
+import { AdmissionStages, DEFAULT_ADMISSION_STAGES, addDays, schoolToday, stageName, type AdmissionStage, type EnquiryPatch, type EnquiryRow, type EnquiryStage } from '@tangent/contracts';
+import { Checkbox, DateField, Dialog, Field, SelectField, currentLanguage, useShake, EmptyState, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { AddBtn, AreaField, Avatar, dateLabel, problem, useGrades, useSetting } from '../../app/kit';
 import { usePageTabs } from '../../app/tabs';
 
-const COLUMNS: { stage: EnquiryStage; label: string; hint: string; next: string }[] = [
-  { stage: 'enquiry', label: t('admin.admissions_page.enquiry'), hint: t('admin.admissions_page.asked_about_a_seat'), next: t('admin.admissions_page.back_to_enquiry') },
-  { stage: 'applied', label: t('admin.admissions_page.applied'), hint: t('admin.admissions_page.form_received'), next: t('admin.admissions_page.mark_applied') },
-  { stage: 'test', label: t('admin.admissions_page.test'), hint: t('admin.admissions_page.entrance_test_booked'), next: t('admin.admissions_page.book_test') },
-  { stage: 'offer', label: t('admin.admissions_page.offer'), hint: t('admin.admissions_page.seat_offered_the_family_is'), next: t('admin.admissions_page.make_offer') },
-  { stage: 'enrolled', label: t('admin.admissions_page.enrolled'), hint: t('admin.admissions_page.now_a_student'), next: t('admin.admissions_page.enrol') },
-];
-const label = (s: EnquiryStage) => COLUMNS.find((c) => c.stage === s)?.label ?? t('admin.admissions_page.declined');
+type Column = { stage: EnquiryStage; label: string; hint: string; def?: AdmissionStage };
+/** The school's stages (People → Settings), read the way the server reads them. */
+function useStages(): AdmissionStage[] {
+  const raw = useSetting<unknown>('admissions.stages', DEFAULT_ADMISSION_STAGES);
+  const parsed = AdmissionStages.safeParse(raw);
+  return parsed.success ? parsed.data : DEFAULT_ADMISSION_STAGES;
+}
+/** A stage's name for the board: the fixed three, else the school's own name in the reader's language. */
+const labelOf = (stages: AdmissionStage[], s: EnquiryStage) =>
+  s === 'enquiry' ? t('admin.admissions_page.enquiry') : s === 'enrolled' ? t('admin.admissions_page.enrolled') : s === 'declined' ? t('admin.admissions_page.declined') : stageName(stages, s, currentLanguage());
 /** A source as stored (older rows keep a key like `walk-in`), shown as words. */
 const sourceLabel = (s: string) => (s.includes(' ') || /[A-Z]/.test(s) ? s : s.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase()));
 const refresh = (qc: ReturnType<typeof useQueryClient>) => void qc.invalidateQueries({ predicate: (q) => ['admissions', 'students', 'shell', 'dashboard', 'classes'].includes(String(q.queryKey[0])) });
@@ -25,25 +27,33 @@ export function AdmissionsPage() {
   const qc = useQueryClient();
   const { toast, say } = useToast();
   const [adding, setAdding] = useState(false);
-  const [dlg, setDlg] = useState<{ kind: 'test' | 'enrol' | 'view'; row: EnquiryRow } | null>(null);
+  const [dlg, setDlg] = useState<{ kind: 'day' | 'enrol' | 'view'; row: EnquiryRow; to?: EnquiryStage } | null>(null);
   const [showDeclined, setShowDeclined] = useState(false);
   const list = useQuery({ queryKey: ['admissions'], queryFn: app.api.admissions.list });
   const grades = useGrades();
   const grade = (g: number) => grades.find((x) => x.value === String(g))?.label ?? t('admin.admissions_page.grade', { g });
-  // The school's stages (console: admissions.stages), with any stage that still holds a card after it was switched off.
-  const used = useSetting<string[]>('admissions.stages', ['applied', 'test', 'offer']);
-  const columns = COLUMNS.filter((c) => c.stage === 'enquiry' || c.stage === 'enrolled' || used.includes(c.stage) || (list.data ?? []).some((r) => r.stage === c.stage));
-  const flow = columns.filter((c) => c.stage === 'enquiry' || c.stage === 'enrolled' || used.includes(c.stage)).map((c) => c.stage);
+  // The school's stages, with any stage it removed that still holds a card (shown after its own, until it is empty).
+  const stages = useStages();
+  const online = useSetting<boolean>('admissions.onlineForm', false);
+  const label = (s: EnquiryStage) => labelOf(stages, s);
+  const gone = [...new Set((list.data ?? []).map((r) => r.stage))].filter((s) => !['enquiry', 'enrolled', 'declined'].includes(s) && !stages.some((x) => x.key === s));
+  const columns: Column[] = [
+    { stage: 'enquiry', label: label('enquiry'), hint: t('admin.admissions_page.asked_about_a_seat') },
+    ...stages.map((d) => ({ stage: d.key, label: label(d.key), hint: d.hint, def: d })),
+    ...gone.map((g) => ({ stage: g, label: g, hint: t('admin.admissions_page.no_longer_a_stage') })),
+    { stage: 'enrolled', label: label('enrolled'), hint: t('admin.admissions_page.now_a_student') },
+  ];
+  const flow = ['enquiry', ...stages.map((d) => d.key), 'enrolled'];
   const step = (s: EnquiryStage, by: 1 | -1) => { const i = flow.indexOf(s); return i < 0 ? (by > 0 ? flow[1] : undefined) : flow[i + by]; };
   const canWrite = app.user.permissions.includes('admissions.write');
   const rows = list.data ?? [];
   const move = useMutation({
-    mutationFn: (v: { id: string; stage: EnquiryStage; testOn?: string }) => app.api.admissions.patch(v.id, { stage: v.stage, testOn: v.testOn }),
-    onSuccess: (r) => { refresh(qc); say(r.stage === 'offer' ? t('admin.admissions_page.offer_made_is_told', { guardianName: r.guardianName }) : t('admin.admissions_page.moved_to', { childName: r.childName, label: label(r.stage) })); setDlg(null); },
+    mutationFn: (v: { id: string; stage: EnquiryStage; stageOn?: string }) => app.api.admissions.patch(v.id, { stage: v.stage, stageOn: v.stageOn }),
+    onSuccess: (r) => { refresh(qc); say(stages.find((d) => d.key === r.stage)?.tellFamily ? t('admin.admissions_page.moved_and_told', { childName: r.childName, label: label(r.stage), guardianName: r.guardianName }) : t('admin.admissions_page.moved_to', { childName: r.childName, label: label(r.stage) })); setDlg(null); },
     onError: (e) => say((e as Error).message, 'bad'),
   });
   const act = (r: EnquiryRow, to: EnquiryStage) => {
-    if (to === 'test') setDlg({ kind: 'test', row: r });
+    if (stages.find((d) => d.key === to)?.needsDate) setDlg({ kind: 'day', row: r, to });
     else if (to === 'enrolled') setDlg({ kind: 'enrol', row: r });
     else move.mutate({ id: r.id, stage: to });
   };
@@ -52,12 +62,12 @@ export function AdmissionsPage() {
   return (
     <Page title={t('admin.admissions_page.admissions')} sub={rows.length ? t('admin.admissions_page.open_enrolled', { open, length: rows.filter((r) => r.stage === 'enrolled').length }) : t('admin.admissions_page.from_first_enquiry_to_first')} tabs={tabs} toast={toast} loading={list.isLoading && !list.data}
       error={list.isError && !list.data ? { message: (list.error as Error).message, retry: () => void list.refetch() } : null}
-      actions={canWrite ? <AddBtn onClick={() => setAdding(true)}>{t('admin.admissions_page.new_enquiry')}</AddBtn> : undefined}
+      actions={<>{online && <a className="btn" href={`${app.base}/apply`} target="_blank" rel="noreferrer" data-tip={t('admin.admissions_page.the_page_families_apply_from')}>{t('admin.admissions_page.application_page')}</a>}{canWrite && <AddBtn onClick={() => setAdding(true)}>{t('admin.admissions_page.new_enquiry')}</AddBtn>}</>}
       overlays={<>
         {adding && <NewEnquiry onClose={() => setAdding(false)} onDone={() => { setAdding(false); refresh(qc); say(t('admin.admissions_page.enquiry_added')); }} />}
-        {dlg?.kind === 'test' && <TestDay row={dlg.row} onClose={() => setDlg(null)} onPick={(d) => move.mutate({ id: dlg.row.id, stage: 'test', testOn: d })} busy={move.isPending} />}
+        {dlg?.kind === 'day' && dlg.to && <StageDay row={dlg.row} stage={label(dlg.to)} onClose={() => setDlg(null)} onPick={(d) => move.mutate({ id: dlg.row.id, stage: dlg.to!, stageOn: d })} busy={move.isPending} />}
         {dlg?.kind === 'enrol' && <Enrol row={dlg.row} onClose={() => setDlg(null)} onDone={(name, adm) => { setDlg(null); refresh(qc); say(t('admin.admissions_page.is_enrolled_admission_number', { name, adm })); }} />}
-        {dlg?.kind === 'view' && <Details row={dlg.row} canWrite={canWrite} back={dlg.row.stage === 'declined' ? undefined : step(dlg.row.stage, -1)} onClose={() => setDlg(null)} onMove={(stage) => move.mutate({ id: dlg.row.id, stage })} onSaved={() => { refresh(qc); setDlg(null); say(t('admin.admissions_page.saved')); }} />}
+        {dlg?.kind === 'view' && <Details row={dlg.row} stages={stages} canWrite={canWrite} back={dlg.row.stage === 'declined' ? undefined : step(dlg.row.stage, -1)} onClose={() => setDlg(null)} onMove={(stage) => act(dlg.row, stage)} onSaved={() => { refresh(qc); setDlg(null); say(t('admin.admissions_page.saved')); }} />}
       </>}>
       {rows.length === 0 ? (
         <div><EmptyState scene="admissions" onAction={canWrite ? () => setAdding(true) : undefined} /></div>
@@ -69,7 +79,7 @@ export function AdmissionsPage() {
               return (
                 <section className="admc rise" key={c.stage} role="listitem" aria-label={c.label}>
                   <header><b>{c.label}</b><span className="chip">{items.length}</span></header>
-                  <small>{c.hint}</small>
+                  <small>{c.hint || '\u00a0'}</small>
                   <div className="lscroll admcl">
                     {items.length === 0 && <div className="admn">{t('admin.admissions_page.nothing_here')}</div>}
                     {items.map((r) => (
@@ -80,10 +90,11 @@ export function AdmissionsPage() {
                         </button>
                         <div className="tgrow" style={{ gap: 6 }}>
                           <span className="chip">{sourceLabel(r.source)}</span>
-                          {r.testOn && <span className="chip a">{t('admin.admissions_page.test')}{' '}{dateLabel(r.testOn)}</span>}
+                          {r.stageOn && <span className="chip a">{dateLabel(r.stageOn)}</span>}
+                          {r.scores[r.stage] && <span className="chip v">{r.scores[r.stage]}</span>}
                           {r.studentId && <span className="chip g">{t('admin.admissions_page.student')}</span>}
                         </div>
-                        {canWrite && (() => { const to = step(r.stage, 1); return to && <button className="btn sm" disabled={move.isPending} onClick={() => act(r, to)}>{COLUMNS.find((x) => x.stage === to)!.next}</button>; })()}
+                        {canWrite && (() => { const to = step(r.stage, 1); return to && <button className="btn sm" disabled={move.isPending} onClick={() => act(r, to)}>{to === 'enrolled' ? t('admin.admissions_page.enrol') : t('admin.admissions_page.move_to', { label: label(to) })}</button>; })()}
                       </article>
                     ))}
                   </div>
@@ -148,14 +159,14 @@ function NewEnquiry({ onClose, onDone }: { onClose: () => void; onDone: () => vo
   );
 }
 
-function TestDay({ row, onClose, onPick, busy }: { row: EnquiryRow; onClose: () => void; onPick: (d: string) => void; busy: boolean }) {
-  const [d, setD] = useState(row.testOn ?? addDays(schoolToday(), 3));
+function StageDay({ row, stage, onClose, onPick, busy }: { row: EnquiryRow; stage: string; onClose: () => void; onPick: (d: string) => void; busy: boolean }) {
+  const [d, setD] = useState(addDays(schoolToday(), 3));
   return (
-    <Dialog title={t('admin.admissions_page.entrance_test')} tag={{ text: row.childName, tone: 'v' }} onClose={onClose} width={440}>
-      <DateField label={t('admin.admissions_page.day_of_the_test')} value={d} min={schoolToday()} onChange={setD} />
+    <Dialog title={stage} tag={{ text: row.childName, tone: 'v' }} onClose={onClose} width={440}>
+      <DateField label={t('admin.admissions_page.which_day')} value={d} onChange={setD} />
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
         <button className="btn" onClick={onClose}>{t('admin.admissions_page.cancel')}</button>
-        <button className="btn pri" disabled={busy || !d} onClick={() => onPick(d)}>{busy ? t('admin.admissions_page.saving') : t('admin.admissions_page.book_the_test')}</button>
+        <button className="btn pri" disabled={busy || !d} onClick={() => onPick(d)}>{busy ? t('admin.admissions_page.saving') : t('admin.admissions_page.move_on_that_day')}</button>
       </div>
     </Dialog>
   );
@@ -167,7 +178,7 @@ function Enrol({ row, onClose, onDone }: { row: EnquiryRow; onClose: () => void;
   const grades = useGrades();
   const fit = (classes.data ?? []).filter((c) => c.grade === row.gradeSought);
   const [classId, setClassId] = useState('');
-  const [dob, setDob] = useState('');
+  const [dob, setDob] = useState(row.dob ?? '');
   const [err, setErr] = useState<Record<string, string>>({});
   const shake = useShake();
   const chosen = classId || fit[0]?.id || '';
@@ -196,8 +207,15 @@ function Enrol({ row, onClose, onDone }: { row: EnquiryRow; onClose: () => void;
   );
 }
 
-function Details({ row, canWrite, back, onClose, onMove, onSaved }: { row: EnquiryRow; canWrite: boolean; back?: EnquiryStage; onClose: () => void; onMove: (s: EnquiryStage) => void; onSaved: () => void }) {
+function Details({ row, stages, canWrite, back, onClose, onMove, onSaved }: { row: EnquiryRow; stages: AdmissionStage[]; canWrite: boolean; back?: EnquiryStage; onClose: () => void; onMove: (s: EnquiryStage) => void; onSaved: () => void }) {
   const app = useApp();
+  const label = (s: EnquiryStage) => labelOf(stages, s);
+  const here = stages.find((d) => d.key === row.stage);
+  // Documents asked for at the stages reached so far (all of them once enrolled), and any already received.
+  const reached = row.stage === 'enrolled' ? stages.length : stages.findIndex((d) => d.key === row.stage) + 1;
+  const asked = [...new Set([...stages.slice(0, Math.max(reached, 0)).flatMap((d) => d.documents), ...Object.keys(row.docs)])];
+  const [score, setScore] = useState(row.scores[row.stage] ?? '');
+  const [docs, setDocs] = useState<Record<string, boolean>>(Object.fromEntries(asked.map((d) => [d, !!row.docs[d]])));
   const grades = useGrades();
   const sources = useSetting<string[]>('admissions.sources', [t('admin.admissions_page.walk_in')]);
   const locked = row.stage === 'enrolled' || !canWrite;
@@ -206,7 +224,8 @@ function Details({ row, canWrite, back, onClose, onMove, onSaved }: { row: Enqui
   const shake = useShake();
   const set = (k: keyof typeof f) => (v: string) => { setF((x) => ({ ...x, [k]: v })); setErr((e) => ({ ...e, [k]: '', _: '' })); };
   const was = { childName: row.childName, gradeSought: String(row.gradeSought), guardianName: row.guardianName, phone: row.phone, email: row.email ?? '', source: row.source, note: row.note };
-  const dirty = (Object.keys(f) as (keyof typeof f)[]).some((k) => f[k].trim() !== was[k]);
+  const docsChanged = asked.filter((d) => docs[d] !== !!row.docs[d]);
+  const dirty = (Object.keys(f) as (keyof typeof f)[]).some((k) => f[k].trim() !== was[k]) || score.trim() !== (row.scores[row.stage] ?? '') || docsChanged.length > 0;
   const save = useMutation({
     mutationFn: () => {
       const b: EnquiryPatch = {};
@@ -217,6 +236,8 @@ function Details({ row, canWrite, back, onClose, onMove, onSaved }: { row: Enqui
       if (f.email.trim() !== was.email) b.email = f.email.trim();
       if (f.source !== was.source) b.source = f.source;
       if (f.note.trim() !== was.note) b.note = f.note.trim();
+      if (here?.scored && score.trim() !== (row.scores[row.stage] ?? '')) b.score = score.trim();
+      if (docsChanged.length) b.docs = Object.fromEntries(docsChanged.map((d) => [d, docs[d]!]));
       return app.api.admissions.patch(row.id, b);
     },
     onSuccess: onSaved, onError: (e) => { setErr(problem(e)); shake.hit(); },
@@ -241,7 +262,9 @@ function Details({ row, canWrite, back, onClose, onMove, onSaved }: { row: Enqui
           <div className="kv"><span>{t('admin.admissions_page.phone')}</span><b>{row.phone || t('admin.admissions_page.not_given')}</b></div>
           {row.email && <div className="kv"><span>{t('admin.admissions_page.email')}</span><b>{row.email}</b></div>}
           <div className="kv"><span>{t('admin.admissions_page.found_us_through')}</span><b>{sourceLabel(row.source)}</b></div>
-          {row.testOn && <div className="kv"><span>{t('admin.admissions_page.entrance_test')}</span><b>{dateLabel(row.testOn)}</b></div>}
+          {row.stageOn && <div className="kv"><span>{label(row.stage)}</span><b>{dateLabel(row.stageOn)}</b></div>}
+          {Object.entries(row.scores).map(([k, v]) => <div key={k} className="kv"><span>{t('admin.admissions_page.score_at', { stage: label(k) })}</span><b>{v}</b></div>)}
+          {asked.length > 0 && <div className="kv"><span>{t('admin.admissions_page.documents')}</span><b>{asked.map((d) => `${row.docs[d] ? '✓' : '·'} ${d}`).join('  ')}</b></div>}
           {row.note && <div className="kv"><span>{t('admin.admissions_page.note')}</span><b>{row.note}</b></div>}
           {row.stage === 'enrolled' && <div className="help">{t('admin.admissions_page.enrolled_change_their_details_on')}</div>}
         </> : <>
@@ -255,7 +278,15 @@ function Details({ row, canWrite, back, onClose, onMove, onSaved }: { row: Enqui
             <Field label={t('admin.admissions_page.email_optional')} type="email" value={f.email} onChange={set('email')} error={err.email} />
           </div>
           <SelectField label={t('admin.admissions_page.how_they_found_us')} value={f.source} onChange={set('source')} options={sourceOptions} />
-          {row.testOn && <div className="kv"><span>{t('admin.admissions_page.entrance_test')}</span><b>{dateLabel(row.testOn)}</b></div>}
+          {row.stageOn && <div className="kv"><span>{label(row.stage)}</span><b>{dateLabel(row.stageOn)}</b></div>}
+          {Object.entries(row.scores).map(([k, v]) => <div key={k} className="kv"><span>{t('admin.admissions_page.score_at', { stage: label(k) })}</span><b>{v}</b></div>)}
+          {here?.scored && <Field label={t('admin.admissions_page.score_at', { stage: label(row.stage) })} value={score} onChange={(v) => { setScore(v); setErr({}); }} error={err.score} maxLength={20} hint={t('admin.admissions_page.a_mark_or_a_grade')} />}
+          {asked.length > 0 && (
+            <div className="fld">
+              <label>{t('admin.admissions_page.documents_received')}</label>
+              <div className="tgrow">{asked.map((d) => <Checkbox key={d} checked={!!docs[d]} label={d} onChange={(on) => setDocs({ ...docs, [d]: on })} />)}</div>
+            </div>
+          )}
           <AreaField label={t('admin.admissions_page.note')} value={f.note} onChange={set('note')} rows={3} maxLength={400} />
           {err._ && <div className="emsg" role="alert">{err._}</div>}
         </>}
@@ -263,7 +294,7 @@ function Details({ row, canWrite, back, onClose, onMove, onSaved }: { row: Enqui
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
         <span style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           {!locked && (row.stage === 'declined' ? <button className="btn" onClick={() => onMove('enquiry')}>{t('admin.admissions_page.reopen')}</button> : <button className="btn dng" onClick={() => onMove('declined')}>{t('admin.admissions_page.decline')}</button>)}
-          {!locked && back && <button className="btn" onClick={() => onMove(back)}>{t('admin.admissions_page.back_to')}{' '}{label(back).toLowerCase()}</button>}
+          {!locked && back && <button className="btn" onClick={() => onMove(back)}>{t('admin.admissions_page.back_to_stage', { label: label(back) })}</button>}
         </span>
         <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <button className="btn" onClick={onClose}>{locked ? t('admin.admissions_page.close') : t('admin.admissions_page.cancel')}</button>

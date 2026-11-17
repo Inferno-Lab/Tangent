@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Field, FilePick, tintFor, Icon, type IconName, t as tr } from '@tangent/web-ui';
 import { useApp } from './context';
 import { HttpError } from '@tangent/api-client';
-import { fmtDate } from '@tangent/contracts';
+import { fmtDate, gradeChoices } from '@tangent/contracts';
 
 export const Ico = ({ d }: { d: IconName }) => <Icon name={d} />;
 export const PLUS = 'plus';
@@ -112,9 +112,7 @@ export function useSetting<T>(key: string, fallback: T): T {
 export function useGrades(): { value: string; label: string }[] {
   const { api } = useApp();
   const q = useQuery({ queryKey: ['classes'], queryFn: api.classes, staleTime: 5 * 60_000 });
-  const seen = new Map<number, string>();
-  for (const c of q.data ?? []) if (!seen.has(c.grade)) seen.set(c.grade, c.section && c.name.endsWith(c.section) ? c.name.slice(0, -c.section.length).trim() : c.name);
-  return [...seen].sort((a, b) => a[0] - b[0]).map(([g, name]) => ({ value: String(g), label: /^\d+$/.test(name) ? tr('admin.kit.grade', { name }) : name }));
+  return gradeChoices(q.data ?? []).map((g) => ({ value: String(g.value), label: /^\d+$/.test(g.name) ? tr('admin.kit.grade', { name: g.name }) : g.name }));
 }
 
 /** The record a page has open, kept in the address (`?open=<id>`), so a link, a reload or a bookmark lands on it. */

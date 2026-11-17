@@ -1,6 +1,6 @@
 import type pg from 'pg';
 import { createHash } from 'node:crypto';
-import { ADMISSION_STAGES, PAY_METHODS, PERIOD_KINDS, WEEKDAYS, fmtMoney, schoolInstant, schoolToday, schoolZone, phoneProblem, schoolCountry, toE164, listKey, tx, type ListItem, composeName } from '@tangent/contracts';
+import { PAY_METHODS, PERIOD_KINDS, WEEKDAYS, fmtMoney, schoolInstant, schoolToday, schoolZone, phoneProblem, schoolCountry, toE164, listKey, tx, type ListItem, composeName } from '@tangent/contracts';
 import { newId } from '../ids.js';
 import { savedSetting, seriesFrom } from '../numbers.js';
 
@@ -410,24 +410,35 @@ const students = kind<StudentLookups>({
   },
 });
 
-const STAGES: readonly string[] = ADMISSION_STAGES;
-const admissions = kind<Map<string, string>>({
+// An application's stage is one of the school's own (by its key or its name), or where every child starts and ends.
+type AdmissionLookups = { known: Map<string, string>; stages: Map<string, string>; names: string[] };
+const admissions = kind<AdmissionLookups>({
   async load(db) {
     const { rows } = await db.query<{ id: string; child_name: string; phone: string }>('select id, child_name, phone from enquiries');
-    return new Map(rows.map((r) => [`${norm(r.child_name)}|${digits(r.phone)}`, r.id]));
+    const own = await savedSetting(db, 'admissions.stages');
+    const all = [{ key: 'enquiry', name: 'Enquiry' }, ...own, { key: 'enrolled', name: 'Enrolled' }, { key: 'declined', name: 'Declined' }];
+    return {
+      known: new Map(rows.map((r) => [`${norm(r.child_name)}|${digits(r.phone)}`, r.id])),
+      stages: new Map(all.flatMap((x) => [[lc(x.key), x.key], [lc(x.name), x.key]] as [string, string][])),
+      names: all.map((x) => x.name),
+    };
   },
   check(r, l) {
     const grade = whole(r.grade_sought!) ?? gradeSection(r.grade_sought!)?.grade ?? null;
-    const errors = [...(grade === null ? ['Grade is a number like 3 (or LKG, UKG).'] : []), ...(r.stage && !STAGES.includes(lc(r.stage)) ? [`Stage is one of ${STAGES.join(', ')}.`] : []),
-      ...(r.test_on && !isoDay(r.test_on) ? ['Write the test date as 2026-12-02 or 02/12/2026.'] : [])];
+    const errors = [...(grade === null ? ['Grade is a number like 3 (or LKG, UKG).'] : []), ...(r.stage && !l.stages.has(lc(r.stage)) ? [tx('Stage is one of {names}.', { names: l.names.join(', ') })] : []),
+      ...(r.test_on && !isoDay(r.test_on) ? ['Write the date as 2026-12-02 or 02/12/2026.'] : [])];
     const key = `${norm(r.child_name!)}|${digits(r.phone ?? '')}`;
-    return ok(key, errors, l.has(key));
+    return ok(key, errors, l.known.has(key));
   },
   writes: (rows, l) => [{ table: 'enquiries', pk: ['id'], cols: ['grade_sought', 'guardian_name', 'email', 'source', 'stage', 'test_on', 'note'], rows: rows.map((r) => ({
-    id: l.get(`${norm(r.child_name!)}|${digits(r.phone ?? '')}`) ?? newId('enq'), child_name: r.child_name, grade_sought: whole(r.grade_sought!) ?? gradeSection(r.grade_sought!)!.grade, guardian_name: r.guardian_name,
-    phone: digits(r.phone ?? '') || (r.phone ?? ''), email: r.email || null, source: r.source ? lc(r.source) : 'walk-in', stage: r.stage ? lc(r.stage) : 'enquiry', test_on: r.test_on ? isoDay(r.test_on) : null, note: r.note ?? '',
+    id: l.known.get(`${norm(r.child_name!)}|${digits(r.phone ?? '')}`) ?? newId('enq'), child_name: r.child_name, grade_sought: whole(r.grade_sought!) ?? gradeSection(r.grade_sought!)!.grade, guardian_name: r.guardian_name,
+    phone: digits(r.phone ?? '') || (r.phone ?? ''), email: r.email || null, source: r.source ? lc(r.source) : 'walk-in', stage: r.stage ? l.stages.get(lc(r.stage))! : 'enquiry', test_on: r.test_on ? isoDay(r.test_on) : null, note: r.note ?? '',
   })) }],
-  totals: (rows) => STAGES.map((s) => ({ label: s[0]!.toUpperCase() + s.slice(1), value: String(rows.filter((r) => (r.stage ? lc(r.stage) : 'enquiry') === s).length) })).filter((t) => t.value !== '0'),
+  totals: (rows) => {
+    const by = new Map<string, number>();
+    for (const r of rows) { const k = r.stage ? r.stage.trim() : 'Enquiry'; by.set(k, (by.get(k) ?? 0) + 1); }
+    return [...by].map(([label, n]) => ({ label, value: String(n) }));
+  },
   async export(db) {
     return (await db.query<Row>("select child_name, grade_sought::text, guardian_name, phone, coalesce(email, '') as email, source, stage, coalesce(test_on::text, '') as test_on, note from enquiries order by created_at")).rows;
   },

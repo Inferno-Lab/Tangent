@@ -6,6 +6,7 @@ import { AppContext, type AppCtx } from './app/context';
 import { makeClient, session, type Client } from './app/client';
 import { SupportBanner } from './app/SupportBanner';
 import { LoginRoute } from './pages/login/LoginRoute';
+import { ApplyRoute } from './pages/apply/ApplyRoute';
 import { NotFoundPage } from './pages/status/StatusPages';
 import { PlanGate } from './pages/status/PlanGate';
 import { AppLayout } from './app/Layout';
@@ -19,6 +20,8 @@ export interface RouterCtx {
 const root = createRootRouteWithContext<RouterCtx>()({ component: Outlet, notFoundComponent: NotFoundPage });
 
 const login = createRoute({ getParentRoute: () => root, path: '/login', component: LoginRoute });
+// A family's application for a seat, before anyone signs in (the school turns it on).
+const apply = createRoute({ getParentRoute: () => root, path: '/apply', component: ApplyRoute });
 
 /** Everything behind sign-in. Without a session the visitor is sent to /login. */
 const authed = createRoute({
@@ -74,6 +77,7 @@ const page = (path: string, load: () => Promise<Record<string, unknown>>, name: 
 
 const routeTree = root.addChildren([
   login,
+  apply,
   authed.addChildren([
     ...page('/', () => import('./pages/dashboard/DashboardPage'), 'DashboardPage'),
     ...page('/approvals', () => import('./pages/approvals/ApprovalsPage'), 'ApprovalsPage'),

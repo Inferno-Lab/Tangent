@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, hasKey, type AppRole } from '@tangent/config-engine';
-import { rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, ADDRESS_PARTS, ADDRESS_PART_LABELS, SCHEME_KINDS, SCHEME_KIND_LABELS, BLOCK_KINDS, BLOCK_KIND_LABELS, DEFAULT_TEMPLATES, DOC_KINDS, DOC_KIND_LABELS, DOC_PLACEHOLDERS, PAGE_SIZES, type Block, type DocKind, type DocTemplate, type DocTemplates, type GradeBand, type GradingScheme, type AddressFormat, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
+import { AdmissionStages, DEFAULT_ADMISSION_STAGES, type AdmissionStage, rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, ADDRESS_PARTS, ADDRESS_PART_LABELS, SCHEME_KINDS, SCHEME_KIND_LABELS, BLOCK_KINDS, BLOCK_KIND_LABELS, DEFAULT_TEMPLATES, DOC_KINDS, DOC_KIND_LABELS, DOC_PLACEHOLDERS, PAGE_SIZES, type Block, type DocKind, type DocTemplate, type DocTemplates, type GradeBand, type GradingScheme, type AddressFormat, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
 import { Checkbox, DateField, FilePick, NumberField, TimeField } from './fields';
 import { ColourField } from './ColourPicker';
 import { ErrorLine, Field, SelectField } from './forms';
@@ -140,6 +140,12 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
           );
         })}
       </div>);
+    }
+    case 'admissionStages': {
+      const v = ctx.values ?? {};
+      const others = (Array.isArray(v['app.languages']) ? (v['app.languages'] as string[]) : []).filter((l) => l !== String(v['school.language'] ?? 'en'));
+      const parsed = AdmissionStages.safeParse(value ?? DEFAULT_ADMISSION_STAGES);
+      return box(<AdmissionStagesEditor value={parsed.success ? parsed.data : DEFAULT_ADMISSION_STAGES} languages={others} disabled={disabled} onChange={onChange} />);
     }
     case 'documentTemplates': {
       const v = ctx.values ?? {};
@@ -491,6 +497,58 @@ function GradingSchemesEditor({ value, subjects, disabled, onChange }: { value: 
  * The layout and wording of the school's printed documents (§3.6.2): blocks in order, each with its words (in the school's
  * other languages too) and {placeholders} the document fills; a preview prints it with the school's own data.
  */
+/** Names typed with commas between them: kept as typed while typing, split into the list when the field is left. */
+function CommaList({ label, hint, value, max, disabled, onChange }: { label: string; hint?: string; value: string[]; max: number; disabled: boolean; onChange: (v: string[]) => void }) {
+  const [text, setText] = useState(value.join(', '));
+  const done = () => { const list = [...new Set(text.split(',').map((x) => x.trim()).filter(Boolean))].slice(0, max); setText(list.join(', ')); onChange(list); };
+  return <Field label={label} hint={hint} value={text} disabled={disabled} onChange={setText} onBlur={done} />;
+}
+
+/** The school's admission stages (§4.2): in order, each with what it needs. Enquiry, Enrolled and Declined are always there. */
+function AdmissionStagesEditor({ value, languages, disabled, onChange }: { value: AdmissionStage[]; languages: string[]; disabled: boolean; onChange: (v: unknown) => void }) {
+  const put = (i: number, patch: Partial<AdmissionStage>) => onChange(value.map((s, j) => (j === i ? { ...s, ...patch } : s)));
+  const move = (i: number, d: number) => { const next = [...value]; [next[i], next[i + d]] = [next[i + d]!, next[i]!]; onChange(next); };
+  // A new stage's key comes from its place in the list; the name is the school's to change any time.
+  const add = () => {
+    let n = value.length + 1;
+    while (value.some((s) => s.key === `stage-${n}`)) n++;
+    onChange([...value, { key: `stage-${n}`, name: tr('ui.settings.new_stage'), hint: '', needsDate: false, scored: false, documents: [], tellFamily: false }]);
+  };
+  return (
+    <div>
+      <div className="help" style={{ marginTop: 0 }}>{tr('ui.settings.stages_fixed')}</div>
+      {value.map((s, i) => (
+        <div key={s.key} className="card" style={{ padding: 12, marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <span className="chip" style={{ marginBottom: 10 }}>{i + 1}</span>
+            <div style={{ flex: 1, minWidth: 160 }}><Field label={tr('ui.settings.stage')} value={s.name} maxLength={40} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
+            <div style={{ flex: 2, minWidth: 200 }}><Field label={tr('ui.settings.stage_hint')} value={s.hint} maxLength={80} disabled={disabled} onChange={(v) => put(i, { hint: v })} /></div>
+          </div>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
+            <Checkbox checked={s.needsDate} disabled={disabled} label={tr('ui.settings.stage_on_a_day')} onChange={(on) => put(i, { needsDate: on })} />
+            <Checkbox checked={s.scored} disabled={disabled} label={tr('ui.settings.stage_scored')} onChange={(on) => put(i, { scored: on })} />
+            <Checkbox checked={s.tellFamily} disabled={disabled} label={tr('ui.settings.stage_tells_family')} onChange={(on) => put(i, { tellFamily: on })} />
+            <span className="grow"></span>
+            <button type="button" className="btn sm" aria-label={tr('ui.settings.move_up')} disabled={disabled || i === 0} onClick={() => move(i, -1)}><Icon name="caretUp" /></button>
+            <button type="button" className="btn sm" aria-label={tr('ui.settings.move_down')} disabled={disabled || i === value.length - 1} onClick={() => move(i, 1)}><Icon name="caretDown" /></button>
+            <button type="button" className="btn sm" disabled={disabled} onClick={() => onChange(value.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
+          </div>
+          <div style={{ marginTop: 6 }}><CommaList label={tr('ui.settings.stage_documents')} value={s.documents} disabled={disabled} hint={tr('ui.settings.stage_documents_hint')} max={12}
+            onChange={(documents) => put(i, { documents })} /></div>
+          {languages.length > 0 && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>{languages.map((l) => (
+            <div key={l} style={{ flex: 1, minWidth: 160 }}><Field label={languageLabel(l)} value={s.names?.[l] ?? ''} maxLength={40} disabled={disabled} onChange={(v) => {
+              const names = { ...s.names, [l]: v };
+              if (!v) delete names[l];
+              put(i, { names: Object.keys(names).length ? names : undefined });
+            }} /></div>
+          ))}</div>}
+        </div>
+      ))}
+      {value.length < 10 && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={add}>{tr('ui.settings.add_a_stage')}</button>}
+    </div>
+  );
+}
+
 function DocumentTemplatesEditor({ value, languages, preview, disabled, onChange }: {
   value: DocTemplates; languages: string[]; preview?: (kind: DocKind, template: DocTemplate) => Promise<Blob>; disabled: boolean; onChange: (v: unknown) => void;
 }) {

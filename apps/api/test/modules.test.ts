@@ -153,10 +153,13 @@ describe('admissions', () => {
     expect(made.status).toBe(201);
     expect(made.json.stage).toBe('enquiry');
     expect((await send('PATCH', `/v1/admissions/${made.json.id}`, { stage: 'test' })).status).toBe(400);
-    const test = await send('PATCH', `/v1/admissions/${made.json.id}`, { stage: 'test', testOn: addDays(schoolToday(), 4) });
-    expect(test.json).toMatchObject({ stage: 'test', testOn: addDays(schoolToday(), 4) });
+    const test = await send('PATCH', `/v1/admissions/${made.json.id}`, { stage: 'test', stageOn: addDays(schoolToday(), 4) });
+    expect(test.json).toMatchObject({ stage: 'test', stageOn: addDays(schoolToday(), 4) });
+    // Moving on clears the day of the stage it left.
+    expect((await send('PATCH', `/v1/admissions/${made.json.id}`, { score: '72%' })).json.scores).toEqual({ test: '72%' });
     const offer = await send('PATCH', `/v1/admissions/${made.json.id}`, { stage: 'offer' });
-    expect(offer.json.stage).toBe('offer');
+    expect(offer.json).toMatchObject({ stage: 'offer', stageOn: null, scores: { test: '72%' } });
+    expect((await send('PATCH', `/v1/admissions/${made.json.id}`, { score: 'A' })).status).toBe(400);
     expect((await send('PATCH', `/v1/admissions/${made.json.id}`, { stage: 'enrolled' })).status).toBe(400);
     const before = (await get('/v1/students/summary')).json.total;
     const enrolled = await send('POST', `/v1/admissions/${made.json.id}/enrol`, { classId: 'cls_4a', dob: '2016-05-12' });
@@ -178,6 +181,57 @@ describe('admissions', () => {
     expect((await send('PATCH', `/v1/admissions/${made.id}`, { stage: 'enquiry' })).json.stage).toBe('enquiry');
     await h.setSettings({ 'admissions.stages': ['applied', 'test', 'offer'] });
   }, 30_000);
+  it('follows the school’s own stages: a day, a score, documents, a stage taken away while cards are still in it', async () => {
+    await h.setSettings({ 'admissions.stages': [
+      { key: 'visit', name: 'School visit', needsDate: true },
+      { key: 'interview', name: 'Interview', scored: true, documents: ['Birth certificate', 'Last report'] },
+      { key: 'offer', name: 'Offer', tellFamily: true },
+    ] });
+    try {
+      const made = (await send('POST', '/v1/admissions', { childName: 'Noor Saleh', gradeSought: 2, guardianName: 'Huda Saleh', phone: '+971 50 123 4567' })).json;
+      expect((await send('PATCH', `/v1/admissions/${made.id}`, { stage: 'visit' })).status).toBe(400);
+      const visit = await send('PATCH', `/v1/admissions/${made.id}`, { stage: 'visit', stageOn: addDays(schoolToday(), 2) });
+      expect(visit.json).toMatchObject({ stage: 'visit', stageOn: addDays(schoolToday(), 2) });
+      const interview = await send('PATCH', `/v1/admissions/${made.id}`, { stage: 'interview', score: 'Strong', docs: { 'Birth certificate': true } });
+      expect(interview.json).toMatchObject({ stage: 'interview', stageOn: null, scores: { interview: 'Strong' } });
+      expect(interview.json.docs['Birth certificate']).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect((await send('PATCH', `/v1/admissions/${made.id}`, { docs: { Passport: true } })).status).toBe(400);
+      expect(Object.keys((await send('PATCH', `/v1/admissions/${made.id}`, { docs: { 'Birth certificate': false } })).json.docs)).toEqual([]);
+      // Taken away: the card stays where it is and moves on, but nobody moves a card into it.
+      await h.setSettings({ 'admissions.stages': [{ key: 'offer', name: 'Offer', tellFamily: true }] });
+      expect((await send('PATCH', `/v1/admissions/${made.id}`, { note: 'Called back' })).json.stage).toBe('interview');
+      expect((await send('PATCH', `/v1/admissions/${made.id}`, { stage: 'offer' })).json.stage).toBe('offer');
+      expect((await send('PATCH', `/v1/admissions/${made.id}`, { stage: 'interview' })).status).toBe(400);
+    } finally {
+      await h.setSettings({ 'admissions.stages': ['applied', 'test', 'offer'] });
+    }
+  }, 30_000);
+  it('takes an application from the school’s page only when the school says so, and keeps robots and repeats out', async () => {
+    const pub = (method: string, body?: unknown, ip = '203.0.113.7') => h.app.getHttpAdapter().getInstance().inject({ method, url: '/v1/apply', headers: { 'x-school': h.slug, 'content-type': 'application/json', 'x-forwarded-for': ip }, payload: body ? JSON.stringify(body) : undefined });
+    const form = { childName: 'Sami Haddad', gradeSought: 3, dob: '2018-02-03', guardianName: 'Rania Haddad', phone: '9822077123', email: '', note: '', consent: true };
+    expect(JSON.parse((await pub('GET')).body).open).toBe(false);
+    expect((await pub('POST', form)).statusCode).toBe(403);
+    await h.setSettings({ 'admissions.onlineForm': true });
+    try {
+      const info = JSON.parse((await pub('GET')).body);
+      expect(info.open).toBe(true);
+      expect(info.grades.length).toBeGreaterThan(5);
+      expect((await pub('POST', { ...form, consent: false })).statusCode).toBe(400);
+      expect((await pub('POST', { ...form, gradeSought: 13 })).statusCode).toBe(400);
+      expect((await pub('POST', form)).statusCode).toBe(200);
+      const row = (await get('/v1/admissions')).json.find((e: any) => e.childName === 'Sami Haddad');
+      expect(row).toMatchObject({ stage: 'applied', dob: '2018-02-03', gradeSought: 3 });
+      expect((await pub('POST', form)).statusCode).toBe(409);
+      // A robot fills the hidden field: it looks accepted and nothing is kept.
+      expect((await pub('POST', { ...form, childName: 'Bot Child', website: 'http://spam.example' })).statusCode).toBe(200);
+      expect((await get('/v1/admissions')).json.some((e: any) => e.childName === 'Bot Child')).toBe(false);
+      for (let i = 0; i < 4; i++) await pub('POST', { ...form, childName: `Child ${i}`, phone: `98220771${30 + i}` }, '198.51.100.9');
+      expect((await pub('POST', { ...form, childName: 'Child 5', phone: '9822077140' }, '198.51.100.9')).statusCode).toBe(200);
+      expect((await pub('POST', { ...form, childName: 'Child 6', phone: '9822077141' }, '198.51.100.9')).statusCode).toBe(429);
+    } finally {
+      await h.setSettings({ 'admissions.onlineForm': false });
+    }
+  }, 60_000);
   it('shows the number waiting on the menu', async () => {
     const shell = (await get('/v1/shell')).json;
     expect(shell.badges.admissions).toBeGreaterThan(0);

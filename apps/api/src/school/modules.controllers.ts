@@ -1,15 +1,15 @@
-import { Body, Controller, Delete, Get, Header, HttpCode, Param, Patch, Post, Put, Query, Res } from '@nestjs/common';
-import type { FastifyReply } from 'fastify';
+import { Body, Controller, Delete, Get, Header, HttpCode, Param, Patch, Post, Put, Query, Req, Res } from '@nestjs/common';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import {
   DataRequestCreate, DataRequestDecision, EnquiryCreate, EnquiryEnrol, EnquiryPatch, EventSave, ExamCreate, ExamMarksPut, HomeworkCreate, HomeworkMarks, InvoiceListQuery, StaffCreate, StaffPatch,
   ThreadCreate, ThreadPatch, ThreadReply, ReportQuery, StudentImport, schoolToday,
   type DataRequestRow, type EnquiryRow, type EventReply, type EventRow, type ExamMarksView, type ImportResult, type ExamResults, type ExamRow, type HomeworkDetail, type HomeworkRow, type InvoiceListRow, type InvoiceListSummary, type Paged,
-  type ReceiptRow, type ReportData, type ReportInfo, RoleDefSave, type RoleRow, type StaffRow, type StudentDetail, type ThreadDetail, type ThreadRow,
+  type ReceiptRow, type ReportData, type ReportInfo, RoleDefSave, type RoleRow, type StaffRow, EnquiryApply, type ApplyInfo, type StudentDetail, type ThreadDetail, type ThreadRow,
 } from '@tangent/contracts';
 import { z } from 'zod';
 import { ZodPipe } from '@tangent/nest-kit';
 import { ownKind, templateXlsx } from '@tangent/db';
-import { Core, CurrentUser, Require, RequireModule } from '../auth/guards.js';
+import { Core, CurrentUser, Public, Require, RequireModule } from '../auth/guards.js';
 import { Tenant, type AuthedUser, type TenantCtx } from '../tenancy/tenant.js';
 import { LearningService } from './learning.service.js';
 import { OfficeService } from './office.service.js';
@@ -164,6 +164,17 @@ export class PeopleController {
   @Post('admissions/:id/enrol') @RequireModule('people.admissions') @HttpCode(200) @Require('admissions.write', 'students.write')
   enrol(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(EnquiryEnrol)) b: EnquiryEnrol): Promise<StudentDetail> {
     return this.people.enrol(t, u, id, b);
+  }
+
+  // The school's own application page, before anyone signs in (the service checks the school takes applications online).
+  @Public() @Core() @Get('apply')
+  applyInfo(@Tenant() t: TenantCtx): Promise<ApplyInfo> {
+    return this.people.applyInfo(t);
+  }
+
+  @Public() @Core() @Post('apply') @HttpCode(200)
+  apply(@Tenant() t: TenantCtx, @Req() req: FastifyRequest, @Body(new ZodPipe(EnquiryApply)) b: EnquiryApply): Promise<{ ok: true }> {
+    return this.people.apply(t, b, req.ip);
   }
 
   @Get('roles') @Require('staff.read')
