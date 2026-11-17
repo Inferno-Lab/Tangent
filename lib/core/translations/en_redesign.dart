@@ -347,18 +347,14 @@ const enRedesign = <String, String>{
   'gallery.n_of': '@i of @n',
   'gallery.details': 'Photo details',
   'gallery.is_in': '@name is in this photo',
-  'gallery.share': 'Share',
-  'gallery.save': 'Save to phone',
-  'gallery.favourite': 'Favourite',
-  'gallery.unfavourite': 'Remove from favourites',
+  'gallery.save': 'Open to save or share',
+  'gallery.save_unavailable': 'This photo cannot be opened outside the app.',
   'gallery.report_label': 'Report a problem with this photo',
   'gallery.report_title': 'Report this photo?',
   'gallery.report_body':
       'The school will review it and may take it down. Tell the office if it shows your child and you would like it removed.',
   'gallery.report': 'Report',
   'gallery.reported': 'Thanks. The school will take a look.',
-  'gallery.shared': 'Copied for sharing',
-  'gallery.saved': 'Saved to this phone',
 
   // leave
   'leave.taken': '@n days taken this term',
