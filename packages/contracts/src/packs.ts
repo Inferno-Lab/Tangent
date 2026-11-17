@@ -1,6 +1,7 @@
 import type { GradingScale, PaymentMethod } from './config.js';
 import type { FieldDef } from './fields.js';
 import type { AddressFormat } from './address.js';
+import type { GradingScheme } from './grading.js';
 import { localized } from './i18n.js';
 
 /**
@@ -17,15 +18,20 @@ export interface Curriculum {
 }
 
 const scale = (...rows: [string, number][]): GradingScale => rows.map(([grade, minPct]) => ({ grade, minPct }));
+/** A scheme of grades with points (CBSE's grade points, an American GPA). */
+const pointsScheme = (key: string, name: string, passPct: number, rows: [string, number, number][], grades?: number[]): GradingScheme =>
+  ({ key, name, kind: 'points', passPct, bands: rows.map(([grade, minPct, points]) => ({ grade, minPct, points })), ...(grades ? { grades } : {}) });
 
 export const CURRICULA: Curriculum[] = localized([
-  { key: 'CBSE', name: 'CBSE', countries: ['IN'], settings: { 'grading.scale': scale(['A1', 91], ['A2', 81], ['B1', 71], ['B2', 61], ['C1', 51], ['C2', 41], ['D', 33], ['E', 0]), 'grading.passPct': 33 } },
+  { key: 'CBSE', name: 'CBSE', countries: ['IN'], settings: { 'grading.scale': scale(['A1', 91], ['A2', 81], ['B1', 71], ['B2', 61], ['C1', 51], ['C2', 41], ['D', 33], ['E', 0]), 'grading.passPct': 33,
+    'grading.schemes': [pointsScheme('cgpa', 'Grade points (CGPA)', 33, [['A1', 91, 10], ['A2', 81, 9], ['B1', 71, 8], ['B2', 61, 7], ['C1', 51, 6], ['C2', 41, 5], ['D', 33, 4], ['E', 0, 0]], [9, 10])] } },
   { key: 'ICSE', name: 'CISCE (ICSE and ISC)', countries: ['IN'], settings: { 'grading.scale': scale(['A+', 90], ['A', 75], ['B', 60], ['C', 45], ['D', 33], ['E', 0]), 'grading.passPct': 33 } },
   { key: 'State', name: 'State board', countries: ['IN'], settings: { 'grading.scale': scale(['A+', 90], ['A', 75], ['B', 60], ['C', 45], ['D', 35], ['E', 0]), 'grading.passPct': 35 } },
   { key: 'British', name: 'English national curriculum (GCSE, A level)', countries: null, settings: { 'grading.scale': scale(['9', 90], ['8', 80], ['7', 70], ['6', 60], ['5', 50], ['4', 40], ['3', 30], ['2', 20], ['1', 10], ['U', 0]), 'grading.passPct': 40 } },
   { key: 'Cambridge', name: 'Cambridge International', countries: null, settings: { 'grading.scale': scale(['A*', 90], ['A', 80], ['B', 70], ['C', 60], ['D', 50], ['E', 40], ['U', 0]), 'grading.passPct': 40 } },
   { key: 'IB', name: 'International Baccalaureate', countries: null, settings: { 'grading.scale': scale(['7', 80], ['6', 70], ['5', 60], ['4', 50], ['3', 40], ['2', 25], ['1', 0]), 'grading.passPct': 50 } },
-  { key: 'American', name: 'American (letter grades)', countries: null, settings: { 'grading.scale': scale(['A', 90], ['B', 80], ['C', 70], ['D', 60], ['F', 0]), 'grading.passPct': 60 } },
+  { key: 'American', name: 'American (letter grades)', countries: null, settings: { 'grading.scale': scale(['A', 90], ['B', 80], ['C', 70], ['D', 60], ['F', 0]), 'grading.passPct': 60,
+    'grading.schemes': [pointsScheme('gpa', 'GPA (4.0)', 60, [['A', 90, 4], ['B', 80, 3], ['C', 70, 2], ['D', 60, 1], ['F', 0, 0]], [9, 10, 11, 12])] } },
   { key: 'International', name: 'Other international', countries: null, settings: {} },
   { key: 'Other', name: 'Other', countries: null, settings: {} },
 ]);

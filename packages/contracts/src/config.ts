@@ -6,6 +6,7 @@ import { DEFAULT_BLOOD_GROUPS, DEFAULT_GENDERS, DEFAULT_RELATIONSHIPS, schoolLis
 import { CustomFieldsSetting } from './fields.js';
 import { WorkflowsSetting } from './workflows.js';
 import { AddressFormat, DEFAULT_ADDRESS_FORMAT } from './address.js';
+import { GradingSchemes } from './grading.js';
 
 
 /** Attendance marks the data model knows; a school picks which it uses (`attendance.statuses`). */
@@ -211,6 +212,8 @@ export const SchoolSettingsSchema = z.object({
     { grade: 'A', minPct: 90 }, { grade: 'B', minPct: 80 }, { grade: 'C', minPct: 70 }, { grade: 'D', minPct: 60 }, { grade: 'E', minPct: 50 }, { grade: 'F', minPct: 0 },
   ]),
   'grading.passPct': z.number().min(0).max(100).default(50),
+  // More grading schemes for some year groups or subjects (§3.6.6); without them every mark uses the scale above.
+  'grading.schemes': GradingSchemes.default([]),
   // Categories of notices and events: one list each, used by the people who write them and the people who read them.
   'notices.categories': z.array(CATEGORY).min(1).max(16).default([
     { key: 'academic', name: 'Academic', tone: 'v' }, { key: 'exams', name: 'Exams', tone: 'c' }, { key: 'events', name: 'Events', tone: 'g' },

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, hasKey, type AppRole } from '@tangent/config-engine';
-import { rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, ADDRESS_PARTS, ADDRESS_PART_LABELS, type AddressFormat, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
+import { rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, ADDRESS_PARTS, ADDRESS_PART_LABELS, SCHEME_KINDS, SCHEME_KIND_LABELS, type GradeBand, type GradingScheme, type AddressFormat, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
 import { Checkbox, DateField, FilePick, NumberField, TimeField } from './fields';
 import { ColourField } from './ColourPicker';
 import { ErrorLine, Field, SelectField } from './forms';
@@ -19,6 +19,8 @@ export interface SettingCtx {
   /** Who a request's step can name: the school's roles (by key) and its staff. */
   roles?: { key: string; name: string }[];
   staff?: { id: string; name: string }[];
+  /** The subjects a grading scheme can be for. */
+  subjects?: { id: string; name: string }[];
 }
 
 /** The channels a message can go through, as the Hub sends them. */
@@ -137,6 +139,8 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
         })}
       </div>);
     }
+    case 'gradingSchemes':
+      return box(<GradingSchemesEditor value={(Array.isArray(value) ? value : []) as GradingScheme[]} subjects={ctx.subjects ?? []} disabled={disabled} onChange={onChange} />);
     case 'gradingScale':
       return box(<GradingEditor value={(Array.isArray(value) ? value : []) as { grade: string; minPct: number }[]} max={meta.max ?? 12} disabled={disabled} onChange={onChange} />);
     case 'notifyRules': {
@@ -277,9 +281,9 @@ function CategoriesEditor({ value, max, disabled, onChange }: { value: Category[
 }
 
 /** Grades from the lowest percentage that earns each, highest first. */
-function GradingEditor({ value, max, disabled, onChange }: { value: { grade: string; minPct: number }[]; max: number; disabled: boolean; onChange: (v: unknown) => void }) {
-  const sorted = (rows: { grade: string; minPct: number }[]) => [...rows].sort((a, b) => b.minPct - a.minPct);
-  const put = (i: number, patch: Partial<{ grade: string; minPct: number }>) => onChange(value.map((g, j) => (j === i ? { ...g, ...patch } : g)));
+function GradingEditor({ value, max, disabled, onChange, points }: { value: GradeBand[]; max: number; disabled: boolean; onChange: (v: unknown) => void; points?: boolean }) {
+  const sorted = (rows: GradeBand[]) => [...rows].sort((a, b) => b.minPct - a.minPct);
+  const put = (i: number, patch: Partial<GradeBand>) => onChange(value.map((g, j) => (j === i ? { ...g, ...patch } : g)));
   const lowest = value.length ? Math.min(...value.map((g) => g.minPct)) : 0;
   return (
     <div>
@@ -287,6 +291,10 @@ function GradingEditor({ value, max, disabled, onChange }: { value: { grade: str
         <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 6, flexWrap: 'wrap' }}>
           <div style={{ width: 120 }}><Field label={tr('ui.settings.grade')} value={g.grade} maxLength={4} disabled={disabled} onChange={(v) => put(i, { grade: v })} /></div>
           <div style={{ width: 160 }}><NumberField label={tr('ui.settings.from')} min={0} max={100} value={String(g.minPct)} disabled={disabled} onChange={(v) => put(i, { minPct: v === '' ? 0 : Number(v) })} /></div>
+          {points !== undefined && <>
+            {points && <div style={{ width: 120 }}><NumberField label={tr('ui.settings.points')} min={0} max={100} decimals value={g.points === undefined ? '' : String(g.points)} disabled={disabled} onChange={(v) => put(i, { points: v === '' ? undefined : Number(v) })} /></div>}
+            <div style={{ flex: 1, minWidth: 140 }}><Field label={tr('ui.settings.descriptor')} value={g.descriptor ?? ''} maxLength={40} disabled={disabled} onChange={(v) => put(i, { descriptor: v || undefined })} /></div>
+          </>}
           <button type="button" className="btn sm" disabled={disabled || value.length <= 1} onClick={() => onChange(value.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
         </div>
       ))}
@@ -432,6 +440,42 @@ function WorkflowsEditor({ value, languages, roles, staff, disabled, onChange }:
       ))}
       {steps.length < 6 && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={add}>{tr('ui.settings.add_a_step')}</button>}
       <div className="help">{tr('ui.settings.steps_help')}</div>
+    </div>
+  );
+}
+
+/** The school's other grading schemes (§3.6.6): what each grades, for which year groups and subjects, and its pass mark. */
+function GradingSchemesEditor({ value, subjects, disabled, onChange }: { value: GradingScheme[]; subjects: { id: string; name: string }[]; disabled: boolean; onChange: (v: unknown) => void }) {
+  const put = (i: number, patch: Partial<GradingScheme>) => onChange(value.map((s, j) => (j === i ? { ...s, ...patch } : s)));
+  const years = (s: GradingScheme) => (s.grades ?? []).join(', ');
+  return (
+    <div>
+      {!value.length && <div className="help" style={{ margin: 0 }}>{tr('ui.settings.no_other_schemes')}</div>}
+      {value.map((s, i) => (
+        <div key={s.key} className="card" style={{ padding: 12, marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 160 }}><Field label={tr('ui.settings.scheme')} value={s.name} maxLength={40} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
+            <div style={{ width: 220 }}><SelectField label={tr('ui.settings.grades_by')} value={s.kind} disabled={disabled} onChange={(k) => put(i, { kind: k as GradingScheme['kind'] })} options={SCHEME_KINDS.map((k) => ({ value: k, label: SCHEME_KIND_LABELS[k] }))} /></div>
+            <div style={{ width: 130 }}><NumberField label={tr('ui.settings.pass_mark')} min={0} max={100} value={String(s.passPct)} disabled={disabled} onChange={(v) => put(i, { passPct: v === '' ? 0 : Number(v) })} /></div>
+            <button type="button" className="btn sm" disabled={disabled} onClick={() => onChange(value.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
+          </div>
+          <div style={{ marginTop: 6, maxWidth: 320 }}><Field label={tr('ui.settings.year_groups')} value={years(s)} disabled={disabled} hint={tr('ui.settings.year_groups_hint')}
+            onChange={(v) => { const g = v.split(/[,\s]+/).map(Number).filter((n) => Number.isInteger(n)); put(i, { grades: g.length ? g : undefined }); }} /></div>
+          {subjects.length > 0 && <div className="fld" role="group" aria-label={tr('ui.settings.subjects')} style={{ marginTop: 6 }}>
+            <label>{tr('ui.settings.subjects')}</label>
+            <div className="tgrow">{subjects.map((sub) => {
+              const on = !!s.subjects?.includes(sub.id);
+              return <button key={sub.id} type="button" className={`chip ${on ? 'v' : ''}`} aria-pressed={on} disabled={disabled} onClick={() => { const next = on ? (s.subjects ?? []).filter((x) => x !== sub.id) : [...(s.subjects ?? []), sub.id]; put(i, { subjects: next.length ? next : undefined }); }}>{sub.name}</button>;
+            })}</div>
+          </div>}
+          {s.kind !== 'passfail' && <div style={{ marginTop: 8 }}><GradingEditor value={s.bands} max={15} disabled={disabled} points={s.kind === 'points'} onChange={(b) => put(i, { bands: b as GradeBand[] })} /></div>}
+        </div>
+      ))}
+      {value.length < 12 && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={() => {
+        let n = value.length + 1;
+        while (value.some((s) => s.key === `scheme-${n}`)) n++;
+        onChange([...value, { key: `scheme-${n}`, name: tr('ui.settings.new_scheme'), kind: 'bands', passPct: 40, bands: [{ grade: 'A', minPct: 80 }, { grade: 'B', minPct: 60 }, { grade: 'C', minPct: 40 }, { grade: 'D', minPct: 0 }] }]);
+      }}>{tr('ui.settings.add_a_scheme')}</button>}
     </div>
   );
 }

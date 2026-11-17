@@ -14,7 +14,7 @@ const regionName = (c: string): string => {
 export type SettingKind =
   | 'text' | 'textarea' | 'number' | 'bool' | 'enum' | 'color' | 'time' | 'date' | 'language'
   | 'multi' | 'appRoles' | 'appLayout' | 'notifyRules' | 'templates' | 'classes' | 'logo'
-  | 'houses' | 'categories' | 'strings' | 'gradingScale' | 'paymentMethods' | 'attendanceMarks' | 'vocabulary' | 'list' | 'customFields' | 'workflows' | 'taxSplit' | 'addressFormat';
+  | 'houses' | 'categories' | 'strings' | 'gradingScale' | 'paymentMethods' | 'attendanceMarks' | 'vocabulary' | 'list' | 'customFields' | 'workflows' | 'taxSplit' | 'addressFormat' | 'gradingSchemes';
 
 export interface SettingMeta {
   /** One of the school-wide groups, or the key of the module that owns the setting (config-engine's MODULES lists it there too). */
@@ -141,6 +141,7 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = localized({
   'results.showRank': { group: 'exams', label: 'Families see the class rank', kind: 'bool' },
   'grading.scale': { group: 'exams', label: 'Grading scale', kind: 'gradingScale', max: 12, help: 'Each grade from the lowest percentage that earns it, highest first. Results, report cards, homework grades and the app use it.' },
   'grading.passPct': { group: 'exams', label: 'Pass mark (%)', kind: 'number', min: 0, max: 100 },
+  'grading.schemes': { group: 'exams', label: 'Other grading schemes', kind: 'gradingSchemes', help: 'Where some year groups or subjects are graded differently: grades with points for a GPA, descriptors, or pass and fail. A mark uses the scheme for its subject and year group, else the scale above.' },
 
   // Fees
   'fees.receiptPrefix': { group: 'fees', label: 'Receipt numbers', kind: 'text', help: 'A pattern: {yyyy} the year, {yy} its last two digits, {mm} the month, {ay} the academic year, {seq} the running number ({seq:5} pads it to 5 digits). RCPT-{yyyy}-{seq:5} gives RCPT-2026-00001; the numbers start again when the year changes.' },

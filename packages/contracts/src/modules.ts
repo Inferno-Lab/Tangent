@@ -107,7 +107,7 @@ export interface ExamResults {
   exam: ExamRow;
   average: number;
   passPct: number;
-  rows: { studentId: string; name: string; rollNo: string; total: number; max: number; pct: number; grade: string; rank: number }[];
+  rows: { studentId: string; name: string; rollNo: string; total: number; max: number; pct: number; grade: string; rank: number; gpa: number | null }[];
 }
 
 // People: staff, admissions, roles

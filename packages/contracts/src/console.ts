@@ -777,6 +777,7 @@ export interface SchoolSettingsView {
   /** Who a step of a request can name (§3.6.1): the school's roles and its staff. */
   roles: { key: string; name: string }[];
   staff: { id: string; name: string }[];
+  subjects: { id: string; name: string }[];
 }
 
 /** A change the school makes to its own settings; a risky one waits for a second person in Approvals. */

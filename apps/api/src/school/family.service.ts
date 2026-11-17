@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
-import { customText, type CustomFieldsSetting, type CustomValues, type FieldDef, type AttendanceMarkDef, MESSAGE_EVENTS, addDays, schoolToday, type AttendanceStatus, type NoticeCreate, type PeriodMarksPut } from '@tangent/contracts';
+import { tx, customText, type CustomFieldsSetting, type CustomValues, type FieldDef, type AttendanceMarkDef, MESSAGE_EVENTS, addDays, schoolToday, type AttendanceStatus, type NoticeCreate, type PeriodMarksPut } from '@tangent/contracts';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import { schoolContext, type Registry } from '@tangent/tenancy';
 import { REGISTRY, type AuthedUser, type TenantCtx } from '../tenancy/tenant.js';
@@ -440,9 +440,10 @@ export class FamilyService {
   async gradeHomework(t: TenantCtx, user: AuthedUser, id: string, b: { studentId: string; marks: number | null; feedback?: string }) {
     if (!user.permissions.includes('homework.write')) throw forbidden('You are not allowed to grade homework.');
     await this.learning.markHomework(t, user, id, { marks: [{ studentId: b.studentId, handed: true, score: b.marks, feedback: b.feedback ?? '' }] });
-    const h = (await t.pool.query<{ title: string; subject: string; max_marks: number }>('select h.title, s.name subject, h.max_marks from homework h join subjects s on s.id = h.subject_id where h.id = $1', [id])).rows[0]!;
+    const h = (await t.pool.query<{ title: string; subject: string; subject_id: string; yr: number | null; max_marks: number }>(
+      'select h.title, s.name subject, h.subject_id, c.grade yr, h.max_marks from homework h join subjects s on s.id = h.subject_id left join classes c on c.id = h.class_id where h.id = $1', [id])).rows[0]!;
     const fam = (await t.pool.query<{ phone: string | null; name: string }>('select g.phone, st.name from students st join student_guardians sg on sg.student_id = st.id and sg.is_primary join guardians g on g.id = sg.guardian_id where st.id = $1', [b.studentId])).rows;
-    const grade = b.marks == null ? 'checked' : (await this.settings.grading(t)).grade(Math.round((b.marks / h.max_marks) * 100)) || `${b.marks}/${h.max_marks}`;
+    const grade = b.marks == null ? tx('checked') : (await this.settings.grading(t, { grade: h.yr, subject: h.subject_id })).grade(Math.round((b.marks / h.max_marks) * 100)) || `${b.marks}/${h.max_marks}`;
     await this.messenger.notify(t, 'homework.graded', fam.filter((f) => f.phone).map((f) => ({ to: f.phone!, vars: { student: f.name, subject: h.subject, title: h.title, grade } })));
     return { ok: true };
   }
@@ -507,12 +508,13 @@ export class FamilyService {
     const marks = await t.pool.query<{ subject_id: string; score: string | null; max_marks: number }>(
       'select m.subject_id, m.score, x.max_marks from exam_marks m join exam_subjects x on x.exam_id = m.exam_id and x.subject_id = m.subject_id where m.exam_id = $1 and m.student_id = $2', [examId, studentId]);
     const trend = await t.pool.query<{ exam: string; pct: number }>('select exam, pct from exam_results where student_id = $1 order by exam limit 6', [studentId]);
-    const grading = await this.settings.grading(t);
+    const year = (await t.pool.query<{ grade: number }>('select c.grade from students s join classes c on c.id = s.class_id where s.id = $1', [studentId])).rows[0]?.grade ?? null;
+    const grading = await this.settings.grading(t, { grade: year });
     // The class rank reaches families only when the console says so (results.showRank).
     const rank = (await this.settings.value<boolean>(t, 'results.showRank', false)) ? { rank: row.rank, totalStudents: res.rows.length } : { rank: 0, totalStudents: 0 };
     return {
-      id: `res_${studentId}_${examId}`, examId, studentId, overallPercent: row.pct, grade: row.grade, ...rank,
-      subjects: marks.rows.map((m) => ({ subject: key(m.subject_id), marks: Math.round(Number(m.score ?? 0)), maxMarks: m.max_marks, grade: grading.grade(Math.round((Number(m.score ?? 0) / m.max_marks) * 100)) })),
+      id: `res_${studentId}_${examId}`, examId, studentId, overallPercent: row.pct, grade: row.grade, gpa: row.gpa, ...rank,
+      subjects: marks.rows.map((m) => ({ subject: key(m.subject_id), marks: Math.round(Number(m.score ?? 0)), maxMarks: m.max_marks, grade: grading.of(Math.round((Number(m.score ?? 0) / m.max_marks) * 100), m.subject_id).grade })),
       trend: trend.rows.map((x) => ({ label: x.exam, percent: x.pct })),
     };
   }

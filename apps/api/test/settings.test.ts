@@ -205,3 +205,15 @@ describe('addresses written the country’s way', () => {
     await change({ 'people.addressFormat': (await import('@tangent/contracts')).DEFAULT_ADDRESS_FORMAT });
   });
 });
+
+describe('grading the school’s way', () => {
+  it('gives a GPA where the year group is graded with points', async () => {
+    const scheme = { key: 'gpa', name: 'GPA', kind: 'points', passPct: 40, grades: [8], bands: [{ grade: 'A', minPct: 80, points: 4 }, { grade: 'B', minPct: 60, points: 3 }, { grade: 'C', minPct: 0, points: 2 }] };
+    expect((await change({ 'grading.schemes': [scheme] })).status).toBe(200);
+    const r = (await h.call('GET', '/v1/exams/exm_8a_ut1/results', { token: principal })).json;
+    expect(r.rows[0].gpa).toBeGreaterThanOrEqual(2);
+    expect(['A', 'B', 'C']).toContain(r.rows[0].grade);
+    await change({ 'grading.schemes': [] });
+    expect((await h.call('GET', '/v1/exams/exm_8a_ut1/results', { token: principal })).json.rows[0].gpa).toBeNull();
+  });
+});

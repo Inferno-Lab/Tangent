@@ -61,15 +61,16 @@ export class ConfigService implements OnModuleInit {
     const versions = await this.db.pool.query<{ id: string; version: number; changes: ConfigVersionRow['changes']; note: string; by: string; at: Date }>(
       'select id, version, changes, note, by, at from config_versions where school_id = $1 order by at desc limit 30', [schoolId]);
     return this.school(schoolId, async (p) => {
-      const [cur, roles, classes, heads, staff] = await Promise.all([
+      const [cur, roles, classes, heads, staff, subjects] = await Promise.all([
         this.values(p), this.roles(p),
         p.query<{ id: string; name: string }>('select id, name from classes order by grade, section'),
         p.query<{ key: string; name: string }>('select key, name from fee_heads order by sort, name'),
         p.query<{ id: string; name: string; designation: string; role_id: string | null }>(
           "select u.id, u.name, s.designation, (select ur.role_id from user_roles ur where ur.user_id = u.id limit 1) role_id from users u join staff s on s.user_id = u.id where u.status = 'active' order by u.name"),
+        p.query<{ id: string; name: string }>('select id, name from subjects order by name'),
       ]);
       return {
-        ...cur, entitled: activeModules(ent), features: activeFeatures(ent, activeModules(ent)), roles, classes: classes.rows, feeHeads: heads.rows,
+        ...cur, entitled: activeModules(ent), features: activeFeatures(ent, activeModules(ent)), roles, classes: classes.rows, feeHeads: heads.rows, subjects: subjects.rows,
         staff: staff.rows.map((s) => ({ id: s.id, name: s.name, designation: s.designation, roleId: s.role_id })),
         locks: ent.locks.map((key) => ({ key, value: ent.overrides[key] ?? null, note: ent.lockNotes?.[key] ?? '' })),
         versions: versions.rows.map((v) => ({ id: v.id, version: v.version, changes: v.changes, note: v.note, by: v.by, at: v.at.toISOString() })),

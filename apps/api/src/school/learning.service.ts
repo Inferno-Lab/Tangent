@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
 import {
-  schoolToday,
+  schoolToday, gpaOf,
   type ExamCreate, type ExamMarksPut, type ExamMarksView, type ExamResults, type ExamRow, type HomeworkCreate, type HomeworkDetail, type HomeworkMarks, type HomeworkRow, tx } from '@tangent/contracts';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
@@ -311,19 +311,22 @@ export class LearningService {
 
   async results(t: TenantCtx, id: string): Promise<ExamResults> {
     const { exam, students } = await this.marksView(t, id);
-    const grading = await this.settings.grading(t);
+    const year = (await t.pool.query<{ grade: number }>('select grade from classes where id = $1', [exam.classId])).rows[0]?.grade ?? null;
+    const grading = await this.settings.grading(t, { grade: year });
     const max = new Map(exam.subjects.map((s) => [s.subjectId, s.maxMarks]));
     const scored = students.filter((s) => Object.keys(s.marks).length).map((s) => {
       let total = 0;
       let outOf = 0;
+      const points: (number | null)[] = [];
       for (const sub of exam.subjects) {
         const m = s.marks[sub.subjectId];
         if (!m) continue;
         outOf += max.get(sub.subjectId)!;
         total += m.score ?? 0;
+        if (!m.absent) points.push(grading.of(Math.round(((m.score ?? 0) / max.get(sub.subjectId)!) * 100), sub.subjectId).points);
       }
       const pct = outOf ? Math.round((total / outOf) * 100) : 0;
-      return { studentId: s.studentId, name: s.name, rollNo: s.rollNo, total, max: outOf, pct, grade: grading.grade(pct), rank: 0 };
+      return { studentId: s.studentId, name: s.name, rollNo: s.rollNo, total, max: outOf, pct, grade: grading.grade(pct), rank: 0, gpa: gpaOf(points) };
     }).sort((a, b) => b.total / Math.max(b.max, 1) - a.total / Math.max(a.max, 1) || a.name.localeCompare(b.name));
     let rank = 0;
     let prev = -1;

@@ -3,7 +3,7 @@ import { StaleSettings, newId, recordSettingsVersion, writeSettings } from '@tan
 import { checkSchoolChanges, resolveConfig, validateSettingsChanges } from '@tangent/config-engine';
 import { ApiError } from '@tangent/nest-kit';
 import type { Registry } from '@tangent/tenancy';
-import { checkCustom, roundToCurrency, type CustomEntity, type CustomFieldsSetting, type CustomValues, rawOf, toE164, phoneProblem, MESSAGE_EVENTS, SETTINGS_META, gradeFor, schoolMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type SchoolSettingsPatch, type SchoolSettingsView, type SettingsDoc } from '@tangent/contracts';
+import { checkCustom, roundToCurrency, type CustomEntity, type CustomFieldsSetting, type CustomValues, rawOf, toE164, phoneProblem, MESSAGE_EVENTS, SETTINGS_META, schoolMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type GradingScheme, gradeIn, schemeFor, type SchoolSettingsPatch, type SchoolSettingsView, type SettingsDoc } from '@tangent/contracts';
 import { REGISTRY, type TenantCtx } from '../tenancy/tenant.js';
 import { HubService } from './hub.service.js';
 import { serverCatalogue } from '@tangent/tenancy';
@@ -32,16 +32,17 @@ export class SettingsService {
 
   /** What the school's admin edits: every setting in force, Tangent's locks and the lists the editors pick from. */
   async view(t: TenantCtx): Promise<SchoolSettingsView> {
-    const [cfg, doc, classes, heads, roles, staff] = await Promise.all([
+    const [cfg, doc, classes, heads, roles, staff, subjects] = await Promise.all([
       this.effective(t), this.doc(t),
       t.pool.query<{ id: string; name: string }>('select id, name from classes order by grade, section'),
       t.pool.query<{ key: string; name: string }>('select key, name from fee_heads order by sort, name'),
       t.pool.query<{ key: string; name: string }>('select key, name from roles order by name'),
       t.pool.query<{ id: string; name: string }>("select u.id, u.name from users u join staff s on s.user_id = u.id where u.status = 'active' order by u.name"),
+      t.pool.query<{ id: string; name: string }>('select id, name from subjects order by name'),
     ]);
     const ent = t.info.entitlement;
     return {
-      version: doc.version, values: cfg.settings, entitled: cfg.modules, features: cfg.features, classes: classes.rows, feeHeads: heads.rows, roles: roles.rows, staff: staff.rows,
+      version: doc.version, values: cfg.settings, entitled: cfg.modules, features: cfg.features, classes: classes.rows, feeHeads: heads.rows, roles: roles.rows, staff: staff.rows, subjects: subjects.rows,
       locks: (ent.locks ?? []).map((key) => ({ key, value: ent.overrides?.[key] ?? null, note: ent.lockNotes?.[key] ?? '' })),
     };
   }
@@ -107,10 +108,22 @@ export class SettingsService {
   }
 
   /** The school's grading scale and pass mark (console: Exams and results), with the function that turns a percentage into a grade. */
-  async grading(t: TenantCtx): Promise<{ pass: number; grade: (pct: number) => string }> {
+  /**
+   * How a mark is graded (§3.6.6): the scheme for a subject and year group (`at`), else the school's scale. `grade` gives the
+   * grade; `of` the grade, points, descriptor and pass for a subject of its own.
+   */
+  async grading(t: TenantCtx, at: { grade?: number | null; subject?: string | null } = {}): Promise<{
+    pass: number; scheme: GradingScheme; grade: (pct: number) => string; of: (pct: number, subject?: string | null) => ReturnType<typeof gradeIn>;
+  }> {
     const v = await this.settingsOf(t);
     const scale = v['grading.scale'] as GradingScale;
-    return { pass: v['grading.passPct'] as number, grade: (pct) => gradeFor(pct, scale) };
+    const fallback: GradingScheme = { key: 'school', name: 'Grades', kind: 'bands', passPct: v['grading.passPct'] as number, bands: scale };
+    const schemes = v['grading.schemes'] as GradingScheme[] | undefined;
+    const scheme = schemeFor(schemes, fallback, at);
+    return {
+      pass: scheme.passPct, scheme, grade: (pct) => gradeIn(scheme, pct).grade,
+      of: (pct, subject) => gradeIn(subject ? schemeFor(schemes, fallback, { ...at, subject }) : scheme, pct),
+    };
   }
 
   private readonly resolved = new Map<string, { at: string; values: Record<string, unknown> }>();

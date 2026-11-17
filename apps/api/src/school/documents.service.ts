@@ -68,13 +68,14 @@ export class DocumentsService {
     const res = await this.learning.results(t, examId);
     const row = res.rows.find((r) => r.studentId === studentId);
     if (!row || (students && res.exam.status !== 'published')) throw notFound('That report card');
-    const s = (await t.pool.query<{ name: string; admission_no: string; class: string; roll_no: string }>(
-      'select s.name, s.admission_no, c.name class, s.roll_no from students s join classes c on c.id = s.class_id where s.id = $1', [studentId])).rows[0]!;
-    const grading = await this.settings.grading(t);
+    const s = (await t.pool.query<{ name: string; admission_no: string; class: string; roll_no: string; grade: number }>(
+      'select s.name, s.admission_no, c.name class, s.roll_no, c.grade from students s join classes c on c.id = s.class_id where s.id = $1', [studentId])).rows[0]!;
+    // Each subject in its own scheme where the school grades it differently (§3.6.6).
+    const grading = await this.settings.grading(t, { grade: s.grade });
     // A family sees the class rank only when the console says so (results.showRank); the office always does.
     const showRank = !students || (await this.settings.value<boolean>(t, 'results.showRank', false));
-    const marks = (await t.pool.query<{ subject: string; score: string | null; absent: boolean; max_marks: number }>(
-      `select coalesce(sub.name, m.subject_id) subject, m.score, m.absent, x.max_marks from exam_marks m join exam_subjects x on x.exam_id = m.exam_id and x.subject_id = m.subject_id
+    const marks = (await t.pool.query<{ subject: string; subject_id: string; score: string | null; absent: boolean; max_marks: number }>(
+      `select coalesce(sub.name, m.subject_id) subject, m.subject_id, m.score, m.absent, x.max_marks from exam_marks m join exam_subjects x on x.exam_id = m.exam_id and x.subject_id = m.subject_id
        left join subjects sub on sub.id = m.subject_id where m.exam_id = $1 and m.student_id = $2 order by subject`, [examId, studentId])).rows;
     const lines: PdfLine[] = [
       ...(await this.header(t, tx('Report card: {exam}', { exam: res.exam.name }))),
@@ -82,9 +83,13 @@ export class DocumentsService {
       { text: tx('Class and roll number'), right: `${s.class} · ${s.roll_no || '-'}` },
       { text: '', rule: true, gap: 18 },
       { text: tx('Subject'), right: tx('Marks · grade'), bold: true, gap: 22 },
-      ...marks.map((m) => ({ text: m.subject, right: m.absent ? tx('Absent') : `${Math.round(Number(m.score ?? 0))} / ${m.max_marks} · ${grading.grade(Math.round((Number(m.score ?? 0) / m.max_marks) * 100))}` })),
+      ...marks.map((m) => {
+        const g = grading.of(Math.round((Number(m.score ?? 0) / m.max_marks) * 100), m.subject_id);
+        return { text: m.subject, right: m.absent ? tx('Absent') : `${Math.round(Number(m.score ?? 0))} / ${m.max_marks} · ${g.grade}${g.descriptor ? ` (${g.descriptor})` : ''}` };
+      }),
       { text: '', rule: true, gap: 18 },
       { text: tx('Overall'), right: tx('{pct}% · grade {grade}', { pct: fmtNumber(row.pct), grade: row.grade }), bold: true, gap: 22 },
+      ...(row.gpa !== null ? [{ text: tx('Grade point average'), right: fmtNumber(row.gpa) }] : []),
       { text: tx('Result'), right: row.pct >= grading.pass ? tx('Passed') : tx('Needs support') },
       ...(showRank ? [{ text: tx('Rank in class'), right: tx('{rank} of {count}', { rank: row.rank, count: res.rows.length }) }] : []),
       { text: tx('Class teacher'), gap: 60 }, { text: tx('{@Principal}'), right: tx('{@Guardian}'), gap: 0 },
