@@ -16,13 +16,15 @@ import 'package:tangent/data/models/user.dart';
 /// The school's privacy notice and grievance officer (Settings → Privacy).
 Future<void> showPrivacy() => showSheet<void>(const PrivacySheet());
 
-/// Once, right after sign-in: a family reads the school's privacy notice and agrees before using the app,
-/// when the console requires it (Privacy → Families must consent). Nothing to ask on sample content.
+/// Once, right after sign-in: a family (and a student old enough to agree for themself, from the country's age of
+/// consent) reads the school's privacy notice and agrees before using the app, when the school requires it.
+/// Nothing to ask on sample content.
 Future<void> askConsentIfNeeded() async {
-  if (!AppConfig.live || !SchoolConfig.consentRequired || Get.find<AuthService>().role != UserRole.parent) return;
+  final role = Get.find<AuthService>().role;
+  if (!AppConfig.live || !SchoolConfig.consentRequired || (role != UserRole.parent && role != UserRole.student)) return;
   try {
     final me = Map<String, dynamic>.from(await Get.find<RemoteDataSource>().get('/v1/f/me') as Map);
-    if (me['consentedAt'] != null) return;
+    if (me['consentedAt'] != null || me['consentFor'] == 'guardian') return;
   } on Object {
     return; // asked again on the next start
   }

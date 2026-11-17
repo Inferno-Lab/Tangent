@@ -44,6 +44,8 @@ const id = (key: string, label: string, pattern?: string, patternHint?: string):
 /** A country's ways: how money is taken there, the school week and the words families expect. */
 export const COUNTRY_PACKS: Record<string, Record<string, unknown>> = {
   IN: {
+    'privacy.consentAge': 18, 'privacy.consentRequired': true, 'privacy.photoConsent': true,
+    'privacy.notice': '{school} keeps the personal data it needs to run the school: who your child is, their attendance, homework, results, fees and messages. We use it only for that, never for advertising, and we do not sell it. We follow the Digital Personal Data Protection Act, 2023: a parent or guardian consents for a child under 18. You may ask for a summary of your data, its correction or its erasure, and name someone to act for you; write to our grievance officer, below.',
     'fees.paymentMethods': [method('cash', 'Cash', 'cash'), method('upi', 'UPI', 'wallet'), method('card', 'Card', 'card'), method('netbanking', 'Net banking', 'bank'), method('cheque', 'Cheque', 'cheque')],
     'calendar.weekStarts': 'mon', 'calendar.weeklyOff': ['sun'], 'leave.reasons': ['Unwell', 'Family function', 'Travel', 'Appointment', 'Other'],
     'fees.refundApprovalAbove': 5000, 'app.languages': ['en', 'hi', 'mr'],
@@ -56,6 +58,8 @@ export const COUNTRY_PACKS: Record<string, Record<string, unknown>> = {
     },
   },
   GB: {
+    'privacy.consentAge': 13, 'privacy.consentRequired': true, 'privacy.photoConsent': true,
+    'privacy.notice': "{school} is the controller of the personal data it keeps to educate and look after your child: who they are, their attendance, work, results, fees and messages. We use it under UK GDPR and the Data Protection Act 2018, for our public task and to keep children safe, never for advertising. You may ask for a copy of your data, its correction or erasure, and complain to the Information Commissioner's Office. Our data protection officer's details are below.",
     'fees.paymentMethods': [method('cash', 'Cash', 'cash'), method('card', 'Card', 'card'), method('bank', 'Bank transfer', 'bank'), method('direct-debit', 'Direct Debit', 'bank'), method('cheque', 'Cheque', 'cheque')],
     'calendar.weekStarts': 'mon', 'calendar.weeklyOff': ['sat', 'sun'], 'leave.reasons': ['Illness', 'Medical appointment', 'Family', 'Religious observance', 'Other'],
     'vocab.words': { en: { student: { one: 'Pupil' }, guardian: { one: 'parent' }, principal: { one: 'head teacher' }, class: { one: 'form' } } }, 'fees.refundApprovalAbove': 100,
@@ -67,6 +71,8 @@ export const COUNTRY_PACKS: Record<string, Record<string, unknown>> = {
     },
   },
   US: {
+    'privacy.consentAge': 13, 'privacy.consentRequired': true, 'privacy.photoConsent': true,
+    'privacy.notice': "{school} keeps education records to run the school: who your child is, their attendance, work, grades, fees and messages. Under FERPA you may inspect your child's records, ask us to correct them, and consent before we share them, except as the law allows. We do not use them for advertising. For children under 13 we follow COPPA. Our records officer's details are below.",
     'fees.paymentMethods': [method('cash', 'Cash', 'cash'), method('card', 'Card', 'card'), method('check', 'Check', 'cheque'), method('ach', 'ACH transfer', 'bank')],
     'calendar.weekStarts': 'sun', 'calendar.weeklyOff': ['sat', 'sun'], 'leave.reasons': ['Sick', 'Medical appointment', 'Family', 'Religious holiday', 'Other'],
     'fees.refundApprovalAbove': 100, 'app.languages': ['en', 'es'], 'tax.name': 'Sales tax', 'tax.numberLabel': 'Tax ID',
@@ -74,6 +80,8 @@ export const COUNTRY_PACKS: Record<string, Record<string, unknown>> = {
     'fields.custom': { student: [id('state_id', 'State student ID')] },
   },
   AE: {
+    'privacy.consentAge': 18, 'privacy.consentRequired': true, 'privacy.photoConsent': true,
+    'privacy.notice': '{school} keeps the personal data it needs to run the school: who your child is, their attendance, work, results, fees and messages. We follow the Personal Data Protection Law (Federal Decree-Law No. 45 of 2021) and the rules of the education authority: a parent or guardian consents for a child under 18. You may ask for access to your data, its correction or erasure; write to our data protection officer, below.',
     'fees.paymentMethods': [method('cash', 'Cash', 'cash'), method('card', 'Card', 'card'), method('bank', 'Bank transfer', 'bank'), method('cheque', 'Cheque', 'cheque')],
     'calendar.weekStarts': 'mon', 'calendar.weeklyOff': ['sat', 'sun'], 'leave.reasons': ['Illness', 'Medical appointment', 'Family', 'Travel', 'Religious observance', 'Other'],
     'fees.refundApprovalAbove': 500, 'app.languages': ['en', 'ar'],

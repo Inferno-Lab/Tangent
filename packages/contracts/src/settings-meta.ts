@@ -48,7 +48,7 @@ export const settingOwner = (key: string): 'school' | 'tangent' => ((TANGENT_SET
  */
 export const TIGHTEN: Partial<Record<SettingKey, 'min' | 'max' | 'on'>> = {
   'security.twoFactor': 'on', 'security.passwordMinLength': 'min', 'security.webSessionDays': 'max', 'security.appSessionDays': 'max',
-  'privacy.retentionMonths': 'min', 'privacy.photoConsent': 'on', 'privacy.consentRequired': 'on',
+  'privacy.retentionMonths': 'min', 'privacy.photoConsent': 'on', 'privacy.consentRequired': 'on', 'privacy.consentAge': 'min',
 };
 
 /** Settings that belong to the whole school rather than one module (docs/product-map.md §5). */
@@ -87,6 +87,7 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = localized({
   'privacy.officerPhone': { group: 'Privacy', label: 'Grievance officer’s phone', kind: 'text' },
   'privacy.retentionMonths': { group: 'Privacy', label: 'Keep records of students who left for (months)', kind: 'number', min: 12, max: 120, risky: true, help: 'After this, a leaver’s records are listed for erasure; erasing needs a second person in the console.' },
   'privacy.photoConsent': { group: 'Privacy', label: 'Ask for photo consent', kind: 'bool', help: 'The consent step in the app also asks whether the school may share photos of the child. Families can change the answer in the app at any time.' },
+  'privacy.consentAge': { group: 'Privacy', label: 'Students agree for themselves from age', kind: 'number', min: 10, max: 21, help: 'Set from the country’s law. A younger student is covered by their family’s consent; from this age a student signing in to the app is asked too.' },
   'privacy.consentRequired': { group: 'Privacy', label: 'People must consent before using the app', kind: 'bool', help: 'The app shows the privacy notice once after sign-in and records the consent; Moving in counts who has consented.' },
   'notify.rules': { group: 'Messaging', label: 'Which message goes where', kind: 'notifyRules' },
   'notify.quietFrom': { group: 'Messaging', label: 'Quiet hours start', kind: 'time', help: 'Only urgent messages (absence, the bus) go out in quiet hours.' },

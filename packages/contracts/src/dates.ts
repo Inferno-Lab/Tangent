@@ -70,3 +70,10 @@ export function initials(name: string): string {
     .map((w) => w[0]!.toUpperCase())
     .join('');
 }
+
+/** Whether someone born on `dob` has reached `age` years by `today` (ISO days; born on 29 February, they turn a year older on 1 March). */
+export function hasReachedAge(dob: string, today: string, age: number): boolean {
+  const [y, m, d] = today.split('-').map(Number) as [number, number, number];
+  const then = `${String(y - age).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  return dob <= then;
+}

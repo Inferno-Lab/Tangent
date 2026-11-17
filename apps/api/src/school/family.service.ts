@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
-import { tx, customText, type CustomFieldsSetting, type CustomValues, type FieldDef, type AttendanceMarkDef, MESSAGE_EVENTS, addDays, schoolToday, type AttendanceStatus, type NoticeCreate, type PeriodMarksPut } from '@tangent/contracts';
+import { tx, hasReachedAge, customText, type CustomFieldsSetting, type CustomValues, type FieldDef, type AttendanceMarkDef, MESSAGE_EVENTS, addDays, schoolToday, type AttendanceStatus, type NoticeCreate, type PeriodMarksPut } from '@tangent/contracts';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import { schoolContext, type Registry } from '@tangent/tenancy';
 import { REGISTRY, type AuthedUser, type TenantCtx } from '../tenancy/tenant.js';
@@ -102,7 +102,10 @@ export class FamilyService {
   async me(t: TenantCtx, user: AuthedUser): Promise<Record<string, unknown>> {
     const w = await this.who(t, user);
     const c = (await t.pool.query<{ consented_at: Date | null; photo_consent: boolean | null }>('select consented_at, photo_consent from users where id = $1', [user.id])).rows[0];
+    // A student agrees for themself from the country's age of consent; a younger one is covered by their family (§3.7).
+    const consentFor = w.kind === 'student' ? ((await this.ofConsentAge(t, w.children[0])) ? 'self' : 'guardian') : 'self';
     return {
+      consentFor,
       id: w.id, role: w.role, name: w.name, email: w.email ?? '', phone: w.phone ?? '', avatarUrl: '', password: '',
       childIds: w.kind === 'guardian' ? w.children : [], ...(w.kind === 'student' ? { studentId: w.children[0] ?? null } : {}), ...(w.kind === 'staff' ? { teacherId: w.id } : {}),
       consentedAt: c?.consented_at?.toISOString() ?? null, photoConsent: c?.photo_consent ?? null,
@@ -110,7 +113,17 @@ export class FamilyService {
   }
 
   /** A family agrees to the school's privacy notice (once), and says whether the school may share photos of the child. */
+  /** Whether a student is old enough to agree to the privacy notice for themself (privacy.consentAge, from their birth date). */
+  private async ofConsentAge(t: TenantCtx, studentId: string | undefined): Promise<boolean> {
+    if (!studentId) return false;
+    const age = await this.settings.value<number>(t, 'privacy.consentAge', 16);
+    const dob = (await t.pool.query<{ dob: string | null }>('select dob::text from students where id = $1', [studentId])).rows[0]?.dob;
+    return !!dob && hasReachedAge(dob, schoolToday(), age);
+  }
+
   async consent(t: TenantCtx, user: AuthedUser, photos: boolean | undefined): Promise<{ consentedAt: string; photoConsent: boolean | null }> {
+    const w = await this.who(t, user);
+    if (w.kind === 'student' && !(await this.ofConsentAge(t, w.children[0]))) throw forbidden('Your parent or guardian agrees to this for you.');
     // The photo answer can be changed at any time (Settings → Privacy); the consent itself is given once.
     const { rows } = await t.pool.query<{ consented_at: Date; photo_consent: boolean | null }>(
       'update users set consented_at = coalesce(consented_at, now()), photo_consent = case when $2::boolean is null then photo_consent else $2 end where id = $1 returning consented_at, photo_consent', [user.id, photos ?? null]);

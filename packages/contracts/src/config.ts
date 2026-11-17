@@ -241,6 +241,8 @@ export const SchoolSettingsSchema = z.object({
   'templates.messages': z.record(z.string(), z.union([z.string().max(320), z.record(z.string().refine(isLanguage), z.string().max(320))])).default({}),
   // Privacy and consent.
   'privacy.notice': z.string().max(4000).default(''),
+  // From this age a student agrees to the privacy notice for themself (§3.7); a younger one is covered by their family's consent.
+  'privacy.consentAge': z.number().int().min(10).max(21).default(16),
   'privacy.officerName': z.string().max(80).default(''),
   'privacy.officerEmail': z.string().max(120).default(''),
   'privacy.officerPhone': z.string().max(24).default(''),
