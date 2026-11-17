@@ -112,6 +112,36 @@ export const LateRule = z.object({
 }).refine((r) => r.kind === 'fixed' || r.amount <= 25, { message: 'A late fee is at most 25% each time', path: ['amount'] });
 export type LateRule = z.infer<typeof LateRule>;
 
+/** One library item type's own rules (library.typeRules, by the type's key); a rule left out is the library's own. */
+export const LibraryTypeRule = z.object({
+  loanDays: z.number().int().min(1).max(365).optional(),
+  finePerDay: z.number().min(0).max(100_000).optional(),
+  maxRenewals: z.number().int().min(0).max(10).optional(),
+});
+export type LibraryTypeRule = z.infer<typeof LibraryTypeRule>;
+/**
+ * A kind of library member: staff, or students of some year groups (none: every year), with its own loan days and how many
+ * items one may have out. A borrower is the first kind that fits; with none, the library's own numbers.
+ */
+export const LibraryMember = z.object({
+  key: z.string().trim().min(1).max(32),
+  name: z.string().trim().min(1).max(40),
+  staff: z.boolean().default(false),
+  grades: z.array(z.number().int().min(-3).max(20)).max(20).default([]),
+  loanDays: z.number().int().min(1).max(365),
+  maxLoans: z.number().int().min(1).max(50),
+});
+export type LibraryMember = z.infer<typeof LibraryMember>;
+
+/** One of the school's bus trips a day (morning, afternoon, late bus, activity bus), and from when the app offers it. */
+export const TripSession = z.object({
+  key: z.string().trim().min(1).max(32).regex(/^[a-z0-9_-]+$/),
+  name: z.string().trim().min(1).max(40),
+  from: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+});
+export type TripSession = z.infer<typeof TripSession>;
+export const DEFAULT_TRIP_SESSIONS: TripSession[] = [{ key: 'morning', name: 'Morning', from: '00:00' }, { key: 'afternoon', name: 'Afternoon', from: '12:00' }];
+
 export const SchoolSettingsSchema = z.object({
   'school.name': z.string().min(2).max(80),
   'school.shortName': z.string().min(2).max(20),
@@ -148,6 +178,13 @@ export const SchoolSettingsSchema = z.object({
   // With two registers: when the afternoon one starts (the app marks whichever it is now).
   'attendance.pmFrom': z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('12:00'),
   'fees.lateFeePct': z.number().min(0).max(25).default(0),
+  // Who a family, and a student, may start a conversation with: their class teacher, their subject teachers, or both.
+  'chat.familiesWriteTo': z.array(z.enum(['classTeacher', 'subjectTeachers'])).max(2).default(['classTeacher', 'subjectTeachers']),
+  'chat.studentsWriteTo': z.array(z.enum(['classTeacher', 'subjectTeachers'])).max(2).default(['classTeacher', 'subjectTeachers']),
+  // When teachers answer messages; outside these hours the app tells a family when to expect an answer (none: any time).
+  'chat.officeHours': z.object({ from: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/), to: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/) }).nullable().default(null),
+  // Short replies staff can pick when answering (a school list, each in the school's languages).
+  'chat.quickReplies': schoolList([], 0, 20),
   // The late-fee rule (one-shot plan 4.7); none: the late fee above, once a month.
   'fees.lateRule': LateRule.nullable().default(null),
   // When families are reminded, in days from the due date (-3 three days before, 7 a week after); none: remindDaysBefore.
@@ -211,8 +248,16 @@ export const SchoolSettingsSchema = z.object({
   // Books a student, and a member of staff, may have out at once.
   'library.maxLoans': z.number().int().min(1).max(20).default(3),
   'library.staffMaxLoans': z.number().int().min(1).max(50).default(5),
+  'library.itemTypes': schoolList([{ key: 'book', name: 'Book' }], 1, 20),
+  'library.typeRules': z.record(z.string().max(32), LibraryTypeRule).default({}),
+  'library.memberTypes': z.array(LibraryMember).max(12).refine((l) => new Set(l.map((m) => m.key)).size === l.length, 'Two kinds have the same key').default([]),
+  // Late days not charged, the most one loan's late fine comes to (0: no cap), and where fines go by default.
+  'library.fineGraceDays': z.number().int().min(0).max(30).default(0),
+  'library.fineCap': z.number().min(0).max(100_000).default(0),
+  'library.finesTo': z.enum(['fees', 'desk']).default('fees'),
   // Families are told the bus is near when it is this many minutes from their stop.
   'transport.nearMinutes': z.number().int().min(2).max(30).default(10),
+  'transport.sessions': z.array(TripSession).min(1).max(8).refine((l) => new Set(l.map((s) => s.key)).size === l.length, 'Two trips have the same key').default(DEFAULT_TRIP_SESSIONS),
   'fees.paymentMethods': PaymentMethods.default(DEFAULT_PAYMENT_METHODS),
   // The school's own words per language (student or pupil, class or form): `{ en: { student: { one: 'Pupil' } } }`.
   'vocab.words': z.record(z.string().refine(isLanguage), z.object(Object.fromEntries(VOCAB_CONCEPTS.map((c) => [c.key, z.object({ one: z.string().trim().max(30), many: z.string().trim().max(30).optional() }).optional()]))))

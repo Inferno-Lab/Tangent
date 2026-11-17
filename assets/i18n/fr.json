@@ -218,8 +218,6 @@
  "driver.no_location": "La localisation est désactivée : les familles ne voient pas le bus. Activez-la dans les paramètres du téléphone.",
  "driver.no_riders": "Personne ne monte ici.",
  "driver.running": "En route",
- "driver.start_afternoon": "Démarrer le trajet de l’après-midi",
- "driver.start_morning": "Démarrer le trajet du matin",
  "driver.started": "Trajet commencé. Les familles voient le bus.",
  "driver.title": "Trajets du jour",
  "driver.trips_done": "@n trajets effectués aujourd’hui",

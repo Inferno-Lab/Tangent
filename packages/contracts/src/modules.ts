@@ -399,6 +399,10 @@ export const EventSave = z.object({
   category: z.string().trim().max(24).default(''),
   /** Ask families whether they are coming. */
   needsRsvp: z.boolean().default(false),
+  /** Replies close at the end of this day (none: until it starts); at most this many grown-ups per family; this many children going. */
+  rsvpBy: IsoDate.nullable().default(null),
+  maxAdults: z.number().int().min(0).max(20).nullable().default(null),
+  capacity: z.number().int().min(1).max(100_000).nullable().default(null),
   lat: z.number().min(-90).max(90).nullable().default(null),
   lng: z.number().min(-180).max(180).nullable().default(null),
 });
@@ -423,6 +427,9 @@ export interface EventRow {
   cant: number;
   /** Grown-ups coming with the children who are going. */
   adults: number;
+  rsvpBy: string | null;
+  maxAdults: number | null;
+  capacity: number | null;
   classId: string | null;
   className: string | null;
 }

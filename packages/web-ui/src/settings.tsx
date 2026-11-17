@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, hasKey, type AppRole } from '@tangent/config-engine';
-import { AdmissionStages, DEFAULT_ADMISSION_STAGES, TimetableCycle, listLabel, type LateRule, type AdmissionStage, rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, ADDRESS_PARTS, ADDRESS_PART_LABELS, SCHEME_KINDS, SCHEME_KIND_LABELS, BLOCK_KINDS, BLOCK_KIND_LABELS, DEFAULT_TEMPLATES, DOC_KINDS, DOC_KIND_LABELS, DOC_PLACEHOLDERS, PAGE_SIZES, type Block, type DocKind, type DocTemplate, type DocTemplates, type GradeBand, type GradingScheme, type AddressFormat, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
+import { AdmissionStages, DEFAULT_ADMISSION_STAGES, DEFAULT_TRIP_SESSIONS, TimetableCycle, listLabel, type LateRule, type LibraryMember, type LibraryTypeRule, type TripSession, type AdmissionStage, rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, ADDRESS_PARTS, ADDRESS_PART_LABELS, SCHEME_KINDS, SCHEME_KIND_LABELS, BLOCK_KINDS, BLOCK_KIND_LABELS, DEFAULT_TEMPLATES, DOC_KINDS, DOC_KIND_LABELS, DOC_PLACEHOLDERS, PAGE_SIZES, type Block, type DocKind, type DocTemplate, type DocTemplates, type GradeBand, type GradingScheme, type AddressFormat, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
 import { Checkbox, DateField, FilePick, NumberField, TimeField } from './fields';
 import { ColourField } from './ColourPicker';
 import { ErrorLine, Field, SelectField } from './forms';
@@ -179,6 +179,92 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
           <div className="tgrow">{days.map((d) => <button key={d} type="button" className="chip v" disabled={disabled} onClick={() => put(days.filter((x) => x !== d))} aria-label={tr('ui.settings.remove')}>
             {d < 0 ? tr('ui.settings.days_before', { n: -d }) : d === 0 ? tr('ui.settings.on_the_day') : tr('ui.settings.days_after', { n: d })} ×</button>)}</div>
           <ReminderDayAdd disabled={disabled} onAdd={(d) => put([...days, d])} />
+        </div>,
+      );
+    }
+    case 'libraryTypes': {
+      // A row for each of the library's item types (library.itemTypes); an empty box is the library's own rule.
+      const types = (Array.isArray(ctx.values?.['library.itemTypes']) ? (ctx.values!['library.itemTypes'] as ListItem[]) : [{ key: 'book', name: 'Book' }]).filter((i) => i.active !== false);
+      const all = (value ?? {}) as Record<string, LibraryTypeRule>;
+      const put = (key: string, k: keyof LibraryTypeRule, v: string) => {
+        const rule = { ...all[key] };
+        if (v === '') delete rule[k]; else rule[k] = Number(v);
+        const next = { ...all };
+        if (Object.keys(rule).length) next[key] = rule; else delete next[key];
+        onChange(next);
+      };
+      const num = (r: LibraryTypeRule | undefined, k: keyof LibraryTypeRule) => (r?.[k] === undefined ? '' : String(r[k]));
+      return box(
+        <div className="stack" style={{ gap: 8 }}>
+          {types.map((ty) => (
+            <div key={ty.key} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <b style={{ width: 140, paddingBottom: 12 }}>{listLabel(types, ty.key, currentLanguage())}</b>
+              <div style={{ width: 130 }}><NumberField label={tr('ui.settings.loan_days')} min={1} max={365} value={num(all[ty.key], 'loanDays')} disabled={disabled} onChange={(v) => put(ty.key, 'loanDays', v)} /></div>
+              <div style={{ width: 150 }}><NumberField label={tr('ui.settings.fine_per_day')} min={0} max={100000} decimals value={num(all[ty.key], 'finePerDay')} disabled={disabled} onChange={(v) => put(ty.key, 'finePerDay', v)} /></div>
+              <div style={{ width: 130 }}><NumberField label={tr('ui.settings.renewals')} min={0} max={10} value={num(all[ty.key], 'maxRenewals')} disabled={disabled} onChange={(v) => put(ty.key, 'maxRenewals', v)} /></div>
+            </div>
+          ))}
+        </div>,
+      );
+    }
+    case 'libraryMembers': {
+      const kinds = (Array.isArray(value) ? value : []) as LibraryMember[];
+      const put = (i: number, p: Partial<LibraryMember>) => onChange(kinds.map((m, j) => (j === i ? { ...m, ...p } : m)));
+      // Year groups as a range: both empty is every year.
+      const range = (m: LibraryMember) => (m.grades.length ? [Math.min(...m.grades), Math.max(...m.grades)] : [null, null]) as [number | null, number | null];
+      const setRange = (i: number, from: number | null, to: number | null) => {
+        const a = from ?? to, b = to ?? from;
+        put(i, { grades: a === null || b === null ? [] : Array.from({ length: Math.min(20, Math.abs(b - a) + 1) }, (_, k) => Math.min(a, b) + k) });
+      };
+      const add = () => onChange([...kinds, { key: `m${Date.now().toString(36)}`, name: '', staff: false, grades: [], loanDays: 14, maxLoans: 3 }]);
+      return box(
+        <div className="stack" style={{ gap: 8 }}>
+          {kinds.map((m, i) => {
+            const [from, to] = range(m);
+            return (
+              <div key={m.key} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <div style={{ width: 180 }}><Field label={tr('ui.settings.name')} value={m.name} disabled={disabled} maxLength={40} onChange={(v) => put(i, { name: v })} /></div>
+                <div style={{ width: 150 }}><SelectField label={tr('ui.settings.who')} value={m.staff ? 'staff' : 'students'} disabled={disabled} onChange={(v) => put(i, { staff: v === 'staff', grades: [] })}
+                  options={[{ value: 'students', label: tr('ui.settings.students') }, { value: 'staff', label: tr('ui.settings.staff') }]} /></div>
+                {!m.staff && <>
+                  <div style={{ width: 110 }}><NumberField label={tr('ui.settings.from_year')} min={-3} max={20} value={from === null ? '' : String(from)} disabled={disabled} onChange={(v) => setRange(i, v === '' ? null : Number(v), to)} /></div>
+                  <div style={{ width: 110 }}><NumberField label={tr('ui.settings.to_year')} min={-3} max={20} value={to === null ? '' : String(to)} disabled={disabled} onChange={(v) => setRange(i, from, v === '' ? null : Number(v))} /></div>
+                </>}
+                <div style={{ width: 120 }}><NumberField label={tr('ui.settings.loan_days')} min={1} max={365} value={String(m.loanDays)} disabled={disabled} onChange={(v) => put(i, { loanDays: Math.max(1, Number(v) || 1) })} /></div>
+                <div style={{ width: 120 }}><NumberField label={tr('ui.settings.items_at_once')} min={1} max={50} value={String(m.maxLoans)} disabled={disabled} onChange={(v) => put(i, { maxLoans: Math.max(1, Number(v) || 1) })} /></div>
+                <button type="button" className="btn sm" disabled={disabled} style={{ marginBottom: 6 }} onClick={() => onChange(kinds.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
+              </div>
+            );
+          })}
+          {kinds.length < 12 && <button type="button" className="btn sm" style={{ alignSelf: 'flex-start' }} disabled={disabled} onClick={add}><Icon name="plus" />{tr('ui.settings.add_member_type')}</button>}
+        </div>,
+      );
+    }
+    case 'tripSessions': {
+      const trips = (Array.isArray(value) && value.length ? value : DEFAULT_TRIP_SESSIONS) as TripSession[];
+      const put = (i: number, p: Partial<TripSession>) => onChange(trips.map((s, j) => (j === i ? { ...s, ...p } : s)));
+      // A key the school never sees, made once from the first name it is given, so trips already run keep their name.
+      const add = () => onChange([...trips, { key: `trip${Date.now().toString(36).slice(-5)}`, name: '', from: '15:00' }]);
+      return box(
+        <div className="stack" style={{ gap: 8 }}>
+          {trips.map((s, i) => (
+            <div key={s.key} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <div style={{ width: 220 }}><Field label={tr('ui.settings.name')} value={s.name} disabled={disabled} maxLength={40} onChange={(v) => put(i, { name: v })} /></div>
+              <div style={{ width: 140 }}><TimeField label={tr('ui.settings.offered_from')} value={s.from} disabled={disabled} onChange={(v) => put(i, { from: v })} /></div>
+              <button type="button" className="btn sm" style={{ marginBottom: 6 }} disabled={disabled || trips.length <= 1} onClick={() => onChange(trips.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
+            </div>
+          ))}
+          {trips.length < 8 && <button type="button" className="btn sm" style={{ alignSelf: 'flex-start' }} disabled={disabled} onClick={add}><Icon name="plus" />{tr('ui.settings.add_a_trip')}</button>}
+        </div>,
+      );
+    }
+    case 'hours': {
+      const h = (value ?? null) as { from: string; to: string } | null;
+      return box(
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <Checkbox checked={!!h} disabled={disabled} label={tr('ui.settings.only_at_set_hours')} onChange={(on) => onChange(on ? { from: '08:00', to: '16:00' } : null)} />
+          {h && <><div style={{ width: 140 }}><TimeField label={tr('ui.settings.from')} value={h.from} disabled={disabled} onChange={(v) => onChange({ ...h, from: v })} /></div>
+            <div style={{ width: 140 }}><TimeField label={tr('ui.settings.until')} value={h.to} disabled={disabled} onChange={(v) => onChange({ ...h, to: v })} /></div></>}
         </div>,
       );
     }

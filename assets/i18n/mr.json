@@ -226,8 +226,6 @@
  "driver.no_location": "स्थान बंद आहे, त्यामुळे कुटुंबांना बस दिसत नाही. फोनच्या सेटिंग्जमध्ये चालू करा.",
  "driver.no_riders": "इथे कोणी चढत नाही.",
  "driver.running": "रस्त्यावर",
- "driver.start_afternoon": "दुपारची फेरी सुरू करा",
- "driver.start_morning": "सकाळची फेरी सुरू करा",
  "driver.started": "फेरी सुरू. कुटुंबे आता बस पाहू शकतात.",
  "driver.title": "आजच्या फेऱ्या",
  "driver.trips_done": "आज @n फेऱ्या पूर्ण",

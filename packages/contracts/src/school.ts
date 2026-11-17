@@ -353,6 +353,13 @@ export const ReceiptCancel = z.object({ reason: z.string().trim().min(3, 'Say wh
 export type ReceiptCancel = z.infer<typeof ReceiptCancel>;
 
 // Notices
+export const NoticeTargets = z.object({
+  classes: z.array(z.string().min(1)).max(80).optional(),
+  grades: z.array(z.number().int().min(-3).max(20)).max(20).optional(),
+  houses: z.array(z.string().trim().min(1).max(40)).max(12).optional(),
+  roles: z.array(z.string().min(1).max(40)).max(20).optional(),
+});
+export type NoticeTargets = z.infer<typeof NoticeTargets>;
 /**
  * A notice as written in the admin or the teachers' app. Who it goes to: everyone, parents, students, staff, or one class.
  * Writing to the whole school needs notices.publish, pinning needs notices.pin; anyone else writes to their own classes.
@@ -370,6 +377,8 @@ export const NoticeCreate = z.object({
   publish: z.boolean().default(false),
   publishAt: z.string().datetime({ offset: true }).nullable().optional(),
   fileIds: z.array(z.string()).max(5).default([]),
+  /** Narrows who it reaches: any of these classes, year groups or houses, and (for staff) these roles; none of a kind: all. */
+  targets: NoticeTargets.optional(),
 }).refine((n) => n.audience !== 'class' || !!n.classId, { message: 'Choose the class', path: ['classId'] });
 export type NoticeCreate = z.infer<typeof NoticeCreate>;
 
@@ -380,6 +389,7 @@ export interface NoticeRow {
   audience: string;
   classId: string | null;
   className: string | null;
+  targets: NoticeTargets;
   category: string;
   pinned: boolean;
   needsAck: boolean;

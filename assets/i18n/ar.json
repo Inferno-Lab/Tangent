@@ -226,8 +226,6 @@
  "driver.no_location": "الموقع متوقف، لذا لا تستطيع العائلات رؤية الحافلة. فعّله من إعدادات الهاتف.",
  "driver.no_riders": "لا أحد يصعد هنا.",
  "driver.running": "في الطريق",
- "driver.start_afternoon": "ابدأ رحلة بعد الظهر",
- "driver.start_morning": "ابدأ الرحلة الصباحية",
  "driver.started": "بدأت الرحلة. يمكن للعائلات رؤية الحافلة الآن.",
  "driver.title": "رحلات اليوم",
  "driver.trips_done": "@n رحلات اليوم",

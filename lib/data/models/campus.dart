@@ -202,6 +202,8 @@ class SchoolEvent {
     required this.category,
     required this.imageUrl,
     required this.rsvps,
+    this.needsRsvp = true,
+    this.rsvpBy,
   });
 
   factory SchoolEvent.fromJson(Map<String, dynamic> json) =>
@@ -217,6 +219,10 @@ class SchoolEvent {
   final String imageUrl;
   final List<Rsvp> rsvps;
 
+  /// Whether the school asks for a reply, and the last day it takes one (none: until the event).
+  final bool needsRsvp;
+  final DateTime? rsvpBy;
+
   SchoolEvent copyWith({List<Rsvp>? rsvps}) => SchoolEvent(
     id: id,
     title: title,
@@ -227,6 +233,8 @@ class SchoolEvent {
     category: category,
     imageUrl: imageUrl,
     rsvps: rsvps ?? this.rsvps,
+    needsRsvp: needsRsvp,
+    rsvpBy: rsvpBy,
   );
 
   Map<String, dynamic> toJson() => _$SchoolEventToJson(this);

@@ -5,9 +5,9 @@ import { schoolToday, type Category, type NoticeRow } from '@tangent/contracts';
 import { Checkbox, DateField, Dialog, Field, SelectField, TimeField, useShake, Icon, EmptyState, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
-import { Attach, useSetting } from '../../app/kit';
+import { Attach, useGrades, useSetting } from '../../app/kit';
 import { usePageTabs } from '../../app/tabs';
-import { fmtDate, schoolInstant } from '@tangent/contracts';
+import { fmtDate, schoolInstant, schoolNow, type NoticeTargets } from '@tangent/contracts';
 
 const TONE: Record<NoticeRow['status'], string> = { draft: 'n', pending: 'a', scheduled: 'v', published: 'g' };
 const LABEL: Record<NoticeRow['status'], string> = { draft: t('admin.notices_page.draft'), pending: t('admin.notices_page.waiting_for_approval'), scheduled: t('admin.notices_page.scheduled'), published: t('admin.notices_page.sent') };
@@ -84,12 +84,21 @@ function Compose({ n, onClose, onDone }: { n?: NoticeRow; onClose: () => void; o
   const cats = useSetting<Category[]>('notices.categories', []);
   const canPublish = app.user.permissions.includes('notices.publish');
   const canPin = app.user.permissions.includes('notices.pin');
-  const at = n?.publishAt ? new Date(new Date(n.publishAt).getTime() + 5.5 * 3600_000).toISOString() : '';
+  const at = n?.publishAt ? schoolNow(new Date(n.publishAt)).toISOString() : ''; // the time on the school's clock
   const [f, setF] = useState({
     title: n?.title ?? '', body: n?.body ?? '', audience: n?.audience ?? (canPublish ? 'everyone' : 'class'), classId: n?.classId ?? '', category: n?.category ?? cats[0]?.key ?? 'academic',
     pinned: n?.pinned ?? false, needsAck: n?.needsAck ?? false, later: !!n?.publishAt, day: at.slice(0, 10), time: at.slice(11, 16) || '08:00', tellAgain: false,
   });
   const [err, setErr] = useState<Record<string, string>>({});
+  // Narrowing who it reaches (someone who publishes to the school): year groups, houses, and staff roles.
+  const grades = useGrades();
+  const houses = useSetting<{ name: string }[]>('people.houses', []);
+  const roles = useQuery({ queryKey: ['roles'], queryFn: app.api.roles.list, staleTime: 60_000, enabled: canPublish });
+  const [targets, setTargets] = useState<NoticeTargets>(n?.targets ?? {});
+  const toggle = <K extends keyof NoticeTargets>(k: K, v: NonNullable<NoticeTargets[K]>[number], on: boolean) => {
+    const cur = (targets[k] ?? []) as (typeof v)[];
+    setTargets({ ...targets, [k]: on ? [...cur, v] : cur.filter((x) => x !== v) });
+  };
   const shake = useShake();
   const [files, setFiles] = useState<File[]>([]);
   const published = n?.status === 'published';
@@ -99,6 +108,11 @@ function Compose({ n, onClose, onDone }: { n?: NoticeRow; onClose: () => void; o
       const body = {
         title: f.title.trim(), body: f.body.trim(), audience: f.audience as 'everyone', classId: f.audience === 'class' ? f.classId : undefined, category: f.category || cats[0]?.key || 'academic',
         pinned: f.pinned, needsAck: f.needsAck, publish, publishAt: f.later && !published ? schoolInstant(f.day, f.time).toISOString() : null, fileIds: [],
+        // Roles only narrow a notice to staff; year groups and houses only one to families and students.
+        targets: canPublish && f.audience !== 'class' ? {
+          grades: f.audience === 'staff' ? [] : targets.grades ?? [], houses: f.audience === 'staff' ? [] : targets.houses ?? [],
+          roles: f.audience === 'staff' || f.audience === 'everyone' ? targets.roles ?? [] : [],
+        } : {},
       };
       const saved = n ? await app.api.notices.update(n.id, { ...body, tellAgain: f.tellAgain }) : await app.api.notices.create(body);
       const failed: string[] = [];
@@ -135,6 +149,16 @@ function Compose({ n, onClose, onDone }: { n?: NoticeRow; onClose: () => void; o
           {f.audience === 'class' && <SelectField label={t('admin.notices_page.class_2')} value={f.classId} onChange={set('classId')} options={[{ value: '', label: t('admin.notices_page.pick_a_class') }, ...(classes.data ?? []).map((c) => ({ value: c.id, label: t('admin.notices_page.class_3', { name: c.name }) }))]} error={err.classId} />}
         </div>
         {!canPublish && <div className="help">{t('admin.notices_page.you_write_to_the_classes')}</div>}
+        {canPublish && f.audience !== 'class' && (
+          <div className="fld">
+            <label>{t('admin.notices_page.only_some_of_them')}</label>
+            <div className="help" style={{ marginTop: 0 }}>{t('admin.notices_page.none_ticked_everyone')}</div>
+            {f.audience !== 'staff' && grades.length > 1 && <div className="tgrow">{grades.map((g) => <Checkbox key={g.value} label={g.label} checked={!!targets.grades?.includes(Number(g.value))} onChange={(on) => toggle('grades', Number(g.value), on)} />)}</div>}
+            {f.audience !== 'staff' && houses.length > 0 && <div className="tgrow">{houses.map((h) => <Checkbox key={h.name} label={h.name} checked={!!targets.houses?.includes(h.name)} onChange={(on) => toggle('houses', h.name, on)} />)}</div>}
+            {(f.audience === 'staff' || f.audience === 'everyone') && (roles.data?.length ?? 0) > 0 && <div className="tgrow">{roles.data!.map((r) => <Checkbox key={r.key} label={r.name} checked={!!targets.roles?.includes(r.key)} onChange={(on) => toggle('roles', r.key, on)} />)}</div>}
+            {err.targets && <div className="emsg" role="alert">{err.targets}</div>}
+          </div>
+        )}
         <SelectField label={t('admin.notices_page.category')} value={f.category} onChange={set('category')} error={err.category} options={cats.map((c) => ({ value: c.key, label: c.name }))} />
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
           {canPin && <Checkbox checked={f.pinned} onChange={set('pinned')} label={t('admin.notices_page.pin_to_the_top')} />}

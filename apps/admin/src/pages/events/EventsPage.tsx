@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { schoolInstant, fmtDate, EVENT_KINDS, schoolToday, type Category, type EventKind, type EventRow, type ExamRow } from '@tangent/contracts';
+import { schoolInstant, schoolNow, fmtDate, EVENT_KINDS, schoolToday, type Category, type EventKind, type EventRow, type ExamRow } from '@tangent/contracts';
 import { Checkbox, DateField, Dialog, Field, NumberField, SelectField, TimeField, useShake, EmptyState, EmptyNote, currentLanguage, t as tr } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
@@ -27,7 +27,7 @@ const when = (e: EventRow) => {
 /** Exams shown on the calendar as the weeks they run (opened in Exams, not edited here). */
 const examEvents = (exams: ExamRow[]): EventRow[] => exams.map((x) => ({
   id: `exam:${x.id}`, title: tr('admin.events_page.class', { name: x.name, className: x.className }), startsAt: schoolInstant(x.startsOn).toISOString(), endsAt: schoolInstant(x.endsOn).toISOString(), kind: 'exam', venue: '', note: '', audience: 'everyone',
-  category: '', needsRsvp: false, lat: null, lng: null, going: 0, maybe: 0, cant: 0, adults: 0, classId: x.classId, className: x.className,
+  category: '', needsRsvp: false, lat: null, lng: null, going: 0, maybe: 0, cant: 0, adults: 0, rsvpBy: null, maxAdults: null, capacity: null, classId: x.classId, className: x.className,
 }));
 const refresh = (qc: ReturnType<typeof useQueryClient>) => void qc.invalidateQueries({ predicate: (q) => ['events', 'dashboard'].includes(String(q.queryKey[0])) });
 
@@ -124,7 +124,7 @@ function EventItem({ e, canWrite, onOpen, dim }: { e: EventRow; canWrite: boolea
 }
 
 /** A stored time as the school's day and clock (India Standard Time), whatever the browser's time zone. */
-const local = (iso: string) => { const d = new Date(new Date(iso).getTime() + 330 * 60_000).toISOString(); return { date: d.slice(0, 10), time: d.slice(11, 16) }; };
+const local = (iso: string) => { const d = schoolNow(new Date(iso)).toISOString(); return { date: d.slice(0, 10), time: d.slice(11, 16) }; };
 
 function EventDialog({ event, defaultDay, onClose, onDone }: { event: EventRow | null; defaultDay: string | null; onClose: () => void; onDone: (msg: string) => void }) {
   const app = useApp();
@@ -136,7 +136,8 @@ function EventDialog({ event, defaultDay, onClose, onDone }: { event: EventRow |
   const replies = useQuery({ queryKey: ['events', event?.id, 'replies'], queryFn: () => app.api.events.replies(event!.id), enabled: !!event && event.going + event.maybe + event.cant > 0 });
   const [showReplies, setShowReplies] = useState(false);
   const [f, setF] = useState({ title: event?.title ?? '', kind: (event?.kind ?? 'event') as EventKind, date: s.date, time: s.time, endDate: en.date, endTime: en.time, venue: event?.venue ?? '', note: event?.note ?? '', audience: event?.audience ?? 'everyone', classId: event?.classId ?? '',
-    category: event?.category ?? cats[0]?.key ?? '', lat: event?.lat == null ? '' : String(event.lat), lng: event?.lng == null ? '' : String(event.lng) });
+    category: event?.category ?? cats[0]?.key ?? '', lat: event?.lat == null ? '' : String(event.lat), lng: event?.lng == null ? '' : String(event.lng),
+    rsvpBy: event?.rsvpBy ?? '', maxAdults: event?.maxAdults == null ? '' : String(event.maxAdults), capacity: event?.capacity == null ? '' : String(event.capacity) });
   const [needsRsvp, setNeedsRsvp] = useState(event?.needsRsvp ?? false);
   const [err, setErr] = useState<Record<string, string>>({});
   const [confirm, setConfirm] = useState(false);
@@ -147,6 +148,7 @@ function EventDialog({ event, defaultDay, onClose, onDone }: { event: EventRow |
   const body = () => ({
     title: f.title.trim(), kind: f.kind, venue: f.venue.trim(), note: f.note.trim(), audience: f.audience as 'everyone', classId: f.audience === 'class' ? f.classId : null, category: f.category, needsRsvp: !holiday && needsRsvp,
     lat: f.lat ? Number(f.lat) : null, lng: f.lng ? Number(f.lng) : null,
+    rsvpBy: f.rsvpBy || null, maxAdults: f.maxAdults === '' ? null : Number(f.maxAdults), capacity: f.capacity === '' ? null : Number(f.capacity),
     startsAt: schoolInstant(f.date, holiday ? '00:00' : f.time).toISOString(), endsAt: schoolInstant(f.endDate, holiday ? '00:00' : f.endTime).toISOString(),
   });
   const save = useMutation({
@@ -161,6 +163,8 @@ function EventDialog({ event, defaultDay, onClose, onDone }: { event: EventRow |
     if (f.audience === 'class' && !f.classId) p.classId = tr('admin.events_page.choose_the_class');
     if (!f.date) p.date = tr('admin.events_page.pick_the_day');
     if (f.endDate < f.date || (!holiday && f.endDate === f.date && f.endTime < f.time)) p.endDate = tr('admin.events_page.it_cannot_end_before_it');
+    if (needsRsvp && !holiday && f.rsvpBy && f.rsvpBy > f.date) p.rsvpBy = tr('admin.events_page.replies_close_by_the_day');
+    if (needsRsvp && !holiday && event && f.capacity !== '' && Number(f.capacity) < event.going) p.capacity = tr('admin.events_page.at_least_going', { n: event.going });
     setErr(p);
     if (Object.keys(p).length) shake.hit(); else save.mutate();
   };
@@ -203,6 +207,16 @@ function EventDialog({ event, defaultDay, onClose, onDone }: { event: EventRow |
         {!holiday && <div className="two"><NumberField label={tr('admin.events_page.latitude_optional')} decimals value={f.lat} onChange={set('lat')} min={-90} max={90} step={0.0001} /><NumberField label={tr('admin.events_page.longitude_optional')} decimals value={f.lng} onChange={set('lng')} min={-180} max={180} step={0.0001} /></div>}
         {!holiday && <div className="help" style={{ marginTop: -6 }}>{tr('admin.events_page.with_the_place_on_the')}</div>}
         {!holiday && <Checkbox checked={needsRsvp} onChange={setNeedsRsvp} label={tr('admin.events_page.ask_families_whether_they_are')} />}
+        {!holiday && needsRsvp && (
+          <>
+            <div className="two">
+              <DateField label={tr('admin.events_page.replies_close_after')} value={f.rsvpBy} max={f.date} onChange={set('rsvpBy')} error={err.rsvpBy} />
+              <NumberField label={tr('admin.events_page.places_for_children')} value={f.capacity} onChange={set('capacity')} min={1} max={100000} error={err.capacity} />
+            </div>
+            <NumberField label={tr('admin.events_page.grown_ups_per_family')} value={f.maxAdults} onChange={set('maxAdults')} min={0} max={20} error={err.maxAdults} />
+            <div className="help" style={{ marginTop: -6 }}>{tr('admin.events_page.leave_empty_no_limit')}</div>
+          </>
+        )}
         <AreaField label={tr('admin.events_page.note_optional')} value={f.note} onChange={set('note')} rows={2} maxLength={300} />
         {err._ && <div className="emsg" role="alert">{err._}</div>}
       </div>

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { BusRouteRow, RiderRow, StopInput } from '@tangent/contracts';
-import { DateField, Dialog, Field, NumberField, Select, SelectField, TimeField, useShake, EmptyState, EmptyNote, t as tr } from '@tangent/web-ui';
+import { DEFAULT_TRIP_SESSIONS, type BusRouteRow, type RiderRow, type StopInput, type TripSession } from '@tangent/contracts';
+import { Checkbox, DateField, Dialog, Field, NumberField, Select, SelectField, TimeField, useShake, EmptyState, EmptyNote, t as tr } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
-import { AddBtn, Ico, problem, stamp } from '../../app/kit';
+import { AddBtn, Ico, problem, stamp, useSetting } from '../../app/kit';
 import { usePageTabs } from '../../app/tabs';
 import { useShellChrome } from '../../app/Layout';
 import { currencySymbol, fmtMoney } from '@tangent/contracts';
@@ -123,7 +123,11 @@ type StopDraft = { id?: string; name: string; pickup: string; dropTime: string; 
 function RouteDialog({ route, onClose, onDone }: { route: BusRouteRow | null; onClose: () => void; onDone: (m: string) => void }) {
   const app = useApp();
   const shake = useShake();
-  const [f, setF] = useState({ name: route?.name ?? '', vehicle: route?.vehicle ?? '', driverUserId: route?.driverUserId ?? '', attendantName: route?.attendantName ?? '', attendantPhone: route?.attendantPhone ?? '', trackerId: route?.trackerId ?? '', fee: String(route?.fee ?? 0) });
+  const [f, setF] = useState({ name: route?.name ?? '', vehicle: route?.vehicle ?? '', driverUserId: route?.driverUserId ?? '', attendantName: route?.attendantName ?? '', attendantPhone: route?.attendantPhone ?? '', trackerId: route?.trackerId ?? '', fee: String(route?.fee ?? 0),
+    attendantUserId: route?.attendantUserId ?? '' });
+  const sessions = useSetting<TripSession[]>('transport.sessions', DEFAULT_TRIP_SESSIONS);
+  // The trips this route runs; none ticked: all of them.
+  const [runs, setRuns] = useState<string[]>(route?.sessions ?? []);
   const staff = useQuery({ queryKey: ['staff'], queryFn: () => app.api.staff.list() });
   const [sure, setSure] = useState(false);
   const [stops, setStops] = useState<StopDraft[]>(() => (route?.stops ?? []).map((s) => ({ id: s.id, name: s.name, pickup: s.pickup, dropTime: s.dropTime, lat: s.lat == null ? '' : String(s.lat), lng: s.lng == null ? '' : String(s.lng) })));
@@ -135,7 +139,7 @@ function RouteDialog({ route, onClose, onDone }: { route: BusRouteRow | null; on
   const ridersAt = (id?: string) => route?.stops.find((x) => x.id === id)?.riders ?? 0;
   const channels = useQuery({ queryKey: ['settings', 'channels'], queryFn: app.api.settings.channels, staleTime: 5 * 60_000 });
   const maps = channels.data?.channels.find((c) => c.capability === 'maps')?.state === 'on';
-  const body = () => ({ ...f, name: f.name.trim(), driverUserId: f.driverUserId || null, fee: Number(f.fee || 0), stops: stops.filter((s) => s.name.trim()).map((s): StopInput => ({ id: s.id, name: s.name.trim(), pickup: s.pickup, dropTime: s.dropTime, lat: s.lat ? Number(s.lat) : null, lng: s.lng ? Number(s.lng) : null })) });
+  const body = () => ({ ...f, name: f.name.trim(), driverUserId: f.driverUserId || null, attendantUserId: f.attendantUserId || null, sessions: runs, fee: Number(f.fee || 0), stops: stops.filter((s) => s.name.trim()).map((s): StopInput => ({ id: s.id, name: s.name.trim(), pickup: s.pickup, dropTime: s.dropTime, lat: s.lat ? Number(s.lat) : null, lng: s.lng ? Number(s.lng) : null })) });
   const save = useMutation({ mutationFn: () => (route ? app.api.transport.save(route.id, body()) : app.api.transport.add(body())), onSuccess: (r) => onDone(tr('admin.transport_page.was_saved_with_stops', { name: r.name, length: r.stops.length })), onError: (e) => { setErr(problem(e)); shake.hit(); } });
   const del = useMutation({ mutationFn: () => app.api.transport.remove(route!.id), onSuccess: () => onDone(tr('admin.transport_page.was_removed', { name: route!.name })), onError: (e) => { setErr(problem(e)); shake.hit(); } });
   return (
@@ -147,6 +151,18 @@ function RouteDialog({ route, onClose, onDone }: { route: BusRouteRow | null; on
             options={[{ value: '', label: tr('admin.transport_page.no_driver_yet') }, ...(staff.data ?? []).filter((p) => p.status === 'active').map((p) => ({ value: p.id, label: `${p.name}${p.designation ? ` · ${p.designation}` : ''}` }))]} />
           <div className="help" style={{ marginTop: 6 }}>{tr('admin.transport_page.the_driver_signs_in_to')}</div>
         </div>
+        <div>
+          <SelectField label={tr('admin.transport_page.attendant_on_the_app')} value={f.attendantUserId} onChange={set('attendantUserId')} error={err.attendantUserId}
+            options={[{ value: '', label: tr('admin.transport_page.no_attendant_on_the_app') }, ...(staff.data ?? []).filter((p) => p.status === 'active' && p.id !== f.driverUserId).map((p) => ({ value: p.id, label: `${p.name}${p.designation ? ` · ${p.designation}` : ''}` }))]} />
+          <div className="help" style={{ marginTop: 6 }}>{tr('admin.transport_page.an_attendant_on_the_app')}</div>
+        </div>
+        {sessions.length > 1 && (
+          <div className="fld">
+            <label>{tr('admin.transport_page.trips_this_route_runs')}</label>
+            <div className="tgrow">{sessions.map((s) => <Checkbox key={s.key} label={s.name} checked={runs.includes(s.key)} onChange={(on) => setRuns(on ? [...runs, s.key] : runs.filter((x) => x !== s.key))} />)}</div>
+            {err.sessions ? <div className="emsg" role="alert">{err.sessions}</div> : <div className="help">{tr('admin.transport_page.none_ticked_all_trips')}</div>}
+          </div>
+        )}
         <div className="two"><Field label={tr('admin.transport_page.attendant')} value={f.attendantName} onChange={set('attendantName')} placeholder={tr('admin.transport_page.meena_kale')} /><Field label={tr('admin.transport_page.attendant_s_phone')} type="tel" value={f.attendantPhone} onChange={set('attendantPhone')} hint={tr('admin.transport_page.families_call_the_attendant_or')} /></div>
         <Field label={tr('admin.transport_page.gps_tracker_number_optional')} value={f.trackerId} onChange={set('trackerId')} hint={tr('admin.transport_page.if_the_bus_has_a')} />
         <NumberField label={tr('admin.transport_page.route_fee_for_a_term', { currencySymbol: currencySymbol() })} value={f.fee} onChange={set('fee')} min={0} decimals />
@@ -181,7 +197,6 @@ function RouteDialog({ route, onClose, onDone }: { route: BusRouteRow | null; on
   );
 }
 
-const KIND = { morning: tr('admin.transport_page.morning'), afternoon: tr('admin.transport_page.afternoon') } as const;
 
 /** Today on every route: which trip runs, where the bus was last seen, who got on and off, and any delay the driver reported. */
 function Live({ routes }: { routes: BusRouteRow[] }) {
@@ -190,7 +205,7 @@ function Live({ routes }: { routes: BusRouteRow[] }) {
       {routes.map((r) => {
         const running = r.trips.find((t) => !t.endedAt);
         return (
-          <Card key={r.id} span="s6" title={r.name} chip={<span className={`chip ${running ? 'g' : ''}`}>{running ? tr('admin.transport_page.trip_running', { p0: KIND[running.kind] }) : r.trips.length ? tr('admin.transport_page.no_trip_running') : tr('admin.transport_page.not_out_today')}</span>}>
+          <Card key={r.id} span="s6" title={r.name} chip={<span className={`chip ${running ? 'g' : ''}`}>{running ? tr('admin.transport_page.trip_running', { p0: running.name }) : r.trips.length ? tr('admin.transport_page.no_trip_running') : tr('admin.transport_page.not_out_today')}</span>}>
             <div className="kv">{tr('admin.transport_page.bus')}<b>{r.vehicle || '–'}</b></div>
             <div className="kv">{tr('admin.transport_page.driver')}<b>{r.driverName || tr('admin.transport_page.none_chosen')}</b></div>
             <div className="kv">{tr('admin.transport_page.last_seen')}<b>{r.bus ? `${stamp(r.bus.at)}${isLive(r.bus.at) ? tr('admin.transport_page.live_2') : ''}` : tr('admin.transport_page.not_yet_today')}</b></div>
@@ -198,7 +213,7 @@ function Live({ routes }: { routes: BusRouteRow[] }) {
             {!r.trips.length && <div className="help" style={{ marginTop: 8 }}>{tr('admin.transport_page.the_driver_starts_each_trip')}</div>}
             {r.trips.map((t) => (
               <div key={t.id} className="kv" style={{ alignItems: 'flex-start', gap: 12 }}>
-                <span style={{ minWidth: 0 }}>{KIND[t.kind]}<small style={{ display: 'block', color: 'var(--ink3)' }}>{stamp(t.startedAt)}{t.endedAt ? tr('admin.transport_page.to', { stamp: stamp(t.endedAt) }) : tr('admin.transport_page.running')}{t.lateMinutes ? tr('admin.transport_page.min_late', { lateMinutes: t.lateMinutes, lateReason: t.lateReason }) : ''}</small></span>
+                <span style={{ minWidth: 0 }}>{t.name}<small style={{ display: 'block', color: 'var(--ink3)' }}>{stamp(t.startedAt)}{t.endedAt ? tr('admin.transport_page.to', { stamp: stamp(t.endedAt) }) : tr('admin.transport_page.running')}{t.lateMinutes ? tr('admin.transport_page.min_late', { lateMinutes: t.lateMinutes, lateReason: t.lateReason }) : ''}</small></span>
                 <b className="num">{t.boarded} {tr('admin.transport_page.on')}{' '}{t.dropped} {tr('admin.transport_page.off')}{t.absent ? tr('admin.transport_page.absent', { absent: t.absent }) : ''}</b>
               </div>
             ))}

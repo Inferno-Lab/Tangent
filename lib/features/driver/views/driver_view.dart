@@ -80,7 +80,7 @@ class _RouteCard extends StatelessWidget {
             const SizedBox(height: 16),
             if (trip == null)
               Btn(
-                controller.kindNow == 'morning' ? 'driver.start_morning' : 'driver.start_afternoon',
+                'driver.start_trip'.trp({'name': controller.sessionNow(route).name}),
                 icon: PhosphorIconsRegular.play,
                 expand: true,
                 loading: controller.busy.value,

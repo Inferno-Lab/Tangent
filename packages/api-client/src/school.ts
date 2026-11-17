@@ -239,6 +239,7 @@ export function schoolApi(h: Http) {
     },
     library: {
       view: () => h.get<LibraryView>('/v1/library'),
+      scan: (code: string) => h.get<BookRow>(`/v1/library/scan?code=${encodeURIComponent(code)}`),
       add: (b: BookInput) => h.post<BookRow>('/v1/library/books', b),
       save: (id: string, b: BookInput) => h.put<BookRow>(`/v1/library/books/${id}`, b),
       remove: (id: string) => h.del<void>(`/v1/library/books/${id}`),

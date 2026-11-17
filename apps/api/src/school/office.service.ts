@@ -283,15 +283,15 @@ export class OfficeService {
   // Events
 
   async events(t: TenantCtx): Promise<EventRow[]> {
-    const { rows } = await t.pool.query<{ id: string; title: string; starts_at: Date; ends_at: Date | null; kind: EventRow['kind']; venue: string; note: string; audience: string; category: string; needs_rsvp: boolean; lat: number | null; lng: number | null; going: string; maybe: string; cant: string; adults: string; class_id: string | null; class_name: string | null }>(
-      `select e.id, e.title, e.starts_at, e.ends_at, e.kind, e.venue, e.note, e.audience, e.category, e.needs_rsvp, e.lat, e.lng, e.class_id, (select name from classes c where c.id = e.class_id) class_name,
+    const { rows } = await t.pool.query<{ id: string; title: string; starts_at: Date; ends_at: Date | null; kind: EventRow['kind']; venue: string; note: string; audience: string; category: string; needs_rsvp: boolean; lat: number | null; lng: number | null; going: string; maybe: string; cant: string; adults: string; class_id: string | null; class_name: string | null; rsvp_by: string | null; max_adults: number | null; capacity: number | null }>(
+      `select e.id, e.title, e.starts_at, e.ends_at, e.kind, e.venue, e.note, e.audience, e.category, e.needs_rsvp, e.lat, e.lng, e.class_id, (select name from classes c where c.id = e.class_id) class_name, e.rsvp_by::text, e.max_adults, e.capacity,
          count(r.*) filter (where r.status = 'going') going, count(r.*) filter (where r.status = 'maybe') maybe, count(r.*) filter (where r.status = 'cant') cant,
          coalesce(sum(r.adults) filter (where r.status = 'going'), 0) adults
        from events e left join event_rsvps r on r.event_id = e.id where e.kind not in ('routine','cover') group by e.id order by e.starts_at desc limit 200`);
     return rows.map((r) => ({
       id: r.id, title: r.title, startsAt: r.starts_at.toISOString(), endsAt: r.ends_at?.toISOString() ?? null, kind: r.kind, venue: r.venue, note: r.note, audience: r.audience,
       category: r.category, needsRsvp: r.needs_rsvp, lat: r.lat, lng: r.lng, going: Number(r.going), maybe: Number(r.maybe), cant: Number(r.cant), adults: Number(r.adults),
-      classId: r.class_id, className: r.class_name,
+      rsvpBy: r.rsvp_by, maxAdults: r.max_adults, capacity: r.capacity, classId: r.class_id, className: r.class_name,
     }));
   }
 
@@ -307,16 +307,25 @@ export class OfficeService {
     if (body.endsAt && body.endsAt < body.startsAt) throw new ApiError('validation', 'The event cannot end before it starts.', { fields: { endsAt: 'Pick a time after the start.' } });
     if (body.audience === 'class' && !(body.classId && (await t.pool.query('select 1 from classes where id = $1', [body.classId])).rowCount)) throw new ApiError('validation', 'Choose the class.', { fields: { classId: 'Choose the class.' } });
     const classId = body.audience === 'class' ? body.classId : null;
+    // Replies close by the day it starts at the latest; the rules mean nothing on an event that asks for no reply.
+    const rsvp = body.needsRsvp ? body : { rsvpBy: null, maxAdults: null, capacity: null };
+    if (rsvp.rsvpBy && rsvp.rsvpBy > schoolToday(new Date(body.startsAt))) {
+      throw new ApiError('validation', tx('Replies must close by the day the event starts.'), { fields: { rsvpBy: tx('Pick a day up to the event.') } });
+    }
+    if (id && rsvp.capacity) {
+      const going = Number((await t.pool.query<{ n: string }>("select count(*) n from event_rsvps where event_id = $1 and status = 'going'", [id])).rows[0]!.n);
+      if (going > rsvp.capacity) throw new ApiError('validation', tx('{n} children are already going; the limit cannot be lower.', { n: going }), { fields: { capacity: tx('At least {n}.', { n: going }) } });
+    }
     if (id) {
-      const r = await t.pool.query("update events set title = $2, starts_at = $3, ends_at = $4, kind = $5, venue = $6, note = $7, audience = $8, category = $9, needs_rsvp = $10, lat = $11, lng = $12, class_id = $13 where id = $1 and kind not in ('routine','cover')",
-        [id, body.title, body.startsAt, body.endsAt ?? null, body.kind, body.venue, body.note, body.audience, body.category, body.needsRsvp, body.lat, body.lng, classId]);
+      const r = await t.pool.query("update events set title = $2, starts_at = $3, ends_at = $4, kind = $5, venue = $6, note = $7, audience = $8, category = $9, needs_rsvp = $10, lat = $11, lng = $12, class_id = $13, rsvp_by = $14, max_adults = $15, capacity = $16 where id = $1 and kind not in ('routine','cover')",
+        [id, body.title, body.startsAt, body.endsAt ?? null, body.kind, body.venue, body.note, body.audience, body.category, body.needsRsvp, body.lat, body.lng, classId, rsvp.rsvpBy, rsvp.maxAdults, rsvp.capacity]);
       if (!r.rowCount) throw notFound('That event');
     } else {
       id = newId('evt');
-      await t.pool.query('insert into events (id, title, starts_at, ends_at, kind, venue, note, audience, created_by, category, needs_rsvp, lat, lng, class_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)',
-        [id, body.title, body.startsAt, body.endsAt ?? null, body.kind, body.venue, body.note, body.audience, user.id, body.category, body.needsRsvp, body.lat, body.lng, classId]);
+      await t.pool.query('insert into events (id, title, starts_at, ends_at, kind, venue, note, audience, created_by, category, needs_rsvp, lat, lng, class_id, rsvp_by, max_adults, capacity) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)',
+        [id, body.title, body.startsAt, body.endsAt ?? null, body.kind, body.venue, body.note, body.audience, user.id, body.category, body.needsRsvp, body.lat, body.lng, classId, rsvp.rsvpBy, rsvp.maxAdults, rsvp.capacity]);
       if (body.audience !== 'staff') {
-        const g = await t.pool.query<{ phone: string | null }>("select distinct g.phone from guardians g join student_guardians sg on sg.guardian_id = g.id join students s on s.id = sg.student_id where s.status = 'active' and g.phone is not null and ($1::text is null or s.class_id = $1) limit 5000", [classId]);
+        const g = await t.pool.query<{ phone: string | null }>("select distinct g.phone from guardians g join student_guardians sg on sg.guardian_id = g.id join students s on s.id = sg.student_id where s.status = 'active' and sg.gets_messages and g.phone is not null and ($1::text is null or s.class_id = $1) limit 5000", [classId]);
         const date = fmtDate(body.startsAt, 'day');
         await this.messenger.notify(t, 'event.created', g.rows.map((x) => ({ to: x.phone!, vars: { title: body.title, date } })));
       }

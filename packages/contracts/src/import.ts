@@ -13,7 +13,7 @@ export interface ImportColumn {
   /** The only values it takes: the template offers them as a dropdown, and the importer accepts them (and its own variants). */
   options?: readonly string[];
   /** A school list (§3.6.5) the column's values come from: the school's own template offers that list instead of `options`. */
-  list?: 'lists.genders' | 'lists.bloodGroups' | 'lists.relationships';
+  list?: 'lists.genders' | 'lists.bloodGroups' | 'lists.relationships' | 'fees.categories' | 'library.itemTypes';
 }
 
 export const PERIOD_KINDS = ['period', 'break', 'lunch', 'recess', 'assembly'] as const;
@@ -75,7 +75,8 @@ export const IMPORT_KINDS: ImportKind[] = localized([
     columns: [req('admission_no', 'Admission number', '2019/0412', ['admission no', 'admn no', 'adm no']), req('title', 'Book', 'Wings of Fire', ['book title', 'book name']), req('due_on', 'Due on', '2026-11-20', ['due date', 'return by']), c('returned_on', 'Returned on', '')] },
   { key: 'library_books', label: 'Library catalogue', blurb: 'Every title the library has, with its copies and shelf.', module: 'library', matchOn: ['title', 'author'],
     columns: [req('title', 'Title', 'Wings of Fire', ['book title', 'book name', 'name']), c('author', 'Author', 'A. P. J. Abdul Kalam', { aliases: ['writer', 'author name'] }), c('isbn', 'ISBN', '9788173711466'),
-      c('category', 'Category', 'Biography', { aliases: ['subject', 'genre'] }), c('shelf', 'Shelf', 'B-3', { aliases: ['rack', 'location'] }), c('copies', 'Copies', '3', { aliases: ['quantity', 'qty', 'no of copies'] })] },
+      c('category', 'Category', 'Biography', { aliases: ['subject', 'genre'] }), c('shelf', 'Shelf', 'B-3', { aliases: ['rack', 'location'] }), c('copies', 'Copies', '3', { aliases: ['quantity', 'qty', 'no of copies'] }),
+      c('item_type', 'Item type', 'Book', { aliases: ['type', 'item'], list: 'library.itemTypes' }), c('barcode', 'Barcode', '', { aliases: ['accession no', 'accession number', 'label'] })] },
   { key: 'contacts', label: 'Family phone numbers', blurb: 'A contact list (a phone’s, or a class WhatsApp group’s): each name is matched to a family that has no phone yet, so it can sign in.', module: 'core', matchOn: ['phone'],
     columns: [req('name', 'Name', 'Priya Sharma', ['contact name', 'display name', 'parent name', 'guardian name', 'first name']), req('phone', 'Phone', '9822011002', ['mobile', 'mobile phone', 'phone 1 - value', 'number', 'contact']),
       c('student', 'Child', 'Aarav Sharma', { aliases: ['child', 'student name', 'ward'] }), c('class', 'Class', '8 A', { aliases: ['class name', 'section'] })] },

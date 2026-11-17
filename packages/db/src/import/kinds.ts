@@ -706,21 +706,28 @@ const libraryLoans = kind<LoanLookups>({
   },
 });
 
-const libraryBooks = kind<Map<string, string>>({
+// An item type is one of the school's (library.itemTypes, by key or name; a school that set none lends books).
+const libraryBooks = kind<{ ids: Map<string, string>; types: ListItem[] }>({
   async load(db) {
     const { rows } = await db.query<{ id: string; title: string; author: string }>('select id, title, author from library_books');
-    return new Map(rows.map((r) => [`${lc(r.title)}|${lc(r.author)}`, r.id]));
+    const saved = await savedSetting(db, 'library.itemTypes');
+    return { ids: new Map(rows.map((r) => [`${lc(r.title)}|${lc(r.author)}`, r.id])), types: saved.length ? saved : [{ key: 'book', name: 'Book' }] };
   },
   check(r, l) {
     const copies = r.copies ? whole(r.copies) : 1;
-    return ok(`${lc(r.title!)}|${lc(r.author ?? '')}`, copies === null || copies < 0 ? ['Copies is a whole number, like 3.'] : [], l.has(`${lc(r.title!)}|${lc(r.author ?? '')}`));
+    const problems = [
+      ...(copies === null || copies < 0 ? ['Copies is a whole number, like 3.'] : []),
+      ...(r.item_type?.trim() && !listKey(l.types, r.item_type) ? [tx('Item type is one of the library’s: {names}.', { names: l.types.map((x) => x.name).join(', ') })] : []),
+    ];
+    return ok(`${lc(r.title!)}|${lc(r.author ?? '')}`, problems, l.ids.has(`${lc(r.title!)}|${lc(r.author ?? '')}`));
   },
-  writes: (rows, l) => [{ table: 'library_books', pk: ['id'], cols: ['isbn', 'category', 'shelf', 'copies'], rows: rows.map((r) => ({
-    id: l.get(`${lc(r.title!)}|${lc(r.author ?? '')}`) ?? newId('bok'), title: r.title!.trim(), author: (r.author ?? '').trim(), isbn: (r.isbn ?? '').trim(),
+  writes: (rows, l) => [{ table: 'library_books', pk: ['id'], cols: ['isbn', 'category', 'shelf', 'copies', 'item_type', 'barcode'], rows: rows.map((r) => ({
+    id: l.ids.get(`${lc(r.title!)}|${lc(r.author ?? '')}`) ?? newId('bok'), title: r.title!.trim(), author: (r.author ?? '').trim(), isbn: (r.isbn ?? '').trim(),
     category: (r.category ?? '').trim() || 'General', shelf: (r.shelf ?? '').trim(), copies: r.copies ? whole(r.copies) : 1,
+    item_type: (r.item_type?.trim() && listKey(l.types, r.item_type)) || 'book', barcode: (r.barcode ?? '').trim().slice(0, 40),
   })) }],
   totals: (rows) => [{ label: 'Titles', value: String(rows.length) }, { label: 'Copies', value: String(rows.reduce((n, r) => n + (r.copies ? whole(r.copies) ?? 0 : 1), 0)) }],
-  async export(db) { return (await db.query<Row>('select title, author, isbn, category, shelf, copies::text from library_books order by title')).rows; },
+  async export(db) { return (await db.query<Row>('select title, author, isbn, category, shelf, copies::text, item_type, barcode from library_books order by title')).rows; },
 });
 
 // A route's ID comes from its name, so the same route named on many rows (and in the admin) is one route.

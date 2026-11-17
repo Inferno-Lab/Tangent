@@ -226,8 +226,6 @@
  "driver.no_location": "स्थान बंद है, इसलिए परिवार बस नहीं देख सकते। फ़ोन की सेटिंग्स में चालू करें।",
  "driver.no_riders": "यहाँ कोई नहीं चढ़ता।",
  "driver.running": "रास्ते में",
- "driver.start_afternoon": "दोपहर की यात्रा शुरू करें",
- "driver.start_morning": "सुबह की यात्रा शुरू करें",
  "driver.started": "यात्रा शुरू। परिवार अब बस देख सकते हैं।",
  "driver.title": "आज की यात्राएँ",
  "driver.trips_done": "आज @n यात्राएँ पूरी",

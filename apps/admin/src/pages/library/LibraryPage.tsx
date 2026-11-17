@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { BookRow, LoanRow, ReservationRow } from '@tangent/contracts';
-import { DateField, Dialog, Field, NumberField, Segmented, SelectField, useShake, EmptyState, EmptyNote, t as tr } from '@tangent/web-ui';
+import { listLabel, listOptions, type BookRow, type ListItem, type LoanRow, type ReservationRow } from '@tangent/contracts';
+import { DateField, Dialog, Field, NumberField, Segmented, SelectField, useShake, EmptyState, EmptyNote, currentLanguage, t as tr } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
-import { AddBtn, AreaField, SEARCH, StudentPick, dateLabel, problem, stamp } from '../../app/kit';
+import { AddBtn, AreaField, SEARCH, StudentPick, dateLabel, problem, stamp, useSetting } from '../../app/kit';
 import { useShellChrome } from '../../app/Layout';
 import { usePageTabs } from '../../app/tabs';
 import { fmtMoney } from '@tangent/contracts';
@@ -25,20 +25,26 @@ export function LibraryPage() { const app = useApp();
   const [cancelling, setCancelling] = useState<ReservationRow | null>(null);
   const [lq, setLq] = useState('');
   const [page, setPage] = useState(1);
+  const [scanning, setScanning] = useState(false);
+  const types = useSetting<ListItem[]>('library.itemTypes', [{ key: 'book', name: 'Book' }]);
+  // A scanned or typed code opens its title: lending it if a copy is in, else editing it.
+  const found = useMutation({ mutationFn: (code: string) => app.api.library.scan(code), onSuccess: (b) => { setScanning(false); setQ(''); if (canWrite) setDlg(b.copies - b.out > 0 ? { kind: 'issue', book: b } : { kind: 'book', book: b }); else setQ(b.title); },
+    onError: (e) => { setScanning(false); say((e as Error).message, 'bad'); } });
   const cancel = useMutation({ mutationFn: ({ id, reason }: { id: string; reason: string }) => app.api.library.cancel(id, reason), onSuccess: () => { setCancelling(null); refresh(); say(tr('admin.library_page.reservation_cancelled_the_family_is')); }, onError: (e) => say((e as Error).message, 'bad') });
   const renew = useMutation({ mutationFn: app.api.library.renew, onSuccess: (l) => { refresh(); say(tr('admin.library_page.is_renewed_until', { title: l.title, dateLabel: dateLabel(l.dueOn) })); }, onError: (e) => say((e as Error).message, 'bad') });
   const v = view.data;
   const loans = (v?.loans ?? []).filter((l) => !lq.trim() || `${l.title} ${l.student} ${l.className}`.toLowerCase().includes(lq.trim().toLowerCase()));
-  const books = useMemo(() => (v?.books ?? []).filter((b) => !q.trim() || `${b.title} ${b.author} ${b.isbn} ${b.category}`.toLowerCase().includes(q.trim().toLowerCase())), [v, q]);
+  const books = useMemo(() => (v?.books ?? []).filter((b) => !q.trim() || `${b.title} ${b.author} ${b.isbn} ${b.barcode} ${b.category}`.toLowerCase().includes(q.trim().toLowerCase())), [v, q]);
   const overdue = (v?.loans ?? []).filter((l) => l.overdueDays > 0);
   return (
     <Page title={tr('admin.library_page.library')} sub={tr('admin.library_page.the_catalogue_who_has_which')} toast={toast} loading={view.isLoading && !v}
       error={view.isError && !v ? { message: (view.error as Error).message, retry: () => void view.refetch() } : null}
       tabs={tabs} actions={<>{canWrite && <AddBtn onClick={() => setDlg({ kind: 'book', book: null })}>{tr('admin.library_page.add_a_book')}</AddBtn>}</>}
       overlays={<>
-        {dlg?.kind === 'book' && <BookDialog book={dlg.book} categories={[...new Set((v?.books ?? []).map((b) => b.category).filter(Boolean))].sort()} onClose={() => setDlg(null)} onDone={done} />}
+        {dlg?.kind === 'book' && <BookDialog book={dlg.book} types={types} categories={[...new Set((v?.books ?? []).map((b) => b.category).filter(Boolean))].sort()} onClose={() => setDlg(null)} onDone={done} />}
+        {scanning && <ScanDialog busy={found.isPending} onClose={() => setScanning(false)} onCode={(c) => found.mutate(c)} />}
         {dlg?.kind === 'issue' && <IssueDialog book={dlg.book} loanDays={v?.rules.loanDays ?? 14} onClose={() => setDlg(null)} onDone={done} />}
-        {dlg?.kind === 'return' && <ReturnDialog loan={dlg.loan} onClose={() => setDlg(null)} onDone={done} />}
+        {dlg?.kind === 'return' && <ReturnDialog loan={dlg.loan} finesTo={v?.rules.finesTo ?? 'fees'} onClose={() => setDlg(null)} onDone={done} />}
         {cancelling && <CancelDialog title={cancelling.title} busy={cancel.isPending} onClose={() => setCancelling(null)} onSend={(reason) => cancel.mutate({ id: cancelling.id, reason })} />}
       </>}>
       {v && (v.books.length === 0 && v.loans.length === 0 ? (
@@ -58,7 +64,13 @@ export function LibraryPage() { const app = useApp();
             </div>
           ))}
         </section>
-        {tab === 'books' && v.books.length > 0 && <div className="rise" style={{ maxWidth: 360 }}><Field label={tr('admin.library_page.search_the_catalogue')} value={q} onChange={(x) => { setQ(x); setPage(1); }} icon={SEARCH} placeholder={tr('admin.library_page.title_author_or_isbn')} /></div>}
+        {/* A hand scanner types the code and presses Enter: Enter on a search that matches no title looks the code up. */}
+        {tab === 'books' && v.books.length > 0 && <div className="rise" style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div style={{ width: 360, maxWidth: '100%' }} onKeyDown={(e) => { if (e.key !== 'Enter' || !q.trim()) return; const one = books.length === 1 ? books[0]! : null; if (one && canWrite && one.copies - one.out > 0) setDlg({ kind: 'issue', book: one }); else if (!books.length) found.mutate(q.trim()); }}>
+            <Field label={tr('admin.library_page.search_the_catalogue')} value={q} onChange={(x) => { setQ(x); setPage(1); }} icon={SEARCH} placeholder={tr('admin.library_page.title_author_isbn_or_barcode')} />
+          </div>
+          {canScan() && <button className="btn" onClick={() => setScanning(true)}>{tr('admin.library_page.scan')}</button>}
+        </div>}
         {tab === 'loans' && v.loans.length > 0 && <div className="rise" style={{ maxWidth: 360 }}><Field label={tr('admin.library_page.search_loans')} value={lq} onChange={setLq} icon={SEARCH} placeholder={tr('admin.library_page.book_or_borrower')} /></div>}
         {tab === 'books' && (
           <Card style={{ padding: 0 }}>
@@ -70,7 +82,7 @@ export function LibraryPage() { const app = useApp();
                 <div className="grd th" style={{ '--cols': 'minmax(0,2.4fr) minmax(0,1fr) 90px 110px 170px' } as React.CSSProperties}><span>{tr('admin.library_page.book')}</span><span>{tr('admin.library_page.category')}</span><span>{tr('admin.library_page.shelf')}</span><span>{tr('admin.library_page.on_the_shelf')}</span><span></span></div>
                 {books.slice((page - 1) * 50, page * 50).map((b) => (
                   <div key={b.id} className="grd rw" style={{ '--cols': 'minmax(0,2.4fr) minmax(0,1fr) 90px 110px 170px', height: 'auto', minHeight: 56, padding: '8px 20px' } as React.CSSProperties}>
-                    <span style={{ minWidth: 0 }}><b style={{ font: '700 14px/1.3 var(--fb)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} data-tip={b.title}>{b.title}</b><small className="help">{b.author || tr('admin.library_page.author_not_given')}{b.isbn ? ` · ${b.isbn}` : ''}</small></span>
+                    <span style={{ minWidth: 0 }}><b style={{ font: '700 14px/1.3 var(--fb)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} data-tip={b.title}>{b.title}</b><small className="help">{types.length > 1 && b.itemType !== 'book' ? `${listLabel(types, b.itemType, currentLanguage())} · ` : ''}{b.author || tr('admin.library_page.author_not_given')}{b.isbn ? ` · ${b.isbn}` : ''}{b.barcode ? ` · ${b.barcode}` : ''}</small></span>
                     <span className="help" style={{ margin: 0 }}>{b.category}</span>
                     <span className="help" style={{ margin: 0 }}>{b.shelf || '–'}</span>
                     <span><span className={`chip ${b.copies - b.out > 0 ? 'g' : 'a'}`}>{b.copies - b.out} {tr('admin.library_page.of')}{' '}{b.copies}</span>{b.waiting > 0 && <span className="chip v" style={{ marginInlineStart: 4 }} data-tip={tr('admin.library_page.families_waiting')}>{b.waiting} {tr('admin.library_page.waiting')}</span>}</span>
@@ -127,14 +139,15 @@ export function LibraryPage() { const app = useApp();
   );
 }
 
-function BookDialog({ book, categories, onClose, onDone }: { book: BookRow | null; categories: string[]; onClose: () => void; onDone: (m: string) => void }) { const app = useApp();
+function BookDialog({ book, types, categories, onClose, onDone }: { book: BookRow | null; types: ListItem[]; categories: string[]; onClose: () => void; onDone: (m: string) => void }) { const app = useApp();
   const shake = useShake();
   const [confirm, setConfirm] = useState(false);
   const [newCat, setNewCat] = useState(false);
-  const [f, setF] = useState({ title: book?.title ?? '', author: book?.author ?? '', isbn: book?.isbn ?? '', category: book?.category ?? tr('admin.library_page.general'), shelf: book?.shelf ?? '', copies: String(book?.copies ?? 1) });
+  const [f, setF] = useState({ title: book?.title ?? '', author: book?.author ?? '', isbn: book?.isbn ?? '', category: book?.category ?? tr('admin.library_page.general'), shelf: book?.shelf ?? '', copies: String(book?.copies ?? 1),
+    itemType: book?.itemType ?? listOptions(types)[0]?.key ?? 'book', barcode: book?.barcode ?? '' });
   const [err, setErr] = useState<Record<string, string>>({});
   const set = (k: keyof typeof f) => (x: string) => { setF((o) => ({ ...o, [k]: x })); setErr((e) => ({ ...e, [k]: '', _: '' })); };
-  const body = () => ({ title: f.title.trim(), author: f.author.trim(), isbn: f.isbn.trim(), category: f.category.trim() || tr('admin.library_page.general'), shelf: f.shelf.trim(), copies: Number(f.copies || 0) });
+  const body = () => ({ title: f.title.trim(), author: f.author.trim(), isbn: f.isbn.trim(), category: f.category.trim() || tr('admin.library_page.general'), shelf: f.shelf.trim(), copies: Number(f.copies || 0), itemType: f.itemType, barcode: f.barcode.trim() });
   const save = useMutation({ mutationFn: () => (book ? app.api.library.save(book.id, body()) : app.api.library.add(body())), onSuccess: (b) => onDone(`${b.title} ${book ? tr('admin.library_page.was_saved') : tr('admin.library_page.is_in_the_catalogue')}.`), onError: (e) => { setErr(problem(e)); shake.hit(); } });
   const del = useMutation({ mutationFn: () => app.api.library.remove(book!.id), onSuccess: () => onDone(tr('admin.library_page.was_taken_out_of_the', { title: book!.title })), onError: (e) => { setErr(problem(e)); shake.hit(); } });
   return (
@@ -149,7 +162,13 @@ function BookDialog({ book, categories, onClose, onDone }: { book: BookRow | nul
             : <SelectField label={tr('admin.library_page.category')} value={f.category} onChange={(v) => (v === '__new' ? (setNewCat(true), set('category')('')) : set('category')(v))} options={[...categories.map((c) => ({ value: c, label: c })), { value: '__new', label: tr('admin.library_page.add_a_category') }]} />}
           <Field label={tr('admin.library_page.shelf')} value={f.shelf} onChange={set('shelf')} placeholder="B-3" />
         </div>
-        <NumberField label={tr('admin.library_page.copies_2')} value={f.copies} onChange={set('copies')} min={0} max={500} error={err.copies} />
+        <div className="two">
+          {listOptions(types, book?.itemType).length > 1
+            ? <SelectField label={tr('admin.library_page.item_type')} value={f.itemType} onChange={set('itemType')} error={err.itemType} options={listOptions(types, book?.itemType).map((i) => ({ value: i.key, label: listLabel(types, i.key, currentLanguage()) }))} />
+            : <NumberField label={tr('admin.library_page.copies_2')} value={f.copies} onChange={set('copies')} min={0} max={500} error={err.copies} />}
+          <Field label={tr('admin.library_page.barcode_optional')} value={f.barcode} onChange={set('barcode')} error={err.barcode} maxLength={40} />
+        </div>
+        {listOptions(types, book?.itemType).length > 1 && <NumberField label={tr('admin.library_page.copies_2')} value={f.copies} onChange={set('copies')} min={0} max={500} error={err.copies} />}
         {err._ && <div className="emsg" role="alert">{err._}</div>}
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
@@ -192,13 +211,13 @@ function IssueDialog({ book, loanDays, onClose, onDone }: { book: BookRow; loanD
 }
 
 /** Taking a book back: how it came back, a charge for a lost or damaged one, and what happens to the fine. */
-function ReturnDialog({ loan, onClose, onDone }: { loan: LoanRow; onClose: () => void; onDone: (m: string) => void }) { const app = useApp();
+function ReturnDialog({ loan, finesTo, onClose, onDone }: { loan: LoanRow; finesTo: 'fees' | 'desk'; onClose: () => void; onDone: (m: string) => void }) { const app = useApp();
   const shake = useShake();
   const { shell } = useShellChrome();
   const fees = !!shell?.modules.includes('fees') && !!loan.studentId;
   const [outcome, setOutcome] = useState<'returned' | 'lost' | 'damaged'>('returned');
   const [charge, setCharge] = useState('');
-  const [fine, setFine] = useState<'bill' | 'waive' | 'paid'>(fees ? 'bill' : 'paid');
+  const [fine, setFine] = useState<'bill' | 'waive' | 'paid'>(fees && finesTo === 'fees' ? 'bill' : 'paid');
   const [reason, setReason] = useState('');
   const [err, setErr] = useState<Record<string, string>>({});
   const owed = loan.fine + (outcome === 'returned' ? 0 : Number(charge || 0));
@@ -223,6 +242,52 @@ function ReturnDialog({ loan, onClose, onDone }: { loan: LoanRow; onClose: () =>
           <button className="btn" onClick={onClose}>{tr('admin.library_page.cancel')}</button>
           <button className="btn pri" disabled={back.isPending} onClick={go}>{back.isPending ? tr('admin.library_page.saving') : outcome === 'lost' ? tr('admin.library_page.mark_lost') : tr('admin.library_page.take_back')}</button>
         </div>
+      </div>
+    </Dialog>
+  );
+}
+
+/** The browser reads barcodes from the camera itself (BarcodeDetector, Chrome and Edge on Android and desktop); elsewhere a hand scanner or typing. */
+const canScan = () => typeof window !== 'undefined' && 'BarcodeDetector' in window && !!navigator.mediaDevices?.getUserMedia;
+
+type Detector = { detect: (v: HTMLVideoElement) => Promise<{ rawValue: string }[]> };
+function ScanDialog({ busy, onClose, onCode }: { busy: boolean; onClose: () => void; onCode: (code: string) => void }) {
+  const video = useRef<HTMLVideoElement>(null);
+  const [err, setErr] = useState('');
+  // Kept in a ref so a new callback each render does not restart the camera.
+  const cb = useRef(onCode);
+  cb.current = onCode;
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+    let timer = 0;
+    let done = false;
+    void (async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        if (done) return stream.getTracks().forEach((tk) => tk.stop());
+        video.current!.srcObject = stream;
+        await video.current!.play();
+        const Ctor = (window as unknown as { BarcodeDetector: new (o: { formats: string[] }) => Detector }).BarcodeDetector;
+        const det = new Ctor({ formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'qr_code', 'upc_a'] });
+        // A few looks a second until a code is read; the camera stops when the dialog closes.
+        const look = async () => {
+          if (done) return;
+          const hit = (await det.detect(video.current!).catch(() => []))[0]?.rawValue;
+          if (hit) { done = true; cb.current(hit); } else timer = window.setTimeout(() => void look(), 250);
+        };
+        void look();
+      } catch {
+        setErr(tr('admin.library_page.the_camera_could_not_open'));
+      }
+    })();
+    return () => { done = true; window.clearTimeout(timer); stream?.getTracks().forEach((tk) => tk.stop()); };
+  }, []);
+  return (
+    <Dialog title={tr('admin.library_page.scan_a_code')} onClose={onClose} width={460}>
+      <div className="stack">
+        {err ? <div className="emsg" role="alert">{err}</div> : <video ref={video} muted playsInline style={{ width: '100%', borderRadius: 16, background: 'var(--ink)', aspectRatio: '4 / 3', objectFit: 'cover' }} />}
+        <p className="help" style={{ margin: 0 }}>{busy ? tr('admin.library_page.looking_it_up') : tr('admin.library_page.hold_the_barcode_or_isbn')}</p>
+        <div className="tgrow" style={{ justifyContent: 'flex-end' }}><button className="btn" onClick={onClose}>{tr('admin.library_page.cancel')}</button></div>
       </div>
     </Dialog>
   );

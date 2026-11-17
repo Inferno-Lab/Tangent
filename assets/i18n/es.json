@@ -222,8 +222,6 @@
  "driver.no_location": "La ubicación está desactivada y las familias no ven el autobús. Actívala en los ajustes del teléfono.",
  "driver.no_riders": "Nadie sube aquí.",
  "driver.running": "En camino",
- "driver.start_afternoon": "Iniciar el viaje de la tarde",
- "driver.start_morning": "Iniciar el viaje de la mañana",
  "driver.started": "Viaje iniciado. Las familias ya ven el autobús.",
  "driver.title": "Viajes de hoy",
  "driver.trips_done": "@n viajes hechos hoy",

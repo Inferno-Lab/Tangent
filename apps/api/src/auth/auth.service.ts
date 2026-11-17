@@ -6,6 +6,7 @@ import { ENV, type Env } from '../env.js';
 import { ApiError } from '@tangent/nest-kit';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { AuditService, Messenger, SettingsService } from '../school/support.js';
+import { BUS_CREW_SQL } from '../school/transport.service.js';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { checkCookieCsrf, clearSchoolRefreshCookie, schoolCookieToken, setSchoolRefreshCookie } from './session-cookies.js';
 
@@ -113,7 +114,7 @@ export class AuthService {
   async appRole(t: TenantCtx, user: { id: string; kind: string }): Promise<AppRoleKey> {
     if (user.kind === 'guardian') return 'parent';
     if (user.kind === 'student') return 'student';
-    const { rowCount } = await t.pool.query('select 1 from transport_routes where driver_user_id = $1 limit 1', [user.id]);
+    const { rowCount } = await t.pool.query(BUS_CREW_SQL, [user.id]);
     return rowCount ? 'driver' : 'teacher';
   }
 

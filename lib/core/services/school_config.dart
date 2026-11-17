@@ -143,10 +143,21 @@ abstract final class SchoolConfig {
 
   /// The school's leave reasons (a school list), each in the reader's language where the school named it there; retired ones are
   /// not offered. A list of plain words (sample content, an older server) reads as it is. The server takes any of these names.
-  static List<String> get leaveReasons {
+  static List<String> get leaveReasons => _names('leave.reasons', const ['Other']);
+
+  /// Short replies staff pick when answering (the school's list, in the reader's language); empty when the school has none.
+  static List<String> get quickReplies => _names('chat.quickReplies', const []);
+
+  /// When teachers answer messages ("08:00" to "16:00"), or null for any time.
+  static ({String from, String to})? get officeHours {
+    final h = _settings['chat.officeHours'];
+    return h is Map && h['from'] is String && h['to'] is String ? (from: h['from'] as String, to: h['to'] as String) : null;
+  }
+
+  static List<String> _names(String key, List<dynamic> fallback) {
     final lang = Get.locale?.languageCode ?? 'en';
     final out = <String>[];
-    for (final r in _s<List<dynamic>>('leave.reasons', const ['Other'])) {
+    for (final r in _s<List<dynamic>>(key, fallback)) {
       if (r is String) {
         out.add(r);
       } else if (r is Map && r['active'] != false) {

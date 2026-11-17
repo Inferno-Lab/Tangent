@@ -152,6 +152,10 @@ export class LibraryController {
   @Get() @Require('library.read')
   view(@Tenant() t: TenantCtx): Promise<LibraryView> { return this.lib.view(t); }
 
+  /** The title a scanned barcode or ISBN is on. */
+  @Get('scan') @Require('library.read')
+  scan(@Tenant() t: TenantCtx, @Query('code') code = ''): Promise<BookRow> { return this.lib.byCode(t, String(code).slice(0, 60)); }
+
   @Post('books') @HttpCode(200) @Require('library.write')
   add(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(BookInput)) b: BookInput): Promise<BookRow> { return this.lib.saveBook(t, u, b); }
 

@@ -14,7 +14,7 @@ const regionName = (c: string): string => {
 export type SettingKind =
   | 'text' | 'textarea' | 'number' | 'bool' | 'enum' | 'color' | 'time' | 'date' | 'language'
   | 'multi' | 'appRoles' | 'appLayout' | 'notifyRules' | 'templates' | 'classes' | 'logo'
-  | 'houses' | 'categories' | 'strings' | 'gradingScale' | 'paymentMethods' | 'attendanceMarks' | 'vocabulary' | 'list' | 'customFields' | 'workflows' | 'taxSplit' | 'addressFormat' | 'gradingSchemes' | 'documentTemplates' | 'admissionStages' | 'timetableCycle' | 'weights' | 'lateRule' | 'reminderDays';
+  | 'houses' | 'categories' | 'strings' | 'gradingScale' | 'paymentMethods' | 'attendanceMarks' | 'vocabulary' | 'list' | 'customFields' | 'workflows' | 'taxSplit' | 'addressFormat' | 'gradingSchemes' | 'documentTemplates' | 'admissionStages' | 'timetableCycle' | 'weights' | 'lateRule' | 'reminderDays' | 'hours' | 'libraryTypes' | 'libraryMembers' | 'tripSessions';
 
 export interface SettingMeta {
   /** One of the school-wide groups, or the key of the module that owns the setting (config-engine's MODULES lists it there too). */
@@ -130,6 +130,10 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = localized({
   'exams.weights': { group: 'exams', label: 'How much each kind counts in the year’s result', kind: 'weights', help: 'A number for each kind of exam (they need not add up to 100). A kind left out counts nothing; none at all: every exam counts the same.' },
   'exams.remarks': { group: 'exams', label: 'Remarks to pick from', kind: 'list', max: 60, help: 'Short remarks a teacher can pick for a student’s report card (they can still write their own). Each can be written in the school’s other languages.' },
   'results.rankWithin': { group: 'exams', label: 'Rank students within', kind: 'enum', options: [['class', 'Their class'], ['year', 'Their year group (every class sitting the exam)']], help: 'Where ranks are shown at all is the setting above.' },
+  'chat.familiesWriteTo': { group: 'chat', label: 'Families can write to', kind: 'multi', options: [['classTeacher', 'Their child’s class teacher'], ['subjectTeachers', 'Their child’s subject teachers']], help: 'None ticked: families only answer conversations the school starts.' },
+  'chat.studentsWriteTo': { group: 'chat', label: 'Students can write to', kind: 'multi', options: [['classTeacher', 'Their class teacher'], ['subjectTeachers', 'Their subject teachers']], help: 'Only where the school lets students message from the app at all.' },
+  'chat.officeHours': { group: 'chat', label: 'When teachers answer', kind: 'hours', help: 'Outside these hours the app tells a family when to expect an answer. Empty: any time.' },
+  'chat.quickReplies': { group: 'chat', label: 'Quick replies', kind: 'list', max: 20, help: 'Short answers staff can pick when replying, in the admin and the teachers’ app.' },
   'attendance.registers': { group: 'attendance', label: 'Registers a day', kind: 'enum', options: [['day', 'One roll call a day'], ['ampm', 'A morning and an afternoon register']], help: 'With two, each half is marked on its own and counted as a session; screens that show one mark a day put the two together.' },
   'attendance.pmFrom': { group: 'attendance', label: 'The afternoon register starts at', kind: 'time', help: 'With two registers a day, the teachers’ app marks the morning one before this time and the afternoon one after it.' },
   'attendance.lockAfterDays': { group: 'attendance', label: 'Attendance can be corrected for this many days', kind: 'number', min: 0, max: 30, help: 'In the admin and in the teachers’ app; after that, only someone allowed to approve can change it.' },
@@ -193,8 +197,15 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = localized({
   'library.maxRenewals': { group: 'library', label: 'Renewals per loan', kind: 'number', min: 0, max: 5, help: 'A book someone is waiting for cannot be renewed.' },
   'library.maxLoans': { group: 'library', label: 'Books a student may have out', kind: 'number', min: 1, max: 20 },
   'library.staffMaxLoans': { group: 'library', label: 'Books a member of staff may have out', kind: 'number', min: 1, max: 50 },
+  'library.itemTypes': { group: 'library', label: 'Item types', kind: 'list', max: 20, help: 'What the library lends: books, laptops, cameras, kits.' },
+  'library.typeRules': { group: 'library', label: 'Rules per item type', kind: 'libraryTypes', help: 'Loan days, fine per late day and renewals for a type; a box left empty is the library’s own.' },
+  'library.memberTypes': { group: 'library', label: 'Member types', kind: 'libraryMembers', help: 'Staff, or students of some year groups, with their own loan days and limit. A borrower is the first type that fits; with none, the numbers above.' },
+  'library.fineGraceDays': { group: 'library', label: 'Late days not charged', kind: 'number', min: 0, max: 30 },
+  'library.fineCap': { group: 'library', label: 'Most one loan’s late fine comes to (0: no cap)', kind: 'number', min: 0, max: 100000 },
+  'library.finesTo': { group: 'library', label: 'Fines go', kind: 'enum', options: [['fees', 'On the family’s fees'], ['desk', 'Paid at the desk']], help: 'What the desk offers first when an item comes back late; it can still choose the other.' },
 
   // Transport
   'transport.nearMinutes': { group: 'transport', label: 'Tell families the bus is near (minutes away)', kind: 'number', min: 2, max: 30 },
+  'transport.sessions': { group: 'transport', label: 'Trips a day', kind: 'tripSessions', help: 'Each bus trip the school runs (morning, afternoon, late bus, activity bus) and from what time the driver’s app offers it. A route can run only some of them.' },
   'transport.familyCalls': { group: 'transport', label: 'Families call about the bus', kind: 'enum', options: [['office', 'The office'], ['attendant', 'The bus attendant'], ['none', 'Nobody: messages only']], help: 'Never the driver, who is driving.' },
 });

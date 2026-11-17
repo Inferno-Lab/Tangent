@@ -13,7 +13,7 @@ import { LibraryService } from './library.service.js';
 import { ChatService, type ChatSender } from './chat.service.js';
 import { NoticesService } from './notices.service.js';
 import { AuditService, Messenger, SettingsService, checkLeaveClash } from './support.js';
-import { TransportService } from './transport.service.js';
+import { BUS_CREW_SQL, TransportService } from './transport.service.js';
 
 const key = (subjectId: string) => subjectId.replace(/^sub_/, '');
 
@@ -71,7 +71,7 @@ export class FamilyService {
     if (guardianIds.length) {
       children = (await t.pool.query<{ student_id: string }>('select distinct student_id from student_guardians where guardian_id = any($1)', [guardianIds])).rows.map((r) => r.student_id);
     }
-    const drives = u.kind === 'staff' && !!(await t.pool.query('select 1 from transport_routes where driver_user_id = $1 limit 1', [u.id])).rowCount;
+    const drives = u.kind === 'staff' && !!(await t.pool.query(BUS_CREW_SQL, [u.id])).rowCount;
     return { id: u.id, kind: u.kind, role: u.kind === 'guardian' ? 'parent' : drives ? 'driver' : 'teacher', name: u.name, phone: u.phone, email: u.email, children, guardianIds, perms: user.permissions };
   }
 
@@ -86,7 +86,7 @@ export class FamilyService {
     if (w.kind === 'staff' && w.perms.includes('students.read')) return;
     if (w.kind === 'staff' && (await t.pool.query(
       `select 1 from students s where s.id = $1 and (s.class_id in (select id from classes where class_teacher_id = $2 union select class_id from timetable_slots where teacher_id = $2)
-         or s.id in (select a.student_id from transport_assignments a join transport_routes r on r.id = a.route_id where r.driver_user_id = $2))`, [studentId, w.id])).rowCount) return;
+         or s.id in (select a.student_id from transport_assignments a join transport_routes r on r.id = a.route_id where r.driver_user_id = $2 or r.attendant_user_id = $2))`, [studentId, w.id])).rowCount) return;
     throw forbidden('That student is not yours to look at.');
   }
 
@@ -665,8 +665,7 @@ export class FamilyService {
   /** The notices this person reads: their own audience and their children's classes; pinned first; read and acknowledged marked. */
   async notices(t: TenantCtx, user: AuthedUser) {
     const w = await this.who(t, user);
-    const classIds = w.children.length ? (await t.pool.query<{ class_id: string }>('select distinct class_id from students where id = any($1)', [w.children])).rows.map((r) => r.class_id) : [];
-    const list = await this.noticesSvc.forReader(t, w.id, classIds, w.kind);
+    const list = await this.noticesSvc.forReader(t, w.id, w.children, w.kind);
     return list.map((n) => ({
       id: n.id, title: n.title, body: n.body, category: n.category, audience: n.audience === 'staff' ? 'teachers' : n.audience, pinned: n.pinned,
       date: (n.publishedAt ?? n.createdAt).slice(0, 10), publishedAt: n.publishedAt, editedAt: n.editedAt, author: n.author,
@@ -708,8 +707,8 @@ export class FamilyService {
   async events(t: TenantCtx, user: AuthedUser) {
     const w = await this.who(t, user);
     const showGoing = await this.settings.value<boolean>(t, 'events.showGoing', false);
-    const { rows } = await t.pool.query<{ id: string; title: string; starts_at: Date; ends_at: Date | null; kind: string; venue: string; note: string; audience: string; category: string; needs_rsvp: boolean; lat: number | null; lng: number | null; going: string; class_id: string | null }>(
-      `select e.id, e.title, e.starts_at, e.ends_at, e.kind, e.venue, e.note, e.audience, e.category, e.needs_rsvp, e.lat, e.lng, e.class_id,
+    const { rows } = await t.pool.query<{ id: string; title: string; starts_at: Date; ends_at: Date | null; kind: string; venue: string; note: string; audience: string; category: string; needs_rsvp: boolean; lat: number | null; lng: number | null; going: string; class_id: string | null; rsvp_by: string | null }>(
+      `select e.id, e.title, e.starts_at, e.ends_at, e.kind, e.venue, e.note, e.audience, e.category, e.needs_rsvp, e.lat, e.lng, e.class_id, e.rsvp_by::text,
          (select count(*) from event_rsvps r where r.event_id = e.id and r.status = 'going') going
        from events e where e.kind not in ('routine','cover') order by e.starts_at limit 150`);
     // A class's own event reaches only the families (and students) of that class.
@@ -718,11 +717,11 @@ export class FamilyService {
     // The event's day and time on the school's clock.
     const ist = (d: Date) => schoolNow(d).toISOString();
     return rows.filter((e) => w.kind === 'staff' || (e.audience !== 'staff' && (e.audience !== 'class' || classes.includes(e.class_id ?? '')))).map((e) => {
-      const replies = mine.rows.filter((m) => m.event_id === e.id);
+      const replies = mine.rows.filter((m) => m.event_id === e.id).sort((x, y) => w.children.indexOf(x.student_id) - w.children.indexOf(y.student_id));
       return {
         id: e.id, title: e.title, description: e.note, date: ist(e.starts_at).slice(0, 10), time: ist(e.starts_at).slice(11, 16), endTime: e.ends_at ? ist(e.ends_at).slice(11, 16) : null,
         endDate: e.ends_at ? ist(e.ends_at).slice(0, 10) : null, venue: e.venue, lat: e.lat, lng: e.lng, kind: e.kind, category: e.category || e.kind, imageUrl: '',
-        needsRsvp: e.needs_rsvp && w.kind !== 'staff', going: showGoing ? Number(e.going) : null,
+        needsRsvp: e.needs_rsvp && w.kind !== 'staff', rsvpBy: e.rsvp_by, going: showGoing ? Number(e.going) : null,
         rsvps: replies.map((r) => ({ userId: w.id, studentId: r.student_id, status: r.status, adults: r.adults })),
       };
     });
@@ -732,11 +731,47 @@ export class FamilyService {
   async rsvp(t: TenantCtx, user: AuthedUser, eventId: string, status: string, studentIds?: string[], adults = 0) {
     const w = await this.who(t, user);
     if (!['going', 'maybe', 'cant'].includes(status)) throw new ApiError('validation', 'Choose going, maybe or cannot come.');
-    const e = (await t.pool.query<{ needs_rsvp: boolean }>('select needs_rsvp from events where id = $1', [eventId])).rows[0];
-    if (!e) throw notFound('That event');
-    if (!e.needs_rsvp) throw new ApiError('conflict', 'This event does not ask for a reply.');
-    const who = studentIds?.length ? studentIds.filter((s) => w.children.includes(s)) : w.children;
-    for (const s of who) await t.pool.query('insert into event_rsvps (event_id, student_id, status, adults) values ($1,$2,$3,$4) on conflict (event_id, student_id) do update set status = excluded.status, adults = excluded.adults', [eventId, s, status, status === 'going' ? adults : 0]);
+    if (!Number.isInteger(adults) || adults < 0) throw new ApiError('validation', tx('Say how many grown-ups are coming.'));
+    const client = await t.pool.connect();
+    try {
+      await client.query('begin');
+      // Locked, so two families taking the last places cannot both get in.
+      const e = (await client.query<{ needs_rsvp: boolean; starts_at: Date; audience: string; class_id: string | null; rsvp_by: string | null; max_adults: number | null; capacity: number | null }>(
+        "select needs_rsvp, starts_at, audience, class_id, rsvp_by::text, max_adults, capacity from events where id = $1 and kind not in ('routine','cover') for update", [eventId])).rows[0];
+      if (!e) throw notFound('That event');
+      if (!e.needs_rsvp || e.audience === 'staff') throw new ApiError('conflict', tx('This event does not ask for a reply.'));
+      // Only the family's own children, and for a class's event only those in that class.
+      const mine = studentIds?.length ? studentIds.filter((s) => w.children.includes(s)) : w.children;
+      const who = e.class_id ? (await client.query<{ id: string }>('select id from students where id = any($1) and class_id = $2', [mine, e.class_id])).rows.map((r) => r.id) : mine;
+      if (!who.length) throw new ApiError('forbidden', tx('This event is not for your children.'));
+      const today = schoolToday();
+      if (schoolToday(e.starts_at) < today || (e.rsvp_by && e.rsvp_by < today)) throw new ApiError('conflict', tx('Replies for this event have closed.'));
+      if (status === 'going' && e.max_adults !== null && adults > e.max_adults) {
+        throw new ApiError('validation', tx('Up to {n} grown-ups can come with each family.', { n: e.max_adults }), { fields: { adults: tx('Up to {n}.', { n: e.max_adults }) } });
+      }
+      if (status === 'going' && e.capacity !== null) {
+        // The places others hold; this family's own replies are being replaced.
+        const others = Number((await client.query<{ n: string }>("select count(*) n from event_rsvps where event_id = $1 and status = 'going' and not (student_id = any($2))", [eventId, who])).rows[0]!.n);
+        if (others + who.length > e.capacity) {
+          const left = Math.max(0, e.capacity - others);
+          throw new ApiError('conflict', left ? tx('Only {n} places are left.', { n: left }) : tx('This event is full.'));
+        }
+      }
+      for (const s of who) {
+        await client.query('insert into event_rsvps (event_id, student_id, status, adults) values ($1,$2,$3,0) on conflict (event_id, student_id) do update set status = excluded.status, adults = 0', [eventId, s, status]);
+      }
+      // Grown-ups are per family, not per child: kept on one going child so the event's total counts them once.
+      if (status === 'going') {
+        await client.query('update event_rsvps set adults = 0 where event_id = $1 and student_id = any($2)', [eventId, w.children]);
+        await client.query('update event_rsvps set adults = $3 where event_id = $1 and student_id = $2', [eventId, who[0], adults]);
+      }
+      await client.query('commit');
+    } catch (err) {
+      await client.query('rollback').catch(() => undefined);
+      throw err;
+    } finally {
+      client.release();
+    }
     return { ok: true };
   }
 
@@ -841,7 +876,10 @@ export class FamilyService {
        join users u on u.kind = 'staff' and u.status = 'active' and (u.id = c.class_teacher_id or u.id in (select tt.teacher_id from timetable_slots tt where tt.class_id = c.id))
        left join timetable_slots tts on tts.class_id = c.id and tts.teacher_id = u.id left join subjects sub on sub.id = tts.subject_id
        where s.id = any($1) group by u.id, u.name order by bool_or(c.class_teacher_id = u.id) desc, u.name`, [w.children.length ? w.children : ['none']]);
-    return rows.map((r) => ({ id: r.id, name: r.name, subject: r.subject ?? '', classTeacher: r.class_teacher }));
+    // The school's rule for who families (or students) may write to: class teachers, subject teachers, or both.
+    const may = await this.settings.value<string[]>(t, w.kind === 'student' ? 'chat.studentsWriteTo' : 'chat.familiesWriteTo', ['classTeacher', 'subjectTeachers']);
+    return rows.filter((r) => (r.class_teacher && may.includes('classTeacher')) || (!!r.subject && may.includes('subjectTeachers')))
+      .map((r) => ({ id: r.id, name: r.name, subject: r.subject ?? '', classTeacher: r.class_teacher }));
   }
 
   async startThread(t: TenantCtx, user: AuthedUser, teacherId: string) {
@@ -878,10 +916,10 @@ export class FamilyService {
       const mine = open.find((l) => l.bookId === b.id);
       return {
         id: b.id, title: b.title, author: b.author, category: b.category, isbn: b.isbn, available: b.copies - b.out > 0, waiting: b.waiting, coverUrl: '',
-        ...(mine ? { borrowedBy: mine.studentId ?? w.id, dueDate: mine.dueOn, loanId: mine.id, fine: mine.fine, overdueDays: mine.overdueDays, renewalsLeft: Math.max(0, rules.maxRenewals - mine.renewals) } : {}),
+        ...(mine ? { borrowedBy: mine.studentId ?? w.id, dueDate: mine.dueOn, loanId: mine.id, fine: mine.fine, overdueDays: mine.overdueDays, renewalsLeft: Math.max(0, mine.maxRenewals - mine.renewals) } : {}),
       };
     });
-    const legacy = open.filter((l) => !l.bookId).map((l) => ({ id: l.id, title: l.title, author: '', category: 'Library', isbn: '', available: false, waiting: 0, coverUrl: '', borrowedBy: l.studentId ?? w.id, dueDate: l.dueOn, loanId: l.id, fine: l.fine, overdueDays: l.overdueDays, renewalsLeft: Math.max(0, rules.maxRenewals - l.renewals) }));
+    const legacy = open.filter((l) => !l.bookId).map((l) => ({ id: l.id, title: l.title, author: '', category: 'Library', isbn: '', available: false, waiting: 0, coverUrl: '', borrowedBy: l.studentId ?? w.id, dueDate: l.dueOn, loanId: l.id, fine: l.fine, overdueDays: l.overdueDays, renewalsLeft: Math.max(0, l.maxRenewals - l.renewals) }));
     const reservations = w.children.length ? await this.library.reservations(t, w.children) : [];
     return {
       books: [...legacy, ...catalogue],

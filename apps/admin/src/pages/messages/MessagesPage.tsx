@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ThreadDetail, ThreadRow } from '@tangent/contracts';
-import { Checkbox, Dialog, Field, FilePick, Segmented, Select, useShake, EmptyState, EmptyNote, t as tr } from '@tangent/web-ui';
+import { listLabel, listOptions, type ListItem, type ThreadDetail, type ThreadRow } from '@tangent/contracts';
+import { Checkbox, Dialog, Field, FilePick, Segmented, Select, currentLanguage, useShake, EmptyState, EmptyNote, t as tr } from '@tangent/web-ui';
 import { uploadFile } from '@tangent/api-client';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
-import { AddBtn, AreaField, Avatar, Ico, problem, stamp, useOpenParam } from '../../app/kit';
+import { AddBtn, AreaField, Avatar, Ico, problem, stamp, useOpenParam, useSetting } from '../../app/kit';
 import { fmtDate } from '@tangent/contracts';
 
 const BACK = 'caretLeft';
@@ -86,6 +86,8 @@ function Conversation({ id, canWrite, onBack, onChanged }: { id: string; canWrit
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['messages', id], queryFn: () => app.api.messages.get(id), refetchInterval: 15_000 });
   const [body, setBody] = useState('');
+  // The school's quick replies (Messages → Settings), in the reader's language.
+  const quick = useSetting<ListItem[]>('chat.quickReplies', []);
   const [files, setFiles] = useState<File[]>([]);
   const [err, setErr] = useState('');
   const staff = useQuery({ queryKey: ['messages', 'staff'], queryFn: app.api.messages.staff, enabled: canWrite, staleTime: 5 * 60_000 });
@@ -134,6 +136,8 @@ function Conversation({ id, canWrite, onBack, onChanged }: { id: string; canWrit
       {canWrite ? (
         <footer className={`mcm ${shake.cls}`}>
           <AreaField label={tr('admin.messages_page.your_reply')} value={body} onChange={(v) => { setBody(v); setErr(''); }} rows={2} maxLength={1000} error={err} />
+          {listOptions(quick).length > 0 && <div style={{ maxWidth: 320 }}><Select compact aria-label={tr('admin.messages_page.quick_reply')} value="" onChange={(k) => k && setBody((b) => (b.trim() ? `${b.trim()} ` : '') + listLabel(quick, k, currentLanguage()))}
+            options={[{ value: '', label: tr('admin.messages_page.quick_reply') }, ...listOptions(quick).map((i) => ({ value: i.key, label: listLabel(quick, i.key, currentLanguage()) }))]} /></div>}
           <div className="tgrow">
             <FilePick className="btn sm" accept="application/pdf,image/jpeg,image/png,image/webp" disabled={files.length >= 5} onPick={(f) => setFiles([...files, f])}>{tr('admin.messages_page.attach_a_file')}</FilePick>
             {files.map((f, i) => <button key={`${f.name}-${i}`} type="button" className="chip v" data-tip={tr('admin.messages_page.remove')} onClick={() => setFiles(files.filter((_, j) => j !== i))}>{f.name} ×</button>)}

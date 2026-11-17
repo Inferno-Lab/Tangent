@@ -136,6 +136,8 @@ SchoolEvent _$SchoolEventFromJson(Map<String, dynamic> json) => SchoolEvent(
   rsvps: (json['rsvps'] as List<dynamic>)
       .map((e) => Rsvp.fromJson(e as Map<String, dynamic>))
       .toList(),
+  needsRsvp: json['needsRsvp'] as bool? ?? true,
+  rsvpBy: json['rsvpBy'] == null ? null : DateTime.parse(json['rsvpBy'] as String),
 );
 
 Map<String, dynamic> _$SchoolEventToJson(SchoolEvent instance) =>

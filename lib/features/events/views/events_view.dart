@@ -160,6 +160,7 @@ class _Featured extends StatelessWidget {
               ),
             ),
           ),
+          if (controller.canReply(event))
           Positioned(
             left: 14,
             right: 14,
@@ -435,15 +436,17 @@ class EventDetailView extends GetView<EventsController> {
           ),
         ],
         bottomBarHeight: 60,
-        bottomBar: GlassSegmented(
-          labels: const ['events.going', 'events.maybe', 'events.cant'],
-          index: answer == null ? -1 : _answers.indexOf(answer),
-          height: 60,
-          droplet: droplet,
-          dropletText: answer == null || answer == RsvpStatus.cant ? c.chalk : AppColors.white,
-          semanticLabel: 'events.are_you_going'.tr,
-          onChanged: (i) => unawaited(controller.rsvp(event.id, _answers[i])),
-        ),
+        bottomBar: controller.canReply(event)
+            ? GlassSegmented(
+                labels: const ['events.going', 'events.maybe', 'events.cant'],
+                index: answer == null ? -1 : _answers.indexOf(answer),
+                height: 60,
+                droplet: droplet,
+                dropletText: answer == null || answer == RsvpStatus.cant ? c.chalk : AppColors.white,
+                semanticLabel: 'events.are_you_going'.tr,
+                onChanged: (i) => unawaited(controller.rsvp(event.id, _answers[i])),
+              )
+            : null,
         children: [
           Container(
             height: 256 + inset.top,
@@ -518,6 +521,15 @@ class EventDetailView extends GetView<EventsController> {
                         ),
                         const Hr(indent: 46),
                         _Fact(icon: PhosphorIconsRegular.mapPin, title: event.venue),
+                        if (event.needsRsvp && event.rsvpBy != null) ...[
+                          const Hr(indent: 46),
+                          _Fact(
+                            icon: PhosphorIconsRegular.calendarCheck,
+                            title: controller.canReply(event)
+                                ? 'events.replies_by'.trp({'date': DateFormat('EEE d MMM').format(event.rsvpBy!)})
+                                : 'events.replies_closed'.tr,
+                          ),
+                        ],
                       ],
                     ),
                   ),
