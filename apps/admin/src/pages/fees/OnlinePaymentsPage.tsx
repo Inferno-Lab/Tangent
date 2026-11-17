@@ -7,7 +7,6 @@ import { Card, Page, useToast } from '../../app/Page';
 import { AreaField, dateLabel, openPdf, problem, stamp, useOpenParam } from '../../app/kit';
 import { fmtMoney } from '@tangent/contracts';
 
-const rupees = (n: number) => fmtMoney(n);
 const REFUND: Record<RefundRow['status'], { text: string; tone: string }> = {
   requested: { text: t('admin.online_payments_page.needs_a_second_person'), tone: 'a' }, sent: { text: t('admin.online_payments_page.sent_to_the_bank'), tone: 'v' }, done: { text: t('admin.online_payments_page.refunded'), tone: 'g' }, failed: { text: t('admin.online_payments_page.failed'), tone: 'c' }, rejected: { text: t('admin.online_payments_page.declined'), tone: '' },
 };
@@ -31,7 +30,7 @@ export function OnlinePaymentsPage({ tabs }: { tabs?: React.ReactNode }) {
   const refunds = useQuery({ queryKey: ['online', 'refunds'], queryFn: app.api.online.refunds, retry: false });
   const recon = useQuery({ queryKey: ['online', 'recon'], queryFn: app.api.online.reconciliation });
   const refresh = () => void qc.invalidateQueries({ queryKey: ['online'] });
-  const decide = useMutation({ mutationFn: ({ id, yes, note }: { id: string; yes: boolean; note: string }) => app.api.online.decide(id, yes, note), onSuccess: (r) => { setDeciding(null); refresh(); say(r.status === 'rejected' ? t('admin.online_payments_page.refund_declined') : r.status === 'failed' ? t('admin.online_payments_page.the_bank_refused', { error: r.error }) : t('admin.online_payments_page.refund_of_sent', { rupees: rupees(r.amount) })); }, onError: (e) => say((e as Error).message, 'bad') });
+  const decide = useMutation({ mutationFn: ({ id, yes, note }: { id: string; yes: boolean; note: string }) => app.api.online.decide(id, yes, note), onSuccess: (r) => { setDeciding(null); refresh(); say(r.status === 'rejected' ? t('admin.online_payments_page.refund_declined') : r.status === 'failed' ? t('admin.online_payments_page.the_bank_refused', { error: r.error }) : t('admin.online_payments_page.refund_of_sent', { amount: fmtMoney(r.amount) })); }, onError: (e) => say((e as Error).message, 'bad') });
   const resolve = useMutation({ mutationFn: ({ id, note }: { id: string; note: string }) => app.api.online.resolve(id, note), onSuccess: () => { setSorting(null); refresh(); say(t('admin.online_payments_page.marked_as_sorted_out')); }, onError: (e) => say((e as Error).message, 'bad') });
   const all = payments.data ?? [];
   const term = q.trim().toLowerCase();
@@ -44,7 +43,7 @@ export function OnlinePaymentsPage({ tabs }: { tabs?: React.ReactNode }) {
       loading={payments.isLoading && !payments.data} error={payments.isError && !payments.data ? { message: (payments.error as Error).message, retry: () => void payments.refetch() } : null}
       overlays={<>
         {refund && <RefundDialog p={refund} onClose={() => setRefund(null)} onDone={(m) => { setRefund(null); refresh(); say(m); }} />}
-        {deciding && <NoteDialog title={deciding.yes ? t('admin.online_payments_page.send_back_to', { rupees: rupees(deciding.r.amount), student: deciding.r.student }) : t('admin.online_payments_page.decline_the_refund_for', { student: deciding.r.student })}
+        {deciding && <NoteDialog title={deciding.yes ? t('admin.online_payments_page.send_back_to', { amount: fmtMoney(deciding.r.amount), student: deciding.r.student }) : t('admin.online_payments_page.decline_the_refund_for', { student: deciding.r.student })}
           label={deciding.yes ? t('admin.online_payments_page.a_note_optional') : t('admin.online_payments_page.why_the_person_who_asked')} need={!deciding.yes} action={deciding.yes ? t('admin.online_payments_page.yes_send_it') : t('admin.online_payments_page.decline')} busy={decide.isPending}
           help={deciding.yes ? t('admin.online_payments_page.the_money_goes_back_to') : undefined}
           onClose={() => setDeciding(null)} onSend={(note) => decide.mutate({ id: deciding.r.id, yes: deciding.yes, note })} />}
@@ -66,7 +65,7 @@ export function OnlinePaymentsPage({ tabs }: { tabs?: React.ReactNode }) {
                 <b className="num" style={{ font: '700 13px var(--fb)' }} data-tip={p.providerPaymentId}>{p.receiptNo}</b>
                 <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.student}</span>
                 <span className="help" style={{ margin: 0, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} data-tip={p.title}>{p.title}</span>
-                <span className="num">{rupees(p.amount)}{p.refunded ? <small className="help" style={{ display: 'block' }}>−{rupees(p.refunded)}</small> : null}</span>
+                <span className="num">{fmtMoney(p.amount)}{p.refunded ? <small className="help" style={{ display: 'block' }}>−{fmtMoney(p.refunded)}</small> : null}</span>
                 <span className="num">{dateLabel(p.paidOn)}</span>
                 <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                   <button className="btn sm" onClick={() => void openPdf(app.api.online.receipt(p.id)).catch((e: Error) => say(e.message, 'bad'))}>{t('admin.online_payments_page.receipt')}</button>
@@ -91,7 +90,7 @@ export function OnlinePaymentsPage({ tabs }: { tabs?: React.ReactNode }) {
             : refunds.data!.map((r) => (
               <div key={r.id} className="rw" style={{ display: 'flex', gap: 10, alignItems: 'center', height: 'auto', minHeight: 56, padding: '10px 20px', flexWrap: 'wrap' }}>
                 <span className={`chip ${REFUND[r.status].tone}`} data-tip={r.error ?? undefined}>{REFUND[r.status].text}</span>
-                <b className="num" style={{ font: '700 13px var(--fb)' }}>{rupees(r.amount)}</b>
+                <b className="num" style={{ font: '700 13px var(--fb)' }}>{fmtMoney(r.amount)}</b>
                 <span style={{ flex: 1, minWidth: 180 }}>{r.student} · {r.receiptNo}<small className="help" style={{ display: 'block' }}>{r.reason} {t('admin.online_payments_page.asked_by')}{' '}{r.requestedBy ?? 'someone'} {stamp(r.createdAt)}{r.approvedBy ? t('admin.online_payments_page.by', { status: r.status === 'rejected' ? 'rejected' : 'approved', approvedBy: r.approvedBy }) : ''}{r.decisionNote ? ` · “${r.decisionNote}”` : ''}</small></span>
                 {canRefund && r.status === 'requested' && <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   <button className="btn sm" disabled={decide.isPending} onClick={() => setDeciding({ r, yes: false })}>{t('admin.online_payments_page.decline')}</button>
@@ -108,7 +107,7 @@ export function OnlinePaymentsPage({ tabs }: { tabs?: React.ReactNode }) {
             : recon.data!.map((r) => (
               <div key={r.id} className="rw" style={{ display: 'flex', gap: 10, alignItems: 'center', height: 'auto', minHeight: 56, padding: '10px 20px', flexWrap: 'wrap', opacity: r.resolved ? 0.6 : 1 }}>
                 <span className={`chip ${r.resolved ? 'g' : 'c'}`}>{r.resolved ? t('admin.online_payments_page.sorted_out') : dateLabel(r.day)}</span>
-                <span style={{ flex: 1, minWidth: 200 }}>{r.problem}<small className="help" style={{ display: 'block' }}>{r.providerPaymentId} {t('admin.online_payments_page.provider')}{' '}{r.providerAmount == null ? '–' : rupees(r.providerAmount)} {t('admin.online_payments_page.receipt_2')}{' '}{r.receiptAmount == null ? '–' : rupees(r.receiptAmount)}{r.note ? ` · ${r.note}` : ''}</small></span>
+                <span style={{ flex: 1, minWidth: 200 }}>{r.problem}<small className="help" style={{ display: 'block' }}>{r.providerPaymentId} {t('admin.online_payments_page.provider')}{' '}{r.providerAmount == null ? '–' : fmtMoney(r.providerAmount)} {t('admin.online_payments_page.receipt_2')}{' '}{r.receiptAmount == null ? '–' : fmtMoney(r.receiptAmount)}{r.note ? ` · ${r.note}` : ''}</small></span>
                 {!r.resolved && perms.includes('fees.collect') && <button className="btn sm" disabled={resolve.isPending} onClick={() => setSorting(r)}>{t('admin.online_payments_page.sorted_out')}</button>}
               </div>
             ))}
@@ -127,13 +126,13 @@ function RefundDialog({ p, onClose, onDone }: { p: OnlinePaymentRow; onClose: ()
   const [err, setErr] = useState<Record<string, string>>({});
   const send = useMutation({
     mutationFn: () => app.api.online.refund({ paymentId: p.id, amount: Number(amount), reason: reason.trim() }),
-    onSuccess: (r) => onDone(r.status === 'requested' ? t('admin.online_payments_page.is_above_the_school_s', { rupees: rupees(r.amount) }) : r.status === 'failed' ? t('admin.online_payments_page.the_bank_refused', { error: r.error }) : t('admin.online_payments_page.refund_of_sent_the_family', { rupees: rupees(r.amount) })),
+    onSuccess: (r) => onDone(r.status === 'requested' ? t('admin.online_payments_page.is_above_the_school_s', { amount: fmtMoney(r.amount) }) : r.status === 'failed' ? t('admin.online_payments_page.the_bank_refused', { error: r.error }) : t('admin.online_payments_page.refund_of_sent_the_family', { amount: fmtMoney(r.amount) })),
     onError: (e) => { setErr(problem(e)); shake.hit(); },
   });
   return (
     <Dialog title={t('admin.online_payments_page.refund_2', { receiptNo: p.receiptNo })} tag={{ text: p.student, tone: 'v' }} onClose={onClose} width={480} shake={shake.cls}>
       <div className="stack">
-        <NumberField label={t('admin.online_payments_page.amount_up_to', { rupees: rupees(left) })} value={amount} onChange={(x) => { setAmount(x); setErr({}); }} min={1} max={left} error={err.amount} />
+        <NumberField label={t('admin.online_payments_page.amount_up_to', { amount: fmtMoney(left) })} value={amount} onChange={(x) => { setAmount(x); setErr({}); }} min={1} max={left} error={err.amount} />
         <Field label={t('admin.online_payments_page.why')} value={reason} onChange={(x) => { setReason(x); setErr({}); }} error={err.reason} placeholder={t('admin.online_payments_page.paid_twice')} />
         <div className="help">{t('admin.online_payments_page.the_money_goes_back_to_2')}</div>
         {err._ && <div className="emsg" role="alert">{err._}</div>}

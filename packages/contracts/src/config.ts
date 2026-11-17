@@ -159,7 +159,7 @@ export const SchoolSettingsSchema = z.object({
   'tax.split': z.array(z.object({ name: z.string().trim().min(1).max(20), sharePct: z.number().min(0).max(100) })).max(4)
     .refine((l) => !l.length || Math.abs(l.reduce((a, x) => a + x.sharePct, 0) - 100) < 0.01, 'The parts add up to 100%').default([]),
   'tax.heads': z.array(z.string()).default([]),
-  // Refunds above this many rupees need a second person in the school (fees.refund on both).
+  // Refunds above this amount (in the school’s currency) need a second person in the school (fees.refund on both).
   // 0: every refund needs a second person until the school sets an amount in its own currency.
   'fees.refundApprovalAbove': z.number().int().min(0).max(10_000_000).default(0),
   // The school's logo image (a file kept in its storage); the letters stand in until there is one.

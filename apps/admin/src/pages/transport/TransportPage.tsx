@@ -9,7 +9,6 @@ import { usePageTabs } from '../../app/tabs';
 import { useShellChrome } from '../../app/Layout';
 import { currencySymbol, fmtMoney } from '@tangent/contracts';
 
-const rupees = (n: number) => fmtMoney(n);
 const UP = 'up';
 const DOWN = 'down';
 const X = 'close';
@@ -61,7 +60,7 @@ export function TransportPage() {
               <Card key={r.id} span="s6" title={r.name} chip={<>{r.bus ? <span className={`chip ${isLive(r.bus.at) ? 'g' : ''}`} data-tip={`${r.bus.lat.toFixed(4)}, ${r.bus.lng.toFixed(4)}`}>{isLive(r.bus.at) ? tr('admin.transport_page.live') : tr('admin.transport_page.seen', { stamp: stamp(r.bus.at) })}</span> : null}{canWrite && <button className="btn sm" onClick={() => setEdit(r)}>{tr('admin.transport_page.edit')}</button>}</>}>
                 <div className="kv">{tr('admin.transport_page.bus')}<b>{r.vehicle || '–'}</b></div>
                 <div className="kv">{tr('admin.transport_page.driver')}<b>{r.driverName ? `${r.driverName}${r.driverPhone ? ` · ${r.driverPhone}` : ''}` : '–'}</b></div>
-                <div className="kv">{tr('admin.transport_page.route_fee')}<b style={{ display: 'flex', gap: 6, alignItems: 'center' }}>{r.fee ? tr('admin.transport_page.a_term', { rupees: rupees(r.fee) }) : tr('admin.transport_page.none')}{canBill && r.fee > 0 && r.riders > 0 && <button className="btn sm" onClick={() => setBilling(r)}>{tr('admin.transport_page.bill_riders')}</button>}</b></div>
+                <div className="kv">{tr('admin.transport_page.route_fee')}<b style={{ display: 'flex', gap: 6, alignItems: 'center' }}>{r.fee ? tr('admin.transport_page.a_term', { amount: fmtMoney(r.fee) }) : tr('admin.transport_page.none')}{canBill && r.fee > 0 && r.riders > 0 && <button className="btn sm" onClick={() => setBilling(r)}>{tr('admin.transport_page.bill_riders')}</button>}</b></div>
                 <div className="kv">{tr('admin.transport_page.riders')}<b>{r.riders}</b></div>
                 <div className="lbl" style={{ margin: '12px 0 4px' }}>{tr('admin.transport_page.stops_2')}</div>
                 <div className="lscroll" data-even-scroll="" style={{ maxHeight: 240 }}>
@@ -247,13 +246,13 @@ function BillDialog({ route, onClose, onDone }: { route: BusRouteRow; onClose: (
   const [err, setErr] = useState<Record<string, string>>({});
   const bill = useMutation({
     mutationFn: () => app.api.transport.bill(route.id, { title: title.trim(), dueOn }),
-    onSuccess: (r) => onDone(tr('admin.transport_page.billed', { created: r.created, rupees: rupees(route.fee), p3: r.skipped ? tr('admin.transport_page.n_already_had_it', { n: r.skipped }) : '' })),
+    onSuccess: (r) => onDone(tr('admin.transport_page.billed', { created: r.created, amount: fmtMoney(route.fee), p3: r.skipped ? tr('admin.transport_page.n_already_had_it', { n: r.skipped }) : '' })),
     onError: (e) => { setErr(problem(e)); shake.hit(); },
   });
   return (
     <Dialog title={tr('admin.transport_page.bill_the_riders_of', { name: route.name })} onClose={onClose} width={480} shake={shake.cls}>
       <div className="stack">
-        <p className="help" style={{ margin: 0 }}>{tr('admin.transport_page.get_a_transport_fee_of', { n: route.riders, fee: rupees(route.fee) })}</p>
+        <p className="help" style={{ margin: 0 }}>{tr('admin.transport_page.get_a_transport_fee_of', { n: route.riders, fee: fmtMoney(route.fee) })}</p>
         <Field label={tr('admin.transport_page.fee_name')} value={title} onChange={(v) => { setTitle(v); setErr({}); }} error={err.title} maxLength={80} />
         <DateField label={tr('admin.transport_page.due_on')} value={dueOn} onChange={(v) => { setDueOn(v); setErr({}); }} error={err.dueOn} />
         {err._ && <div className="emsg" role="alert">{err._}</div>}

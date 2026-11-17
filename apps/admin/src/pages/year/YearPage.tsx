@@ -10,7 +10,6 @@ import { usePageTabs } from '../../app/tabs';
 import { useSetupSections } from './SetupSections';
 
 const STATUS: Record<YearRow['status'], { text: string; tone: string }> = { current: { text: t('admin.year_page.current'), tone: 'g' }, draft: { text: t('admin.year_page.draft'), tone: 'a' }, archived: { text: t('admin.year_page.archived'), tone: '' } };
-const rupees = (n: number) => fmtMoney(n);
 type Kid = { id: string; name: string; className: string };
 
 /** Which of the school's setup records each tab of Academic year lists (config-engine: the school module's year page). */
@@ -155,7 +154,7 @@ function Promote({ years, onClose, onDone }: { years: YearRow[]; onClose: () => 
             <StudentPick label={t('admin.year_page.leaving_the_school_besides_the')} value={null} onChange={(s) => s && setLeaving((l) => (l.some((x) => x.id === s.id) ? l : [...l, s]))} />
             {leaving.length > 0 && <div className="tgrow" style={{ marginTop: 8 }}>{leaving.map((k) => <button key={k.id} type="button" className="chip c" onClick={() => setLeaving((l) => l.filter((x) => x.id !== k.id))}>{k.name} ×</button>)}</div>}
           </div>
-          {!!preview.data?.dues && <div className="help">{rupees(preview.data.dues)} {t('admin.year_page.is_still_owed_by')}{' '}{preview.data.duesStudents} {t('admin.year_page.students_it_carries_forward_nothing')}</div>}
+          {!!preview.data?.dues && <div className="help">{fmtMoney(preview.data.dues)} {t('admin.year_page.is_still_owed_by')}{' '}{preview.data.duesStudents} {t('admin.year_page.students_it_carries_forward_nothing')}</div>}
           {err && <div className="emsg" role="alert">{err}</div>}
         </div>
       )}

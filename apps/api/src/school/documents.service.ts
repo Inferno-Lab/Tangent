@@ -9,7 +9,6 @@ import { DEFAULT_TEMPLATES, schoolToday, fmtDate, fmtMoney, fmtNumber, readRecei
 import { schoolContext } from '@tangent/tenancy';
 
 // A receipt or report card is written in the school's own way: its currency, its dates.
-const rupees = (n: number) => fmtMoney(n);
 const date = (d: string) => fmtDate(d, 'long');
 
 /** Printable receipts and report cards, made on request (nothing to keep in sync): the school's header, then the facts. */
@@ -70,19 +69,19 @@ export class DocumentsService {
       `select p.receipt_no, p.amount, p.refunded, p.method, p.reference, p.paid_on::text, i.title, s.name student, s.id student_id, s.admission_no, c.name class, p.tax, p.cancelled_at, p.cancel_reason
        from payments p join fee_invoices i on i.id = p.invoice_id join students s on s.id = i.student_id join classes c on c.id = s.class_id where p.id = $1`, [paymentId])).rows[0];
     if (!p || (students && !students.includes(p.student_id))) throw notFound('That receipt');
-    const lines: PdfLine[] = [{ text: p.title, right: rupees(p.amount), bold: true, gap: 22 }];
+    const lines: PdfLine[] = [{ text: p.title, right: fmtMoney(p.amount), bold: true, gap: 22 }];
     const methods = await this.settings.value<{ key: string; name: string }[]>(t, 'fees.paymentMethods', []);
     const tax = readReceiptTax(p.tax);
     if (tax) {
-      lines.push({ text: tax.code ? tx('Taxable value ({codeLabel} {code})', { codeLabel: tax.codeLabel, code: tax.code }) : tx('Taxable value'), right: rupees(tax.taxable), size: 10 });
-      for (const part of tax.parts) lines.push({ text: `${part.name} ${fmtNumber(part.pct)}%`, right: rupees(part.amount), size: 10 });
+      lines.push({ text: tax.code ? tx('Taxable value ({codeLabel} {code})', { codeLabel: tax.codeLabel, code: tax.code }) : tx('Taxable value'), right: fmtMoney(tax.taxable), size: 10 });
+      for (const part of tax.parts) lines.push({ text: `${part.name} ${fmtNumber(part.pct)}%`, right: fmtMoney(part.amount), size: 10 });
       lines.push({ text: `${tax.numberLabel} ${tax.number}`, size: 10 });
     }
     if (p.cancelled_at) lines.push({ text: tx('Cancelled on {day}: {reason}', { day: date(p.cancelled_at.toISOString().slice(0, 10)), reason: p.cancel_reason }), bold: true, size: 10 });
-    else if (p.refunded) lines.push({ text: tx('Refunded'), right: `- ${rupees(p.refunded)}`, size: 10 });
+    else if (p.refunded) lines.push({ text: tx('Refunded'), right: `- ${fmtMoney(p.refunded)}`, size: 10 });
     const method = `${methods.find((m) => m.key === p.method)?.name ?? p.method}${p.reference ? ` · ${p.reference}` : ''}`;
     const fill = { school: String((await this.settings.doc(t)).values['school.name'] ?? t.info.name), student: p.student, class: p.class, admissionNo: p.admission_no, receiptNo: p.receipt_no,
-      date: date(p.paid_on), title: p.title, amount: rupees(p.amount), method, reference: p.reference ?? '', taxName: tax?.name ?? 'none', taxNumber: tax?.number ?? '' };
+      date: date(p.paid_on), title: p.title, amount: fmtMoney(p.amount), method, reference: p.reference ?? '', taxName: tax?.name ?? 'none', taxNumber: tax?.number ?? '' };
     return { name: `${p.receipt_no}.pdf`, ...(await this.render(t, 'receipt', fill, lines, draft)) };
   }
 
@@ -102,7 +101,7 @@ export class DocumentsService {
     const school = String((await this.settings.doc(t)).values['school.name'] ?? t.info.name);
     const fill: Record<string, string> = {
       school, student: 'Alex Morgan', class: '5 A', admissionNo: '2026/0001', rollNo: '12', receiptNo: 'RCPT-2026-00001', date: date(schoolToday()), title: tx('Tuition, first term'),
-      amount: rupees(1000), method: tx('Cash'), reference: '', taxName: 'none', taxNumber: '', exam: tx('Mid-term exams'), percent: '82', grade: 'A', gpa: '', result: tx('Passed'), rank: '', classSize: '30',
+      amount: fmtMoney(1000), method: tx('Cash'), reference: '', taxName: 'none', taxNumber: '', exam: tx('Mid-term exams'), percent: '82', grade: 'A', gpa: '', result: tx('Passed'), rank: '', classSize: '30',
     };
     const items: PdfLine[] = kind === 'receipt' ? [{ text: fill.title!, right: fill.amount, bold: true, gap: 22 }]
       : [{ text: tx('Subject'), right: tx('Marks · grade'), bold: true, gap: 22 }, { text: tx('Mathematics'), right: '82 / 100 · A' }, { text: tx('Science'), right: '78 / 100 · B' }];

@@ -9,7 +9,6 @@ import { FeesService } from './fees.service.js';
 import { HubService } from './hub.service.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
 
-const rupees = (n: number) => fmtMoney(n);
 const METHODS: Record<string, 'upi' | 'card' | 'netbanking'> = { upi: 'upi', card: 'card', netbanking: 'netbanking', nb: 'netbanking', wallet: 'upi' };
 
 
@@ -105,7 +104,7 @@ export class PaymentsService implements OnModuleInit {
         studentId: claimed.student_id, invoiceId: claimed.invoice_id, amount: paid, method: METHODS[ev.method ?? ''] ?? 'upi', reference: ev.providerPaymentId.slice(0, 60),
       }, { providerPaymentId: ev.providerPaymentId });
       await t.pool.query('update payment_orders set payment_id = $2 where id = $1', [orderId, done.paymentId]);
-      return `Paid ${rupees(paid)}: receipt ${done.receiptNo}`;
+      return `Paid ${fmtMoney(paid)}: receipt ${done.receiptNo}`;
     } catch (e) {
       // Money arrived but no receipt could be written (the invoice was settled at the desk meanwhile): listed for the office to refund.
       await t.pool.query('insert into reconciliation (id, day, provider_payment_id, provider_amount, receipt_amount, problem) values ($1,$2,$3,$4,null,$5) on conflict do nothing',
@@ -143,7 +142,7 @@ export class PaymentsService implements OnModuleInit {
     if (!p) throw notFound('That payment');
     if (!p.provider_payment_id) throw new ApiError('validation', 'Only payments made online can be refunded here. Cash and cheques are returned at the desk.');
     const pending = Number((await t.pool.query<{ n: string }>("select coalesce(sum(amount), 0) n from refunds where payment_id = $1 and status in ('requested','sent')", [paymentId])).rows[0]!.n);
-    if (amount > p.amount - p.refunded - pending) throw new ApiError('validation', tx('At most {p0} can be refunded on this payment.', { p0: rupees(p.amount - p.refunded - pending) }), { fields: { amount: 'That is more than can be refunded.' } });
+    if (amount > p.amount - p.refunded - pending) throw new ApiError('validation', tx('At most {p0} can be refunded on this payment.', { p0: fmtMoney(p.amount - p.refunded - pending) }), { fields: { amount: 'That is more than can be refunded.' } });
     const id = newId('rfd');
     await t.pool.query('insert into refunds (id, payment_id, amount, reason, requested_by) values ($1,$2,$3,$4,$5)', [id, paymentId, amount, reason, user.id]);
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'refund.requested', entity: 'payment', entityId: paymentId, detail: { amount } });
@@ -178,7 +177,7 @@ export class PaymentsService implements OnModuleInit {
       await t.pool.query("update payment_orders set status = case when (select amount - refunded from payments where id = $1) <= 0 then 'refunded' else 'partial_refund' end where payment_id = $1", [r.payment_id]);
       await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'refund.sent', entity: 'payment', entityId: r.payment_id, detail: { amount: r.amount, refundId: out.refundId } });
       const g = (await t.pool.query<{ phone: string | null; email: string | null }>('select g.phone, g.email from student_guardians sg join guardians g on g.id = sg.guardian_id where sg.student_id = $1 and sg.is_primary', [r.student_id])).rows[0];
-      if (g?.phone) await this.messenger.notify(t, 'fees.refunded', [{ to: g.phone, email: g.email, vars: { receipt: r.receipt_no, amount: rupees(r.amount) } }]);
+      if (g?.phone) await this.messenger.notify(t, 'fees.refunded', [{ to: g.phone, email: g.email, vars: { receipt: r.receipt_no, amount: fmtMoney(r.amount) } }]);
     } catch (e) {
       await t.pool.query("update refunds set status = 'failed', error = $2, approved_by = $3 where id = $1", [id, (e as Error).message.slice(0, 300), user.id]);
     }

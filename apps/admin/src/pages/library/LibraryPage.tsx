@@ -10,7 +10,6 @@ import { usePageTabs } from '../../app/tabs';
 import { fmtMoney } from '@tangent/contracts';
 
 type Tab = 'books' | 'loans' | 'waiting';
-const rupees = (n: number) => fmtMoney(n);
 
 export function LibraryPage() { const app = useApp();
   const qc = useQueryClient();
@@ -50,7 +49,7 @@ export function LibraryPage() { const app = useApp();
           {[
             { label: tr('admin.library_page.titles'), value: v.books.length, note: tr('admin.library_page.copies', { p0: v.books.reduce((n, b) => n + b.copies, 0) }), tone: 'v' },
             { label: tr('admin.library_page.out_on_loan'), value: v.loans.length, note: tr('admin.library_page.waiting_for_a_copy', { length: v.reservations.length }), tone: 'i' },
-            { label: tr('admin.library_page.overdue'), value: overdue.length, note: overdue.length ? tr('admin.library_page.in_fines_so_far', { rupees: rupees(overdue.reduce((n, l) => n + l.fine, 0)) }) : tr('admin.library_page.fine_a_day', { rupees: rupees(v.rules.finePerDay) }), tone: overdue.length ? 'a' : 'g' },
+            { label: tr('admin.library_page.overdue'), value: overdue.length, note: overdue.length ? tr('admin.library_page.in_fines_so_far', { amount: fmtMoney(overdue.reduce((n, l) => n + l.fine, 0)) }) : tr('admin.library_page.fine_a_day', { amount: fmtMoney(v.rules.finePerDay) }), tone: overdue.length ? 'a' : 'g' },
           ].map((t, i) => (
             <div key={t.label} className={`tile t-${t.tone} s4 rise`} style={{ '--d': `${i * 0.05}s` } as React.CSSProperties}>
               <span className="lbl">{t.label}</span>
@@ -102,7 +101,7 @@ export function LibraryPage() { const app = useApp();
                     <b style={{ font: '700 14px/1.3 var(--fb)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} data-tip={l.title}>{l.title}</b>
                     <span style={{ minWidth: 0 }}><b style={{ font: '600 13px var(--fb)' }}>{l.student}</b><small className="help" style={{ display: 'block' }}>{l.className}</small></span>
                     <span className="num">{dateLabel(l.dueOn)}</span>
-                    <span>{l.overdueDays > 0 ? <span className="chip c" data-tip={tr('admin.library_page.days_late', { overdueDays: l.overdueDays })}>{tr('admin.library_page.late')}{' '}{rupees(l.fine)}</span> : <span className="chip g">{tr('admin.library_page.on_time')}</span>}</span>
+                    <span>{l.overdueDays > 0 ? <span className="chip c" data-tip={tr('admin.library_page.days_late', { overdueDays: l.overdueDays })}>{tr('admin.library_page.late')}{' '}{fmtMoney(l.fine)}</span> : <span className="chip g">{tr('admin.library_page.on_time')}</span>}</span>
                     <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>{canWrite && <><button className="btn sm" disabled={renew.isPending} onClick={() => renew.mutate(l.id)}>{tr('admin.library_page.renew')}</button><button className="btn sm" onClick={() => setDlg({ kind: 'return', loan: l })}>{tr('admin.library_page.take_back')}</button></>}</span>
                   </div>
                 ))}
@@ -204,20 +203,20 @@ function ReturnDialog({ loan, onClose, onDone }: { loan: LoanRow; onClose: () =>
   const [err, setErr] = useState<Record<string, string>>({});
   const owed = loan.fine + (outcome === 'returned' ? 0 : Number(charge || 0));
   const back = useMutation({ mutationFn: () => app.api.library.giveBack(loan.id, { outcome, charge: Number(charge || 0), fine, reason: reason.trim() }),
-    onSuccess: (r) => onDone(`${loan.title} ${outcome === 'lost' ? tr('admin.library_page.is_marked_lost') : tr('admin.library_page.is_back')}.${r.fine ? (r.billed ? tr('admin.library_page.was_added_to_the_family', { rupees: rupees(r.fine) }) : fine === 'waive' ? tr('admin.library_page.the_was_waived', { rupees: rupees(r.fine) }) : tr('admin.library_page.paid_at_the_desk', { rupees: rupees(r.fine) })) : ''}`),
+    onSuccess: (r) => onDone(`${loan.title} ${outcome === 'lost' ? tr('admin.library_page.is_marked_lost') : tr('admin.library_page.is_back')}.${r.fine ? (r.billed ? tr('admin.library_page.was_added_to_the_family', { amount: fmtMoney(r.fine) }) : fine === 'waive' ? tr('admin.library_page.the_was_waived', { amount: fmtMoney(r.fine) }) : tr('admin.library_page.paid_at_the_desk', { amount: fmtMoney(r.fine) })) : ''}`),
     onError: (e) => { setErr(problem(e)); shake.hit(); } });
   const go = () => { if (owed > 0 && fine === 'waive' && reason.trim().length < 3) { setErr({ reason: tr('admin.library_page.say_why_the_fine_is') }); shake.hit(); } else back.mutate(); };
   return (
     <Dialog title={tr('admin.library_page.take_back_2', { title: loan.title })} onClose={onClose} width={500} shake={shake.cls}>
       <div className="stack">
-        <p className="help" style={{ margin: 0 }}>{tr('admin.library_page.from')}{' '}{loan.student}, {loan.className}. {loan.overdueDays > 0 ? tr('admin.library_page.it_is_days_late_the', { overdueDays: loan.overdueDays, rupees: rupees(loan.fine) }) : tr('admin.library_page.it_is_on_time')}</p>
+        <p className="help" style={{ margin: 0 }}>{tr('admin.library_page.from')}{' '}{loan.student}, {loan.className}. {loan.overdueDays > 0 ? tr('admin.library_page.it_is_days_late_the', { overdueDays: loan.overdueDays, amount: fmtMoney(loan.fine) }) : tr('admin.library_page.it_is_on_time')}</p>
         <Segmented label={tr('admin.library_page.how_it_came_back')} value={outcome} onChange={(o) => { setOutcome(o); setErr({}); }} options={[{ value: 'returned', label: tr('admin.library_page.returned') }, { value: 'damaged', label: tr('admin.library_page.damaged') }, { value: 'lost', label: tr('admin.library_page.lost') }]} />
         {outcome !== 'returned' && <NumberField label={outcome === 'lost' ? tr('admin.library_page.what_it_costs_to_replace') : tr('admin.library_page.what_the_damage_costs')} value={charge} onChange={setCharge} min={0} max={100000} />}
         {outcome === 'lost' && <p className="help" style={{ margin: 0 }}>{tr('admin.library_page.one_copy_fewer_is_on')}</p>}
         {owed > 0 && <>
           <Segmented label={tr('admin.library_page.the_fine')} value={fine} onChange={(v) => { setFine(v); setErr({}); }} options={[...(fees ? [{ value: 'bill' as const, label: tr('admin.library_page.add_to_fees') }] : []), { value: 'paid', label: tr('admin.library_page.paid_at_the_desk_2') }, { value: 'waive', label: tr('admin.library_page.waive_it') }]} />
           {fine === 'waive' && <AreaField label={tr('admin.library_page.why')} value={reason} onChange={(v) => { setReason(v); setErr({}); }} error={err.reason} rows={2} maxLength={200} />}
-          <p className="help" style={{ margin: 0 }}>{rupees(owed)} {tr('admin.library_page.in_all')}{fine === 'bill' ? tr('admin.library_page.as_a_library_fee_due') : '.'}</p>
+          <p className="help" style={{ margin: 0 }}>{fmtMoney(owed)} {tr('admin.library_page.in_all')}{fine === 'bill' ? tr('admin.library_page.as_a_library_fee_due') : '.'}</p>
         </>}
         {err._ && <div className="emsg" role="alert">{err._}</div>}
         <div className="tgrow" style={{ justifyContent: 'flex-end' }}>
