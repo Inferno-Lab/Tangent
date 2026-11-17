@@ -22,8 +22,8 @@ describe('modules', () => {
     expect(activeModules(ent, '2026-12-01')).toEqual(['school', 'people', 'fees']);
   });
   it('built features are on unless taken away, planned ones never', () => {
-    expect(activeFeatures({}, ['fees'])).toEqual(['fees.onlinePayment', 'fees.reminders', 'fees.lateFines', 'fees.gstReceipts', 'fees.refunds']);
-    expect(activeFeatures({ features: { 'fees.onlinePayment': false, 'fees.concessions': true } }, ['fees'])).toEqual(['fees.reminders', 'fees.lateFines', 'fees.gstReceipts', 'fees.refunds']);
+    expect(activeFeatures({}, ['fees'])).toEqual(['fees.onlinePayment', 'fees.reminders', 'fees.lateFines', 'fees.taxReceipts', 'fees.refunds']);
+    expect(activeFeatures({ features: { 'fees.onlinePayment': false, 'fees.concessions': true } }, ['fees'])).toEqual(['fees.reminders', 'fees.lateFines', 'fees.taxReceipts', 'fees.refunds']);
   });
   it('every catalogue key is unique and every feature is named after its module', () => {
     const keys = [...MODULES.map((m) => m.key), ...MODULES.flatMap((m) => m.features.map((f) => f.key))];

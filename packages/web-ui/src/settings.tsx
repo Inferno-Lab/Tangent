@@ -70,7 +70,7 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
     case 'logo':
       return box(<LogoPick has={!!str} picked={logo ?? null} disabled={disabled || !onLogo} onPick={(f) => onLogo?.(f)} />);
     case 'multi':
-      // `fees.gstHeads` names the school's own fee heads; every other list names its options.
+      // `tax.heads` names the school's own fee heads; every other list names its options.
       return pick(meta.options ? meta.options.map(([key, l]) => ({ key, label: l })) : ctx.feeHeads.map((h) => ({ key: h.key, label: h.name })));
     case 'appRoles': return pick(APP_ROLES.map((r) => ({ key: r, label: APP_ROLE_LABELS[r] })));
     case 'appLayout':
@@ -105,6 +105,21 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
       const v = ctx.values ?? {};
       const others = (Array.isArray(v['app.languages']) ? (v['app.languages'] as string[]) : []).filter((l) => l !== String(v['school.language'] ?? 'en'));
       return box(<WorkflowsEditor value={(value ?? {}) as WorkflowsSetting} languages={others} roles={ctx.roles ?? []} staff={ctx.staff ?? []} disabled={disabled} onChange={onChange} />);
+    }
+    case 'taxSplit': {
+      const parts = (Array.isArray(value) ? value : []) as { name: string; sharePct: number }[];
+      const put = (i: number, patch: Partial<{ name: string; sharePct: number }>) => onChange(parts.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+      return box(<div>
+        {!parts.length && <div className="help" style={{ margin: 0 }}>{tr('ui.settings.one_tax_line')}</div>}
+        {parts.map((x, i) => (
+          <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 6, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 140 }}><Field label={tr('ui.settings.part')} value={x.name} maxLength={20} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
+            <div style={{ width: 160 }}><NumberField label={tr('ui.settings.share_pct')} min={0} max={100} decimals value={String(x.sharePct)} disabled={disabled} onChange={(v) => put(i, { sharePct: v === '' ? 0 : Number(v) })} /></div>
+            <button type="button" className="btn sm" disabled={disabled} onClick={() => onChange(parts.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
+          </div>
+        ))}
+        {parts.length < 4 && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={() => onChange([...parts, { name: tr('ui.settings.part_n', { n: parts.length + 1 }), sharePct: parts.length ? 0 : 100 }])}>{tr('ui.settings.add_a_part')}</button>}
+      </div>);
     }
     case 'gradingScale':
       return box(<GradingEditor value={(Array.isArray(value) ? value : []) as { grade: string; minPct: number }[]} max={meta.max ?? 12} disabled={disabled} onChange={onChange} />);

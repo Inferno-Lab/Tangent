@@ -4,6 +4,7 @@ import * as schema from '@tangent/db/school';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { PoolManager, Registry, enterSchool, type TenantInfo } from '@tangent/tenancy';
 import type { Pool } from 'pg';
+import type { Vocabulary } from '@tangent/contracts';
 import type { FastifyRequest } from 'fastify';
 import { ApiError } from '@tangent/nest-kit';
 
@@ -45,6 +46,15 @@ export class TenantService {
     @Inject(POOLS) private readonly pools: PoolManager,
   ) {}
 
+  private readonly words = new Map<string, { at: number; v: Vocabulary | undefined }>();
+  private async vocab(slug: string, pool: Pool): Promise<Vocabulary | undefined> {
+    const hit = this.words.get(slug);
+    if (hit && Date.now() - hit.at < 5000) return hit.v;
+    const v = (await pool.query<{ value: Vocabulary }>("select value from settings where key = 'vocab.words'").catch(() => ({ rows: [] }))).rows[0]?.value;
+    this.words.set(slug, { at: Date.now(), v });
+    return v;
+  }
+
   async resolve(slug: string): Promise<TenantCtx> {
     const info = await this.registry.school(slug);
     if (!info) throw new ApiError('not_found', 'We could not find that school. Check the address and try again.');
@@ -59,8 +69,8 @@ export class TenantService {
       db = drizzle(pool, { schema });
       this.dbs.set(pool, db);
     }
-    // Whatever runs next in this request or job is for this school: its clock, its currency (locale.ts).
-    enterSchool(info);
+    // Whatever runs next in this request or job is for this school: its clock, its currency (locale.ts), its words.
+    enterSchool(info, await this.vocab(slug, pool));
     return { info, pool, db };
   }
 }

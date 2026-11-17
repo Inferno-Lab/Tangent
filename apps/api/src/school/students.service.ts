@@ -483,7 +483,8 @@ export class StudentsService {
   }
 
   async assignFee(t: TenantCtx, body: AssignFee, user: { id: string; name: string }): Promise<{ created: number }> {
-    const rows = body.ids.map((id) => [newId('inv'), id, body.head, body.title, body.amount, body.dueOn]);
+    const amount = await this.settings.billed(t, body.head, body.amount);
+    const rows = body.ids.map((id) => [newId('inv'), id, body.head, body.title, amount, body.dueOn]);
     const params: unknown[] = [];
     const tuples = rows.map((r) => `(${r.map((v) => { params.push(v); return `$${params.length}`; }).join(',')})`);
     await t.pool.query(`insert into fee_invoices (id, student_id, head, title, amount, due_on) values ${tuples.join(',')}`, params);

@@ -123,7 +123,7 @@ export class LibraryService {
       await t.pool.query("insert into fee_heads (key, name, sort, concession) values ('library', 'Library', 900, false) on conflict (key) do nothing");
       invoiceId = newId('inv');
       await t.pool.query('insert into fee_invoices (id, student_id, head, title, amount, due_on) values ($1,$2,$3,$4,$5,$6)',
-        [invoiceId, l.student_id, 'library', `${b.outcome === 'lost' ? 'Lost book' : b.outcome === 'damaged' ? 'Damaged book' : 'Library fine'}: ${l.title}`.slice(0, 80), fine, addDays(today, 14)]);
+        [invoiceId, l.student_id, 'library', `${b.outcome === 'lost' ? 'Lost book' : b.outcome === 'damaged' ? 'Damaged book' : 'Library fine'}: ${l.title}`.slice(0, 80), await this.settings.billed(t, 'library', fine), addDays(today, 14)]);
     }
     const note = fine === 0 ? '' : b.fine === 'waive' ? `Waived: ${b.reason}` : b.fine === 'paid' || !invoiceId ? 'Paid at the desk' : 'Added to the fees';
     await t.pool.query('update library_loans set returned_on = $2, fine = $3, outcome = $4, fine_note = $5, fine_invoice_id = $6 where id = $1', [loanId, today, fine, b.outcome, note, invoiceId]);

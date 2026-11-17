@@ -162,9 +162,10 @@ export class TransportService implements OnModuleInit {
     await t.pool.query("insert into fee_heads (key, name, sort, concession) values ('transport', 'Transport', 800, false) on conflict (key) do nothing");
     const riders = (await t.pool.query<{ student_id: string }>("select a.student_id from transport_assignments a join students s on s.id = a.student_id and s.status = 'active' where a.route_id = $1", [routeId])).rows.map((x) => x.student_id);
     let created = 0;
+    const fee = await this.settings.billed(t, 'transport', r.fee);
     for (const sid of riders) {
       if ((await t.pool.query('select 1 from fee_invoices where student_id = $1 and title = $2', [sid, b.title])).rowCount) continue;
-      await t.pool.query("insert into fee_invoices (id, student_id, head, title, amount, due_on) values ($1,$2,'transport',$3,$4,$5)", [newId('inv'), sid, b.title, r.fee, b.dueOn]);
+      await t.pool.query("insert into fee_invoices (id, student_id, head, title, amount, due_on) values ($1,$2,'transport',$3,$4,$5)", [newId('inv'), sid, b.title, fee, b.dueOn]);
       created++;
     }
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'transport.billed', entity: 'route', entityId: routeId, detail: { title: b.title, created } });

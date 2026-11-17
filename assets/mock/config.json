@@ -39,7 +39,7 @@
     "fees.onlinePayment",
     "fees.reminders",
     "fees.lateFines",
-    "fees.gstReceipts",
+    "fees.taxReceipts",
     "fees.refunds",
     "notices.teacherPosts",
     "chat.familyChat",

@@ -78,7 +78,7 @@ export class SetupService {
        and not exists (select 1 from fee_invoices i where i.student_id = s.id and lower(i.title) = lower($2))`, [fee.grade, fee.title]);
     if (rows.length) {
       await t.pool.query('insert into fee_invoices (id, student_id, head, title, amount, due_on) select unnest($1::text[]), unnest($2::text[]), $3, $4, $5, $6',
-        [rows.map(() => newId('inv')), rows.map((r) => r.id), fee.head, fee.title, fee.amount, fee.due_on]);
+        [rows.map(() => newId('inv')), rows.map((r) => r.id), fee.head, fee.title, await this.settings.billed(t, fee.head, fee.amount), fee.due_on]);
     }
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'fee.assigned', entity: 'fee_structure', entityId: id, detail: { count: rows.length, title: fee.title, amount: fee.amount } });
     return { created: rows.length };

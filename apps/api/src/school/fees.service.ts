@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { nextNumber, newId } from '@tangent/db';
-import { schoolCurrency, roundToCurrency, roundMoney, currencyDigits, fmtMoney, addDays, dayName, dayMonth, schoolToday, latestSchoolDay, schoolDaysEnding, type FeeHead, type FeeHeadsPut, type FeeSummary, type InvoiceDetail, type InvoiceRow, type PaymentCreate, type ReceiptCancel, type WaiverRequest, tx } from '@tangent/contracts';
+import { schoolCurrency, roundToCurrency, roundMoney, currencyDigits, fmtMoney, addDays, dayName, dayMonth, schoolToday, latestSchoolDay, schoolDaysEnding, type FeeHead, type FeeHeadsPut, type FeeSummary, type InvoiceDetail, type InvoiceRow, type PaymentCreate, type ReceiptCancel, type WaiverRequest, type ReceiptTax, receiptTax, tx } from '@tangent/contracts';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
@@ -181,17 +181,15 @@ export class FeesService {
     if (!allowed.some((m) => m.key === method)) throw new ApiError('validation', 'The school does not take payments that way.', { fields: { method: 'Choose another way to pay.' } });
   }
 
-  /** GST inside a payment (fees are GST-inclusive) when the school has GST receipts and the invoice's head is taxable. */
-  private async tax(t: TenantCtx, head: string, amount: number): Promise<Record<string, unknown> | null> {
+  /** The tax in a payment (§3.4.2) when the school has tax receipts, is registered and the invoice's head carries tax. */
+  private async tax(t: TenantCtx, head: string, amount: number): Promise<ReceiptTax | null> {
     const cfg = await this.settings.effective(t);
-    if (!cfg.features.includes('fees.gstReceipts')) return null;
-    const v = (await this.settings.doc(t)).values;
-    const heads = (v['fees.gstHeads'] as string[] | undefined) ?? [];
-    const rate = Number(v['fees.gstRatePct'] ?? 18);
-    if (!heads.includes(head) || !rate || !v['fees.gstin']) return null;
-    const taxable = roundToCurrency((amount * 100) / (100 + rate));
-    const half = roundToCurrency((amount - taxable) / 2);
-    return { gstin: v['fees.gstin'], sac: v['fees.gstSac'] ?? '', ratePct: rate, taxable, cgst: half, sgst: amount - taxable - half };
+    if (!cfg.features.includes('fees.taxReceipts')) return null;
+    const v = cfg.settings;
+    const rate = Number(v['tax.ratePct'] ?? 0);
+    if (!((v['tax.heads'] as string[] | undefined) ?? []).includes(head) || !rate || !v['tax.number']) return null;
+    return receiptTax({ name: String(v['tax.name']), number: String(v['tax.number']), numberLabel: String(v['tax.numberLabel']), code: String(v['tax.code'] ?? ''),
+      codeLabel: String(v['tax.codeLabel'] ?? ''), ratePct: rate, inclusive: v['tax.inclusive'] !== false, split: (v['tax.split'] as { name: string; sharePct: number }[]) ?? [] }, amount, roundToCurrency);
   }
 
   async pay(t: TenantCtx, user: { id: string; name: string }, body: PaymentCreate, online?: { providerPaymentId: string }): Promise<{ receiptNo: string; amount: number; outstanding: number; paymentId: string }> {
@@ -259,7 +257,7 @@ export class FeesService {
     let n = 0;
     for (const r of rows.filter((x) => x.owed > 0)) {
       // At least the currency's smallest unit (a paisa, a cent).
-      const amount = Math.max(1 / 10 ** currencyDigits(schoolCurrency()), roundToCurrency((r.owed * pct) / 100));
+      const amount = await this.settings.billed(t, 'fine', Math.max(1 / 10 ** currencyDigits(schoolCurrency()), roundToCurrency((r.owed * pct) / 100)));
       const fineId = newId('inv');
       const client = await t.pool.connect();
       try {

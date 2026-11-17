@@ -143,11 +143,18 @@ export const SchoolSettingsSchema = z.object({
   // Printed under the school's name on every receipt: the trust, its registration or GST number.
   'fees.receiptNote': z.string().max(300).default(''),
   // How the office may record a payment (families pay in the app by UPI, card or net banking).
-  // GST on receipts (feature fees.gstReceipts): the school's GSTIN, the service code and rate, and which fee heads are taxable.
-  'fees.gstin': z.string().trim().regex(/^$|^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/, 'A GSTIN has 15 characters, like 27AAAAA0000A1Z5').default(''),
-  'fees.gstSac': z.string().trim().max(8).default(''),
-  'fees.gstRatePct': z.number().min(0).max(28).default(0),
-  'fees.gstHeads': z.array(z.string()).default([]),
+  // Tax on fees (§3.4.2, feature fees.taxReceipts): what the country calls it, the school's registration and service code
+  // (with the names they go by there), the rate, whether fees include it, how a receipt splits it, and which fee heads carry it.
+  'tax.name': z.string().trim().min(1).max(20).default('Tax'),
+  'tax.number': z.string().trim().max(30).default(''),
+  'tax.numberLabel': z.string().trim().min(1).max(30).default('Tax number'),
+  'tax.code': z.string().trim().max(12).default(''),
+  'tax.codeLabel': z.string().trim().max(30).default(''),
+  'tax.ratePct': z.number().min(0).max(50).default(0),
+  'tax.inclusive': z.boolean().default(true),
+  'tax.split': z.array(z.object({ name: z.string().trim().min(1).max(20), sharePct: z.number().min(0).max(100) })).max(4)
+    .refine((l) => !l.length || Math.abs(l.reduce((a, x) => a + x.sharePct, 0) - 100) < 0.01, 'The parts add up to 100%').default([]),
+  'tax.heads': z.array(z.string()).default([]),
   // Refunds above this many rupees need a second person in the school (fees.refund on both).
   // 0: every refund needs a second person until the school sets an amount in its own currency.
   'fees.refundApprovalAbove': z.number().int().min(0).max(10_000_000).default(0),

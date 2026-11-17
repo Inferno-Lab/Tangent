@@ -2,7 +2,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { readdirSync, readFileSync } from 'node:fs';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { setLocaleSource, setZoneSource, type EntitlementDoc, setTextSource, isLanguage, type Catalogue } from '@tangent/contracts';
+import { setLocaleSource, setZoneSource, type EntitlementDoc, setTextSource, isLanguage, wordsFor, type Catalogue, type Vocabulary } from '@tangent/contracts';
 import { pg } from '@tangent/db';
 import { schools } from '@tangent/db/registry';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -194,13 +194,17 @@ export class PoolManager {
  * (docs/one-shot-plan.md §3.3). A request runs inside one context (the API's onRequest hook) that the tenant guard fills in;
  * a job runs inside `withSchool`. Code that serves two schools at once passes their zones explicitly.
  */
-export const schoolContext = new AsyncLocalStorage<{ zone?: string; locale?: string; currency?: string; country?: string; lang?: string }>();
+export const schoolContext = new AsyncLocalStorage<{ zone?: string; locale?: string; currency?: string; country?: string; lang?: string; vocab?: Vocabulary }>();
 setZoneSource(() => schoolContext.getStore()?.zone);
 setLocaleSource(() => schoolContext.getStore());
 // Server text (errors, labels, PDFs) in the reader's language: the request's Accept-Language, catalogues from contracts/i18n.
+// The school's own words ({@Principal} is its head teacher) come with it, in the reader's language.
 setTextSource(() => {
-  const lang = schoolContext.getStore()?.lang;
-  return lang && lang !== 'en' ? { lang, cat: serverCatalogue(lang) } : undefined;
+  const store = schoolContext.getStore();
+  if (!store) return undefined;
+  const lang = store.lang && store.lang !== 'en' ? store.lang : 'en';
+  const cat = lang === 'en' ? {} : serverCatalogue(lang);
+  return { lang, cat, words: wordsFor(lang, store.vocab, cat) };
 });
 
 /**
@@ -284,9 +288,9 @@ export function requestLanguage(header: string | string[] | undefined): string {
   return 'en';
 }
 
-export function enterSchool(info: Pick<TenantInfo, 'timezone' | 'locale' | 'currency' | 'country'>): void {
+export function enterSchool(info: Pick<TenantInfo, 'timezone' | 'locale' | 'currency' | 'country'>, vocab?: Vocabulary): void {
   const store = schoolContext.getStore();
-  if (store) Object.assign(store, { zone: info.timezone, locale: info.locale, currency: info.currency, country: info.country });
+  if (store) Object.assign(store, { zone: info.timezone, locale: info.locale, currency: info.currency, country: info.country, vocab });
 }
 
 export function withSchool<T>(info: Pick<TenantInfo, 'timezone' | 'locale' | 'currency' | 'country'> | null | undefined, fn: () => T): T {

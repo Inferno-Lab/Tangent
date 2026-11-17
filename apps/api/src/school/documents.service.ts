@@ -5,7 +5,7 @@ import { FilesService } from './files.service.js';
 import { LearningService } from './learning.service.js';
 import { pdf, type PdfLine } from './pdf.js';
 import { SettingsService } from './support.js';
-import { fmtDate, fmtMoney } from '@tangent/contracts';
+import { fmtDate, fmtMoney, fmtNumber, readReceiptTax, tx } from '@tangent/contracts';
 
 // A receipt or report card is written in the school's own way: its currency, its dates.
 const rupees = (n: number) => fmtMoney(n);
@@ -40,23 +40,25 @@ export class DocumentsService {
        from payments p join fee_invoices i on i.id = p.invoice_id join students s on s.id = i.student_id join classes c on c.id = s.class_id where p.id = $1`, [paymentId])).rows[0];
     if (!p || (students && !students.includes(p.student_id))) throw notFound('That receipt');
     const lines: PdfLine[] = [
-      ...(await this.header(t, p.tax ? 'Tax receipt' : 'Fee receipt')),
-      { text: 'Receipt number', right: p.receipt_no },
-      { text: 'Date', right: date(p.paid_on) },
-      { text: 'Student', right: `${p.student} (${p.admission_no})` },
-      { text: 'Class', right: p.class },
+      ...(await this.header(t, p.tax ? tx('Tax receipt') : tx('Fee receipt'))),
+      { text: tx('Receipt number'), right: p.receipt_no },
+      { text: tx('Date'), right: date(p.paid_on) },
+      { text: tx('Student'), right: `${p.student} (${p.admission_no})` },
+      { text: tx('Class'), right: p.class },
       { text: '', rule: true, gap: 18 },
       { text: p.title, right: rupees(p.amount), bold: true, gap: 22 },
     ];
-    if (p.tax) {
-      lines.push({ text: `Taxable value (SAC ${p.tax.sac})`, right: rupees(p.tax.taxable), size: 10 });
-      lines.push({ text: `CGST ${p.tax.ratePct / 2}%`, right: rupees(p.tax.cgst), size: 10 }, { text: `SGST ${p.tax.ratePct / 2}%`, right: rupees(p.tax.sgst), size: 10 });
-      lines.push({ text: `GSTIN ${p.tax.gstin}`, size: 10 });
+    const methods = await this.settings.value<{ key: string; name: string }[]>(t, 'fees.paymentMethods', []);
+    const tax = readReceiptTax(p.tax);
+    if (tax) {
+      lines.push({ text: tax.code ? tx('Taxable value ({codeLabel} {code})', { codeLabel: tax.codeLabel, code: tax.code }) : tx('Taxable value'), right: rupees(tax.taxable), size: 10 });
+      for (const part of tax.parts) lines.push({ text: `${part.name} ${fmtNumber(part.pct)}%`, right: rupees(part.amount), size: 10 });
+      lines.push({ text: `${tax.numberLabel} ${tax.number}`, size: 10 });
     }
-    if (p.cancelled_at) lines.push({ text: `Cancelled on ${date(p.cancelled_at.toISOString().slice(0, 10))}: ${p.cancel_reason}`, bold: true, size: 10 });
-    else if (p.refunded) lines.push({ text: 'Refunded', right: `- ${rupees(p.refunded)}`, size: 10 });
-    lines.push({ text: '', rule: true, gap: 18 }, { text: 'Paid by', right: `${p.method.toUpperCase()}${p.reference ? ` · ${p.reference}` : ''}`, size: 10 },
-      { text: 'This receipt was made by Tangent and needs no signature.', size: 9, gap: 40 });
+    if (p.cancelled_at) lines.push({ text: tx('Cancelled on {day}: {reason}', { day: date(p.cancelled_at.toISOString().slice(0, 10)), reason: p.cancel_reason }), bold: true, size: 10 });
+    else if (p.refunded) lines.push({ text: tx('Refunded'), right: `- ${rupees(p.refunded)}`, size: 10 });
+    lines.push({ text: '', rule: true, gap: 18 }, { text: tx('Paid by'), right: `${methods.find((m) => m.key === p.method)?.name ?? p.method}${p.reference ? ` · ${p.reference}` : ''}`, size: 10 },
+      { text: tx('This receipt was made by Tangent and needs no signature.'), size: 9, gap: 40 });
     return { name: `${p.receipt_no}.pdf`, data: await pdf(lines, { logo: await this.files.logoBytes(t) }) };
   }
 
@@ -75,17 +77,17 @@ export class DocumentsService {
       `select coalesce(sub.name, m.subject_id) subject, m.score, m.absent, x.max_marks from exam_marks m join exam_subjects x on x.exam_id = m.exam_id and x.subject_id = m.subject_id
        left join subjects sub on sub.id = m.subject_id where m.exam_id = $1 and m.student_id = $2 order by subject`, [examId, studentId])).rows;
     const lines: PdfLine[] = [
-      ...(await this.header(t, `Report card: ${res.exam.name}`)),
-      { text: 'Student', right: `${s.name} (${s.admission_no})` },
-      { text: 'Class and roll number', right: `${s.class} · ${s.roll_no || '-'}` },
+      ...(await this.header(t, tx('Report card: {exam}', { exam: res.exam.name }))),
+      { text: tx('Student'), right: `${s.name} (${s.admission_no})` },
+      { text: tx('Class and roll number'), right: `${s.class} · ${s.roll_no || '-'}` },
       { text: '', rule: true, gap: 18 },
-      { text: 'Subject', right: 'Marks · grade', bold: true, gap: 22 },
-      ...marks.map((m) => ({ text: m.subject, right: m.absent ? 'Absent' : `${Math.round(Number(m.score ?? 0))} / ${m.max_marks} · ${grading.grade(Math.round((Number(m.score ?? 0) / m.max_marks) * 100))}` })),
+      { text: tx('Subject'), right: tx('Marks · grade'), bold: true, gap: 22 },
+      ...marks.map((m) => ({ text: m.subject, right: m.absent ? tx('Absent') : `${Math.round(Number(m.score ?? 0))} / ${m.max_marks} · ${grading.grade(Math.round((Number(m.score ?? 0) / m.max_marks) * 100))}` })),
       { text: '', rule: true, gap: 18 },
-      { text: 'Overall', right: `${row.pct}% · grade ${row.grade}`, bold: true, gap: 22 },
-      { text: 'Result', right: row.pct >= grading.pass ? 'Passed' : 'Needs support' },
-      ...(showRank ? [{ text: 'Rank in class', right: `${row.rank} of ${res.rows.length}` }] : []),
-      { text: 'Class teacher', gap: 60 }, { text: 'Principal', right: 'Parent', gap: 0 },
+      { text: tx('Overall'), right: tx('{pct}% · grade {grade}', { pct: fmtNumber(row.pct), grade: row.grade }), bold: true, gap: 22 },
+      { text: tx('Result'), right: row.pct >= grading.pass ? tx('Passed') : tx('Needs support') },
+      ...(showRank ? [{ text: tx('Rank in class'), right: tx('{rank} of {count}', { rank: row.rank, count: res.rows.length }) }] : []),
+      { text: tx('Class teacher'), gap: 60 }, { text: tx('{@Principal}'), right: tx('{@Guardian}'), gap: 0 },
     ];
     return { name: `${s.admission_no}-${res.exam.name.replace(/[^\w-]+/g, '_')}.pdf`, data: await pdf(lines, { logo: await this.files.logoBytes(t) }) };
   }

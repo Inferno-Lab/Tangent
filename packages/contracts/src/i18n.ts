@@ -243,10 +243,13 @@ let textSource: TextSource = () => undefined;
 export function setTextSource(fn: TextSource): void {
   textSource = fn;
 }
+let englishWords: Record<string, string> | null = null;
 export function tx(english: string, params?: Params): string {
   const s = textSource();
-  if (!s) return params ? formatMessage(english, params) : english;
-  return formatMessage(s.cat[english] ?? english, params, s.cat[english] === undefined ? 'en' : s.lang, s.words);
+  if (!s) return params || english.includes('{@') ? formatMessage(english, params, 'en', (englishWords ??= wordsFor('en', undefined))) : english;
+  const own = s.cat[english];
+  // A text with no translation reads in English, with the school's English words.
+  return formatMessage(own ?? english, params, own === undefined ? 'en' : s.lang, own === undefined && s.lang !== 'en' ? wordsFor('en', undefined) : s.words);
 }
 
 /** Fields of shared data that people read: these come back in the reader's language (`localized`). */

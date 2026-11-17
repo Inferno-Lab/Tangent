@@ -235,3 +235,37 @@ export function countryName(code: string, locale = 'en'): string {
     return code;
   }
 }
+
+/** The tax on one receipt (§3.4.2), as it was when paid: what it is called, the registration, and each part. */
+export interface ReceiptTax {
+  name: string; number: string; numberLabel: string; code: string; codeLabel: string; ratePct: number; inclusive: boolean;
+  /** The amount the tax is worked on (inside an inclusive fee, the fee less its tax). */
+  taxable: number;
+  parts: { name: string; pct: number; amount: number }[];
+}
+/**
+ * Works out the tax inside a payment (a fee billed without tax had it added when it was billed, so what is paid always
+ * includes it), split into the country's parts; the last part takes the rounding so the parts add up to the tax.
+ * `round` rounds to the currency's minor unit.
+ */
+export function receiptTax(o: Omit<ReceiptTax, 'taxable' | 'parts'> & { split: { name: string; sharePct: number }[] }, amount: number, round: (n: number) => number): ReceiptTax {
+  const taxable = round((amount * 100) / (100 + o.ratePct));
+  const total = amount - taxable;
+  const split = o.split.length ? o.split : [{ name: o.name, sharePct: 100 }];
+  let left = total;
+  const parts = split.map((p, i) => {
+    const share = i === split.length - 1 ? left : round((total * p.sharePct) / 100);
+    left -= share;
+    return { name: p.name, pct: (o.ratePct * p.sharePct) / 100, amount: share };
+  });
+  const { split: _s, ...rest } = o;
+  return { ...rest, taxable, parts };
+}
+/** A receipt's tax as it was kept before the tax model (an Indian GST receipt): read as the same parts. */
+export function readReceiptTax(raw: Record<string, unknown> | null): ReceiptTax | null {
+  if (!raw) return null;
+  if ('parts' in raw) return raw as unknown as ReceiptTax;
+  const r = raw as { gstin?: string; sac?: string; ratePct?: number; taxable?: number; cgst?: number; sgst?: number };
+  return { name: 'GST', number: r.gstin ?? '', numberLabel: 'GSTIN', code: r.sac ?? '', codeLabel: 'SAC', ratePct: r.ratePct ?? 0, inclusive: true, taxable: r.taxable ?? 0,
+    parts: [{ name: 'CGST', pct: (r.ratePct ?? 0) / 2, amount: r.cgst ?? 0 }, { name: 'SGST', pct: (r.ratePct ?? 0) / 2, amount: r.sgst ?? 0 }] };
+}

@@ -35,22 +35,26 @@ export const COUNTRY_PACKS: Record<string, Record<string, unknown>> = {
   IN: {
     'fees.paymentMethods': [method('cash', 'Cash', 'cash'), method('upi', 'UPI', 'wallet'), method('card', 'Card', 'card'), method('netbanking', 'Net banking', 'bank'), method('cheque', 'Cheque', 'cheque')],
     'calendar.weekStarts': 'mon', 'calendar.weeklyOff': ['sun'], 'leave.reasons': ['Unwell', 'Family function', 'Travel', 'Appointment', 'Other'],
-    'fees.refundApprovalAbove': 5000, 'fees.gstSac': '999293', 'fees.gstRatePct': 18, 'app.languages': ['en', 'hi', 'mr'],
+    'fees.refundApprovalAbove': 5000, 'app.languages': ['en', 'hi', 'mr'],
+    'tax.name': 'GST', 'tax.numberLabel': 'GSTIN', 'tax.code': '999293', 'tax.codeLabel': 'SAC', 'tax.ratePct': 18, 'tax.inclusive': true,
+    'tax.split': [{ name: 'CGST', sharePct: 50 }, { name: 'SGST', sharePct: 50 }],
   },
   GB: {
     'fees.paymentMethods': [method('cash', 'Cash', 'cash'), method('card', 'Card', 'card'), method('bank', 'Bank transfer', 'bank'), method('direct-debit', 'Direct Debit', 'bank'), method('cheque', 'Cheque', 'cheque')],
     'calendar.weekStarts': 'mon', 'calendar.weeklyOff': ['sat', 'sun'], 'leave.reasons': ['Illness', 'Medical appointment', 'Family', 'Religious observance', 'Other'],
     'vocab.words': { en: { student: { one: 'Pupil' }, guardian: { one: 'parent' }, principal: { one: 'head teacher' }, class: { one: 'form' } } }, 'fees.refundApprovalAbove': 100,
+    'tax.name': 'VAT', 'tax.numberLabel': 'VAT registration number', 'tax.ratePct': 20, 'tax.inclusive': true,
   },
   US: {
     'fees.paymentMethods': [method('cash', 'Cash', 'cash'), method('card', 'Card', 'card'), method('check', 'Check', 'cheque'), method('ach', 'ACH transfer', 'bank')],
     'calendar.weekStarts': 'sun', 'calendar.weeklyOff': ['sat', 'sun'], 'leave.reasons': ['Sick', 'Medical appointment', 'Family', 'Religious holiday', 'Other'],
-    'fees.refundApprovalAbove': 100, 'app.languages': ['en', 'es'],
+    'fees.refundApprovalAbove': 100, 'app.languages': ['en', 'es'], 'tax.name': 'Sales tax', 'tax.numberLabel': 'Tax ID',
   },
   AE: {
     'fees.paymentMethods': [method('cash', 'Cash', 'cash'), method('card', 'Card', 'card'), method('bank', 'Bank transfer', 'bank'), method('cheque', 'Cheque', 'cheque')],
     'calendar.weekStarts': 'mon', 'calendar.weeklyOff': ['sat', 'sun'], 'leave.reasons': ['Illness', 'Medical appointment', 'Family', 'Travel', 'Religious observance', 'Other'],
     'fees.refundApprovalAbove': 500, 'app.languages': ['en', 'ar'],
+    'tax.name': 'VAT', 'tax.numberLabel': 'TRN', 'tax.ratePct': 5, 'tax.inclusive': true,
   },
 };
 

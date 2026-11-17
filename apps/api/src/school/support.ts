@@ -3,7 +3,7 @@ import { StaleSettings, newId, recordSettingsVersion, writeSettings } from '@tan
 import { checkSchoolChanges, resolveConfig, validateSettingsChanges } from '@tangent/config-engine';
 import { ApiError } from '@tangent/nest-kit';
 import type { Registry } from '@tangent/tenancy';
-import { checkCustom, type CustomEntity, type CustomFieldsSetting, type CustomValues, rawOf, toE164, phoneProblem, MESSAGE_EVENTS, SETTINGS_META, gradeFor, schoolMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type SchoolSettingsPatch, type SchoolSettingsView, type SettingsDoc } from '@tangent/contracts';
+import { checkCustom, roundToCurrency, type CustomEntity, type CustomFieldsSetting, type CustomValues, rawOf, toE164, phoneProblem, MESSAGE_EVENTS, SETTINGS_META, gradeFor, schoolMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type SchoolSettingsPatch, type SchoolSettingsView, type SettingsDoc } from '@tangent/contracts';
 import { REGISTRY, type TenantCtx } from '../tenancy/tenant.js';
 import { HubService } from './hub.service.js';
 import { serverCatalogue } from '@tangent/tenancy';
@@ -134,6 +134,14 @@ export class SettingsService {
     const e164 = toE164(raw, t.info.country);
     if (!e164) throw new ApiError('validation', phoneProblem(raw, t.info.country)!, { fields: { [field]: phoneProblem(raw, t.info.country)! } });
     return e164;
+  }
+
+  /** What a fee is billed at: with the tax added when the school's fees do not include it and the head carries tax (§3.4.2). */
+  async billed(t: TenantCtx, head: string, amount: number): Promise<number> {
+    const cfg = await this.effective(t);
+    const v = cfg.settings;
+    if (!cfg.features.includes('fees.taxReceipts') || v['tax.inclusive'] !== false || !v['tax.number'] || !((v['tax.heads'] as string[] | undefined) ?? []).includes(head)) return amount;
+    return amount + roundToCurrency((amount * Number(v['tax.ratePct'] ?? 0)) / 100);
   }
 
   /** A record's custom-field values checked against the school's fields (§3.6.3); `whole` for a new record (required ones needed). */

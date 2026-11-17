@@ -64,3 +64,25 @@ describe('money in any currency', () => {
     expect((await send('GET', `/v1/students/${s2.json.id}`)).json.admissionNo).toBe(`ADM-${year}-41`);
   });
 });
+
+describe('tax on fees in any country', () => {
+  it('adds VAT when the fee is billed and shows the school’s tax lines on the receipt', async () => {
+    const view = await send('GET', '/v1/settings/edit');
+    const change = (changes: Record<string, unknown>) => send('GET', '/v1/settings/edit').then((v) => send('PATCH', '/v1/settings', { expectedVersion: v.json.version, changes }));
+    expect(view.status).toBe(200);
+    await h.entitle({ features: { 'fees.taxReceipts': true } });
+    expect((await change({ 'tax.name': 'VAT', 'tax.number': 'GB123456789', 'tax.numberLabel': 'VAT number', 'tax.ratePct': 20, 'tax.inclusive': false, 'tax.split': [], 'tax.heads': ['activities'] })).status).toBe(200);
+    const due = new Date(Date.now() + 10 * 86_400_000).toISOString().slice(0, 10);
+    await send('POST', '/v1/students/assign-fee', { ids: ['stu_aarav'], head: 'activities', title: 'Drama club', amount: 50, dueOn: due });
+    const inv = (await send('GET', '/v1/fees/invoices?studentId=stu_aarav')).json.find((i: any) => i.title === 'Drama club');
+    expect(inv.amount).toBe(60);
+    const paid = await send('POST', '/v1/fees/payments', { studentId: 'stu_aarav', invoiceId: inv.id, amount: 60, method: 'cash' });
+    const t = (await h.app.get((await import('../src/tenancy/tenant.js')).TenantService).resolve(h.slug)).pool;
+    const tax = (await t.query('select tax from payments where id = $1', [paid.json.paymentId])).rows[0].tax;
+    expect(tax).toMatchObject({ name: 'VAT', number: 'GB123456789', taxable: 50, parts: [{ name: 'VAT', pct: 20, amount: 10 }] });
+    const pdf = await h.call('GET', `/v1/fees/payments/${paid.json.paymentId}/receipt.pdf`, { token });
+    expect(pdf.headers['content-type']).toContain('application/pdf');
+    await change({ 'tax.number': '', 'tax.heads': [] });
+  });
+});
+

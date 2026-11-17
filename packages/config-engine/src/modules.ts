@@ -235,15 +235,15 @@ export const MODULES: ModuleManifest[] = localized([
     features: [
       { key: 'fees.onlinePayment', name: 'Families pay in the app', state: 'live' }, { key: 'fees.reminders', name: 'Fee reminders', state: 'live' },
       { key: 'fees.lateFines', name: 'Late fines', state: 'live' }, { key: 'fees.concessions', name: 'Concession rules', state: 'planned' },
-      { key: 'fees.gstReceipts', name: 'GST receipts', state: 'live' }, { key: 'fees.refunds', name: 'Refunds', state: 'live' }, { key: 'fees.tally', name: 'Tally export', state: 'planned' },
+      { key: 'fees.taxReceipts', name: 'Tax receipts', state: 'live' }, { key: 'fees.refunds', name: 'Refunds', state: 'live' }, { key: 'fees.tally', name: 'Tally export', state: 'planned' },
     ],
     pages: [P('fee', 'Fees', 'fees', 'G E', '/fees', 'Money', ['fees.read'], {
       tabs: [{ key: 'overview', label: 'Overview' }, { key: 'invoices', label: 'Invoices' }, { key: 'receipts', label: 'Receipts' }, { key: 'online', label: 'Online payments', feature: 'fees.onlinePayment' }, { key: 'structure', label: 'Fee structure' }],
     })],
     app: [A('dock', 'fees', 'Fees', ['parent']), A('home', 'dueStack', 'Fees due', ['parent']), A('quick', 'payFees', 'Pay fees', ['parent'], 'fees.onlinePayment')],
     settings: [
-      'fees.receiptPrefix', 'fees.receiptStart', 'fees.receiptNote', 'fees.paymentMethods', 'fees.lateFeePct', 'fees.remindDaysBefore', 'fees.gstin', 'fees.gstSac',
-      'fees.gstRatePct', 'fees.gstHeads', 'fees.refundApprovalAbove', 'fees.dailyTarget', 'feeStructures.schoolEdits',
+      'fees.receiptPrefix', 'fees.receiptStart', 'fees.receiptNote', 'fees.paymentMethods', 'fees.lateFeePct', 'fees.remindDaysBefore', 'tax.name', 'tax.number', 'tax.numberLabel',
+      'tax.code', 'tax.codeLabel', 'tax.ratePct', 'tax.inclusive', 'tax.split', 'tax.heads', 'fees.refundApprovalAbove', 'fees.dailyTarget', 'feeStructures.schoolEdits',
     ],
     permissions: ['fees.read', 'fees.collect', 'fees.waive', 'fees.refund'],
     messages: ['fees.reminder', 'fees.receipt', 'fees.refunded'],
