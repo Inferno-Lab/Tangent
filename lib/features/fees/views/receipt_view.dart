@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:tangent/core/config/app_config.dart';
+import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
 import 'package:tangent/core/theme/tokens.dart';
@@ -52,7 +53,7 @@ class ReceiptView extends StatelessWidget {
         ),
       ('fees.paid_on'.tr, DateFormat('EEE d MMM y, HH:mm').format(receipt.paidOn), false),
       ('fees.method'.tr, 'fees.${receipt.method}'.tr, false),
-      (receipt.method == 'upi' ? 'fees.upi_reference'.tr : 'fees.reference'.tr, receipt.reference, true),
+      ('fees.reference'.tr, receipt.reference, true),
       ('fees.receipt_no'.tr, number, true),
     ];
     return Scaffold(
@@ -167,8 +168,11 @@ class _Slip extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Overline(AppConfig.schoolName),
-                  const SizedBox(height: 4),
-                  Text('fees.school_address'.tr, style: context.type.cap),
+                  // The school's own address, as it set it (nothing when it has none).
+                  if (SchoolConfig.schoolAddress.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(SchoolConfig.schoolAddress, style: context.type.cap),
+                  ],
                   const SizedBox(height: 20),
                   Text(Formatters.money(receipt.amount), style: context.type.dl),
                   const SizedBox(height: 6),
@@ -185,7 +189,7 @@ class _Slip extends StatelessWidget {
                           Expanded(
                             child: Text(
                               r.$2,
-                              textAlign: TextAlign.right,
+                              textAlign: TextAlign.end,
                               style: r.$3
                                   ? context.type.mono.copyWith(color: c.ink)
                                   : AppText.chip(color: c.ink, height: 1.3),
@@ -195,7 +199,12 @@ class _Slip extends StatelessWidget {
                       ),
                     ),
                   const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: DashedLine()),
-                  Text('fees.receipt_note'.tr, style: context.type.cap),
+                  Text(
+                    SchoolConfig.schoolPhone.isEmpty
+                        ? 'fees.receipt_note'.tr
+                        : 'fees.receipt_note_phone'.trp({'phone': SchoolConfig.schoolPhone}),
+                    style: context.type.cap,
+                  ),
                 ],
               ),
               Positioned(

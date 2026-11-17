@@ -30,18 +30,17 @@ class PaySheet extends StatefulWidget {
 }
 
 class _PaySheetState extends State<PaySheet> {
-  var _method = 'upi';
+  late var _method = _methods.first.$1;
   var _x = 0.0;
   var _drag = false;
   var _busy = false;
   Receipt? _receipt;
 
-  static const _methods = [
-    ('upi', 'UPI', 'fees.upi_title', 'fees.upi_sub'),
-    ('upi_id', '@', 'fees.upi_id_title', 'fees.upi_id_sub'),
-    ('card', null, 'fees.card_title', 'fees.card_sub'),
-    ('netbanking', null, 'fees.net_title', 'fees.net_sub'),
-  ];
+  // A live school pays through its payment connection, whose own page offers the ways it takes (cards, bank, the
+  // country's wallets); sample content shows the usual ones.
+  static List<(String, String?, String, String)> get _methods => AppConfig.live
+      ? const [('online', null, 'fees.online_title', 'fees.online_sub')]
+      : const [('card', null, 'fees.card_title', 'fees.card_sub'), ('bank', null, 'fees.net_title', 'fees.net_sub')];
 
   Future<void> _pay(double max) async {
     setState(() {
@@ -50,7 +49,7 @@ class _PaySheetState extends State<PaySheet> {
       _x = max;
     });
     Haptics.medium();
-    final receipt = await Get.find<FeesController>().pay(widget.item, _method == 'upi_id' ? 'upi' : _method);
+    final receipt = await Get.find<FeesController>().pay(widget.item, _method);
     if (!mounted) return;
     if (receipt == null) {
       setState(() {
@@ -135,7 +134,7 @@ class _PaySheetState extends State<PaySheet> {
                           child: m.$2 != null
                               ? Text(m.$2!, style: AppText.o(color: c.ink))
                               : Icon(
-                                  m.$1 == 'card' ? PhosphorIconsRegular.creditCard : PhosphorIconsRegular.bank,
+                                  m.$1 == 'card' ? PhosphorIconsRegular.creditCard : m.$1 == 'online' ? PhosphorIconsRegular.globe : PhosphorIconsRegular.bank,
                                   size: 18,
                                   color: c.ink,
                                 ),

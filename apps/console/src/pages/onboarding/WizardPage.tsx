@@ -7,7 +7,7 @@ import { packSettings, curriculaFor, countryName, ZONES, LOCALES, COUNTRY_DEFAUL
 import { ColourField, Field, FilePick, NumberField, SelectField, useShake, Icon, t as tr, listOf, dayOf } from '@tangent/web-ui';
 import { Card, Page, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
-import { count, rupees } from '../../app/format';
+import { count, price } from '../../app/format';
 
 const STEPS = [
   { key: 'basics', label: tr('console.wizard_page.the_school'), schema: WizardBasics },
@@ -22,7 +22,7 @@ type Key = 'basics' | 'plan' | 'branding' | 'placement' | 'admin' | 'data';
 type Data = Record<Key, Record<string, unknown>>;
 
 const DEFAULTS: Data = {
-  basics: { name: '', shortName: '', slug: '', board: 'CBSE', address: '', city: '', contactName: '', contactPhone: '', contactEmail: '', gstin: '', language: 'en', country: '', timezone: '', locale: '', currency: '' },
+  basics: { name: '', shortName: '', slug: '', board: 'Other', address: '', city: '', contactName: '', contactPhone: '', contactEmail: '', gstin: '', language: 'en', country: '', timezone: '', locale: '', currency: '' },
   plan: { plan: '', modules: [], students: 500 },
   branding: { color: DEFAULT_BRAND, logoText: '', appName: '', tagline: '', logo: null },
   placement: { target: '', cell: '', addressing: 'path', customDomain: '' },
@@ -184,7 +184,7 @@ export function WizardPage() {
             {(plans.data ?? []).map((p) => (
               <button key={p.key} type="button" role="radio" aria-checked={p.key === data.plan.plan} className={`opt ${p.key === data.plan.plan ? 'on' : ''}`} onClick={() => { if (p.key === data.plan.plan) return; set('plan', 'plan', p.key); set('plan', 'modules', p.modules); setPlanNote(tr('console.wizard_page.modules_reset_to_the_plan', { name: p.name, length: p.modules.length })); }}>
                 <span className="rd"><Icon name="check" /></span>
-                <span style={{ flex: 1 }}><b>{p.name} · {rupees(p.perStudentYear)} {tr('console.wizard_page.per_student_a_year')}</b><small>{p.modules.length} {tr('console.wizard_page.modules_up_to')}{' '}{count(p.limits.students)} {tr('console.wizard_page.students')}{' '}{p.limits.storageGb} {tr('console.wizard_page.gb_files')}{' '}{count(p.limits.smsPerMonth)} {tr('console.wizard_page.texts_a_month')}</small></span>
+                <span style={{ flex: 1 }}><b>{p.name} · {price(p.perStudentYear)} {tr('console.wizard_page.per_student_a_year')}</b><small>{p.modules.length} {tr('console.wizard_page.modules_up_to')}{' '}{count(p.limits.students)} {tr('console.wizard_page.students')}{' '}{p.limits.storageGb} {tr('console.wizard_page.gb_files')}{' '}{count(p.limits.smsPerMonth)} {tr('console.wizard_page.texts_a_month')}</small></span>
               </button>
             ))}
           </div>

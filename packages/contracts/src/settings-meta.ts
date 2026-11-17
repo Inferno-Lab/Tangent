@@ -148,18 +148,18 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = localized({
   // Fees
   'fees.receiptPrefix': { group: 'fees', label: 'Receipt numbers', kind: 'text', help: 'A pattern: {yyyy} the year, {yy} its last two digits, {mm} the month, {ay} the academic year, {seq} the running number ({seq:5} pads it to 5 digits). RCPT-{yyyy}-{seq:5} gives RCPT-2026-00001; the numbers start again when the year changes.' },
   'fees.receiptStart': { group: 'fees', label: 'First receipt number', kind: 'number', min: 1, max: 99_999_999, help: 'For a school arriving from another system: the series carries on after its highest number either way.' },
-  'fees.receiptNote': { group: 'fees', label: 'Printed on receipts', kind: 'textarea', help: 'Under the school’s name and address on every receipt: the trust, its registration or GST number.' },
+  'fees.receiptNote': { group: 'fees', label: 'Printed on receipts', kind: 'textarea', help: 'Under the school’s name and address on every receipt: the trust, its registration or tax number.' },
   'fees.paymentMethods': { group: 'fees', label: 'How the office records payments', kind: 'paymentMethods', max: 16, help: 'Each with the name the office uses and what kind of money it is.' },
   'fees.lateFeePct': { group: 'fees', label: 'Late fee (%)', kind: 'number', min: 0, max: 25, help: 'Charged once a month on each overdue invoice while the school has Late fines. 0 charges nothing.' },
   'fees.remindDaysBefore': { group: 'fees', label: 'Remind families this many days before a due date', kind: 'number', min: 0, max: 30, help: 'Sent each morning while the school has Fee reminders, once per invoice per day.' },
-  'tax.name': { group: 'fees', label: 'What the tax is called', kind: 'text', help: 'GST, VAT, sales tax: printed on tax receipts.' },
+  'tax.name': { group: 'fees', label: 'What the tax is called', kind: 'text', help: 'VAT, GST, sales tax: printed on tax receipts.' }, // india-pack: examples from several countries
   'tax.number': { group: 'fees', label: 'The school’s tax registration', kind: 'text', help: 'Printed on receipts with the tax lines while the school has tax receipts. Receipts carry no tax until it is filled in.' },
   'tax.numberLabel': { group: 'fees', label: 'What the registration is called', kind: 'text', help: 'GSTIN, VAT number, TRN…' },
   'tax.code': { group: 'fees', label: 'Service code', kind: 'text', help: 'Where the country asks for one on receipts (a SAC in India).' },
   'tax.codeLabel': { group: 'fees', label: 'What the service code is called', kind: 'text' },
   'tax.ratePct': { group: 'fees', label: 'Tax rate (%)', kind: 'number', min: 0, max: 50 },
   'tax.inclusive': { group: 'fees', label: 'Fees include the tax', kind: 'bool', help: 'On: the receipt shows the tax inside each fee. Off: the tax is added on top of the fee when it is billed.' },
-  'tax.split': { group: 'fees', label: 'Parts of the tax on a receipt', kind: 'taxSplit', help: 'Where a country shows the tax in parts (central and state GST in India), each part and its share. Empty: one line.' },
+  'tax.split': { group: 'fees', label: 'Parts of the tax on a receipt', kind: 'taxSplit', help: 'Where a country shows the tax in parts (central and state GST in India), each part and its share. Empty: one line.' }, // india-pack: an example
   'tax.heads': { group: 'fees', label: 'Fee heads that carry tax', kind: 'multi', help: 'From the school’s own fee heads.' },
   'fees.refundApprovalAbove': { group: 'fees', label: 'Refunds above this need a second person (in the school’s currency)', kind: 'number', min: 0, max: 10_000_000 },
   'fees.dailyTarget': { group: 'fees', label: 'Daily fee collection target (in the school’s currency)', kind: 'number', min: 0, max: 100_000_000, help: 'The dashboard measures each day’s collection against it.' },

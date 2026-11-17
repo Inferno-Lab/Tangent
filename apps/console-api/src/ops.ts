@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Header, HttpCode, Inject, Injectable, Logger, Param, Post, Put, Query, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
 import { POOLS } from './tokens.js';
-import { MODULES, activeModules, closeModules, moduleByKey } from '@tangent/config-engine';
+import { MODULES, PRICE_CURRENCY, activeModules, closeModules, moduleByKey } from '@tangent/config-engine';
 import { fmtMoney, CellCreate, CellPatch, CONSOLE_PERMISSIONS, DEPLOY_TARGET_LABELS, InvoicePaid, auditLabel, CONSOLE_ROLES, WizardPayload, type AuditRow, type DeployTarget, type ConsoleRole, type FleetSummary, type ConsoleUserRow, type FlagRow, type EntitlementDoc, type EntitlementRow, type InvoiceRowC, type SupportSessionRow, type SupportToken, tx } from '@tangent/contracts';
 import { migrate, newId, pg, scheduleJob } from '@tangent/db';
 import { topUpDemo } from '@tangent/db/seed';
@@ -163,8 +163,8 @@ export class Admin {
     if (r.status === 'paid') throw new ApiError('conflict', 'That invoice is paid already.');
     const s = (await this.db.pool.query<{ name: string; contact: { name: string; email: string }; gstin: string }>('select name, contact, gstin from schools where id = $1', [r.school_id])).rows[0]!;
     if (!s.contact?.email) throw new ApiError('validation', tx('{name} has no contact email. Add one under its details first.', { name: s.name }));
-    // Tangent's own prices and invoices are in rupees (docs/one-shot-plan.md D13: a contract currency comes with billing per contract).
-    const inr = (n: number) => fmtMoney(n, 'INR', 'en-IN');
+    // Tangent's own prices and invoices are in its price list's currency (PRICE_CURRENCY).
+    const inr = (n: number) => fmtMoney(n, PRICE_CURRENCY);
     const body = [`Dear ${s.contact.name},`, '', `Tangent invoice for ${s.name}, ${r.period}${s.gstin ? ` (GSTIN ${s.gstin})` : ''}:`, ...r.lines.map((l) => `  ${l.label}: ${inr(l.amount)}`), `Total: ${inr(r.amount)}`, `Due by ${dueFor(r.period)}.`, '', 'Thank you.'].join('\n');
     await hub.send({ schoolId: null, schoolSlug: 'console', channel: 'email', to: s.contact.email, subject: `Tangent invoice ${r.period} · ${s.name}`, body, now: true });
     await this.db.pool.query("update invoices set status = 'sent', sent_at = now(), sent_to = $2 where id = $1", [id, s.contact.email]);

@@ -584,7 +584,6 @@
  "admin.gallery_page.albums_by_class_and_event": "Albums by {@class} and event. Families see a shared album, minus any photo with a child whose family has not agreed to photos.",
  "admin.gallery_page.an_album": "An album",
  "admin.gallery_page.and_its_photos_were_deleted": "{title} and its photos were deleted.",
- "admin.gallery_page.asia_kolkata": "Asia/Kolkata",
  "admin.gallery_page.cancel": "Cancel",
  "admin.gallery_page.class": "{@Class} {name}",
  "admin.gallery_page.close": "Close",

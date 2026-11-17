@@ -9,7 +9,7 @@ import {
 import { Checkbox, Dialog, Field, FilePick, NumberField, Segmented, Select, SelectField, useShake, Icon, type IconName, EmptyState, useMore, EmptyNote, t as tr } from '@tangent/web-ui';
 import { Card, Page, Tiles, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
-import { ago, count, rupees, when } from '../../app/format';
+import { ago, count, price, when } from '../../app/format';
 import { tabsOf } from '../../app/nav';
 
 type Tab = 'connections' | 'routing' | 'templates' | 'activity' | 'webhooks';
@@ -90,7 +90,7 @@ export function IntegrationsPage() {
         <Tiles items={[
           { label: tr('console.integrations_page.connections'), value: v.connections.length, note: tr('console.integrations_page.live_failing', { length: v.connections.filter((c) => c.state === 'live').length, length1: v.connections.filter((c) => c.health.ok === false).length }), tone: 'v' },
           { label: tr('console.integrations_page.sent_this_month'), value: count(v.connections.reduce((n, c) => n + c.usage.count, 0)), note: tr('console.integrations_page.through_real_providers'), tone: 'a' },
-          { label: tr('console.integrations_page.cost_this_month'), value: rupees(v.connections.reduce((n, c) => n + c.usage.costPaise, 0) / 100), note: tr('console.integrations_page.from_each_connection_s_price'), tone: 'i' },
+          { label: tr('console.integrations_page.cost_this_month'), value: price(v.connections.reduce((n, c) => n + c.usage.costPaise, 0) / 100), note: tr('console.integrations_page.from_each_connection_s_price'), tone: 'i' },
         ]} />
         {tab === 'connections' && <Connections v={v} write={write} busy={act.isPending} onEdit={(c) => setDlg({ kind: 'edit', c })} onTest={(c) => setDlg({ kind: 'test', c })} onDelete={(c) => setDlg({ kind: 'delete', c })}
           onAct={(c, what) => act.mutate({ c, what })} onAdd={() => setDlg({ kind: 'add' })} />}
@@ -126,7 +126,7 @@ function Connections({ v, write, busy, onEdit, onTest, onDelete, onAct, onAdd }:
                 <div className="kv">{tr('console.integrations_page.health')}<b className={`st ${c.health.ok === null ? '' : c.health.ok ? 'g' : 'c'}`} data-tip={c.health.error ?? undefined} style={{ minWidth: 0 }}>
                   <i></i>{c.health.ok === null ? tr('console.integrations_page.not_tested_yet') : c.health.ok ? tr('console.integrations_page.healthy', { ago: ago(c.health.checkedAt) }) : tr('console.integrations_page.failing', { ago: ago(c.health.checkedAt) })}</b></div>
                 {c.health.ok === false && c.health.error && <div className="help" style={{ padding: '0 0 8px', overflowWrap: 'anywhere' }}>{c.health.error}</div>}
-                <div className="kv">{tr('console.integrations_page.this_month')}<b className="num">{count(c.usage.count)}{c.usage.costPaise ? ` · ${rupees(c.usage.costPaise / 100)}` : ''}</b></div>
+                <div className="kv">{tr('console.integrations_page.this_month')}<b className="num">{count(c.usage.count)}{c.usage.costPaise ? ` · ${price(c.usage.costPaise / 100)}` : ''}</b></div>
                 <div className="kv">{tr('console.integrations_page.keys')}<b style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.secretsSet.length ? c.secretsSet.map((s) => `${s.key} ••${s.ending}`).join(' · ') : tr('console.integrations_page.none')}</b></div>
                 {write && (
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
@@ -520,7 +520,7 @@ function Activity({ schools, write, say }: { schools: SchoolRow[]; write: boolea
                   <span className="help" style={{ margin: 0 }}>{m.schoolSlug}</span>
                   <span style={{ minWidth: 0 }}><b className="num" style={{ font: '700 13px var(--fb)' }}>{m.to}</b><div className="help" style={{ margin: 0 }}>{CAPABILITY_LABELS[m.channel as Capability] ?? m.channel} · {ago(m.createdAt)}</div></span>
                   <span style={{ minWidth: 0, font: '400 13px/1.4 var(--fb)', color: 'var(--ink2)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} data-tip={m.error ?? m.body}>{m.error ? <span style={{ color: 'var(--bad-i)' }}>{m.error}</span> : m.body}</span>
-                  <span className="help" style={{ margin: 0 }}>{m.connectionName ?? '–'}{m.costPaise ? ` · ${rupees(m.costPaise / 100)}` : ''}</span>
+                  <span className="help" style={{ margin: 0 }}>{m.connectionName ?? '–'}{m.costPaise ? ` · ${price(m.costPaise / 100)}` : ''}</span>
                   <span>{write && m.status === 'failed' && <button className="btn sm" disabled={retry.isPending} onClick={() => retry.mutate(m.id)}>{tr('console.integrations_page.retry')}</button>}</span>
                 </div>
               ))}

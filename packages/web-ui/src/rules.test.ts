@@ -145,6 +145,12 @@ describe('every word in a language catalogue', () => {
     expect(englishInCode(), 'use one message with {n, plural, …} or select, and listOf() for lists (node tools/i18n-english.mjs)').toEqual([]);
   });
 
+  it('names India only in the India pack and the files about India (docs/one-shot-plan.md §3.9.1)', async () => {
+    // @ts-expect-error a plain .mjs tool
+    const { indiaInCode } = (await import('../../../tools/guard-international.mjs')) as { indiaInCode: () => string[] };
+    expect(indiaInCode(), 'take it from the school’s settings or its country pack (node tools/guard-international.mjs); a line about India on purpose says india-pack: why').toEqual([]);
+  });
+
   it('keeps code out of the catalogues (CSS, class names)', () => {
     const code = catalogues.flatMap((d) => Object.entries(JSON.parse(read(path.join(root, d, 'en.json'))) as Record<string, string>)
       .filter(([, v]) => /minmax\(|var\(--|\d(px|fr)\b|\bsp-\{|!important/.test(v)).map(([k]) => `${d}/en.json ${k}`));

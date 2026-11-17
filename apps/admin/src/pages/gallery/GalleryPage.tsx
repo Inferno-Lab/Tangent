@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { uploadFile } from '@tangent/api-client';
-import type { AlbumRow, GalleryReportRow, PhotoRow } from '@tangent/contracts';
+import { fmtDate, type AlbumRow, type GalleryReportRow, type PhotoRow } from '@tangent/contracts';
 import { Dialog, Field, FilePick, Panel, Presence, SelectField, useShake, Icon, EmptyState, EmptyNote, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
@@ -143,7 +143,7 @@ function AlbumDialog({ album, onClose, onDone }: { album: AlbumRow | null; onClo
       <div className="stack">
         <Field label={t('admin.gallery_page.title')} value={title} onChange={(x) => { setTitle(x); setErr({}); }} error={err.title} placeholder={t('admin.gallery_page.sports_day_2026')} />
         <SelectField label={t('admin.gallery_page.shared_with')} value={classId} onChange={setClassId} options={[{ value: '', label: t('admin.gallery_page.the_whole_school') }, ...(classes.data ?? []).map((c) => ({ value: c.id, label: t('admin.gallery_page.class', { name: c.name }) }))]} />
-        {(events.data?.length ?? 0) > 0 && <SelectField label={t('admin.gallery_page.from_the_event_optional')} value={eventId} onChange={setEventId} options={[{ value: '', label: t('admin.gallery_page.not_linked_to_an_event') }, ...(events.data ?? []).filter((e) => e.kind !== 'holiday').map((e) => ({ value: e.id, label: `${e.title} · ${new Date(e.startsAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: t('admin.gallery_page.asia_kolkata') })}` }))]} />}
+        {(events.data?.length ?? 0) > 0 && <SelectField label={t('admin.gallery_page.from_the_event_optional')} value={eventId} onChange={setEventId} options={[{ value: '', label: t('admin.gallery_page.not_linked_to_an_event') }, ...(events.data ?? []).filter((e) => e.kind !== 'holiday').map((e) => ({ value: e.id, label: `${e.title} · ${fmtDate(e.startsAt, 'day')}` }))]} />}
         {err._ && <div className="emsg" role="alert">{err._}</div>}
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>

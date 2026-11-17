@@ -103,6 +103,12 @@ export interface ModuleManifest {
   dashboard: DashboardPiece[];
 }
 
+/**
+ * The currency of Tangent's own prices (module add-ons, plans, its invoices to schools and message costs). One price list
+ * today; prices in other currencies per contract (docs/one-shot-plan.md D13) come with that price list.
+ */
+export const PRICE_CURRENCY = 'INR'; // india-pack: Tangent's one price list is in rupees today (D13).
+
 const NONE = { pages: [], app: [], settings: [], permissions: [], messages: [], imports: [], approvals: [], dashboard: [] };
 const planned = (key: string, name: string, blurb: string): ModuleManifest =>
   ({ key, name, blurb, state: 'planned', addOnPerStudentYear: 0, features: [], requires: ['people'], backend: false, ...NONE });
@@ -144,7 +150,7 @@ export const MODULES: ModuleManifest[] = localized([
   {
     key: 'people', state: 'live', addOnPerStudentYear: 0, core: true, requires: ['school'], backend: true,
     name: 'People', blurb: 'Students, guardians and staff.',
-    features: [{ key: 'people.admissions', name: 'Admissions', state: 'live' }, { key: 'people.udise', name: 'UDISE+ export', state: 'planned' }],
+    features: [{ key: 'people.admissions', name: 'Admissions', state: 'live' }, { key: 'people.udise', name: 'UDISE+ export', state: 'planned' }], // india-pack: India's statutory census export.
     pages: [
       P('stu', 'Students', 'students', 'G S', '/students', 'People', ['students.read'], { tabs: [{ key: 'list', label: 'Students' }, { key: 'app', label: 'On the app' }] }),
       P('staff', 'Staff', 'staff', 'G F', '/staff', 'People', ['staff.read']),

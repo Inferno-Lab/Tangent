@@ -85,6 +85,7 @@ export const PaymentMethod = z.object({
 });
 export type PaymentMethod = z.infer<typeof PaymentMethod>;
 // Schools saved before methods had names kept plain keys: each is read as the method it always was.
+// india-pack: keys saved before methods had names, read as the methods they were.
 const OLD_METHODS: Record<string, [string, PaymentMethod['kind']]> = { cash: ['Cash', 'cash'], upi: ['UPI', 'wallet'], card: ['Card', 'card'], netbanking: ['Net banking', 'bank'], cheque: ['Cheque', 'cheque'] };
 const PaymentMethods = z.preprocess(
   (v) => (Array.isArray(v) ? v.map((x) => (typeof x === 'string' ? { key: x, name: OLD_METHODS[x]?.[0] ?? x, kind: OLD_METHODS[x]?.[1] ?? 'other' } : x)) : v),

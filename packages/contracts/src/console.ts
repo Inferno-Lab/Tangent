@@ -122,6 +122,7 @@ export type PlanSave = z.infer<typeof PlanSave>;
 
 /** The boards a school can follow: the one list the wizard and a school's details offer. */
 /** The curricula a school can start from (packs.ts sets each one's grading); kept as the registry's `board`. */
+// india-pack: the curricula the onboarding offers, India's among them (their grading is in packs.ts).
 export const SCHOOL_BOARDS = ['CBSE', 'ICSE', 'State', 'British', 'Cambridge', 'IB', 'American', 'International', 'Other'] as const;
 
 /** What Tangent keeps about a school beside its own settings: the contact for Tangent, tax number and board. */
@@ -136,7 +137,7 @@ export const WizardBasics = z.object({
   name: z.string().trim().min(3, 'Enter the school’s full name').max(80),
   shortName: z.string().trim().min(2, 'Enter a short name').max(20),
   slug: Slug,
-  board: z.enum(SCHOOL_BOARDS).default('CBSE'),
+  board: z.enum(SCHOOL_BOARDS).default('Other'),
   address: z.string().trim().max(240).default(''),
   city: z.string().trim().max(60).default(''),
   contactName: z.string().trim().min(2).max(80),

@@ -43,7 +43,7 @@ class MockAssistantRepository implements AssistantRepository {
     final q = prompt.toLowerCase();
     if (q.contains('fee')) {
       return const AssistantReply(
-        text: 'Fees are under the Fees tab. You can pay by UPI and the receipt is saved there.',
+        text: 'Fees are under the Fees tab. You can pay there and the receipt is saved there.',
         suggestions: ['When is the next due date?'],
         route: '/fees',
       );

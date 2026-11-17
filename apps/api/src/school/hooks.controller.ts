@@ -68,7 +68,7 @@ export class HooksController {
   sandboxPay(@Param('token') token: string, @Res() reply: FastifyReply): void {
     const d = sandboxLink<{ amount: number; cur?: string; desc: string }>(this.env.SECRETS_KEY, token);
     if (!d) { void reply.code(410).type('text/html').send(page('Link expired', '<h1>This payment link has expired</h1><p>Go back to the app and try again.</p>')); return; }
-    void reply.type('text/html').send(page('Test payment', `<h1>Test payment</h1><p>${esc(d.desc)}</p><div class="amt">${esc(fmtMoney(d.amount / 10 ** currencyDigits(d.cur ?? 'INR'), d.cur ?? 'INR'))}</div>
+    void reply.type('text/html').send(page('Test payment', `<h1>Test payment</h1><p>${esc(d.desc)}</p><div class="amt">${esc(fmtMoney(d.amount / 10 ** currencyDigits(d.cur ?? 'USD'), d.cur ?? 'USD'))}</div>
 <div class="note">This is Tangent's test checkout. No money moves: choose what the bank would say.</div>
 <form method="post"><button name="outcome" value="failed">Payment fails</button><button class="go" name="outcome" value="paid">Pay</button></form>`));
   }

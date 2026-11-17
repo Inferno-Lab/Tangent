@@ -7,7 +7,7 @@ import { DateField, Dialog, EmptyCard, Field, NumberField, PageScope, Select, Se
 import { useApp } from '../../app/context';
 import { url } from '../../app/base';
 import { useShellChrome } from '../../app/Layout';
-import { count, rupees, statusOf, when } from '../../app/format';
+import { count, price, statusOf, when } from '../../app/format';
 import { SchoolView } from './school.view';
 import { ConfigTab } from './ConfigTab';
 import { DataTab } from './DataTab';
@@ -157,9 +157,9 @@ export function SchoolPage() {
     log: lines.length ? lines.map((l) => ({ t: clock(l.at), m: l.text, c: l.level === 'error' ? 'bad' : l.level === 'info' ? 'ok' : '' })) : [{ t: '--:--:--', m: tr('console.school_page.ready_nothing_has_run_for'), c: '' }],
     canRetry: !!failedStep && !!run && !running && app.can('schools.write'), canSkip: !!failedStep?.optional && !running && app.can('schools.write'), failedNo: failed + 1, busy: retry.isPending || skip.isPending,
     retry: () => run && retry.mutate(run), skip: () => run && failedStep && skip.mutate({ run, step: failedStep.key }),
-    planName, invoiceLine: !app.can('billing.read') ? '' : last ? tr('console.school_page.last_invoice', { period: last.period, rupees: rupees(last.amount), status: last.status }) : d.entitlement.trialUntil ? tr('console.school_page.free_until', { trialUntil: d.entitlement.trialUntil }) : tr('console.school_page.no_invoice_yet'),
+    planName, invoiceLine: !app.can('billing.read') ? '' : last ? tr('console.school_page.last_invoice', { period: last.period, rupees: price(last.amount), status: last.status }) : d.entitlement.trialUntil ? tr('console.school_page.free_until', { trialUntil: d.entitlement.trialUntil }) : tr('console.school_page.no_invoice_yet'),
     contactLine: tr('console.school_page.contact', { name: d.contact.name, phone: d.contact.phone }), canBilling: app.can('billing.read'), openBilling: () => app.go(`/billing?school=${d.id}`),
-    planChip: stChip, planStatus: stText, yearly: plan ? tr('console.school_page.a_year_at_most', { rupees: rupees(lim.students * plan.perStudentYear) }) : '', limitStudents: count(lim.students),
+    planChip: stChip, planStatus: stText, yearly: plan ? tr('console.school_page.a_year_at_most', { rupees: price(lim.students * plan.perStudentYear) }) : '', limitStudents: count(lim.students),
     u1: pct(d.usage.students, lim.students), u2: pct(d.usage.storageGb, lim.storageGb), studentsText: tr('console.school_page.of', { count: count(d.usage.students), count1: count(lim.students) }), storageText: tr('console.school_page.of_gb', { p0: d.usage.storageGb.toFixed(1), storageGb: lim.storageGb }),
     smsText: tr('console.school_page.used', { smsPct }), sms: Array.from({ length: 20 }, (_, k) => ({ c: k < Math.round(smsPct / 5) ? 'on' : '' })),
     checks: d.checklist.map((c) => ({ key: c.key, n: c.label, state: c.state, cls: c.state === 'done' ? 'd' : c.state === 'waiting' ? 'w' : 'n', who: c.by ? `${STATE_WORDS[c.state]} · ${c.by} · ${when(c.at)}` : '', set: (state: 'done' | 'waiting' | 'todo') => check.mutate({ key: c.key, state }) })),

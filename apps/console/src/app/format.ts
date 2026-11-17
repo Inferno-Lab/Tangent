@@ -1,9 +1,10 @@
 import { fmtDate, fmtMoney, fmtNumber, setLocaleSource, setZoneSource, type SchoolRow } from '@tangent/contracts';
 import { t } from '@tangent/web-ui';
+import { PRICE_CURRENCY } from '@tangent/config-engine';
 
-// The console is read by Tangent's own people: dates and numbers their browser's way, prices in rupees (Tangent bills in
-// rupees today; docs/one-shot-plan.md D13). A school's own amounts are written in its currency where they are shown.
-const reader = { zone: Intl.DateTimeFormat().resolvedOptions().timeZone, locale: typeof navigator === 'undefined' ? 'en' : navigator.language, currency: 'INR' };
+// The console is read by Tangent's own people: dates and numbers their browser's way, Tangent's prices in its price list's
+// currency (PRICE_CURRENCY). A school's own amounts are written in its currency where they are shown.
+const reader = { zone: Intl.DateTimeFormat().resolvedOptions().timeZone, locale: typeof navigator === 'undefined' ? 'en' : navigator.language, currency: PRICE_CURRENCY };
 setZoneSource(() => reader.zone);
 setLocaleSource(() => reader);
 
@@ -35,7 +36,8 @@ export function ago(iso: string | null | undefined, now = Date.now()): string {
 
 export const when = (iso: string | null | undefined) => (iso ? fmtDate(iso, 'stamp') : '–');
 
-export const rupees = (n: number) => fmtMoney(Math.round(n), 'INR');
+/** One of Tangent's own amounts (a price, an invoice to a school, a message's cost). */
+export const price = (n: number) => fmtMoney(Math.round(n), PRICE_CURRENCY);
 export const count = (n: number) => fmtNumber(n);
 
 /** A smooth line through hourly values, in the 600 by 240 box the chart draws in. */
