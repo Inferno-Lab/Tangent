@@ -8,6 +8,7 @@ export * from './fields.js';
 export * from './workflows.js';
 export * from './address.js';
 export * from './grading.js';
+export * from './templates.js';
 export * from './modules.js';
 export * from './console.js';
 export * from './dates.js';

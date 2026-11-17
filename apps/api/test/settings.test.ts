@@ -217,3 +217,24 @@ describe('grading the school’s way', () => {
     expect((await h.call('GET', '/v1/exams/exm_8a_ut1/results', { token: principal })).json.rows[0].gpa).toBeNull();
   });
 });
+
+describe('the school’s own printed documents', () => {
+  it('prints a receipt and a report card from the school’s own template, and previews one being edited', async () => {
+    const receipt = { size: 'A5', blocks: [{ kind: 'school' }, { kind: 'heading', text: 'Official receipt {receiptNo}', align: 'center' }, { kind: 'items' }, { kind: 'signatures', value: 'Bursar\nParent' }] };
+    expect((await change({ 'documents.templates': { receipt } })).status).toBe(200);
+    const preview = await h.call('POST', '/v1/school/documents/preview', { token: principal, body: { kind: 'reportCard', template: { blocks: [{ kind: 'school' }, { kind: 'items' }, { kind: 'fact', text: 'GPA', value: '{gpa}', when: 'gpa' }] } } });
+    expect(preview.status).toBe(200);
+    expect(preview.headers['content-type']).toContain('application/pdf');
+    // A block that is not a block is refused before anything prints.
+    expect((await h.call('POST', '/v1/school/documents/preview', { token: principal, body: { kind: 'receipt', template: { blocks: [{ kind: 'banner' }] } } })).status).toBe(400);
+    expect((await h.call('POST', '/v1/school/documents/preview', { token: teacher, body: { kind: 'receipt', template: receipt } })).status).toBe(403);
+    const pay = (await h.call('GET', '/v1/fees/invoices?studentId=stu_aarav', { token: principal })).json.find((i: any) => i.paid > 0);
+    if (pay) {
+      const pool = (await h.app.get((await import('../src/tenancy/tenant.js')).TenantService).resolve(h.slug)).pool;
+      const id = (await pool.query('select id from payments where invoice_id = $1 limit 1', [pay.id])).rows[0].id;
+      const pdf = await h.call('GET', `/v1/fees/payments/${id}/receipt.pdf`, { token: principal });
+      expect(pdf.headers['content-type']).toContain('application/pdf');
+    }
+    await change({ 'documents.templates': {} });
+  });
+});

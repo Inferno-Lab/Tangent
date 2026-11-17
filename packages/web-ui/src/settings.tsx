@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, hasKey, type AppRole } from '@tangent/config-engine';
-import { rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, ADDRESS_PARTS, ADDRESS_PART_LABELS, SCHEME_KINDS, SCHEME_KIND_LABELS, type GradeBand, type GradingScheme, type AddressFormat, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
+import { rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, ADDRESS_PARTS, ADDRESS_PART_LABELS, SCHEME_KINDS, SCHEME_KIND_LABELS, BLOCK_KINDS, BLOCK_KIND_LABELS, DEFAULT_TEMPLATES, DOC_KINDS, DOC_KIND_LABELS, DOC_PLACEHOLDERS, PAGE_SIZES, type Block, type DocKind, type DocTemplate, type DocTemplates, type GradeBand, type GradingScheme, type AddressFormat, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
 import { Checkbox, DateField, FilePick, NumberField, TimeField } from './fields';
 import { ColourField } from './ColourPicker';
 import { ErrorLine, Field, SelectField } from './forms';
@@ -21,6 +21,8 @@ export interface SettingCtx {
   staff?: { id: string; name: string }[];
   /** The subjects a grading scheme can be for. */
   subjects?: { id: string; name: string }[];
+  /** Prints a document template being edited (the admin passes it; the console has no school data to print with). */
+  previewDocument?: (kind: DocKind, template: DocTemplate) => Promise<Blob>;
 }
 
 /** The channels a message can go through, as the Hub sends them. */
@@ -138,6 +140,11 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
           );
         })}
       </div>);
+    }
+    case 'documentTemplates': {
+      const v = ctx.values ?? {};
+      const others = (Array.isArray(v['app.languages']) ? (v['app.languages'] as string[]) : []).filter((l) => l !== String(v['school.language'] ?? 'en'));
+      return box(<DocumentTemplatesEditor value={(value ?? {}) as DocTemplates} languages={others} preview={ctx.previewDocument} disabled={disabled} onChange={onChange} />);
     }
     case 'gradingSchemes':
       return box(<GradingSchemesEditor value={(Array.isArray(value) ? value : []) as GradingScheme[]} subjects={ctx.subjects ?? []} disabled={disabled} onChange={onChange} />);
@@ -476,6 +483,75 @@ function GradingSchemesEditor({ value, subjects, disabled, onChange }: { value: 
         while (value.some((s) => s.key === `scheme-${n}`)) n++;
         onChange([...value, { key: `scheme-${n}`, name: tr('ui.settings.new_scheme'), kind: 'bands', passPct: 40, bands: [{ grade: 'A', minPct: 80 }, { grade: 'B', minPct: 60 }, { grade: 'C', minPct: 40 }, { grade: 'D', minPct: 0 }] }]);
       }}>{tr('ui.settings.add_a_scheme')}</button>}
+    </div>
+  );
+}
+
+/**
+ * The layout and wording of the school's printed documents (§3.6.2): blocks in order, each with its words (in the school's
+ * other languages too) and {placeholders} the document fills; a preview prints it with the school's own data.
+ */
+function DocumentTemplatesEditor({ value, languages, preview, disabled, onChange }: {
+  value: DocTemplates; languages: string[]; preview?: (kind: DocKind, template: DocTemplate) => Promise<Blob>; disabled: boolean; onChange: (v: unknown) => void;
+}) {
+  const [kind, setKind] = useState<DocKind>('receipt');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const tpl = value[kind] ?? DEFAULT_TEMPLATES[kind];
+  const own = !!value[kind];
+  const setTpl = (next: DocTemplate | undefined) => onChange({ ...value, [kind]: next });
+  const blocks = tpl.blocks;
+  const put = (i: number, patch: Partial<Block>) => setTpl({ ...tpl, blocks: blocks.map((b, j) => (j === i ? { ...b, ...patch } : b)) });
+  const move = (i: number, d: number) => { const next = [...blocks]; [next[i], next[i + d]] = [next[i + d]!, next[i]!]; setTpl({ ...tpl, blocks: next }); };
+  const show = async () => {
+    if (!preview) return;
+    setBusy(true);
+    setError('');
+    try { window.open(URL.createObjectURL(await preview(kind, tpl)), '_blank', 'noopener'); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  };
+  const words = (b: Block, field: 'text' | 'value') => languages.length > 0 && (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>{languages.map((l) => (
+      <div key={l} style={{ flex: 1, minWidth: 160 }}><Field label={languageLabel(l)} value={b.names?.[l]?.[field] ?? ''} maxLength={field === 'text' ? 2000 : 400} disabled={disabled} onChange={(v) => {
+        const names = { ...b.names, [l]: { ...b.names?.[l], [field]: v || undefined } };
+        put(blocks.indexOf(b), { names });
+      }} /></div>
+    ))}</div>
+  );
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <div style={{ width: 220 }}><Select value={kind} onChange={(k) => setKind(k as DocKind)} aria-label={tr('ui.settings.document')} options={DOC_KINDS.map((k) => ({ value: k, label: DOC_KIND_LABELS[k] }))} /></div>
+        <div style={{ width: 140 }}><Select value={tpl.size} disabled={disabled} onChange={(s) => setTpl({ ...tpl, size: s as DocTemplate['size'] })} aria-label={tr('ui.settings.page_size')} options={PAGE_SIZES.map((s) => ({ value: s, label: s }))} /></div>
+        {preview && <button type="button" className="btn sm" disabled={busy} onClick={() => void show()}><Icon name="print" />{tr('ui.settings.preview')}</button>}
+        {own && <button type="button" className="btn sm" disabled={disabled} onClick={() => setTpl(undefined)}>{tr('ui.settings.back_to_tangent_s_layout')}</button>}
+      </div>
+      {error && <ErrorLine>{error}</ErrorLine>}
+      <div className="help">{tr('ui.settings.fill_in', { names: DOC_PLACEHOLDERS[kind].map((p) => `{${p}}`).join(' ') })}</div>
+      {blocks.map((b, i) => (
+        <div key={i} className="card" style={{ padding: 12, marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div style={{ width: 240 }}><SelectField label={tr('ui.settings.block')} value={b.kind} disabled={disabled} onChange={(k) => put(i, { kind: k as Block['kind'] })} options={BLOCK_KINDS.map((k) => ({ value: k, label: BLOCK_KIND_LABELS[k] }))} /></div>
+            {['heading', 'text', 'fact', 'signatures'].includes(b.kind) && <>
+              <div style={{ width: 110 }}><NumberField label={tr('ui.settings.text_size')} min={7} max={28} value={b.size === undefined ? '' : String(b.size)} disabled={disabled} onChange={(v) => put(i, { size: v === '' ? undefined : Number(v) })} /></div>
+              <div style={{ width: 150 }}><SelectField label={tr('ui.settings.align')} value={b.align ?? 'start'} disabled={disabled} onChange={(a) => put(i, { align: a === 'start' ? undefined : (a as Block['align']) })}
+                options={[{ value: 'start', label: tr('ui.settings.align_start') }, { value: 'center', label: tr('ui.settings.align_center') }, { value: 'end', label: tr('ui.settings.align_end') }]} /></div>
+              <div style={{ paddingBottom: 10 }}><Checkbox checked={!!b.bold} disabled={disabled} label={tr('ui.settings.bold')} onChange={(on) => put(i, { bold: on || undefined })} /></div>
+            </>}
+            <div style={{ width: 170 }}><SelectField label={tr('ui.settings.only_when')} value={b.when ?? ''} disabled={disabled} onChange={(w) => put(i, { when: w || undefined })}
+              options={[{ value: '', label: tr('ui.settings.always') }, ...DOC_PLACEHOLDERS[kind].map((p) => ({ value: p, label: `{${p}}` }))]} /></div>
+            <button type="button" className="btn sm" aria-label={tr('ui.settings.move_up')} disabled={disabled || i === 0} onClick={() => move(i, -1)}><Icon name="caretUp" /></button>
+            <button type="button" className="btn sm" aria-label={tr('ui.settings.move_down')} disabled={disabled || i === blocks.length - 1} onClick={() => move(i, 1)}><Icon name="caretDown" /></button>
+            <button type="button" className="btn sm" disabled={disabled || blocks.length <= 1} onClick={() => setTpl({ ...tpl, blocks: blocks.filter((_, j) => j !== i) })}>{tr('ui.settings.remove')}</button>
+          </div>
+          {['heading', 'text', 'fact'].includes(b.kind) && <div style={{ marginTop: 6 }}><Field label={b.kind === 'fact' ? tr('ui.settings.label') : tr('ui.settings.words')} value={b.text ?? ''} maxLength={2000} disabled={disabled} onChange={(v) => put(i, { text: v })} /></div>}
+          {['heading', 'text', 'fact'].includes(b.kind) && words(b, 'text')}
+          {b.kind === 'fact' && <div style={{ marginTop: 6 }}><Field label={tr('ui.settings.value_at_the_end')} value={b.value ?? ''} maxLength={400} disabled={disabled} onChange={(v) => put(i, { value: v })} /></div>}
+          {b.kind === 'signatures' && <div style={{ marginTop: 6 }}><div className="fld"><label>{tr('ui.settings.who_signs')}</label>
+            <textarea style={ta} value={b.value ?? ''} disabled={disabled} maxLength={400} onChange={(e) => put(i, { value: e.target.value })} aria-label={tr('ui.settings.who_signs')} /></div></div>}
+          {(b.kind === 'fact' || b.kind === 'signatures') && words(b, 'value')}
+        </div>
+      ))}
+      {blocks.length < 60 && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={() => setTpl({ ...tpl, blocks: [...blocks, { kind: 'text', text: '' }] })}>{tr('ui.settings.add_a_block')}</button>}
     </div>
   );
 }

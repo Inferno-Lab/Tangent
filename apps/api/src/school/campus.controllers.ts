@@ -2,7 +2,8 @@ import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query, Res }
 import {
   AlbumInput, BookInput, BusPosition, TripDelay, TripMark, TripStart, BusRouteInput, FILE_KINDS, FileStart, IssueInput, LeaverInput, NewYearInput, PhotoTags, PromotionInput, RefundRequest, RiderInput,
   type AlbumRow, type BookRow, type BusRouteRow, type FileRow, type FileUpload, type LibraryView, type LoanRow, type OnlinePaymentRow, type PhotoRow, type PromotionPreview,
-  type ReconRow, type RefundRow, type ReservationRow, type SchoolChannels, type TransportView, type YearView, CAPABILITY_LABELS, GiveBack, CancelReservation } from '@tangent/contracts';
+  type ReconRow, type RefundRow, type ReservationRow, type SchoolChannels, type TransportView, type YearView, CAPABILITY_LABELS, GiveBack, CancelReservation, DOC_KINDS, DocTemplate, type DocKind,
+} from '@tangent/contracts';
 import { ApiError, ZodPipe, forbidden } from '@tangent/nest-kit';
 import type { FastifyReply } from 'fastify';
 import { z } from 'zod';
@@ -61,7 +62,13 @@ export class FilesController {
 /** The school's logo, for its sign-in pages before anyone signs in. */
 @Controller('v1/school')
 export class SchoolLogoController {
-  constructor(private readonly files: FilesService, private readonly settings: SettingsService) {}
+  constructor(private readonly files: FilesService, private readonly settings: SettingsService, private readonly docs: DocumentsService) {}
+
+  /** A printed document's template as it is being edited (§3.6.2), with the school's own data. */
+  @Core() @Post('documents/preview') @HttpCode(200) @Require('settings.manage')
+  async preview(@Tenant() t: TenantCtx, @Body(new ZodPipe(z.object({ kind: z.enum(DOC_KINDS), template: DocTemplate }))) b: { kind: DocKind; template: DocTemplate }, @Res() reply: FastifyReply): Promise<void> {
+    sendPdf(reply, await this.docs.preview(t, b.kind, b.template));
+  }
 
   @Public() @Core() @Get('logo')
   async logo(@Tenant() t: TenantCtx, @Res() reply: FastifyReply): Promise<void> {

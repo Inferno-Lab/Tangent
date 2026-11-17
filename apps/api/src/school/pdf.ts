@@ -12,7 +12,9 @@ import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
  * assets/fonts (SIL Open Font License); only the ones a document uses are embedded.
  */
 /** A line of a document. `page` starts a new page first; `qr` draws a QR code of that text at the right, beside the lines after it. */
-export interface PdfLine { text: string; right?: string; size?: number; bold?: boolean; gap?: number; rule?: boolean; page?: boolean; qr?: string }
+export interface PdfLine { text: string; right?: string; size?: number; bold?: boolean; gap?: number; rule?: boolean; page?: boolean; qr?: string; align?: 'start' | 'center' | 'end' }
+/** Page sizes in points (§3.6.2). */
+const PAGES = { A4: [595, 842], Letter: [612, 792], A5: [420, 595] } as const;
 
 const FONTS = new URL('../../assets/fonts/', import.meta.url);
 /** Each script's letters and the Noto font that has them (Latin, Cyrillic and Greek are in Noto Sans itself). */
@@ -47,10 +49,9 @@ function runs(text: string): { text: string; script: string }[] {
 }
 
 const MARGIN = 50;
-const WIDTH = 595;
-const HEIGHT = 842;
 
-export async function pdf(lines: PdfLine[], opts: { logo?: Buffer | null } = {}): Promise<Buffer> {
+export async function pdf(lines: PdfLine[], opts: { logo?: Buffer | null; size?: keyof typeof PAGES } = {}): Promise<Buffer> {
+  const [WIDTH, HEIGHT] = PAGES[opts.size ?? 'A4'];
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
   // Only the scripts this document has are embedded (each subset to the letters it uses).
@@ -123,7 +124,9 @@ export async function pdf(lines: PdfLine[], opts: { logo?: Buffer | null } = {})
     if (y - need < MARGIN) { page = doc.addPage([WIDTH, HEIGHT]); y = HEIGHT - MARGIN; }
     y -= l.gap ?? Math.round(size * 1.5);
     if (l.rule) { page.drawLine({ start: { x: MARGIN, y: y + size }, end: { x: WIDTH - MARGIN, y: y + size }, thickness: 0.6, color: rgb(0.7, 0.7, 0.74) }); continue; }
-    parts.forEach((p, i) => draw(page, p, MARGIN, y - i * size * 1.35, size, l.bold));
+    // Centred or at the end, each wrapped line on its own; the default is the start of the line.
+    const at = (p: string) => (l.align === 'center' ? (WIDTH - width(p, size, l.bold)) / 2 : l.align === 'end' ? WIDTH - MARGIN - width(p, size, l.bold) : MARGIN);
+    parts.forEach((p, i) => draw(page, p, at(p), y - i * size * 1.35, size, l.bold));
     if (l.right) draw(page, l.right, WIDTH - MARGIN - width(l.right, size, l.bold), y, size, l.bold);
     y -= (parts.length - 1) * size * 1.35;
   }

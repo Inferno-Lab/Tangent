@@ -198,6 +198,8 @@ export function schoolApi(h: Http) {
       change: (b: SchoolSettingsPatch) => h.patch<{ pending: true; approvalId: string } | { version: number }>('/v1/settings', b),
       audit: () => h.get<AuditRow[]>('/v1/settings/audit'),
       channels: () => h.get<SchoolChannels>('/v1/settings/channels'),
+      /** A printed document's template as it is being edited, as a PDF (§3.6.2). */
+      previewDocument: (kind: string, template: unknown) => h.postBlob('/v1/school/documents/preview', { kind, template }),
     },
     files: {
       start: (b: FileStart) => h.post<FileUpload>('/v1/files', b),

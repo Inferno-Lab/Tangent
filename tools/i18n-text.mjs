@@ -32,6 +32,9 @@ for (const r of [C.MARK_MEANING_LABELS, C.CATEGORY_TONE_LABELS, C.PAYMENT_KIND_L
 for (const g of [...C.SETTING_GROUPS, ...E.ADMIN_GROUPS]) add(g);
 // The usual wording of each message to families and staff (sent in each person's language).
 for (const e of C.rawOf(C.MESSAGE_EVENTS)) add(e.text);
+// The labels of the shared building blocks, and the wording of the documents every school starts with (§3.6).
+for (const r of [C.PROCESS_LABELS, C.STEP_ACTOR_LABELS, C.STEP_TIMEOUT_LABELS, C.SCHEME_KIND_LABELS, C.ADDRESS_PART_LABELS, C.DOC_KIND_LABELS, C.BLOCK_KIND_LABELS]) Object.values(C.rawOf(r)).forEach(add);
+for (const t of Object.values(C.DEFAULT_TEMPLATES)) for (const b of t.blocks) { if (b.text) add(b.text); if (b.value && !/^\{[a-zA-Z]+\}$/.test(b.value)) add(b.value); }
 
 // 2. Server code and contracts: error messages, field problems, form checks (zod messages) and tx() calls.
 const DIRS = ['apps/api/src', 'apps/console-api/src', 'packages/contracts/src', 'packages/config-engine/src', 'packages/db/src', 'packages/nest-kit/src',

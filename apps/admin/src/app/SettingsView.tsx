@@ -61,7 +61,7 @@ export function SettingsEditor({ keys: asked, title = t('admin.settings_view.set
         {keys.map((k) => {
           // A floor (security, privacy) still lets the school be stricter, so it stays editable.
           const readOnly = !can || settingOwner(k) === 'tangent' || (!!locked(k) && !TIGHTEN[k]);
-          return <SettingRow key={k} meta={SETTINGS_META[k]} value={value(k)} error={err[k]} disabled={readOnly} ctx={v} note={why(k)} onChange={(x) => { setEdits((e) => ({ ...e, [k]: x })); setErr({}); }} />;
+          return <SettingRow key={k} meta={SETTINGS_META[k]} value={value(k)} error={err[k]} disabled={readOnly} ctx={{ ...v, previewDocument: app.api.settings.previewDocument }} note={why(k)} onChange={(x) => { setEdits((e) => ({ ...e, [k]: x })); setErr({}); }} />;
         })}
         {can && keys.some((k) => settingOwner(k) === 'school') && (
           <div style={{ marginTop: 16 }}>
