@@ -463,7 +463,7 @@ class _ClassCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.app;
     final mine = cls.id == controller.own?.id;
-    final subject = controller.teacher?.subject ?? 'maths';
+    final subject = controller.teacher?.subject ?? '';
     final periods = controller.today.where((p) => p.schoolClass?.id == cls.id).toList();
     final now = nowMinutes();
     final live = periods.where((p) => minutesOf(p.slot.start) <= now && minutesOf(p.slot.end) > now).firstOrNull;

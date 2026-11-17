@@ -39,6 +39,7 @@ Receipt _$ReceiptFromJson(Map<String, dynamic> json) => Receipt(
   paidOn: DateTime.parse(json['paidOn'] as String),
   method: json['method'] as String,
   reference: json['reference'] as String,
+  number: json['number'] as String? ?? '',
 );
 
 Map<String, dynamic> _$ReceiptToJson(Receipt instance) => <String, dynamic>{
@@ -49,6 +50,7 @@ Map<String, dynamic> _$ReceiptToJson(Receipt instance) => <String, dynamic>{
   'paidOn': instance.paidOn.toIso8601String(),
   'method': instance.method,
   'reference': instance.reference,
+  'number': instance.number,
 };
 
 FeeAccount _$FeeAccountFromJson(Map<String, dynamic> json) => FeeAccount(

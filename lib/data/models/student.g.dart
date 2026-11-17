@@ -100,6 +100,7 @@ SchoolInfo _$SchoolInfoFromJson(Map<String, dynamic> json) => SchoolInfo(
   founded: (json['founded'] as num).toInt(),
   officeHours: json['officeHours'] as String,
   about: json['about'] as String,
+  termStart: json['termStart'] as String? ?? '',
 );
 
 Map<String, dynamic> _$SchoolInfoToJson(SchoolInfo instance) =>
@@ -114,4 +115,5 @@ Map<String, dynamic> _$SchoolInfoToJson(SchoolInfo instance) =>
       'founded': instance.founded,
       'officeHours': instance.officeHours,
       'about': instance.about,
+      'termStart': instance.termStart,
     };

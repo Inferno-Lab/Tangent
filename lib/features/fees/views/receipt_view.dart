@@ -42,8 +42,8 @@ class ReceiptView extends StatelessWidget {
         children: [EmptyState(title: 'fees.no_receipt', body: 'fees.no_receipt_body')],
       );
     }
-    final number =
-        'GIS/${receipt.paidOn.year % 100}-${(receipt.paidOn.year + 1) % 100}/${receipt.id.replaceAll(RegExp('[^0-9]'), '').padLeft(4, '0').substring(receipt.id.replaceAll(RegExp('[^0-9]'), '').padLeft(4, '0').length - 4)}';
+    // The school's own receipt number; sample receipts show their id.
+    final number = receipt.number.isNotEmpty ? receipt.number : receipt.id.toUpperCase();
     final rows = [
       if (args['student'] != null)
         (

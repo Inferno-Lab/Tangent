@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:tangent/core/routes/app_routes.dart';
+import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
 import 'package:tangent/core/theme/tokens.dart';
@@ -194,7 +195,9 @@ class _HomeworkRow extends StatelessWidget {
       case 2:
         meta = '${mine?.marks ?? 0}/${item.maxMarks}${(mine?.feedback ?? '').isEmpty ? '' : ' · “${mine!.feedback}”'}';
         stamp = mine?.grade ?? '—';
-        tone = (mine?.grade ?? '').startsWith('A') ? AppColors.ok : (c.dark ? AppColors.blackboard.mariText : AppColors.late);
+        // Green when the mark reaches the school's pass mark, whatever its grades are called.
+        final passed = item.maxMarks > 0 && (mine?.marks ?? 0) * 100 / item.maxMarks >= SchoolConfig.passPct;
+        tone = passed ? AppColors.ok : (c.dark ? AppColors.blackboard.mariText : AppColors.late);
       default:
         meta = [
           if (teacher.isNotEmpty) teacher,

@@ -81,6 +81,7 @@ class Receipt {
     required this.paidOn,
     required this.method,
     required this.reference,
+    this.number = '',
   });
 
   factory Receipt.fromJson(Map<String, dynamic> json) => _$ReceiptFromJson(json);
@@ -92,6 +93,10 @@ class Receipt {
   final DateTime paidOn;
   final String method;
   final String reference;
+
+  /// The receipt's number in the school's series; empty in sample data.
+  @JsonKey(defaultValue: '')
+  final String number;
 
   Map<String, dynamic> toJson() => _$ReceiptToJson(this);
 }

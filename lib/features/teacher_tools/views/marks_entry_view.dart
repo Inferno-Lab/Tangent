@@ -55,9 +55,9 @@ class _MarksEntryViewState extends State<MarksEntryView> {
       controller.put(id, MarksEntryController.absentMark);
     } else {
       final n = int.tryParse(t);
-      if (n == null || n < 0 || n > MarksEntryController.maxMarks) {
+      if (n == null || n < 0 || n > controller.maxMarks) {
         ToastHelper.show(
-          'teacher.marks_range'.trp({'max': '${MarksEntryController.maxMarks}'}),
+          'teacher.marks_range'.trp({'max': '${controller.maxMarks}'}),
           kind: ToastKind.error,
         );
         return;
@@ -90,7 +90,7 @@ class _MarksEntryViewState extends State<MarksEntryView> {
       return PageFrame(
         leading: const BackGlass(),
         actions: [
-          Chip2('teacher.marks_chip'.trp({'max': '${MarksEntryController.maxMarks}'})),
+          Chip2('teacher.marks_chip'.trp({'max': '${controller.maxMarks}'})),
         ],
         edgeBar: true,
         bottomBar: controller.students.isEmpty

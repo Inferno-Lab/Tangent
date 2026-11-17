@@ -118,7 +118,7 @@ void main() {
       tester,
       () => Get.find<ExamRepository>().marksDraft('cls_8a', 'maths'),
     );
-    expect(draft?[studentId], 91);
+    expect(draft?.marks[studentId], 91);
   });
 
   test('demo login roles map to the showcase accounts', () async {

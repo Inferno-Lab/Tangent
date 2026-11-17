@@ -113,6 +113,7 @@ class SchoolInfo {
     required this.founded,
     required this.officeHours,
     required this.about,
+    this.termStart = '',
   });
 
   factory SchoolInfo.fromJson(Map<String, dynamic> json) =>
@@ -127,6 +128,9 @@ class SchoolInfo {
   final String principal;
   final int founded;
   final String officeHours;
+  /// When the term the school is in started (ISO day); empty without terms or in sample data.
+  @JsonKey(defaultValue: '')
+  final String termStart;
   final String about;
 
   Map<String, dynamic> toJson() => _$SchoolInfoToJson(this);

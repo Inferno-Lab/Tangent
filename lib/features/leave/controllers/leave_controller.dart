@@ -23,11 +23,6 @@ DateTime dayOnly(DateTime d) => DateUtils.dateOnly(d);
 /// Days a leave covers, counting both ends.
 int leaveSpan(LeaveRequest r) => dayOnly(r.to).difference(dayOnly(r.from)).inDays + 1;
 
-/// shortcut: terms are fixed halves (Jun–Nov, Dec–May); read them from the school calendar once it exists.
-DateTime termStart(DateTime now) {
-  if (now.month >= 6 && now.month <= 11) return DateTime(now.year, 6);
-  return now.month == 12 ? DateTime(now.year, 12) : DateTime(now.year - 1, 12);
-}
 
 class LeaveController extends GetxController with Loadable {
   List<LeaveRequest> items = [];
@@ -51,8 +46,11 @@ class LeaveController extends GetxController with Loadable {
     }
   }
 
+  /// When the school's current term started (its calendar); the calendar year without terms.
+  DateTime? _termStart;
+
   int get takenThisTerm {
-    final start = termStart(Clock.now());
+    final start = _termStart ?? DateTime(Clock.now().year);
     return items
         .where((i) => i.status == LeaveStatus.approved && !i.from.isBefore(start))
         .fold(0, (sum, i) => sum + leaveSpan(i));
@@ -71,6 +69,7 @@ class LeaveController extends GetxController with Loadable {
       final cls = await directory.schoolClass(student.classId);
       childName = student.name.split(' ').first;
       teacherName = (await directory.teacherOrNull(cls.classTeacherId))?.name;
+      _termStart = DateTime.tryParse((await directory.school()).termStart);
       items = await Get.find<LeaveRepository>().forStudent(id);
       items.sort((a, b) => b.appliedOn.compareTo(a.appliedOn));
       final days = await Get.find<AttendanceRepository>().forStudent(id);

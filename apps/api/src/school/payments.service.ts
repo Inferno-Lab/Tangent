@@ -78,9 +78,9 @@ export class PaymentsService implements OnModuleInit {
   async orderStatus(t: TenantCtx, orderId: string, studentIds: string[] | null) {
     const o = (await t.pool.query<{ id: string; invoice_id: string; student_id: string; status: string; payment_id: string | null }>('select * from payment_orders where id = $1', [orderId])).rows[0];
     if (!o || (studentIds && !studentIds.includes(o.student_id))) throw notFound('That payment');
-    const p = o.payment_id ? (await t.pool.query<{ id: string; title: string; amount: number; paid_on: string; method: string; reference: string }>(
-      'select p.id, i.title, p.amount, p.paid_on::text, p.method, coalesce(p.reference, p.receipt_no) reference from payments p join fee_invoices i on i.id = p.invoice_id where p.id = $1', [o.payment_id])).rows[0] : undefined;
-    return { id: o.id, status: o.status, receipt: p ? { id: p.id, installmentId: o.invoice_id, title: p.title, amount: p.amount, paidOn: p.paid_on, method: p.method, reference: p.reference } : null };
+    const p = o.payment_id ? (await t.pool.query<{ id: string; title: string; amount: number; paid_on: string; method: string; reference: string; receipt_no: string }>(
+      'select p.id, i.title, p.amount, p.paid_on::text, p.method, coalesce(p.reference, p.receipt_no) reference, p.receipt_no from payments p join fee_invoices i on i.id = p.invoice_id where p.id = $1', [o.payment_id])).rows[0] : undefined;
+    return { id: o.id, status: o.status, receipt: p ? { id: p.id, number: p.receipt_no, installmentId: o.invoice_id, title: p.title, amount: p.amount, paidOn: p.paid_on, method: p.method, reference: p.reference } : null };
   }
 
   /** A provider's payment event (from the webhook or the sandbox checkout). Applied once per provider payment ID. */

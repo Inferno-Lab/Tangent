@@ -176,7 +176,10 @@ export class FamilyService {
     const v = (await this.settings.doc(t)).values;
     const s = (k: string) => (typeof v[k] === 'string' ? (v[k] as string) : '');
     const principal = (await t.pool.query<{ name: string }>("select u.name from staff st join users u on u.id = st.user_id where st.designation = 'Principal' limit 1")).rows[0]?.name ?? '';
+    // The term the school is in, as its calendar says (terms start any month; none: empty).
+    const term = (await t.pool.query<{ s: string }>('select starts_on::text s from terms where starts_on <= $1 and ends_on >= $1 order by starts_on desc limit 1', [schoolToday()])).rows[0]?.s ?? '';
     return {
+      termStart: term,
       // The school's own facts only: the year it was founded and its office hours are not recorded, so they are left empty.
       name: s('school.name') || t.info.name, tagline: s('school.tagline'), address: s('school.address'), phone: s('school.phone'), email: s('school.email'), website: '', principal, founded: 0,
       officeHours: '', about: s('school.tagline'),
@@ -547,15 +550,16 @@ export class FamilyService {
 
   private async openExam(t: TenantCtx, classId: string, subject: string) {
     return (await t.pool.query<{ id: string }>(
-      `select e.id from exams e join exam_subjects x on x.exam_id = e.id where e.class_id = $1 and x.subject_id = $2 and e.status in ('upcoming','marking') order by e.starts_on limit 1`, [classId, `sub_${subject}`])).rows[0];
+      `select e.id, x.max_marks from exams e join exam_subjects x on x.exam_id = e.id where e.class_id = $1 and x.subject_id = $2 and e.status in ('upcoming','marking') order by e.starts_on limit 1`, [classId, `sub_${subject}`])).rows[0] as { id: string; max_marks: number } | undefined;
   }
 
   async marksDraft(t: TenantCtx, user: AuthedUser, classId: string, subject: string) {
     if (!user.permissions.includes('exams.read')) throw forbidden('You are not allowed to see marks.');
+    // The marks so far, and what the open exam marks this subject out of (the school's default before there is one).
     const e = await this.openExam(t, classId, subject);
-    if (!e) return {};
+    if (!e) return { marks: {}, maxMarks: await this.settings.value<number>(t, 'exams.defaultMaxMarks', 100) };
     const { rows } = await t.pool.query<{ student_id: string; score: string }>('select student_id, score from exam_marks where exam_id = $1 and subject_id = $2 and score is not null', [e.id, `sub_${subject}`]);
-    return Object.fromEntries(rows.map((r) => [r.student_id, Math.round(Number(r.score))]));
+    return { marks: Object.fromEntries(rows.map((r) => [r.student_id, Math.round(Number(r.score))])), maxMarks: e.max_marks };
   }
 
   async saveMarks(t: TenantCtx, user: AuthedUser, classId: string, b: { subject: string; values: Record<string, number> }) {
@@ -578,13 +582,13 @@ export class FamilyService {
          (select paid_on::text from payments p where p.invoice_id = i.id order by paid_on desc limit 1) last, (select method from payments p where p.invoice_id = i.id order by paid_on desc limit 1) method,
          (select coalesce(reference, receipt_no) from payments p where p.invoice_id = i.id order by paid_on desc limit 1) reference
        from fee_invoices i where i.student_id = $1 order by i.due_on, i.id`, [studentId]);
-    const pay = await t.pool.query<{ id: string; invoice_id: string; title: string; amount: number; paid_on: string; method: string; reference: string }>(
-      `select p.id, p.invoice_id, i.title, p.amount, p.paid_on::text, p.method, coalesce(p.reference, p.receipt_no) reference from payments p join fee_invoices i on i.id = p.invoice_id where i.student_id = $1 order by p.paid_on desc, p.id`, [studentId]);
+    const pay = await t.pool.query<{ id: string; invoice_id: string; title: string; amount: number; paid_on: string; method: string; reference: string; receipt_no: string }>(
+      `select p.id, p.invoice_id, i.title, p.amount, p.paid_on::text, p.method, coalesce(p.reference, p.receipt_no) reference, p.receipt_no from payments p join fee_invoices i on i.id = p.invoice_id where i.student_id = $1 order by p.paid_on desc, p.id`, [studentId]);
     const year = (await t.pool.query<{ label: string }>('select label from academic_years where current limit 1')).rows[0]?.label ?? '';
     return {
       studentId, academicYear: year,
       installments: inv.rows.map((i) => { const due = i.amount - i.waived_amount; const paid = Number(i.paid) >= due; return { id: i.id, title: i.title, amount: due, dueDate: i.due_on, paid, ...(paid && i.last ? { paidOn: i.last, method: i.method, reference: i.reference } : {}) }; }),
-      receipts: pay.rows.map((p) => ({ id: p.id, installmentId: p.invoice_id, title: p.title, amount: p.amount, paidOn: p.paid_on, method: p.method, reference: p.reference })),
+      receipts: pay.rows.map((p) => ({ id: p.id, number: p.receipt_no, installmentId: p.invoice_id, title: p.title, amount: p.amount, paidOn: p.paid_on, method: p.method, reference: p.reference })),
     };
   }
 

@@ -145,6 +145,7 @@ abstract final class SchoolConfig {
   static String get handedInBy => _s('homework.handedInBy', 'either');
 
   static int get libraryMaxLoans => _s<num>('library.maxLoans', 3).toInt();
+  static int get defaultMaxMarks => _s<num>('exams.defaultMaxMarks', 100).toInt();
   static int get libraryMaxRenewals => _s<num>('library.maxRenewals', 1).toInt();
 
   /// Who a family calls about the bus: `office`, `attendant` or `none`.

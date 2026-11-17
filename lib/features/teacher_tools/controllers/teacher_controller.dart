@@ -92,7 +92,7 @@ class TeacherHomeController extends GetxController with Loadable {
             ..sort((a, b) => (a.submittedAt ?? h.dueOn).compareTo(b.submittedAt ?? h.dueOn));
           if (waiting.isNotEmpty) grading.add(GradingItem(h, c, waiting));
         }
-        entered[c.id] = (await Get.find<ExamRepository>().marksDraft(c.id, teacher!.subject)).length;
+        entered[c.id] = (await Get.find<ExamRepository>().marksDraft(c.id, teacher!.subject)).marks.length;
         if (c.id == own?.id) {
           for (final s in roster) {
             leave.addAll(
@@ -475,7 +475,9 @@ class MarksEntryController extends GetxController with Loadable {
 
   /// Marks for an absent student.
   static const absentMark = -1;
-  static const maxMarks = 20;
+
+  /// What the open exam marks this subject out of (sent with the draft).
+  var maxMarks = SchoolConfig.defaultMaxMarks;
 
   @override
   bool get watchRevision => false;
@@ -505,7 +507,7 @@ class MarksEntryController extends GetxController with Loadable {
         ..sort((a, b) => a.rollNo.compareTo(b.rollNo));
       final exams = await Get.find<ExamRepository>().forClass(id);
       final set = <String>{for (final e in exams) ...e.subjects};
-      subjects = set.isEmpty ? const ['maths', 'science', 'english', 'hindi', 'social'] : set.toList();
+      subjects = set.toList();
       final teacherId = Get.find<AuthService>().user.value?.teacherId;
       if (teacherId != null) {
         final mine = (await directory.teacher(teacherId)).subject;
@@ -513,16 +515,17 @@ class MarksEntryController extends GetxController with Loadable {
       }
       if (!subjects.contains(subject.value)) subject.value = subjects.first;
       await _draft();
-    }, isEmpty: () => students.isEmpty);
+    }, isEmpty: () => students.isEmpty || subjects.isEmpty);
   }
 
   Future<void> _draft() async {
     final id = _classId;
     if (id == null) return;
     final draft = await Get.find<ExamRepository>().marksDraft(id, subject.value);
+    maxMarks = draft.maxMarks;
     values
       ..clear()
-      ..addAll(draft);
+      ..addAll(draft.marks);
     active.value = students.where((s) => !values.containsKey(s.id)).firstOrNull?.id;
   }
 
