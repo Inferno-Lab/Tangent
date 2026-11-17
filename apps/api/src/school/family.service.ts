@@ -847,12 +847,16 @@ export class FamilyService {
     const classes = w.kind === 'staff' ? undefined : (await t.pool.query<{ class_id: string }>('select distinct class_id from students where id = any($1)', [w.children])).rows.map((r) => r.class_id);
     const albums = (await this.gallerySvc.albums(t, classes)).filter((a) => a.published);
     const cfg = await this.settings.effective(t);
+    // Each album under the school's own academic year (they start in any month).
+    const years = (await t.pool.query<{ label: string; s: string; e: string }>('select label, starts_on::text s, ends_on::text e from academic_years')).rows;
     const out = [];
     for (const a of albums) {
       const photos = await this.gallerySvc.photos(t, a.id, w.kind !== 'staff');
       const shown = [];
       for (const p of photos) shown.push({ id: p.id, url: await this.files.url(t, user, p.id).catch(() => ''), caption: p.name.replace(/\.[^.]+$/, ''), tagged: p.students.map((s) => s.id) });
-      out.push({ id: a.id, title: a.title, date: a.createdAt, blurb: a.className ?? 'Whole school', photos: shown.filter((p) => p.url), downloads: cfg.features.includes('gallery.downloads') });
+      const day = a.createdAt.slice(0, 10);
+      out.push({ id: a.id, title: a.title, date: a.createdAt, blurb: a.className ?? tx('Whole school'), photos: shown.filter((p) => p.url), downloads: cfg.features.includes('gallery.downloads'),
+        yearLabel: years.find((y) => y.s <= day && day <= y.e)?.label ?? '' });
     }
     return out.filter((a) => a.photos.length);
   }

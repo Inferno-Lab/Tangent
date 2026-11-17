@@ -483,6 +483,7 @@ class GalleryAlbum {
     required this.date,
     required this.blurb,
     required this.photos,
+    this.yearLabel = '',
   });
 
   factory GalleryAlbum.fromJson(Map<String, dynamic> json) =>
@@ -493,6 +494,10 @@ class GalleryAlbum {
   final DateTime date;
   final String blurb;
   final List<GalleryPhoto> photos;
+
+  /// The school's academic year it belongs to ('2026–27'); empty in sample data.
+  @JsonKey(defaultValue: '')
+  final String yearLabel;
 
   Map<String, dynamic> toJson() => _$GalleryAlbumToJson(this);
 }

@@ -335,6 +335,7 @@ GalleryAlbum _$GalleryAlbumFromJson(Map<String, dynamic> json) => GalleryAlbum(
   photos: (json['photos'] as List<dynamic>)
       .map((e) => GalleryPhoto.fromJson(e as Map<String, dynamic>))
       .toList(),
+  yearLabel: json['yearLabel'] as String? ?? '',
 );
 
 Map<String, dynamic> _$GalleryAlbumToJson(GalleryAlbum instance) =>
@@ -344,6 +345,7 @@ Map<String, dynamic> _$GalleryAlbumToJson(GalleryAlbum instance) =>
       'date': instance.date.toIso8601String(),
       'blurb': instance.blurb,
       'photos': instance.photos.map((e) => e.toJson()).toList(),
+      'yearLabel': instance.yearLabel,
     };
 
 AppNotification _$AppNotificationFromJson(Map<String, dynamic> json) =>

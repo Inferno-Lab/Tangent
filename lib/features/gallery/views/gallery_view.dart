@@ -121,7 +121,7 @@ class GalleryView extends GetView<GalleryController> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (rest.isNotEmpty) ...[
-                    Rise(child: Overline('gallery.albums'.trp({'year': _year(hero.date)}))),
+                    Rise(child: Overline('gallery.albums'.trp({'year': _year(hero)}))),
                     const SizedBox(height: 12),
                     Rise(index: 1, child: _AlbumGrid(albums: rest)),
                   ],
@@ -134,11 +134,8 @@ class GalleryView extends GetView<GalleryController> {
     });
   }
 
-  /// Academic year runs June to May.
-  static String _year(DateTime d) {
-    final start = d.month >= 6 ? d.year : d.year - 1;
-    return '$start–${(start + 1) % 100}';
-  }
+  /// The school's own academic year the album belongs to (it may start in any month); the calendar year without one.
+  static String _year(GalleryAlbum a) => a.yearLabel.isNotEmpty ? a.yearLabel : '${a.date.year}';
 }
 
 void _open(GalleryAlbum album, [int index = 0]) => unawaited(

@@ -1,11 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { nextNumber, newId } from '@tangent/db';
-import { schoolCurrency, roundToCurrency, roundMoney, currencyDigits, fmtMoney, addDays, dayName, dayMonth, schoolToday, latestSchoolDay, schoolDaysEnding, type FeeHead, type FeeHeadsPut, type FeeSummary, type InvoiceDetail, type InvoiceRow, type PaymentCreate, type ReceiptCancel, type WaiverRequest, type ReceiptTax, receiptTax, tx } from '@tangent/contracts';
+import { fmtDate, schoolCurrency, roundToCurrency, roundMoney, currencyDigits, fmtMoney, addDays, dayName, dayMonth, schoolToday, latestSchoolDay, schoolDaysEnding, type FeeHead, type FeeHeadsPut, type FeeSummary, type InvoiceDetail, type InvoiceRow, type PaymentCreate, type ReceiptCancel, type WaiverRequest, type ReceiptTax, receiptTax, tx } from '@tangent/contracts';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
 
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 @Injectable()
 export class FeesService {
@@ -26,7 +25,8 @@ export class FeesService {
     const last = latestSchoolDay(today, OFF_DAYS);
     let monthStart = `${last.slice(0, 7)}-01`;
     let nextMonth = addDays(monthStart, 32).slice(0, 7) + '-01';
-    let label = MONTHS[Number(last.slice(5, 7)) - 1]!;
+    // The month in the reader's language (fmtDate reads the school's locale).
+    let label = fmtDate(monthStart, 'month');
     if (period !== 'month') {
       const r = (await t.pool.query<{ name: string; s: string; e: string }>(period === 'term'
         ? 'select name, starts_on::text s, ends_on::text e from terms where starts_on <= $1 and ends_on >= $1 order by starts_on desc limit 1'
