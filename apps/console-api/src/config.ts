@@ -2,8 +2,8 @@ import { Body, Controller, Delete, Get, HttpCode, Inject, Injectable, Param, Pat
 import { activeFeatures, activeModules, resolveConfig, validateSettingsChanges } from '@tangent/config-engine';
 import {
   ConfigPatch, PERMISSIONS, RoleDefSave, SETTINGS_META, SettingLockPut,
-  type ChangeRequestRow, type ConfigTemplateRow, type ConfigVersionRow, type EffectiveConfig, type EntitlementDoc, type RoleDef, type SchoolConfig, tx } from '@tangent/contracts';
-import { StaleSettings, newId, readSettings, recordSettingsVersion, writeSettings, type pg } from '@tangent/db';
+  type ChangeRequestRow, type ConfigTemplateRow, type ConfigVersionRow, type EffectiveConfig, type EntitlementDoc, type RoleDef, type SchoolConfig } from '@tangent/contracts';
+import { RoleError, StaleSettings, deleteRole, newId, readSettings, recordSettingsVersion, saveRole, writeSettings, type pg } from '@tangent/db';
 import { ApiError, ZodPipe, notFound } from '@tangent/nest-kit';
 import { z } from 'zod';
 import { Actions } from './actions.js';
@@ -19,6 +19,11 @@ const OWN_KEYS = ['school.name', 'school.shortName', 'school.tagline', 'school.p
 const KNOWN = new Set<string>(PERMISSIONS);
 
 type Q = pg.Pool | pg.PoolClient;
+
+/** A role rule broken (packages/db roles.ts), as the API's error. */
+async function roleCall<T>(fn: () => Promise<T>): Promise<T> {
+  try { return await fn(); } catch (e) { if (e instanceof RoleError) throw e.code === 'not_found' ? notFound('That role') : new ApiError(e.code, e.message, e.fields ? { fields: e.fields } : undefined); throw e; }
+}
 
 /**
  * A school's configuration, as only Tangent changes it: settings, roles and who holds them. Every change becomes a version
@@ -137,24 +142,8 @@ export class ConfigService implements OnModuleInit {
   // Roles: only Tangent makes and changes them.
 
   async saveRole(schoolId: string, by: string, id: string | null, body: RoleDefSave): Promise<RoleDef[]> {
-    const bad = body.permissions.find((p) => !KNOWN.has(p));
-    if (bad) throw new ApiError('validation', tx('There is no permission called {bad}.', { bad }));
     return this.school(schoolId, async (p) => {
-      if (id) {
-        const cur = (await p.query<{ locked: boolean }>('select locked from roles where id = $1', [id])).rows[0];
-        if (!cur) throw notFound('That role');
-        if (cur.locked) throw new ApiError('conflict', 'The principal role always has everything and cannot be changed.');
-        await p.query('update roles set name = $2, description = $3, permissions = $4 where id = $1', [id, body.name, body.description, JSON.stringify(body.permissions)]);
-      } else {
-        const key = `custom_${body.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}`;
-        id = `role_${key}`;
-        if ((await p.query('select 1 from roles where id = $1 or lower(name) = lower($2)', [id, body.name])).rowCount) throw new ApiError('validation', 'There is already a role with that name.', { fields: { name: 'Already used.' } });
-        await p.query('insert into roles (id, key, name, description, permissions, locked) values ($1,$2,$3,$4,$5,false)', [id, key, body.name, body.description, JSON.stringify(body.permissions)]);
-      }
-      // People in the role get the change within about half a minute (their token version moves on).
-      await p.query('update users set token_version = token_version + 1 where id in (select user_id from user_roles where role_id = $1)', [id]);
-      await p.query('insert into audit_log (id, actor_id, actor_name, action, entity, entity_id, detail) values ($1,null,$2,$3,$4,$5,$6)',
-        [newId('aud'), `Tangent · ${by}`, 'role.saved', 'role', id, JSON.stringify({ name: body.name, permissions: body.permissions.length })]);
+      await roleCall(() => saveRole(p, { id: null, name: `Tangent · ${by}` }, id, body));
       await this.db.audit(by, 'role.saved', 'school', schoolId, { role: body.name });
       return this.roles(p);
     });
@@ -162,12 +151,8 @@ export class ConfigService implements OnModuleInit {
 
   async deleteRole(schoolId: string, by: string, id: string): Promise<RoleDef[]> {
     return this.school(schoolId, async (p) => {
-      const r = (await this.roles(p)).find((x) => x.id === id);
-      if (!r) throw notFound('That role');
-      if (r.locked) throw new ApiError('conflict', 'The principal role cannot be deleted.');
-      if (r.people) throw new ApiError('conflict', tx('{people} {p1} this role. Move them to another role first.', { people: r.people, p1: r.people === 1 ? 'person has' : 'people have' }));
-      await p.query('delete from roles where id = $1', [id]);
-      await this.db.audit(by, 'role.removed', 'school', schoolId, { role: r.name });
+      await roleCall(() => deleteRole(p, { id: null, name: `Tangent · ${by}` }, id));
+      await this.db.audit(by, 'role.removed', 'school', schoolId, { roleId: id });
       return this.roles(p);
     });
   }

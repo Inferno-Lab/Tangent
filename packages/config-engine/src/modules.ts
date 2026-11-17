@@ -140,7 +140,7 @@ export const MODULES: ModuleManifest[] = localized([
       P('move', 'Moving in', 'moving', 'G U', '/moving-in', 'School', ['setup.write'], { untilLive: true }),
     ],
     app: [A('dock', 'home', 'Home', EVERYONE)],
-    settings: ['classes.schoolEdits', 'calendar.weeklyOff', 'calendar.weekStarts', 'calendar.schoolEdits', 'dashboard.rollClasses', 'workflows.steps'],
+    settings: ['classes.schoolEdits', 'calendar.weeklyOff', 'calendar.weekStarts', 'calendar.schoolEdits', 'dashboard.rollClasses', 'workflows.steps', 'roles.schoolEdits'],
     permissions: ['approvals.read', 'approvals.decide', 'settings.read', 'settings.manage', 'privacy.manage', 'audit.read', 'reports.read', 'setup.write', 'year.manage'],
     messages: ['privacy.answered', 'approval.waiting'],
     imports: ['years', 'terms', 'holidays', 'subjects', 'periods', 'classes'],

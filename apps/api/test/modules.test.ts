@@ -113,10 +113,9 @@ describe('staff and roles', () => {
     const off = await send('PATCH', `/v1/staff/${pooja.id}`, { status: 'inactive', designation: 'Maths teacher' });
     expect(off.json).toMatchObject({ status: 'inactive', designation: 'Maths teacher' });
   });
-  it('shows the roles Tangent made, and lets the school put staff in them only while the console allows it', async () => {
+  it('shows the school’s roles, and lets it put staff in them only while the console allows it', async () => {
     const roles = (await get('/v1/roles')).json;
     expect(roles.find((r: any) => r.key === 'principal')).toMatchObject({ locked: true });
-    expect((await send('POST', '/v1/roles', { name: 'Exam cell', permissions: [] })).status).toBe(404);
     const pooja = (await get('/v1/staff?query=Pooja')).json[0];
     expect((await send('PATCH', '/v1/staff/' + pooja.id, { roleId: 'role_office' })).status).toBe(200);
     await h.setSettings({ 'staff.schoolAssignsRoles': false });

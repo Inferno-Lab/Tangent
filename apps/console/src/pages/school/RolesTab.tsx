@@ -8,7 +8,7 @@ import { useApp } from '../../app/context';
 
 type Say = (text: string, tone?: 'ok' | 'bad') => void;
 
-/** Roles at one school: what each can open and do, made and changed only here; and who holds which role. */
+/** Roles at one school: what each can open and do (the school can change them too, unless roles.schoolEdits is off); and who holds which role. */
 export function RolesTab({ schoolId, say }: { schoolId: string; say: Say }) {
   const app = useApp();
   const qc = useQueryClient();

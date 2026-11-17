@@ -4,7 +4,7 @@ import {
   DataRequestCreate, DataRequestDecision, EnquiryCreate, EnquiryEnrol, EnquiryPatch, EventSave, ExamCreate, ExamMarksPut, HomeworkCreate, HomeworkMarks, InvoiceListQuery, StaffCreate, StaffPatch,
   ThreadCreate, ThreadPatch, ThreadReply, ReportQuery, StudentImport, schoolToday,
   type DataRequestRow, type EnquiryRow, type EventReply, type EventRow, type ExamMarksView, type ImportResult, type ExamResults, type ExamRow, type HomeworkDetail, type HomeworkRow, type InvoiceListRow, type InvoiceListSummary, type Paged,
-  type ReceiptRow, type ReportData, type ReportInfo, type RoleRow, type StaffRow, type StudentDetail, type ThreadDetail, type ThreadRow,
+  type ReceiptRow, type ReportData, type ReportInfo, RoleDefSave, type RoleRow, type StaffRow, type StudentDetail, type ThreadDetail, type ThreadRow,
 } from '@tangent/contracts';
 import { z } from 'zod';
 import { ZodPipe } from '@tangent/nest-kit';
@@ -171,7 +171,21 @@ export class PeopleController {
     return this.people.roles(t);
   }
 
-  // Roles are made and changed only from the console (Tangent); the school sees them and, if allowed, puts its staff into them.
+  // The school makes and changes its own roles (D4) unless Tangent holds them (roles.schoolEdits), within its plan's permissions.
+  @Post('roles') @Require('settings.manage')
+  createRole(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(RoleDefSave)) b: RoleDefSave): Promise<RoleRow[]> {
+    return this.people.saveRole(t, u, null, b);
+  }
+
+  @Put('roles/:id') @Require('settings.manage')
+  saveRole(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(RoleDefSave)) b: RoleDefSave): Promise<RoleRow[]> {
+    return this.people.saveRole(t, u, id, b);
+  }
+
+  @Delete('roles/:id') @Require('settings.manage')
+  deleteRole(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string): Promise<RoleRow[]> {
+    return this.people.deleteRole(t, u, id);
+  }
 }
 
 @Controller('v1')

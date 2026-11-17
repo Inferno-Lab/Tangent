@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { commitImport, exportRows, newId, previewImport, toCsv } from '@tangent/db';
+import { RoleError, commitImport, deleteRole, exportRows, newId, previewImport, saveRole, toCsv } from '@tangent/db';
 import {
-  PERMISSIONS, initials, type ImportResult,
+  PERMISSIONS, initials, permissionAvailable, type ImportResult, type RoleDefSave,
   type EnquiryCreate, type EnquiryEnrol, type EnquiryPatch, type EnquiryRow, type EnquiryStage, type RoleRow, type StaffCreate, type StaffPatch, type StaffRow, type StudentDetail, tx } from '@tangent/contracts';
 import { hashPassword, randomToken } from '@tangent/security';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
@@ -21,6 +21,11 @@ interface StaffSql {
 }
 
 /** Staff, the admissions pipeline and the roles that decide what each person may do. */
+/** A role rule broken (packages/db roles.ts), as the API's error. */
+async function roleCall<T>(fn: () => Promise<T>): Promise<T> {
+  try { return await fn(); } catch (e) { if (e instanceof RoleError) throw e.code === 'not_found' ? notFound('That role') : new ApiError(e.code, e.message, e.fields ? { fields: e.fields } : undefined); throw e; }
+}
+
 @Injectable()
 export class PeopleService {
   constructor(
@@ -241,6 +246,24 @@ export class PeopleService {
   }
 
   // Roles
+
+  private async mayEditRoles(t: TenantCtx): Promise<void> {
+    if ((await this.settings.value<boolean>(t, 'roles.schoolEdits', true)) === false) throw forbidden('Tangent holds the school’s roles. Ask Tangent to change them.');
+  }
+
+  /** A role the school makes or changes: only permissions its plan includes (a module or feature it has). */
+  async saveRole(t: TenantCtx, user: User, id: string | null, body: RoleDefSave): Promise<RoleRow[]> {
+    await this.mayEditRoles(t);
+    const cfg = await this.settings.effective(t);
+    await roleCall(() => saveRole(t.pool, { id: user.id, name: user.name }, id, body, (p) => permissionAvailable(p, cfg)));
+    return this.roles(t);
+  }
+
+  async deleteRole(t: TenantCtx, user: User, id: string): Promise<RoleRow[]> {
+    await this.mayEditRoles(t);
+    await roleCall(() => deleteRole(t.pool, { id: user.id, name: user.name }, id));
+    return this.roles(t);
+  }
 
   async roles(t: TenantCtx): Promise<RoleRow[]> {
     const { rows } = await t.pool.query<{ id: string; key: string; name: string; description: string; permissions: string[]; locked: boolean; people: string }>(

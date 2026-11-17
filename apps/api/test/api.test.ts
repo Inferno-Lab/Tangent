@@ -374,14 +374,12 @@ describe('timetable', () => {
   });});
 
 describe('settings', () => {
-  it('shows the school its setup, lets it change its own settings and never Tangent’s or its roles', async () => {
+  it('shows the school its setup, lets it change its own settings and never Tangent’s', async () => {
     const before = (await h.call('GET', '/v1/settings', { token })).json;
     expect(before.usage.students).toBeGreaterThan(0);
     expect(before.usage.studentLimit).toBeGreaterThanOrEqual(before.usage.students);
     const version = (await h.call('GET', '/v1/settings/edit', { token })).json.version;
     expect((await h.call('PATCH', '/v1/settings', { token, body: { expectedVersion: version, changes: { 'brand.color': '#123456' } } })).status).toBe(400);
-    expect((await h.call('POST', '/v1/roles', { token, body: { name: 'Mine', permissions: [] } })).status).toBe(404);
-    expect((await h.call('PUT', '/v1/roles/role_teacher', { token, body: { name: 'Mine', permissions: [] } })).status).toBe(404);
     expect((await h.call('GET', '/v1/me', { token })).json.permissions).not.toContain('settings.write');
   });
   it('follows what the console sets: colour, and the modules of the plan (the only place modules are chosen)', async () => {

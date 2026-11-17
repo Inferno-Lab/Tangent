@@ -1,8 +1,9 @@
-import { useState, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState, type ReactNode } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { HttpError } from '@tangent/api-client';
 import { MODULES } from '@tangent/config-engine';
-import { fmtNumber, PERMISSION_CATALOG, SETTINGS_META, SchoolSettingsSchema, type EffectiveConfig, type SettingMeta, type SettingsResponse } from '@tangent/contracts';
-import { EmptyCard, Segmented, useToast, t } from '@tangent/web-ui';
+import { fmtNumber, PERMISSION_CATALOG, SETTINGS_META, SchoolSettingsSchema, permissionAvailable, type EffectiveConfig, type RoleDefSave, type RoleRow, type SettingMeta, type SettingsResponse } from '@tangent/contracts';
+import { Checkbox, EmptyCard, ErrorLine, Field, Icon, Segmented, useShake, useToast, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page } from '../../app/Page';
 import { SettingsEditor } from '../../app/SettingsView';
@@ -78,7 +79,7 @@ export function ProfilePage() {
           {tab === 'security' && <SettingsEditor title={t('admin.profile_page.sign_in_and_security')} keys={editable('Sign-in and security')} say={say} />}
           {tab === 'plan' && <Plan doc={d} cfg={c} />}
           {tab === 'app' && <SettingsEditor title={t('admin.profile_page.the_app')} keys={editable('The app')} say={say} />}
-          {tab === 'roles' && <Roles cfg={c} />}
+          {tab === 'roles' && <Roles cfg={c} say={say} />}
           {tab === 'messages' && <><Channels /><SettingsEditor title={t('admin.profile_page.messages')} keys={editable('Messaging')} say={say} /></>}
           {tab === 'data' && <YourData say={say} />}
           {tab === 'privacy' && <SettingsEditor title={t('admin.profile_page.privacy_and_consent')} keys={editable('Privacy')} say={say} />}
@@ -117,30 +118,79 @@ function Plan({ doc, cfg }: { doc: SettingsResponse; cfg: EffectiveConfig }) {
   </>;
 }
 
-function Roles({ cfg }: { cfg: EffectiveConfig }) {
+/** The school's roles: it makes and changes them (unless Tangent holds them), with only the permissions its plan includes. */
+function Roles({ cfg, say }: { cfg: EffectiveConfig; say: (m: string, tone?: 'bad') => void }) {
   const app = useApp();
+  const qc = useQueryClient();
   const roles = useQuery({ queryKey: ['roles'], queryFn: app.api.roles.list });
   const [sel, setSel] = useState('');
+  const [name, setName] = useState('');
+  const [desc, setDesc] = useState('');
+  const [perms, setPerms] = useState<Set<string>>(new Set());
+  const [err, setErr] = useState<Record<string, string>>({});
+  const [sure, setSure] = useState(false);
+  const shake = useShake();
+  const list = roles.data ?? [];
+  const cur = sel === 'new' ? undefined : list.find((r) => r.id === sel) ?? list[0];
+  useEffect(() => { if (cur) { setName(cur.name); setDesc(cur.description); setPerms(new Set(cur.permissions)); setErr({}); setSure(false); } }, [cur?.id, roles.dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Only permissions of modules the school has; a role keeps the others (unseen) so they come back with the module.
+  const offered = PERMISSION_CATALOG.filter((p) => permissionAvailable(p.key, cfg));
+  const areas = [...new Set(offered.map((p) => p.area))];
+  const held = cfg.settings['roles.schoolEdits'] === false;
+  const can = app.user.permissions.includes('settings.manage') && !held;
+  const after = (m: string, r: RoleRow[], pick: string) => { qc.setQueryData(['roles'], r); setSel(pick); say(m); };
+  const fail = (e: unknown) => { setErr(e instanceof HttpError && Object.keys(e.fields).length ? e.fields : { _: (e as Error).message }); shake.hit(); };
+  const body = (): RoleDefSave => ({ name: name.trim(), description: desc.trim(), permissions: [...perms] as RoleDefSave['permissions'] });
+  const save = useMutation({
+    mutationFn: () => (cur ? app.api.roles.save(cur.id, body()) : app.api.roles.create(body())),
+    onSuccess: (r) => after(cur ? t('admin.profile_page.role_saved', { name: name.trim() }) : t('admin.profile_page.role_made', { name: name.trim() }), r, r.find((x) => x.name === name.trim())?.id ?? ''),
+    onError: fail,
+  });
+  const remove = useMutation({ mutationFn: () => app.api.roles.remove(cur!.id), onSuccess: (r) => after(t('admin.profile_page.role_deleted'), r, ''), onError: fail });
+  const startNew = () => { setSel('new'); setName(''); setDesc(''); setPerms(new Set()); setErr({}); setSure(false); };
+
   if (roles.isLoading) return <div className="skc" style={{ height: 240, borderRadius: 16 }} />;
   if (roles.isError) return <EmptyCard error title={t('admin.profile_page.roles')} chip={{ text: t('admin.profile_page.couldn_t_load'), tone: 'c' }} icon="lock" heading={t('admin.profile_page.you_can_t_see_roles')} body={(roles.error as Error).message} actions={<button className="btn pri" onClick={() => void roles.refetch()}>{t('admin.profile_page.try_again')}</button>} />;
-  const list = roles.data ?? [];
-  const cur = list.find((r) => r.id === sel) ?? list[0];
-  if (!cur) return <EmptyCard title={t('admin.profile_page.roles')} chip={{ text: '0', tone: 'v' }} icon="lock" heading={t('admin.profile_page.no_roles_yet')} body={t('admin.profile_page.tangent_makes_the_school_s')} />;
-  const has = { modules: cfg.modules, features: cfg.features };
-  const allowed = PERMISSION_CATALOG.filter((p) => cur.permissions.includes(p.key) && (has.modules.length === 0 || true));
-  const areas = [...new Set(allowed.map((p) => p.area))];
+  if (!list.length && sel !== 'new') return <EmptyCard title={t('admin.profile_page.roles')} chip={{ text: '0', tone: 'v' }} icon="lock" heading={t('admin.profile_page.no_roles_yet')} body={can ? t('admin.profile_page.make_a_role_for_each') : t('admin.profile_page.tangent_makes_the_school_s')} actions={can ? <button className="btn pri" onClick={startNew}>{t('admin.profile_page.new_role')}</button> : undefined} />;
+  const readOnly = !can || !!cur?.locked;
   return <>
-    <Segmented label={t('admin.profile_page.roles')} value={cur.id} onChange={setSel} options={list.map((r) => ({ value: r.id, label: r.name, count: r.people }))} style={{ alignSelf: 'flex-start', maxWidth: '100%', overflowX: 'auto' }} />
-    <Card title={cur.name} chip={<span className="chip">{t('admin.profile_page.n_people', { n: cur.people })}</span>}>
-      {cur.description && <p className="help" style={{ margin: '0 0 8px' }}>{cur.description}</p>}
-      {areas.map((a) => (
-        <div key={a} className="kv" style={{ alignItems: 'flex-start', gap: 16 }}>
-          <span>{a}</span>
-          <b style={{ textAlign: 'end' }}>{allowed.filter((p) => p.area === a).map((p) => p.label).join(' · ')}</b>
+    <div className="tgrow">
+      <Segmented label={t('admin.profile_page.roles')} value={cur?.id ?? 'new'} onChange={setSel} options={[...list.map((r) => ({ value: r.id, label: r.name, count: r.people })), ...(sel === 'new' ? [{ value: 'new', label: name.trim() || t('admin.profile_page.new_role') }] : [])]} style={{ maxWidth: '100%', overflowX: 'auto' }} />
+      {can && sel !== 'new' && <button className="btn" onClick={startNew}><Icon name="plus" />{t('admin.profile_page.new_role')}</button>}
+    </div>
+    <div className={shake.cls}>
+      <Card title={cur?.name ?? t('admin.profile_page.new_role')} chip={cur ? <span className="chip">{t('admin.profile_page.n_people', { n: cur.people })}</span> : undefined}>
+        {!can && <p className="help" style={{ marginTop: 0 }}>{held ? t('admin.profile_page.tangent_holds_your_roles') : t('admin.profile_page.only_people_who_manage_settings')}</p>}
+        {cur?.locked && <p className="help" style={{ marginTop: 0 }}>{t('admin.profile_page.the_principal_role_has_everything')}</p>}
+        <div className="two">
+          <Field label={t('admin.profile_page.role_name')} value={name} onChange={(v) => { setName(v); setErr({}); }} error={err.name} disabled={readOnly} maxLength={40} />
+          <Field label={t('admin.profile_page.what_it_is_for')} value={desc} onChange={setDesc} disabled={readOnly} maxLength={160} />
         </div>
-      ))}
-      {!areas.length && <p className="help">{t('admin.profile_page.this_role_can_sign_in')}</p>}
-    </Card>
+        {areas.map((a) => (
+          <fieldset key={a} style={{ border: 0, padding: 0, margin: '12px 0 0' }}>
+            <legend className="lbl" style={{ marginBottom: 6 }}>{a}</legend>
+            {offered.filter((p) => p.area === a).map((p) => (
+              <label key={p.key} className="hwc" style={{ display: 'flex', whiteSpace: 'normal', alignItems: 'flex-start', padding: '4px 0' }}>
+                <Checkbox checked={perms.has(p.key)} disabled={readOnly} onChange={(c) => { const x = new Set(perms); if (c) x.add(p.key); else x.delete(p.key); setPerms(x); }} />
+                <span>{p.label}{p.sensitive && <span className="chip a" style={{ marginInlineStart: 6 }}>{t('admin.profile_page.careful')}</span>}</span>
+              </label>
+            ))}
+          </fieldset>
+        ))}
+        {err._ && <ErrorLine>{err._}</ErrorLine>}
+        {!readOnly && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+            {cur && !cur.people ? (sure
+              ? <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><button className="btn sm dng" disabled={remove.isPending} onClick={() => remove.mutate()}>{t('admin.profile_page.yes_delete')}</button><button className="btn sm" onClick={() => setSure(false)}>{t('admin.profile_page.keep')}</button></span>
+              : <button className="btn dng" onClick={() => setSure(true)}>{t('admin.profile_page.delete_role')}</button>) : <span className="help">{cur?.people ? t('admin.profile_page.move_people_first', { people: cur.people }) : ''}</span>}
+            <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              {sel === 'new' && <button className="btn" onClick={() => setSel('')}>{t('admin.profile_page.cancel')}</button>}
+              <button className="btn pri" disabled={save.isPending} onClick={() => { if (name.trim().length < 3) { setErr({ name: t('admin.profile_page.name_the_role') }); shake.hit(); } else save.mutate(); }}>{save.isPending ? t('admin.profile_page.saving') : t('admin.profile_page.save_role')}</button>
+            </span>
+          </div>
+        )}
+      </Card>
+    </div>
   </>;
 }
 

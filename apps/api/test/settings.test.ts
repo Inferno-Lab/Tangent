@@ -238,3 +238,31 @@ describe('the school’s own printed documents', () => {
     await change({ 'documents.templates': {} });
   });
 });
+
+describe('roles the school makes', () => {
+  it('makes, changes and deletes a role with only what its plan includes, and leaves the principal’s alone', async () => {
+    const send = (method: string, path: string, body?: unknown, token = principal) => h.call(method, path, { token, body });
+    const made = await send('POST', '/v1/roles', { name: 'Exam cell', description: 'Runs the exams', permissions: ['exams.read', 'exams.write'] });
+    expect(made.status).toBe(201);
+    const cell = made.json.find((r: any) => r.name === 'Exam cell');
+    expect(cell).toMatchObject({ locked: false, people: 0, permissions: ['exams.read', 'exams.write'] });
+    expect((await send('POST', '/v1/roles', { name: 'exam CELL', permissions: [] })).status).toBe(400);
+    expect((await send('PUT', `/v1/roles/${cell.id}`, { name: 'Exam cell', permissions: ['no.such'] })).status).toBe(400);
+    expect((await send('PUT', '/v1/roles/role_principal', { name: 'Head', permissions: [] })).status).toBe(409);
+    expect((await send('DELETE', '/v1/roles/role_teacher')).status).toBe(409);
+    expect((await send('PUT', `/v1/roles/${cell.id}`, { name: 'Exam cell', permissions: ['exams.read'] }, teacher)).status).toBe(403);
+    // A permission of a module the school does not have is refused.
+    const was = (await h.registry.query("select entitlement->'modules' m from schools where slug = $1", [h.slug])).rows[0].m;
+    await h.entitle({ modules: (was as string[]).filter((m) => m !== 'library') });
+    try {
+      expect((await send('PUT', `/v1/roles/${cell.id}`, { name: 'Exam cell', permissions: ['library.read'] })).status).toBe(400);
+    } finally { await h.entitle({ modules: was }); }
+    // Tangent can hold the roles for a school.
+    await h.setSettings({ 'roles.schoolEdits': false });
+    expect((await send('DELETE', `/v1/roles/${cell.id}`)).status).toBe(403);
+    await h.setSettings({ 'roles.schoolEdits': true });
+    const left = await send('DELETE', `/v1/roles/${cell.id}`);
+    expect(left.status).toBe(200);
+    expect(left.json.some((r: any) => r.id === cell.id)).toBe(false);
+  }, 30_000);
+});

@@ -37,7 +37,7 @@ export interface SettingMeta {
  * lock a whole area of the school's data. Tangent can still change any setting for support, and lock one for one school.
  */
 export const TANGENT_SETTINGS: readonly SettingKey[] = [
-  'brand.color', 'school.country', 'school.currency', 'classes.schoolEdits', 'calendar.schoolEdits', 'timetable.schoolEdits', 'feeStructures.schoolEdits', 'staff.schoolAssignsRoles',
+  'brand.color', 'school.country', 'school.currency', 'classes.schoolEdits', 'calendar.schoolEdits', 'timetable.schoolEdits', 'feeStructures.schoolEdits', 'staff.schoolAssignsRoles', 'roles.schoolEdits',
 ];
 export const settingOwner = (key: string): 'school' | 'tangent' => ((TANGENT_SETTINGS as readonly string[]).includes(key) ? 'tangent' : 'school');
 
@@ -97,6 +97,7 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = localized({
 
   // School (the academic year)
   'workflows.steps': { group: 'school', label: 'Steps for each kind of request', kind: 'workflows', help: 'Who decides each request, in order. A kind with one step is decided by anyone allowed to; add a step for a second person, a step only above an amount, and what happens when a step waits too long.' },
+  'roles.schoolEdits': { group: 'school', label: 'The school makes and changes its own roles', kind: 'bool', help: 'Off: only Tangent changes the school’s roles. Either way, only permissions the plan includes can be given.' },
   'classes.schoolEdits': { group: 'school', label: 'The school may edit its classes, subjects and periods', kind: 'bool', help: 'Off: only Tangent changes them (Data, or the school asks).' },
   'calendar.weeklyOff': { group: 'school', label: 'Closed every week on', kind: 'multi', options: [['sun', 'Sunday'], ['mon', 'Monday'], ['tue', 'Tuesday'], ['wed', 'Wednesday'], ['thu', 'Thursday'], ['fri', 'Friday'], ['sat', 'Saturday']], help: 'Attendance, the dashboard, fee charts and the app’s calendars skip these days. Holidays are added under Academic year.' },
   'calendar.weekStarts': { group: 'school', label: 'Weeks start on', kind: 'enum', options: [['mon', 'Monday'], ['tue', 'Tuesday'], ['wed', 'Wednesday'], ['thu', 'Thursday'], ['fri', 'Friday'], ['sat', 'Saturday'], ['sun', 'Sunday']], help: 'The first column of every week grid in the admin and the app.' },
@@ -118,7 +119,7 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = localized({
   'people.houses': { group: 'people', label: 'Houses', kind: 'houses', max: 12, help: 'The school’s houses and their colours, if it has them: on student profiles, the roll-call grid and the app. Students are put in a house by import or on their profile.' },
   'admissions.sources': { group: 'people', label: 'Where enquiries come from', kind: 'strings', max: 16, help: 'The choices on a new enquiry, and how Admissions counts them.' },
   'admissions.stages': { group: 'people', label: 'Admission stages', kind: 'multi', options: [['applied', 'Applied (form received)'], ['test', 'Entrance test'], ['offer', 'Offer (the family is told)']], help: 'The steps between an enquiry and enrolment on the Admissions board. Enquiry and Enrolled are always there.' },
-  'staff.schoolAssignsRoles': { group: 'people', label: 'The school may put its staff into roles', kind: 'bool', help: 'Roles themselves are always made here. Off: only Tangent assigns roles to people.' },
+  'staff.schoolAssignsRoles': { group: 'people', label: 'The school may put its staff into roles', kind: 'bool', help: 'Off: only Tangent puts people into roles.' },
 
   // Attendance
   'attendance.notifyParents': { group: 'attendance', label: 'Tell families when a child is absent or late', kind: 'bool' },
