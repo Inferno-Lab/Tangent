@@ -67,7 +67,7 @@ function Overview({ tabs }: { tabs: React.ReactNode }) { const app = useApp();
           <div className="g" style={{ gridTemplateColumns: 'minmax(0,1.5fr) repeat(2,minmax(0,1fr))' }}>
             <section className="card deep">
               <span className="lbl">{t('admin.fees_page.collected_in')}{' '}{s.monthLabel}</span>
-              <div className="fig" style={{ fontSize: 64 }}><Roll digits={rollDigits(money(s.collected))} /></div>
+              <div className="fig" style={{ fontSize: 'clamp(34px, 11vw, 64px)' }}><Roll digits={rollDigits(money(s.collected))} /></div>
               <div className="bar" style={{ height: 10, background: 'var(--deep3)' }}><i style={{ width: `${s.pct}%`, background: 'var(--bright)' }} /></div>
               <span className="note">{s.pct}{t('admin.fees_page.of')}{' '}{money(s.due)} · {money(Math.max(0, s.due - s.collected))} {t('admin.fees_page.still_to_come')}</span>
             </section>
