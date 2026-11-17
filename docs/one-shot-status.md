@@ -37,9 +37,10 @@ package's tests, the rule tests). The full gate (section 9) has not run yet.
 ## Phase 2: Modules to the standard (section 4)
 
 Moved onto the foundations where the foundations touch them (students, staff, attendance marks, fees, tax, receipts,
-report cards, approvals, gallery, library fines, transport fees, notices dates, events calendar, privacy). Not done, by
+report cards, approvals, gallery, library fines, transport fees, notices dates, events calendar, privacy, roles: the
+school makes and changes its own roles within its plan unless Tangent holds them with `roles.schoolEdits`). Not done, by
 module: dashboard roll classes as a personal preference; government reports tab; guardians' multiple households and
-contact preferences per channel; roles created by the school; admissions stages from the workflow engine and online
+contact preferences per channel; admissions stages from the workflow engine and online
 application; attendance sessions (AM/PM); timetable day cycles, A/B weeks, rooms; homework settings tab; exam types,
 papers, remarks bank; fee structures by category with instalments, late-fee rules, reminder schedules; notice audiences
 beyond classes and machine translation; chat rules per role pair; RSVP rules; library member and item types and scanning;
