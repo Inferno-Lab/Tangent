@@ -14,7 +14,7 @@ const regionName = (c: string): string => {
 export type SettingKind =
   | 'text' | 'textarea' | 'number' | 'bool' | 'enum' | 'color' | 'time' | 'date' | 'language'
   | 'multi' | 'appRoles' | 'appLayout' | 'notifyRules' | 'templates' | 'classes' | 'logo'
-  | 'houses' | 'categories' | 'strings' | 'gradingScale' | 'paymentMethods' | 'attendanceMarks' | 'vocabulary' | 'list' | 'customFields' | 'workflows' | 'taxSplit' | 'addressFormat' | 'gradingSchemes' | 'documentTemplates' | 'admissionStages' | 'timetableCycle' | 'weights';
+  | 'houses' | 'categories' | 'strings' | 'gradingScale' | 'paymentMethods' | 'attendanceMarks' | 'vocabulary' | 'list' | 'customFields' | 'workflows' | 'taxSplit' | 'addressFormat' | 'gradingSchemes' | 'documentTemplates' | 'admissionStages' | 'timetableCycle' | 'weights' | 'lateRule' | 'reminderDays';
 
 export interface SettingMeta {
   /** One of the school-wide groups, or the key of the module that owns the setting (config-engine's MODULES lists it there too). */
@@ -162,6 +162,9 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = localized({
   'fees.receiptNote': { group: 'fees', label: 'Printed on receipts', kind: 'textarea', help: 'Under the school’s name and address on every receipt: the trust, its registration or tax number.' },
   'fees.paymentMethods': { group: 'fees', label: 'How the office records payments', kind: 'paymentMethods', max: 16, help: 'Each with the name the office uses and what kind of money it is.' },
   'fees.lateFeePct': { group: 'fees', label: 'Late fee (%)', kind: 'number', min: 0, max: 25, help: 'Charged once a month on each overdue invoice while the school has Late fines. 0 charges nothing.' },
+  'fees.lateRule': { group: 'fees', label: 'Late fee rule', kind: 'lateRule', help: 'A percentage of what is still owed, or a fixed amount, charged once or every day, week or month an invoice stays unpaid after the grace days, up to a cap. Without a rule, the late fee above is charged once a month.' },
+  'fees.reminderDays': { group: 'fees', label: 'Reminder days', kind: 'reminderDays', help: 'Days from the due date when families are reminded: minus before it, plus after it (a reminder after the due date says it is overdue). Without any, families are reminded the days before set above.' },
+  'fees.categories': { group: 'fees', label: 'Fee categories', kind: 'list', max: 20, help: 'Groups of students who pay differently (staff children, scholarships, boarders). A student is put in one on their record; a fee structure for a category takes the place of the everyone fee of that head for them.' },
   'fees.remindDaysBefore': { group: 'fees', label: 'Remind families this many days before a due date', kind: 'number', min: 0, max: 30, help: 'Sent each morning while the school has Fee reminders, once per invoice per day.' },
   'tax.name': { group: 'fees', label: 'What the tax is called', kind: 'text', help: 'VAT, GST, sales tax: printed on tax receipts.' }, // india-pack: examples from several countries
   'tax.number': { group: 'fees', label: 'The school’s tax registration', kind: 'text', help: 'Printed on receipts with the tax lines while the school has tax receipts. Receipts carry no tax until it is filled in.' },

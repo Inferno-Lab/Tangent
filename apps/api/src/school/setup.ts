@@ -71,11 +71,16 @@ export class SetupService {
 
   /** Bills every active student in the fee's grade (or every grade) once: a student who already has a fee with this name is left alone. */
   async apply(t: TenantCtx, id: string, user: { id: string; name: string }): Promise<{ created: number }> {
-    const fee = (await t.pool.query<{ head: string; title: string; amount: number; due_on: string; grade: number | null }>('select head, title, amount, due_on::text, grade from fee_structures where id = $1', [id])).rows[0];
+    const fee = (await t.pool.query<{ head: string; title: string; amount: number; due_on: string; grade: number | null; category: string | null }>('select head, title, amount, due_on::text, grade, category from fee_structures where id = $1', [id])).rows[0];
     if (!fee) throw notFound('That fee');
+    // A category's own fee goes to that category only; the everyone fee goes to every other student, and to a category's
+    // students only where the category has no fee of its own for that head (for their grade or every grade).
     const { rows } = await t.pool.query<{ id: string }>(
       `select s.id from students s join classes c on c.id = s.class_id where s.status = 'active' and ($1::int is null or c.grade = $1)
-       and not exists (select 1 from fee_invoices i where i.student_id = s.id and lower(i.title) = lower($2))`, [fee.grade, fee.title]);
+       and not exists (select 1 from fee_invoices i where i.student_id = s.id and lower(i.title) = lower($2))
+       and (case when $3::text is not null then s.fee_category = $3
+            else s.fee_category is null or not exists (select 1 from fee_structures o where o.category = s.fee_category and o.head = $4 and (o.grade is null or o.grade = c.grade)) end)`,
+      [fee.grade, fee.title, fee.category, fee.head]);
     if (rows.length) {
       await t.pool.query('insert into fee_invoices (id, student_id, head, title, amount, due_on) select unnest($1::text[]), unnest($2::text[]), $3, $4, $5, $6',
         [rows.map(() => newId('inv')), rows.map((r) => r.id), fee.head, fee.title, await this.settings.billed(t, fee.head, fee.amount), fee.due_on]);

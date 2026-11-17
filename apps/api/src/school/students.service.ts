@@ -208,8 +208,8 @@ export class StudentsService {
       this.activity(t, id),
       t.pool.query<{ phone: string | null; email: string | null; last_login_at: Date | null }>('select u.phone, u.email, u.last_login_at from students s join users u on u.id = s.user_id where s.id = $1', [id]),
     ]);
-    const extra = (await t.pool.query<{ gender: StudentDetail['gender']; status: string; left_on: string | null; reason: string | null; kind: LeavingKind | null; transfer_to: string | null; custom: StudentDetail['custom']; address_parts: StudentDetail['addressParts']; given_name: string | null; family_name: string | null; name_local: string | null }>(
-      'select gender, status, left_on::text, leaving_reason reason, leaving_kind kind, transfer_to, custom, address_parts, given_name, family_name, name_local from students where id = $1', [id])).rows[0];
+    const extra = (await t.pool.query<{ gender: StudentDetail['gender']; status: string; left_on: string | null; reason: string | null; kind: LeavingKind | null; transfer_to: string | null; custom: StudentDetail['custom']; address_parts: StudentDetail['addressParts']; given_name: string | null; family_name: string | null; name_local: string | null; fee_category: string | null }>(
+      'select gender, status, left_on::text, leaving_reason reason, leaving_kind kind, transfer_to, custom, address_parts, given_name, family_name, name_local, fee_category from students where id = $1', [id])).rows[0];
     const has = await this.has(t);
     const acc = account.rows[0];
     const base = this.mask(this.row(r, ticks.get(id)!), has);
@@ -222,7 +222,7 @@ export class StudentsService {
       },
       chips: { house: r.house }, recentActivity: acts, roll24: has.attendance ? roll24 : roll24.map(() => null),
       gender: extra?.gender ?? null, custom: extra?.custom ?? {}, addressParts: extra?.address_parts ?? {}, guardians: await this.guardians(t, id),
-      givenName: extra?.given_name ?? null, familyName: extra?.family_name ?? null, nameLocal: extra?.name_local ?? null,
+      givenName: extra?.given_name ?? null, familyName: extra?.family_name ?? null, nameLocal: extra?.name_local ?? null, feeCategory: extra?.fee_category ?? null,
       left: extra?.status === 'left' && extra.left_on ? { on: extra.left_on, reason: extra.reason ?? '', kind: extra.kind ?? 'withdrawn', transferTo: extra.transfer_to } : null,
       appAccount: acc ? { phone: acc.phone ? maskPhone(acc.phone) : '', email: acc.email ?? '', lastSignIn: acc.last_login_at?.toISOString() ?? null } : null,
     };
@@ -273,6 +273,12 @@ export class StudentsService {
     const need = await this.settings.value<string[]>(t, 'students.required', []);
     const missing = need.filter((k) => k in body ? !String((body as Record<string, unknown>)[k] ?? '').trim() : false);
     if (missing.length) throw new ApiError('validation', 'Fill in the fields your school keeps for every student.', { fields: Object.fromEntries(missing.map((k) => [k, 'Your school needs this.'])) });
+    // A fee category is one of the school's (fees.categories), kept by its key.
+    if (body.feeCategory) {
+      const key = listKey(await this.settings.value<ListItem[]>(t, 'fees.categories', []), body.feeCategory);
+      if (!key) throw new ApiError('validation', tx('Choose one of the school’s fee categories.'), { fields: { feeCategory: tx('Choose from the list.') } });
+      body.feeCategory = key;
+    }
     // Gender and blood group come from the school's lists (§3.6.5): stored as the item's key, whatever was typed.
     for (const [field, list] of [['gender', 'lists.genders'], ['bloodGroup', 'lists.bloodGroups']] as const) {
       const typed = body[field];
@@ -288,8 +294,9 @@ export class StudentsService {
     if (body.givenName && body.familyName) body.name = composeName(body.givenName, body.familyName, await this.settings.value(t, 'people.nameOrder', 'given-family'));
     const name = body.name ?? '';
     const need = await this.settings.value<string[]>(t, 'students.required', []);
-    const checked = { ...Object.fromEntries(need.map((k) => [k, (body as Record<string, unknown>)[k] ?? ''])), gender: body.gender, bloodGroup: body.bloodGroup, addressParts: body.addressParts } as StudentPatch;
+    const checked = { ...Object.fromEntries(need.map((k) => [k, (body as Record<string, unknown>)[k] ?? ''])), gender: body.gender, bloodGroup: body.bloodGroup, addressParts: body.addressParts, feeCategory: body.feeCategory } as StudentPatch;
     await this.required(t, checked);
+    body.feeCategory = checked.feeCategory;
     body.gender = checked.gender;
     body.bloodGroup = checked.bloodGroup;
     if (checked.addressParts) body.address = checked.address;
@@ -314,10 +321,10 @@ export class StudentsService {
     try {
       await client.query('begin');
       const admissionNo = body.admissionNo || (await nextNumber(client, { pattern, start, day: schoolToday(), ay, table: 'students', column: 'admission_no' }));
-      await client.query(`insert into students (id, admission_no, name, class_id, roll_no, dob, blood_group, address, gender, house, admitted_on, custom, address_parts, given_name, family_name, name_local)
-        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+      await client.query(`insert into students (id, admission_no, name, class_id, roll_no, dob, blood_group, address, gender, house, admitted_on, custom, address_parts, given_name, family_name, name_local, fee_category)
+        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
         [id, admissionNo, name, body.classId, roll, body.dob, body.bloodGroup ?? null, body.address || null, body.gender ?? null, body.house || null, schoolToday(), JSON.stringify(custom), JSON.stringify(body.addressParts ?? {}),
-          body.givenName || null, body.familyName || null, body.nameLocal || null]);
+          body.givenName || null, body.familyName || null, body.nameLocal || null, body.feeCategory || null]);
       // One family, one guardian: a brother or sister joins the guardian who already has that phone number.
       let g = (await client.query<{ id: string; user_id: string | null }>(`select id, user_id from guardians where ${byPhone} limit 1`, [digits])).rows[0];
       if (!g) {
@@ -365,7 +372,7 @@ export class StudentsService {
     if (b.addressParts) await t.pool.query('update students set address_parts = $2 where id = $1', [id, JSON.stringify(b.addressParts)]);
     const cols: Record<Exclude<keyof StudentPatch, 'custom' | 'addressParts'>, string> = {
       name: 'name', classId: 'class_id', rollNo: 'roll_no', dob: 'dob', gender: 'gender', house: 'house', admissionNo: 'admission_no', bloodGroup: 'blood_group', address: 'address',
-      givenName: 'given_name', familyName: 'family_name', nameLocal: 'name_local',
+      givenName: 'given_name', familyName: 'family_name', nameLocal: 'name_local', feeCategory: 'fee_category',
     };
     const set = (Object.keys(cols) as (keyof typeof cols)[]).filter((k) => b[k] !== undefined);
     if (set.length) {

@@ -39,7 +39,8 @@ describe('Greenfield demo seed', () => {
     expect(who[0]!.name).toBe('Kavita Iyer');
   });
   it('leaves four classes unmarked on the latest school day', async () => {
-    const last = latestSchoolDay(schoolToday());
+    // The seed counts days on the demo school's own clock.
+    const last = latestSchoolDay(schoolToday(new Date(), 'Asia/Kolkata')); // india-pack: the demo school's zone
     const unmarked = await q<{ name: string }>(
       'select c.name from classes c where not exists (select 1 from attendance_sessions a where a.class_id=c.id and a.date=$1) order by 1', [last]);
     expect(unmarked.map((u) => u.name)).toEqual(['10 A', '6 A', '7 C', '9 B']);

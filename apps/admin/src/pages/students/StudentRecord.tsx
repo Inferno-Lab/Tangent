@@ -4,7 +4,7 @@ import { AddressFields, Checkbox, CustomFieldInputs, DateField, Dialog, ErrorLin
 import { useApp } from '../../app/context';
 import { AreaField, problem, useSetting } from '../../app/kit';
 
-export type Rec = { gender: string; house: string; admissionNo: string; bloodGroup: string; address: string };
+export type Rec = { gender: string; house: string; admissionNo: string; bloodGroup: string; address: string; feeCategory: string };
 export type Names = { name: string; givenName: string; familyName: string; nameLocal: string };
 
 /**
@@ -36,7 +36,7 @@ export function NameFields({ f, set, err }: { f: Names; set: (k: keyof Names) =>
     </>
   );
 }
-export const emptyRec: Rec = { gender: '', house: '', admissionNo: '', bloodGroup: '', address: '' };
+export const emptyRec: Rec = { gender: '', house: '', admissionNo: '', bloodGroup: '', address: '', feeCategory: '' };
 /** A school list as a form's choices, keeping a value that was retired since (or typed before the list existed). */
 export const choices = (list: ListItem[], current: string) => {
   const items = listOptions(list, current).map((i) => ({ value: i.key, label: listLabel([i], i.key, currentLanguage()) }));
@@ -57,6 +57,7 @@ export function RecordFields({ f, set, err, adding, custom, onCustom, address, o
   const houses = useSetting<{ key: string; name: string }[]>('people.houses', []);
   const genders = useSetting<ListItem[]>('lists.genders', []);
   const blood = useSetting<ListItem[]>('lists.bloodGroups', []);
+  const feeCats = useSetting<ListItem[]>('fees.categories', []);
   const opt = (k: keyof Rec, label: string) => (need.includes(k) ? label : t('admin.student_record.optional', { label }));
   return (
     <>
@@ -68,6 +69,7 @@ export function RecordFields({ f, set, err, adding, custom, onCustom, address, o
         <Field label={adding && !need.includes('admissionNo') ? t('admin.student_record.admission_number_blank_tangent_numbers') : opt('admissionNo', t('admin.student_record.admission_number'))} value={f.admissionNo} onChange={set('admissionNo')} error={err.admissionNo} maxLength={30} />
         <SelectField label={opt('bloodGroup', t('admin.student_record.blood_group'))} value={f.bloodGroup} onChange={set('bloodGroup')} error={err.bloodGroup} options={[{ value: '', label: t('admin.student_record.not_given') }, ...choices(blood, f.bloodGroup)]} />
       </div>
+      {(feeCats.length > 0 || f.feeCategory) && <SelectField label={t('admin.student_record.fee_category')} value={f.feeCategory} onChange={set('feeCategory')} error={err.feeCategory} options={[{ value: '', label: t('admin.student_record.no_fee_category') }, ...choices(feeCats, f.feeCategory)]} />}
       <AddressFields format={format} parts={address} onChange={onAddress} errors={err} optional={!need.includes('address')} />
       {err.address && <ErrorLine>{err.address}</ErrorLine>}
       <CustomFieldInputs defs={own} values={custom} onChange={onCustom} errors={err} />
@@ -80,7 +82,7 @@ export function EditStudentDialog({ s, classes, onClose, onDone }: { s: StudentD
   const { api } = useApp();
   const shake = useShake();
   const order = useSetting<string>('people.nameOrder', 'given-family');
-  const [f, setF] = useState({ name: s.name, givenName: s.givenName ?? '', familyName: s.familyName ?? '', nameLocal: s.nameLocal ?? '', classId: classes.find((c) => c.name === s.className)?.id ?? '', rollNo: s.rollNo, dob: s.dob, gender: s.gender ?? '', house: s.house ?? '', admissionNo: s.admissionNo, bloodGroup: s.bloodGroup ?? '', address: s.address ?? '' });
+  const [f, setF] = useState({ name: s.name, givenName: s.givenName ?? '', familyName: s.familyName ?? '', nameLocal: s.nameLocal ?? '', classId: classes.find((c) => c.name === s.className)?.id ?? '', rollNo: s.rollNo, dob: s.dob, gender: s.gender ?? '', house: s.house ?? '', admissionNo: s.admissionNo, bloodGroup: s.bloodGroup ?? '', address: s.address ?? '', feeCategory: s.feeCategory ?? '' });
   const [err, setErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof f) => (v: string) => { setF((x) => ({ ...x, [k]: v })); setErr((e) => ({ ...e, [k]: '' })); };

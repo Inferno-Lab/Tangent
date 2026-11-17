@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, hasKey, type AppRole } from '@tangent/config-engine';
-import { AdmissionStages, DEFAULT_ADMISSION_STAGES, TimetableCycle, listLabel, type AdmissionStage, rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, ADDRESS_PARTS, ADDRESS_PART_LABELS, SCHEME_KINDS, SCHEME_KIND_LABELS, BLOCK_KINDS, BLOCK_KIND_LABELS, DEFAULT_TEMPLATES, DOC_KINDS, DOC_KIND_LABELS, DOC_PLACEHOLDERS, PAGE_SIZES, type Block, type DocKind, type DocTemplate, type DocTemplates, type GradeBand, type GradingScheme, type AddressFormat, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
+import { AdmissionStages, DEFAULT_ADMISSION_STAGES, TimetableCycle, listLabel, type LateRule, type AdmissionStage, rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, ADDRESS_PARTS, ADDRESS_PART_LABELS, SCHEME_KINDS, SCHEME_KIND_LABELS, BLOCK_KINDS, BLOCK_KIND_LABELS, DEFAULT_TEMPLATES, DOC_KINDS, DOC_KIND_LABELS, DOC_PLACEHOLDERS, PAGE_SIZES, type Block, type DocKind, type DocTemplate, type DocTemplates, type GradeBand, type GradingScheme, type AddressFormat, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
 import { Checkbox, DateField, FilePick, NumberField, TimeField } from './fields';
 import { ColourField } from './ColourPicker';
 import { ErrorLine, Field, SelectField } from './forms';
@@ -150,6 +150,35 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
           {kinds.map((k) => <div key={k.key} style={{ width: 170 }}><NumberField label={listLabel(kinds, k.key, currentLanguage())} min={0} max={100} value={w[k.key] === undefined ? '' : String(w[k.key])} disabled={disabled}
             onChange={(v) => { const next = { ...w }; if (v === '') delete next[k.key]; else next[k.key] = Math.min(100, Math.max(0, Number(v) || 0)); onChange(next); }} /></div>)}
           {!kinds.length && <div className="help" style={{ margin: 0 }}>{tr('ui.settings.add_kinds_of_exam_first')}</div>}
+        </div>,
+      );
+    }
+    case 'lateRule': {
+      const r = (value ?? null) as LateRule | null;
+      const heads = (ctx.feeHeads ?? []);
+      const put = (p: Partial<LateRule>) => onChange({ kind: 'percent', amount: 0, every: 'month', graceDays: 0, cap: 0, heads: [], ...r, ...p });
+      return box(
+        <div>
+          <Checkbox checked={!!r} disabled={disabled} label={tr('ui.settings.use_a_late_fee_rule')} onChange={(on) => onChange(on ? { kind: 'percent', amount: 2, every: 'month', graceDays: 0, cap: 0, heads: [] } : null)} />
+          {r && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 8 }}>
+            <div style={{ width: 200 }}><SelectField label={tr('ui.settings.late_fee_is')} value={r.kind} disabled={disabled} onChange={(k) => put({ kind: k as LateRule['kind'] })} options={[{ value: 'percent', label: tr('ui.settings.a_percent_of_what_is_owed') }, { value: 'fixed', label: tr('ui.settings.a_fixed_amount') }]} /></div>
+            <div style={{ width: 130 }}><NumberField label={r.kind === 'percent' ? tr('ui.settings.percent') : tr('ui.settings.amount')} min={0} max={r.kind === 'percent' ? 25 : 1000000} decimals value={String(r.amount)} disabled={disabled} onChange={(v) => put({ amount: Number(v) || 0 })} /></div>
+            <div style={{ width: 180 }}><SelectField label={tr('ui.settings.charged')} value={r.every} disabled={disabled} onChange={(e) => put({ every: e as LateRule['every'] })} options={[{ value: 'once', label: tr('ui.settings.once') }, { value: 'day', label: tr('ui.settings.every_day') }, { value: 'week', label: tr('ui.settings.every_week_late') }, { value: 'month', label: tr('ui.settings.every_month') }]} /></div>
+            <div style={{ width: 130 }}><NumberField label={tr('ui.settings.grace_days')} min={0} max={90} value={String(r.graceDays)} disabled={disabled} onChange={(v) => put({ graceDays: Number(v) || 0 })} /></div>
+            <div style={{ width: 150 }}><NumberField label={tr('ui.settings.cap_0_none')} min={0} decimals value={String(r.cap)} disabled={disabled} onChange={(v) => put({ cap: Number(v) || 0 })} /></div>
+          </div>}
+          {r && heads.length > 0 && <div className="tgrow" style={{ marginTop: 8 }}><span className="lbl">{tr('ui.settings.on_these_fees')}</span>{heads.map((h) => <Checkbox key={h.key} checked={r.heads.includes(h.key)} disabled={disabled} label={h.name} onChange={(on) => put({ heads: on ? [...r.heads, h.key] : r.heads.filter((x) => x !== h.key) })} />)}<span className="help" style={{ margin: 0 }}>{tr('ui.settings.none_ticked_every_fee')}</span></div>}
+        </div>,
+      );
+    }
+    case 'reminderDays': {
+      const days = (Array.isArray(value) ? value : []) as number[];
+      const put = (next: number[]) => onChange([...new Set(next)].sort((a, b) => a - b).slice(0, 8));
+      return box(
+        <div>
+          <div className="tgrow">{days.map((d) => <button key={d} type="button" className="chip v" disabled={disabled} onClick={() => put(days.filter((x) => x !== d))} aria-label={tr('ui.settings.remove')}>
+            {d < 0 ? tr('ui.settings.days_before', { n: -d }) : d === 0 ? tr('ui.settings.on_the_day') : tr('ui.settings.days_after', { n: d })} ×</button>)}</div>
+          <ReminderDayAdd disabled={disabled} onAdd={(d) => put([...days, d])} />
         </div>,
       );
     }
@@ -520,6 +549,19 @@ function GradingSchemesEditor({ value, subjects, disabled, onChange }: { value: 
  * The layout and wording of the school's printed documents (§3.6.2): blocks in order, each with its words (in the school's
  * other languages too) and {placeholders} the document fills; a preview prints it with the school's own data.
  */
+/** Adds a reminder day: so many days before or after the due date, or on it. */
+function ReminderDayAdd({ disabled, onAdd }: { disabled: boolean; onAdd: (d: number) => void }) {
+  const [n, setN] = useState('3');
+  const [when, setWhen] = useState('before');
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 8 }}>
+      <div style={{ width: 110 }}><NumberField label={tr('ui.settings.days')} min={0} max={120} value={n} disabled={disabled} onChange={setN} /></div>
+      <div style={{ width: 180 }}><SelectField label={tr('ui.settings.when')} value={when} disabled={disabled} onChange={setWhen} options={[{ value: 'before', label: tr('ui.settings.before_the_due_date') }, { value: 'after', label: tr('ui.settings.after_the_due_date') }]} /></div>
+      <button type="button" className="btn sm" disabled={disabled} onClick={() => onAdd((when === 'before' ? -1 : 1) * Math.min(when === 'before' ? 60 : 120, Number(n) || 0))}>{tr('ui.settings.add')}</button>
+    </div>
+  );
+}
+
 /** Names typed with commas between them: kept as typed while typing, split into the list when the field is left. */
 function CommaList({ label, hint, value, max, disabled, onChange }: { label: string; hint?: string; value: string[]; max: number; disabled: boolean; onChange: (v: string[]) => void }) {
   const [text, setText] = useState(value.join(', '));

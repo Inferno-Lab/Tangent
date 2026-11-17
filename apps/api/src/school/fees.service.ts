@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { nextNumber, newId } from '@tangent/db';
-import { fmtDate, schoolCurrency, roundToCurrency, roundMoney, currencyDigits, fmtMoney, addDays, dayName, dayMonth, schoolToday, latestSchoolDay, schoolDaysEnding, type FeeHead, type FeeHeadsPut, type FeeSummary, type InvoiceDetail, type InvoiceRow, type PaymentCreate, type ReceiptCancel, type WaiverRequest, type ReceiptTax, receiptTax, tx } from '@tangent/contracts';
+import { type LateRule, fmtDate, schoolCurrency, roundToCurrency, roundMoney, currencyDigits, fmtMoney, addDays, dayName, dayMonth, schoolToday, latestSchoolDay, schoolDaysEnding, type FeeHead, type FeeHeadsPut, type FeeSummary, type InvoiceDetail, type InvoiceRow, type PaymentCreate, type ReceiptCancel, type WaiverRequest, type ReceiptTax, receiptTax, tx } from '@tangent/contracts';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
@@ -228,52 +228,89 @@ export class FeesService {
     return { receiptNo, amount: body.amount, outstanding: roundMoney(outstanding - body.amount), paymentId };
   }
 
-  /** Daily (job fees.reminders): families of invoices falling due in `fees.remindDaysBefore` days, once per invoice per day. */
+  /**
+   * Daily (job fees.reminders): families of an unpaid invoice on each of the school's reminder days (fees.reminderDays: -3
+   * three days before the due date, 7 a week after; else fees.remindDaysBefore days before), once per invoice per day. A
+   * reminder after the due date says the fee is overdue.
+   */
   async dailyReminders(t: TenantCtx, day: string): Promise<string> {
     const cfg = await this.settings.effective(t);
     if (!cfg.features.includes('fees.reminders')) return 'Fee reminders are off for this school.';
-    const days = await this.settings.value<number>(t, 'fees.remindDaysBefore', 3);
-    const { rows } = await t.pool.query<{ id: string; phone: string | null; name: string }>(
-      `select i.id, g.phone, s.name from fee_invoices i join students s on s.id = i.student_id and s.status = 'active'
-       join student_guardians sg on sg.student_id = s.id and sg.gets_bills join guardians g on g.id = sg.guardian_id
-       where i.due_on = $1::date + $2::int and i.amount - i.waived_amount > coalesce((select sum(amount - refunded) from payments where invoice_id = i.id), 0)
-         and not exists (select 1 from fee_reminders r where r.invoice_id = i.id and r.day = $1::date)`, [day, days]);
-    for (const r of rows) await t.pool.query('insert into fee_reminders (invoice_id, day) values ($1,$2) on conflict do nothing', [r.id, day]);
-    const sent = await this.messenger.notify(t, 'fees.reminder', rows.filter((r) => r.phone).map((r) => ({ to: r.phone!, vars: { student: r.name } })));
-    return `${sent} reminders for invoices due in ${days} days.`;
+    const set = await this.settings.value<number[]>(t, 'fees.reminderDays', []);
+    const days = [...new Set(set.length ? set : [-(await this.settings.value<number>(t, 'fees.remindDaysBefore', 3))])];
+    let sent = 0;
+    for (const d of days) {
+      // Due on the day that is `d` days before today's run (d negative: still to come).
+      const { rows } = await t.pool.query<{ id: string; phone: string | null; name: string }>(
+        `select i.id, g.phone, s.name from fee_invoices i join students s on s.id = i.student_id and s.status = 'active'
+         join student_guardians sg on sg.student_id = s.id and sg.gets_bills join guardians g on g.id = sg.guardian_id
+         where i.due_on = $1::date - $2::int and i.amount - i.waived_amount > coalesce((select sum(amount - refunded) from payments where invoice_id = i.id), 0)
+           and not exists (select 1 from fee_reminders r where r.invoice_id = i.id and r.day = $1::date)`, [day, d]);
+      for (const id of new Set(rows.map((r) => r.id))) await t.pool.query('insert into fee_reminders (invoice_id, day) values ($1,$2) on conflict do nothing', [id, day]);
+      sent += await this.messenger.notify(t, d > 0 ? 'fees.overdue' : 'fees.reminder', rows.filter((r) => r.phone).map((r) => ({ to: r.phone!, vars: { student: r.name } })));
+    }
+    return `${sent} reminders (${days.join(', ')} days from due).`;
   }
 
-  /** Daily (job fees.lateFines): `fees.lateFeePct` of what is still owed on each overdue invoice, once per invoice per month. */
+  /**
+   * Daily (job fees.lateFines): the school's late-fee rule (fees.lateRule; without one, fees.lateFeePct once a month) on
+   * every invoice still owed past its due date and grace days. Each period (the invoice's "once", a week, a month; a month
+   * for a fee by the day) has one fine invoice, recomputed each run and only ever raised, so a missed run catches up and a
+   * second run charges nothing more. The cap is for all of an invoice's late fees together.
+   */
   async lateFines(t: TenantCtx, day: string): Promise<string> {
     const cfg = await this.settings.effective(t);
     if (!cfg.features.includes('fees.lateFines')) return 'Late fines are off for this school.';
     const pct = await this.settings.value<number>(t, 'fees.lateFeePct', 0);
-    if (!pct) return 'The late fee is 0%.';
-    const month = day.slice(0, 7);
-    const { rows } = await t.pool.query<{ id: string; student_id: string; title: string; owed: number }>(
-      `select i.id, i.student_id, i.title, (i.amount - i.waived_amount - coalesce((select sum(amount - refunded) from payments where invoice_id = i.id), 0)) owed
-       from fee_invoices i where i.due_on < $1::date and i.head <> 'fine'
-         and not exists (select 1 from fee_fines f where f.invoice_id = i.id and f.month = $2)`, [day, month]);
+    const rule = (await this.settings.value<LateRule | null>(t, 'fees.lateRule', null)) ?? (pct ? { kind: 'percent' as const, amount: pct, every: 'month' as const, graceDays: 0, cap: 0, heads: [] } : null);
+    if (!rule || !rule.amount) return 'There is no late fee.';
+    const { rows } = await t.pool.query<{ id: string; student_id: string; title: string; head: string; due_on: string; owed: number }>(
+      `select i.id, i.student_id, i.title, i.head, i.due_on::text, (i.amount - i.waived_amount - coalesce((select sum(amount - refunded) from payments where invoice_id = i.id), 0)) owed
+       from fee_invoices i where i.due_on + $2::int < $1::date and i.head <> 'fine' and ($3::text[] = '{}' or i.head = any($3))`, [day, rule.graceDays, rule.heads]);
+    const smallest = 1 / 10 ** currencyDigits(schoolCurrency());
     let n = 0;
-    for (const r of rows.filter((x) => x.owed > 0)) {
-      // At least the currency's smallest unit (a paisa, a cent).
-      const amount = await this.settings.billed(t, 'fine', Math.max(1 / 10 ** currencyDigits(schoolCurrency()), roundToCurrency((r.owed * pct) / 100)));
-      const fineId = newId('inv');
-      const client = await t.pool.connect();
-      try {
-        await client.query('begin');
-        await client.query("insert into fee_invoices (id, student_id, head, title, amount, due_on) values ($1,$2,'fine',$3,$4,$5)", [fineId, r.student_id, `Late fee: ${r.title} (${month})`, amount, day]);
-        await client.query('insert into fee_fines (id, invoice_id, fine_invoice_id, month, amount) values ($1,$2,$3,$4,$5)', [newId('fin'), r.id, fineId, month, amount]);
-        await client.query('commit');
-        n++;
-      } catch {
-        await client.query('rollback').catch(() => undefined);
-      } finally {
-        client.release();
+    for (const r of rows.filter((x) => Number(x.owed) > 0)) {
+      const start = addDays(r.due_on, rule.graceDays + 1);
+      // What each period of this invoice owes, from the first late day to today.
+      const periods = new Map<string, number>();
+      if (rule.every === 'once') periods.set('once', 1);
+      else for (let d = start; d <= day; d = addDays(d, 1)) {
+        const key = rule.every === 'week' ? addDays(d, -((new Date(`${d}T00:00:00Z`).getUTCDay() + 6) % 7)) : d.slice(0, 7);
+        periods.set(key, rule.every === 'day' ? (periods.get(key) ?? 0) + 1 : 1);
+      }
+      const each = rule.kind === 'fixed' ? rule.amount : roundToCurrency((Number(r.owed) * rule.amount) / 100);
+      const kept = new Map((await t.pool.query<{ month: string; amount: string; fine_invoice_id: string }>('select month, amount, fine_invoice_id from fee_fines where invoice_id = $1', [r.id])).rows.map((x) => [x.month, x]));
+      let total = [...kept.values()].reduce((a, x) => a + Number(x.amount), 0);
+      for (const [key, units] of periods) {
+        const was = kept.get(key);
+        let want = Math.max(smallest, roundToCurrency(units * each));
+        if (rule.cap > 0) want = Math.min(want, roundToCurrency(rule.cap - (total - Number(was?.amount ?? 0))));
+        if (want <= Number(was?.amount ?? 0) || want <= 0) continue;
+        const amount = await this.settings.billed(t, 'fine', want);
+        const label = rule.every === 'once' ? r.title : `${r.title} (${key})`;
+        const client = await t.pool.connect();
+        try {
+          await client.query('begin');
+          if (was) {
+            await client.query('update fee_invoices set amount = $2 where id = $1', [was.fine_invoice_id, amount]);
+            await client.query('update fee_fines set amount = $3 where invoice_id = $1 and month = $2', [r.id, key, want]);
+          } else {
+            const fineId = newId('inv');
+            await client.query("insert into fee_invoices (id, student_id, head, title, amount, due_on) values ($1,$2,'fine',$3,$4,$5)", [fineId, r.student_id, tx('Late fee: {title}', { title: label }), amount, day]);
+            await client.query('insert into fee_fines (id, invoice_id, fine_invoice_id, month, amount) values ($1,$2,$3,$4,$5)', [newId('fin'), r.id, fineId, key, want]);
+          }
+          await client.query('commit');
+          total += want - Number(was?.amount ?? 0);
+          n++;
+        } catch {
+          await client.query('rollback').catch(() => undefined);
+        } finally {
+          client.release();
+        }
       }
     }
-    if (n) await this.audit.record(t, { action: 'fees.lateFines', entity: 'invoice', detail: { count: n, pct, month } });
-    return `${n} late fines at ${pct}%.`;
+    if (n) await this.audit.record(t, { action: 'fees.lateFines', entity: 'invoice', detail: { count: n, rule: `${rule.kind} ${rule.amount} ${rule.every}` } });
+    return `${n} late fees charged or raised.`;
   }
 
   async remind(t: TenantCtx, user: { id: string; name: string }, ids: string[] | 'overdue'): Promise<{ sent: number }> {

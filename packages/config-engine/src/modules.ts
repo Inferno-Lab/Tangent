@@ -248,11 +248,11 @@ export const MODULES: ModuleManifest[] = localized([
     })],
     app: [A('dock', 'fees', 'Fees', ['parent']), A('home', 'dueStack', 'Fees due', ['parent']), A('quick', 'payFees', 'Pay fees', ['parent'], 'fees.onlinePayment')],
     settings: [
-      'fees.receiptPrefix', 'fees.receiptStart', 'fees.receiptNote', 'fees.paymentMethods', 'fees.lateFeePct', 'fees.remindDaysBefore', 'tax.name', 'tax.number', 'tax.numberLabel',
+      'fees.receiptPrefix', 'fees.receiptStart', 'fees.receiptNote', 'fees.paymentMethods', 'fees.categories', 'fees.lateFeePct', 'fees.lateRule', 'fees.remindDaysBefore', 'fees.reminderDays', 'tax.name', 'tax.number', 'tax.numberLabel',
       'tax.code', 'tax.codeLabel', 'tax.ratePct', 'tax.inclusive', 'tax.split', 'tax.heads', 'fees.refundApprovalAbove', 'fees.dailyTarget', 'feeStructures.schoolEdits',
     ],
     permissions: ['fees.read', 'fees.collect', 'fees.waive', 'fees.refund'],
-    messages: ['fees.reminder', 'fees.receipt', 'fees.refunded'],
+    messages: ['fees.reminder', 'fees.overdue', 'fees.receipt', 'fees.refunded'],
     imports: ['fee_heads', 'fee_structures', 'fee_dues', 'payments'],
     approvals: ['fee_waiver', 'receipt_cancel'],
     dashboard: [

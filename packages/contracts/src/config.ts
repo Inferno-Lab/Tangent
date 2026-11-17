@@ -98,6 +98,20 @@ export const DEFAULT_PAYMENT_METHODS: PaymentMethod[] = [
   { key: 'cash', name: 'Cash', kind: 'cash' }, { key: 'card', name: 'Card', kind: 'card' }, { key: 'bank', name: 'Bank transfer', kind: 'bank' }, { key: 'cheque', name: 'Cheque', kind: 'cheque' },
 ];
 
+/**
+ * A late fee: a percentage of what is still owed or a fixed amount, charged once, every day, week or month it stays unpaid
+ * after the grace days, never more than the cap in all (0: no cap), on the fee heads named (none: every head but fines).
+ */
+export const LateRule = z.object({
+  kind: z.enum(['percent', 'fixed']),
+  amount: z.number().min(0).max(1_000_000),
+  every: z.enum(['once', 'day', 'week', 'month']),
+  graceDays: z.number().int().min(0).max(90).default(0),
+  cap: z.number().min(0).max(100_000_000).default(0),
+  heads: z.array(z.string().max(40)).max(20).default([]),
+}).refine((r) => r.kind === 'fixed' || r.amount <= 25, { message: 'A late fee is at most 25% each time', path: ['amount'] });
+export type LateRule = z.infer<typeof LateRule>;
+
 export const SchoolSettingsSchema = z.object({
   'school.name': z.string().min(2).max(80),
   'school.shortName': z.string().min(2).max(20),
@@ -134,6 +148,12 @@ export const SchoolSettingsSchema = z.object({
   // With two registers: when the afternoon one starts (the app marks whichever it is now).
   'attendance.pmFrom': z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('12:00'),
   'fees.lateFeePct': z.number().min(0).max(25).default(0),
+  // The late-fee rule (one-shot plan 4.7); none: the late fee above, once a month.
+  'fees.lateRule': LateRule.nullable().default(null),
+  // When families are reminded, in days from the due date (-3 three days before, 7 a week after); none: remindDaysBefore.
+  'fees.reminderDays': z.array(z.number().int().min(-60).max(120)).max(8).default([]),
+  // The school's fee categories (staff child, scholarship, boarder…): a fee structure can be for one of them.
+  'fees.categories': schoolList([], 0, 20),
   'fees.remindDaysBefore': z.number().int().min(0).max(30).default(3),
   // 0: no daily target (the dashboard shows the collection without a goal line).
   'fees.dailyTarget': z.number().int().min(0).max(100000000).default(0),

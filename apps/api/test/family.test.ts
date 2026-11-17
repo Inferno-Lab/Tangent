@@ -439,11 +439,11 @@ describe('messages and background work through the Hub', () => {
     for (let i = 0; i < 4; i++) await hub.tick();
     const jobs = (await h.registry.query("select kind, status, result, last_error from job_queue where kind = 'fees.lateFines'")).rows;
     expect(jobs[0]).toMatchObject({ status: 'done' });
-    const count = Number(/(\d+) late fines/.exec(jobs[0].result)![1]);
+    const count = Number(/(\d+) late fees/.exec(jobs[0].result)![1]);
     expect(count).toBeGreaterThan(0);
     await h.registry.query("update job_queue set status = 'queued', run_at = now(), payload = payload || '{\"again\":true}' where kind = 'fees.lateFines'");
     await hub.tick();
-    expect((await h.registry.query("select result from job_queue where kind = 'fees.lateFines'")).rows[0].result).toMatch(/^0 late fines/);
+    expect((await h.registry.query("select result from job_queue where kind = 'fees.lateFines'")).rows[0].result).toMatch(/^0 late fees/);
   });
 
   it('queues each school’s morning jobs for 09:00 on its own clock and its own day (§3.9.9)', async () => {

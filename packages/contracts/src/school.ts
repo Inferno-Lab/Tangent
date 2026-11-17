@@ -63,6 +63,7 @@ export interface StudentDetail extends StudentRow {
   givenName: string | null;
   familyName: string | null;
   nameLocal: string | null;
+  feeCategory: string | null;
   /** When and why a student who left the school left (null while on the roll). */
   left: { on: string; reason: string; kind: LeavingKind; transferTo: string | null } | null;
   /** Every guardian (phones masked: the reveal call shows one in full). */
@@ -165,6 +166,8 @@ const StudentFields = {
   familyName: z.string().trim().max(60).optional(),
   // The name in a second script (Arabic, Devanagari…), shown beside the name and found by search.
   nameLocal: z.string().trim().max(80).optional(),
+  // A key of the school's fee categories (fees.categories); '' takes the student out of any.
+  feeCategory: z.string().trim().max(32).optional(),
   classId: z.string().min(1, 'Choose a class'),
   rollNo: z.string().trim().max(10).optional(),
   dob: IsoDate,

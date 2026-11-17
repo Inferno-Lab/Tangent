@@ -289,7 +289,7 @@ const staff = kind<StaffLookups>({
 });
 
 type GuardianRow = { id: string; user_id: string | null; name: string; phone: string | null; email: string | null; relation: string };
-type StudentLookups = { classes: Map<string, ClassRow>; students: Map<string, Rec & { id: string }>; people: Map<string, Rec & { id: string }>; next: { take: () => string }; order: 'given-family' | 'family-given'; lists: { genders: ListItem[]; blood: ListItem[]; rels: ListItem[] }; guardians: Map<string, GuardianRow>; users: Map<string, string>; links: Set<string> };
+type StudentLookups = { classes: Map<string, ClassRow>; students: Map<string, Rec & { id: string }>; people: Map<string, Rec & { id: string }>; next: { take: () => string }; order: 'given-family' | 'family-given'; lists: { genders: ListItem[]; blood: ListItem[]; rels: ListItem[]; fees: ListItem[] }; guardians: Map<string, GuardianRow>; users: Map<string, string>; links: Set<string> };
 const person = (name: string, dob: string) => `${norm(name)}|${dob}`;
 // A student who left before the school moved here is on the "Left the school" list, with why (TC is a transfer certificate).
 const STATUS: Record<string, { status: 'active' | 'left'; kind?: string }> = {
@@ -299,7 +299,7 @@ const STATUS: Record<string, { status: 'active' | 'left'; kind?: string }> = {
 const students = kind<StudentLookups>({
   async load(db) {
     const st = (await db.query<Rec & { id: string; admission_no: string }>(
-      'select id, admission_no, name, class_id, roll_no, dob::text, blood_group, house, address, status, admitted_on::text, left_on::text, leaving_kind, leaving_reason, given_name, family_name, name_local from students')).rows;
+      'select id, admission_no, name, class_id, roll_no, dob::text, blood_group, house, address, status, admitted_on::text, left_on::text, leaving_kind, leaving_reason, given_name, family_name, name_local, fee_category from students')).rows;
     const order = (await savedSetting(db, 'people.nameOrder')) === 'family-given' ? 'family-given' : 'given-family';
     const gs = (await db.query<GuardianRow>('select id, user_id, name, phone, email, relation from guardians')).rows;
     const us = (await db.query<{ id: string; phone: string }>('select id, phone from users where phone is not null')).rows;
@@ -310,7 +310,7 @@ const students = kind<StudentLookups>({
     return {
       classes: await classMap(db), students: new Map(st.map((s) => [lc(s.admission_no), s])), people: new Map(st.map((s) => [person(String(s.name), String(s.dob)), s])),
       next, order,
-      lists: { genders: await savedSetting(db, 'lists.genders'), blood: await savedSetting(db, 'lists.bloodGroups'), rels: await savedSetting(db, 'lists.relationships') },
+      lists: { genders: await savedSetting(db, 'lists.genders'), blood: await savedSetting(db, 'lists.bloodGroups'), rels: await savedSetting(db, 'lists.relationships'), fees: await savedSetting(db, 'fees.categories') },
       guardians: new Map(gs.filter((g) => g.phone).map((g) => [digits(g.phone!), g])), users: new Map(us.map((u) => [digits(u.phone), u.id])), links: new Set(links.map((x) => `${x.s}|${x.g}`)),
     };
   },
@@ -326,6 +326,7 @@ const students = kind<StudentLookups>({
       ...(r.guardian2_phone && !digits(r.guardian2_phone) ? [`The second guardian’s phone: ${badPhone(r.guardian2_phone)}`] : []),
       ...(r.status && !STATUS[norm(r.status)] ? ['Status is active, left, transferred (or TC) or graduated (or passed out).'] : []),
       ...(r.gender && !listKey(l.lists.genders, r.gender) ? [tx('Gender is one of the school’s: {names}.', { names: l.lists.genders.filter((g) => g.active !== false).map((g) => g.name).join(', ') })] : []),
+      ...(r.fee_category && !listKey(l.lists.fees, r.fee_category) ? [tx('Fee category is one of the school’s: {names}.', { names: l.lists.fees.map((g) => g.name).join(', ') || '—' })] : []),
       ...(r.blood_group && !listKey(l.lists.blood, r.blood_group) ? [tx('Blood group is one of the school’s: {names}.', { names: l.lists.blood.filter((g) => g.active !== false).map((g) => g.name).join(', ') })] : []),
     ];
     // No admission number (a sheet of new children): the same child is the same name and date of birth, and Tangent numbers new ones.
@@ -372,6 +373,7 @@ const students = kind<StudentLookups>({
         status: st.status, ...left, admitted_on: r.admitted_on ? isoDay(r.admitted_on) : was?.admitted_on ?? null,
         given_name: r.given_name?.trim() || (r.name && !r.given_name ? null : was?.given_name) || null, family_name: r.family_name?.trim() || (r.name && !r.family_name ? null : was?.family_name) || null,
         name_local: r.name_local?.trim() || was?.name_local || null,
+        fee_category: r.fee_category?.trim() ? listKey(l.lists.fees, r.fee_category) : was?.fee_category ?? null,
       });
       const g1 = guardian(r.guardian_name!, r.guardian_phone ?? '', r.guardian_email!, r.relation!, id);
       if (!l.links.has(`${id}|${g1}`)) links.push({ student_id: id, guardian_id: g1, is_primary: true });
@@ -383,7 +385,7 @@ const students = kind<StudentLookups>({
     return [
       { table: 'users', pk: ['id'], cols: [], rows: users },
       { table: 'guardians', pk: ['id'], cols: ['user_id', 'email'], rows: [...guardians.values()] },
-      { table: 'students', pk: ['id'], cols: ['name', 'class_id', 'roll_no', 'dob', 'gender', 'blood_group', 'house', 'address', 'status', 'admitted_on', 'left_on', 'leaving_kind', 'leaving_reason', 'given_name', 'family_name', 'name_local'], rows: studs },
+      { table: 'students', pk: ['id'], cols: ['name', 'class_id', 'roll_no', 'dob', 'gender', 'blood_group', 'house', 'address', 'status', 'admitted_on', 'left_on', 'leaving_kind', 'leaving_reason', 'given_name', 'family_name', 'name_local', 'fee_category'], rows: studs },
       { table: 'student_guardians', pk: ['student_id', 'guardian_id'], cols: [], rows: links },
     ];
   },
@@ -464,21 +466,28 @@ const feeHeads = kind<Map<string, string>>({
 });
 
 const feeKey = (grade: string, title: string) => `${whole(grade) ?? 0}|${lc(title)}`;
-const feeStructures = kind<{ ids: Map<string, string>; heads: Map<string, string> }>({
+// A fee for one category (fees.categories, by key or name) is its own row beside the everyone fee of the same title.
+type FeeLookups = { ids: Map<string, string>; heads: Map<string, string>; cats: ListItem[] };
+const catOf = (l: FeeLookups, typed: string | undefined) => (typed?.trim() ? listKey(l.cats, typed) : '');
+const feeStructures = kind<FeeLookups>({
   async load(db) {
-    const { rows } = await db.query<{ id: string; grade: number | null; title: string }>('select id, grade, title from fee_structures');
-    return { ids: new Map(rows.map((r) => [`${r.grade ?? 0}|${lc(r.title)}`, r.id])), heads: await headMap(db) };
+    const { rows } = await db.query<{ id: string; grade: number | null; title: string; category: string | null }>('select id, grade, title, category from fee_structures');
+    return { ids: new Map(rows.map((r) => [`${feeKey(String(r.grade ?? ''), r.title)}|${r.category ?? ''}`, r.id])), heads: await headMap(db), cats: await savedSetting(db, 'fees.categories') };
   },
   check(r, l) {
+    const cat = catOf(l, r.fee_category);
     const errors = [...(r.grade && whole(r.grade) === null ? ['Grade is a number like 8, or blank for every grade.'] : []), ...(money(r.amount!) === null || money(r.amount!)! < 0 ? ['Amount is a number, like 18500 or 18,500.50.'] : []),
-      ...(!isoDay(r.due_on!) ? ['Write the due date as 2026-11-10 or 10/11/2026.'] : []), ...needHead(l.heads, r.head!)];
-    return ok(feeKey(r.grade ?? '', r.title!), errors, l.ids.has(feeKey(r.grade ?? '', r.title!)));
+      ...(!isoDay(r.due_on!) ? ['Write the due date as 2026-11-10 or 10/11/2026.'] : []), ...needHead(l.heads, r.head!),
+      ...(cat === null ? [tx('Fee category is one of the school’s: {names}.', { names: l.cats.map((c) => c.name).join(', ') || '—' })] : [])];
+    const key = `${feeKey(r.grade ?? '', r.title!)}|${cat ?? ''}`;
+    return ok(key, errors, l.ids.has(key));
   },
-  writes: (rows, l) => [{ table: 'fee_structures', pk: ['id'], cols: ['head', 'amount', 'due_on'], rows: rows.map((r) => ({
-    id: l.ids.get(feeKey(r.grade ?? '', r.title!)) ?? newId('fst'), grade: r.grade ? whole(r.grade) : null, head: l.heads.get(headKey(r.head!)), title: r.title, amount: money(r.amount!), due_on: isoDay(r.due_on!),
-  })) }],
+  writes: (rows, l) => [{ table: 'fee_structures', pk: ['id'], cols: ['head', 'amount', 'due_on', 'category'], rows: rows.map((r) => {
+    const cat = catOf(l, r.fee_category) || null;
+    return { id: l.ids.get(`${feeKey(r.grade ?? '', r.title!)}|${cat ?? ''}`) ?? newId('fst'), grade: r.grade ? whole(r.grade) : null, head: l.heads.get(headKey(r.head!)), title: r.title, amount: money(r.amount!), due_on: isoDay(r.due_on!), category: cat };
+  }) }],
   totals: (rows) => [{ label: 'Fees', value: String(rows.length) }, { label: 'Grades', value: String(new Set(rows.map((r) => r.grade || 'all')).size) }],
-  async export(db) { return (await db.query<Row>("select id, coalesce(grade::text, '') as grade, head, title, trim_scale(amount)::text as amount, due_on::text from fee_structures order by grade nulls first, due_on, title")).rows; },
+  async export(db) { return (await db.query<Row>("select id, coalesce(grade::text, '') as grade, head, title, trim_scale(amount)::text as amount, due_on::text, coalesce(category, '') as fee_category from fee_structures order by grade nulls first, due_on, title")).rows; },
 });
 
 type InvoiceRow = { id: string; student_id: string; title: string; amount: number; waived_amount: number };
