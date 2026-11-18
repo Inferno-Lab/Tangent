@@ -17,10 +17,21 @@ export const LoginChallenge = z.object({
   channel: z.enum(['sms', 'email']),
   maskedTo: z.string(),
   expiresInSeconds: z.number().int(),
+  /** When another code may be asked for: a short wait, longer once several were sent. */
+  resendInSeconds: z.number().int().optional(),
   /** Present only on schools in demo mode, so the sign-in page can offer to fill it in. */
   demoCode: z.string().optional(),
 });
 export type LoginChallenge = z.infer<typeof LoginChallenge>;
+
+/** A new phone number or email for one's own account: confirmed by a code sent to it. */
+export const ContactStart = z.object({ phone: z.string().trim().min(6).max(24).optional(), email: z.string().trim().email('Enter an email address').max(120).optional() })
+  .refine((b) => !!b.phone !== !!b.email, { message: 'Give a phone number or an email.' });
+export type ContactStart = z.infer<typeof ContactStart>;
+export const ContactFinish = z.object({ challengeId: z.string().min(1), code: z.string().regex(/^\d{6}$/, 'The code is 6 digits') });
+export type ContactFinish = z.infer<typeof ContactFinish>;
+/** A place someone is signed in: the app or a browser, since when, and whether it is this one. */
+export interface SessionRow { id: string; client: string; device: string; since: string; current: boolean }
 
 export type LoginResponse =
   | { step: 'otp'; challenge: LoginChallenge }

@@ -1,5 +1,5 @@
-import { Body, Controller, Get, HttpCode, Post, Put, Req, Res } from '@nestjs/common';
-import { CodeRequest, DEFAULT_BRAND, appTokens, hueOf, LoginRequest, PasswordChange, USER_PREFS, UserPrefPut, RefreshRequest, ResetFinish, ResetStart, VerifyRequest, type EffectiveConfig, type LoginChallenge, type SchoolBrand, type LoginResponse, type SessionUser, type TokenPair } from '@tangent/contracts';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Req, Res } from '@nestjs/common';
+import { CodeRequest, ContactFinish, ContactStart, type SessionRow, DEFAULT_BRAND, appTokens, hueOf, LoginRequest, PasswordChange, USER_PREFS, UserPrefPut, RefreshRequest, ResetFinish, ResetStart, VerifyRequest, type EffectiveConfig, type LoginChallenge, type SchoolBrand, type LoginResponse, type SessionUser, type TokenPair } from '@tangent/contracts';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { ApiError, Limiter, ZodPipe } from '@tangent/nest-kit';
 import type { z } from 'zod';
@@ -110,6 +110,25 @@ export class MeController {
     return this.auth.me(t, u.id);
   }
 
+  /** A new phone number or email for one's own account: a code goes to it, and the code confirms it. */
+  @Post('me/contact') @HttpCode(200)
+  contactStart(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(ContactStart)) b: ContactStart): Promise<LoginChallenge> {
+    if (u.id.startsWith('support:')) throw new ApiError('forbidden', 'A support session cannot change a person’s account.');
+    return this.auth.startContact(t, u.id, b);
+  }
+
+  @Post('me/contact/confirm') @HttpCode(204)
+  contactFinish(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(ContactFinish)) b: ContactFinish): Promise<void> {
+    return this.auth.finishContact(t, u.id, b);
+  }
+
+  /** Where the person is signed in, and signing one of those out. */
+  @Get('me/sessions')
+  sessions(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser): Promise<SessionRow[]> { return this.auth.sessions(t, u.id, u.sid); }
+
+  @Delete('me/sessions/:id') @HttpCode(204)
+  endSession(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string): Promise<void> { return this.auth.endSession(t, u.id, id, u.sid); }
+
   /** The person's own choices, saved to their account. */
   @Get('me/prefs')
   async prefs(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser): Promise<Record<string, unknown>> {
@@ -141,4 +160,23 @@ export class MeController {
       privacy: cfg.privacy,
     };
   }
+}
+
+/** The same account pieces for the app (families and students reach only /v1/f): a new phone or email, and devices. */
+@Controller('v1/f/me')
+@Core()
+export class FamilyAccountController {
+  constructor(private readonly auth: AuthService) {}
+
+  @Post('contact') @HttpCode(200)
+  contactStart(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(ContactStart)) b: ContactStart): Promise<LoginChallenge> { return this.auth.startContact(t, u.id, b); }
+
+  @Post('contact/confirm') @HttpCode(204)
+  contactFinish(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(ContactFinish)) b: ContactFinish): Promise<void> { return this.auth.finishContact(t, u.id, b); }
+
+  @Get('sessions')
+  sessions(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser): Promise<SessionRow[]> { return this.auth.sessions(t, u.id, u.sid); }
+
+  @Delete('sessions/:id') @HttpCode(204)
+  endSession(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string): Promise<void> { return this.auth.endSession(t, u.id, id, u.sid); }
 }

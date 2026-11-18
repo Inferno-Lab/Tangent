@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
-import { toE164, initials, type AppRoleKey, type ClientKind, type LoginChallenge, type LoginRequest, type LoginResponse, type Permission, type SessionUser, type TokenPair, tx } from '@tangent/contracts';
+import { toE164, initials, type AppRoleKey, type ClientKind, type LoginChallenge, type LoginRequest, type LoginResponse, type Permission, type SessionUser, type TokenPair, tx, type ContactFinish, type ContactStart, type SessionRow } from '@tangent/contracts';
 import { hashPassword, maskEmail, maskPhone, passwordNeedsRehash, randomCode, randomToken, sha256, signJwt, verifyPassword, constantTimeEqual } from '@tangent/security';
 import { ENV, type Env } from '../env.js';
 import { ApiError } from '@tangent/nest-kit';
@@ -43,6 +43,14 @@ interface Life { maxDays: number; idleDays: number }
 
 function sessionExpiry(created: Date, life: Life): Date {
   return new Date(Math.min(Date.now() + life.idleDays * 86_400_000, created.getTime() + life.maxDays * 86_400_000));
+}
+
+/** A device in plain words from its user agent: the app on a phone, or a browser on a computer. */
+export function deviceOf(ua: string | null): string {
+  const a = ua ?? '';
+  const os = /Android/i.test(a) ? 'Android' : /iPhone|iPad|iOS/i.test(a) ? 'iPhone or iPad' : /Windows/i.test(a) ? 'Windows' : /Mac OS|Macintosh/i.test(a) ? 'Mac' : /Linux/i.test(a) ? 'Linux' : '';
+  const app = /Dart|okhttp|Tangent/i.test(a) ? 'Tangent app' : /Edg\//.test(a) ? 'Edge' : /Chrome\//.test(a) ? 'Chrome' : /Firefox\//.test(a) ? 'Firefox' : /Safari\//.test(a) ? 'Safari' : '';
+  return [app, os].filter(Boolean).join(', ') || 'Unknown device';
 }
 
 @Injectable()
@@ -177,8 +185,9 @@ export class AuthService {
     return rows[0];
   }
 
-  private async sendCode(t: TenantCtx, user: { id: string; phone: string | null; email: string | null }, purpose: 'sign_in' | 'reset'): Promise<LoginChallenge> {
+  private async sendCode(t: TenantCtx, user: { id: string; phone: string | null; email: string | null }, purpose: 'sign_in' | 'reset' | 'contact', target?: { channel: 'sms' | 'email'; to: string }): Promise<LoginChallenge> {
     const demo = t.info.demo;
+    let sends = 0;
     if (!demo) {
       const { rows: [r] } = await t.pool.query<{ n: string; first: Date | null }>(
         `select count(*) n, min(created_at) first from otp_challenges where user_id = $1 and created_at > now() - interval '${OTP_WINDOW_MINUTES} minutes'`, [user.id]);
@@ -186,30 +195,74 @@ export class AuthService {
         const retryAfter = Math.max(60, Math.ceil((r!.first!.getTime() + OTP_WINDOW_MINUTES * 60_000 - Date.now()) / 1000));
         throw new ApiError('rate_limited', tx('Too many codes sent. Try again in {p0} minutes.', { p0: Math.ceil(retryAfter / 60) }), { retryAfter });
       }
+      sends = Number(r!.n) + 1;
     }
     const code = demo ? DEMO_CODE : randomCode(6);
     const id = newId('otp');
-    const channel: 'sms' | 'email' = user.phone ? 'sms' : 'email';
-    await t.pool.query('insert into otp_challenges (id, user_id, code_hash, channel, purpose, expires_at) values ($1,$2,$3,$4,$5,$6)', [id, user.id, sha256(`${id}:${code}`), channel, purpose, new Date(Date.now() + OTP_MINUTES * 60_000)]);
-    const what = purpose === 'reset' ? 'code to set a new password' : 'sign-in code';
+    const channel: 'sms' | 'email' = target?.channel ?? (user.phone ? 'sms' : 'email');
+    const to = target?.to ?? (channel === 'sms' ? user.phone : user.email) ?? '';
+    await t.pool.query('insert into otp_challenges (id, user_id, code_hash, channel, purpose, expires_at, target) values ($1,$2,$3,$4,$5,$6,$7)', [id, user.id, sha256(`${id}:${code}`), channel, purpose, new Date(Date.now() + OTP_MINUTES * 60_000), target?.to ?? null]);
+    const what = purpose === 'reset' ? 'code to set a new password' : purpose === 'contact' ? 'code to confirm this address' : 'sign-in code';
     try {
       // Sent now (never queued or held): the person is waiting on the sign-in screen.
       await this.messenger.send(t, {
-        channel, to: (channel === 'sms' ? user.phone : user.email) ?? '', subject: channel === 'email' ? `Your Tangent ${what}` : undefined,
+        channel, to, subject: channel === 'email' ? `Your Tangent ${what}` : undefined,
         body: `Your Tangent ${what} for ${t.info.shortName} is ${code}. It expires in ${OTP_MINUTES} minutes.`,
         key: purpose === 'reset' ? 'auth.reset' : 'auth.code', vars: { code, school: t.info.shortName, minutes: String(OTP_MINUTES) }, now: true,
       });
     } catch {
       throw new ApiError('school_unavailable', 'We could not send the code just now. Try again in a minute.');
     }
+    // Another code after a short wait; the last one allowed in the window waits for the window to end.
+    const resendInSeconds = sends >= OTP_SENDS ? OTP_WINDOW_MINUTES * 60 : 30 * Math.max(1, sends);
     return {
-      challengeId: id, channel, maskedTo: channel === 'sms' ? maskPhone(user.phone!) : maskEmail(user.email!),
-      expiresInSeconds: OTP_MINUTES * 60, ...(demo ? { demoCode: DEMO_CODE } : {}),
+      challengeId: id, channel, maskedTo: channel === 'sms' ? maskPhone(to) : maskEmail(to),
+      expiresInSeconds: OTP_MINUTES * 60, resendInSeconds, ...(demo ? { demoCode: DEMO_CODE } : {}),
     };
   }
 
+  /** A new phone number or email for one's own account: free (no one else has it), then confirmed by a code sent to it. */
+  async startContact(t: TenantCtx, userId: string, b: ContactStart): Promise<LoginChallenge> {
+    const u = (await t.pool.query<{ id: string; phone: string | null; email: string | null }>("select id, phone, email from users where id = $1 and status = 'active'", [userId])).rows[0];
+    if (!u) throw new ApiError('unauthenticated', 'Your session has ended. Sign in again.');
+    const to = b.phone ? this.settings.phone(t, b.phone, 'phone') : b.email!.toLowerCase();
+    if (to === (b.phone ? u.phone : u.email?.toLowerCase())) throw new ApiError('validation', tx('That is already yours.'), { fields: { [b.phone ? 'phone' : 'email']: tx('That is already yours.') } });
+    const taken = await t.pool.query(b.phone ? 'select 1 from users where phone = $1 and id <> $2' : 'select 1 from users where lower(email) = $1 and id <> $2', [to, userId]);
+    if (taken.rowCount) throw new ApiError('conflict', tx('Another account at the school has it. Ask the school office.'), { fields: { [b.phone ? 'phone' : 'email']: tx('Already in use.') } });
+    return this.sendCode(t, u, 'contact', { channel: b.phone ? 'sms' : 'email', to });
+  }
+
+  /** The code from the new address: the account (and, for a parent, the family's record the school messages) takes it. */
+  async finishContact(t: TenantCtx, userId: string, b: ContactFinish): Promise<void> {
+    const who = await this.useCode(t, b.challengeId, b.code, 'contact');
+    if (who !== userId) throw new ApiError('unauthenticated', 'That code has expired. Go back and ask for a new one.', { fields: { code: 'That code has expired.' } });
+    const c = (await t.pool.query<{ channel: 'sms' | 'email'; target: string }>('select channel, target from otp_challenges where id = $1', [b.challengeId])).rows[0]!;
+    const col = c.channel === 'sms' ? 'phone' : 'email';
+    // Checked again: someone may have taken it while the code was on its way.
+    if ((await t.pool.query(`select 1 from users where ${col === 'phone' ? 'phone = $1' : 'lower(email) = $1'} and id <> $2`, [c.target, userId])).rowCount) {
+      throw new ApiError('conflict', tx('Another account at the school has it. Ask the school office.'));
+    }
+    await t.pool.query(`update users set ${col} = $2 where id = $1`, [userId, c.target]);
+    await t.pool.query(`update guardians set ${col} = $2 where user_id = $1`, [userId, c.target]);
+    await this.audit.record(t, { actorId: userId, actorName: 'self', action: `account.${col}`, entity: 'user', entityId: userId });
+  }
+
+  /** Where this person is signed in, newest first; the one asking is marked. */
+  async sessions(t: TenantCtx, userId: string, current: string | undefined): Promise<SessionRow[]> {
+    const { rows } = await t.pool.query<{ id: string; client: string | null; user_agent: string | null; created_at: Date }>(
+      'select id, client, user_agent, created_at from sessions where user_id = $1 and revoked_at is null and expires_at > now() order by created_at desc limit 50', [userId]);
+    return rows.map((r) => ({ id: r.id, client: r.client ?? 'web', device: deviceOf(r.user_agent), since: r.created_at.toISOString(), current: r.id === current }));
+  }
+
+  /** Signs one of them out (not the one asking: that is sign out). */
+  async endSession(t: TenantCtx, userId: string, id: string, current: string | undefined): Promise<void> {
+    if (id === current) throw new ApiError('validation', tx('This is the device you are on: sign out instead.'));
+    const r = await t.pool.query('update sessions set revoked_at = now() where id = $1 and user_id = $2 and revoked_at is null', [id, userId]);
+    if (!r.rowCount) throw new ApiError('not_found', tx('That device is already signed out.'));
+  }
+
   /** Checks a code for one purpose and spends it. Returns the user it belongs to. */
-  private async useCode(t: TenantCtx, challengeId: string, code: string, purpose: 'sign_in' | 'reset'): Promise<string> {
+  private async useCode(t: TenantCtx, challengeId: string, code: string, purpose: 'sign_in' | 'reset' | 'contact'): Promise<string> {
     const { rows } = await t.pool.query<{ id: string; user_id: string; code_hash: string; attempts: number; expires_at: Date; used_at: Date | null; purpose: string }>(
       'select id, user_id, code_hash, attempts, expires_at, used_at, purpose from otp_challenges where id = $1', [challengeId]);
     const row = rows[0];

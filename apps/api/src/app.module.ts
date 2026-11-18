@@ -1,7 +1,7 @@
 import { Inject, Injectable, Module, type DynamicModule, type OnApplicationShutdown } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { PoolManager, Registry } from '@tangent/tenancy';
-import { AuthController, MeController } from './auth/auth.controller.js';
+import { AuthController, FamilyAccountController, MeController } from './auth/auth.controller.js';
 import { AuthService } from './auth/auth.service.js';
 import { AuthGuard, PermissionsGuard } from './auth/guards.js';
 import { ApiExceptionFilter } from '@tangent/nest-kit';
@@ -74,7 +74,7 @@ export class AppModule {
     return {
       module: AppModule,
       controllers: [
-        FormsController, FamilyFormsController, PhotoZipController, ReportSchedulesController,
+        FamilyAccountController, FormsController, FamilyFormsController, PhotoZipController, ReportSchedulesController,
         AuthController, MeController, ClassesController, StudentsController, AttendanceController, FeesController, ApprovalsController, NoticesController,
         TimetableController, DashboardController, SettingsController, HealthController, LearningController, PeopleController, OfficeController, FamilyController, ErrorsController, I18nController, ChangeRequestsController, SetupController, MovingInController,
         HooksController, FilesController, SchoolLogoController, ChannelsController, FeesOnlineController, ReportCardsController, LibraryController, TransportController, GalleryController, YearController, FamilyCampusController, FinderController,
