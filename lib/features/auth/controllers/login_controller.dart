@@ -18,6 +18,9 @@ class LoginController extends GetxController {
   final formKey = GlobalKey<FormState>();
   final loading = false.obs;
   final useOtp = false.obs;
+
+  /// Seconds before another code may be asked for (the school's answer).
+  final resendIn = 30.obs;
   /// True when the person asked for a code instead of typing a password (families have no password).
   var _codeOnly = false;
   /// Demo role picked on the login shelf; none until the user taps one.
@@ -70,6 +73,8 @@ class LoginController extends GetxController {
       // The password was right. The school sent a code; the code screen takes over.
       otp.clear();
       useOtp.value = true;
+      resendIn.value = sent.resendIn;
+      resendIn.refresh();
       final hint = sent.demoCode;
       ToastHelper.show(sent.message, body: hint == null ? sent.sentTo : '${sent.sentTo} · $hint');
     } on AppException catch (error) {

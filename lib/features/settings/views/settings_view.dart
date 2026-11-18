@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/features/auth/views/account_sheets.dart';
 import 'package:tangent/features/auth/views/password_sheets.dart';
 import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/routes/app_routes.dart';
@@ -235,7 +236,11 @@ class SettingsView extends StatelessWidget {
                   _LinkRow(icon: PhosphorIconsRegular.password, label: 'auth.change_password', onTap: () => unawaited(showChangePassword())),
                   const Hr(indent: 46),
                 ],
-                _LinkRow(icon: PhosphorIconsRegular.devices, label: 'auth.sign_out_everywhere', onTap: () => unawaited(signOutEverywhere())),
+                _LinkRow(icon: PhosphorIconsRegular.at, label: 'account.phone_email', onTap: () => unawaited(showContactChange())),
+                const Hr(indent: 46),
+                _LinkRow(icon: PhosphorIconsRegular.devices, label: 'account.devices', onTap: () => unawaited(showDevices())),
+                const Hr(indent: 46),
+                _LinkRow(icon: PhosphorIconsRegular.signOut, label: 'auth.sign_out_everywhere', onTap: () => unawaited(signOutEverywhere())),
                 const Hr(indent: 46),
                 _LinkRow(
                   icon: PhosphorIconsRegular.signOut,

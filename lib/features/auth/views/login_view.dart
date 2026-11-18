@@ -330,12 +330,15 @@ class _OtpScreen extends StatefulWidget {
 class _OtpScreenState extends State<_OtpScreen> {
   final _focus = FocusNode();
   Timer? _timer;
+  Worker? _wait;
   var _left = 30;
 
   @override
   void initState() {
     super.initState();
     _startTimer();
+    // A new code restarts the wait the school gave with it.
+    _wait = ever(widget.controller.resendIn, (_) => _startTimer());
     widget.controller.otp.addListener(_changed);
     WidgetsBinding.instance.addPostFrameCallback((_) => _focus.requestFocus());
   }
@@ -344,7 +347,7 @@ class _OtpScreenState extends State<_OtpScreen> {
 
   void _startTimer() {
     _timer?.cancel();
-    setState(() => _left = 30);
+    setState(() => _left = widget.controller.resendIn.value);
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) return;
       if (_left <= 1) t.cancel();
@@ -355,6 +358,7 @@ class _OtpScreenState extends State<_OtpScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _wait?.dispose();
     widget.controller.otp.removeListener(_changed);
     _focus.dispose();
     super.dispose();
@@ -434,7 +438,7 @@ class _OtpScreenState extends State<_OtpScreen> {
                                       text: '${'auth.resend_in'.tr} ',
                                       children: [
                                         TextSpan(
-                                          text: '0:${_left.toString().padLeft(2, '0')}',
+                                          text: '${_left ~/ 60}:${(_left % 60).toString().padLeft(2, '0')}',
                                           style: AppText.capB(color: c.ink2),
                                         ),
                                       ],
@@ -442,10 +446,7 @@ class _OtpScreenState extends State<_OtpScreen> {
                                     style: context.type.cap,
                                   )
                                 : Pressable(
-                                    onTap: () {
-                                      _startTimer();
-                                      unawaited(widget.controller.resend());
-                                    },
+                                    onTap: () => unawaited(widget.controller.resend()),
                                     child: Text('auth.resend'.tr, style: AppText.capB(color: c.mariText)),),
                           ),
                           Pressable(

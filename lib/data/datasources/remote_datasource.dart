@@ -14,4 +14,6 @@ class RemoteDataSource {
 
   Future<dynamic> patch(String path, Map<String, dynamic> body) =>
       client.patch(path, body);
+
+  Future<dynamic> delete(String path) => client.delete(path);
 }

@@ -126,6 +126,8 @@ class ApiClient {
 
   Future<dynamic> patch(String path, Map<String, dynamic> body) => _send('PATCH', path, body: body);
 
+  Future<dynamic> delete(String path) => _send('DELETE', path);
+
   /// A public file's bytes (a script's font): no sign-in, no cache of its own (the caller keeps it).
   Future<Uint8List> bytes(String path) async {
     if (_base.isEmpty) throw const AppException('errors.remote_unconfigured');

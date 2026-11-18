@@ -76,10 +76,16 @@ class MockAuthRepository implements AuthRepository {
 }
 
 /// The school sent a sign-in code; the person has to type it. Thrown by the first step of a real sign-in.
+/// The wait the school gives before another code (30 seconds when it does not say).
+int _resendIn(Map<String, dynamic> c) => (c['resendInSeconds'] as num?)?.toInt() ?? 30;
+
 class OtpRequired extends AppException {
-  const OtpRequired(this.sentTo, {this.demoCode}) : super('auth.code_sent');
+  const OtpRequired(this.sentTo, {this.demoCode, this.resendIn = 30}) : super('auth.code_sent');
 
   final String sentTo;
+
+  /// Seconds until another code may be asked for, as the school says (longer once several were sent).
+  final int resendIn;
 
   /// Only a demo school hands the code to the app, so the demo can be tried without a phone.
   final String? demoCode;
@@ -97,7 +103,7 @@ class RemoteAuthRepository implements AuthRepository {
     if (json['step'] == 'done') return _enter(Map<String, dynamic>.from(json['tokens'] as Map));
     final challenge = Map<String, dynamic>.from(json['challenge'] as Map);
     _challenge = challenge['challengeId'] as String;
-    throw OtpRequired(challenge['maskedTo'] as String? ?? '', demoCode: challenge['demoCode'] as String?);
+    throw OtpRequired(challenge['maskedTo'] as String? ?? '', demoCode: challenge['demoCode'] as String?, resendIn: _resendIn(challenge));
   }
 
   Future<AppUser> _enter(Map<String, dynamic> tokens) async {
@@ -121,7 +127,7 @@ class RemoteAuthRepository implements AuthRepository {
   Future<Never> requestCode(String identifier) async {
     final challenge = Map<String, dynamic>.from(await _remote.post('/v1/auth/code', {'identifier': identifier.trim(), 'client': 'mobile'}) as Map);
     _challenge = challenge['challengeId'] as String;
-    throw OtpRequired(challenge['maskedTo'] as String? ?? '', demoCode: challenge['demoCode'] as String?);
+    throw OtpRequired(challenge['maskedTo'] as String? ?? '', demoCode: challenge['demoCode'] as String?, resendIn: _resendIn(challenge));
   }
 
   @override
