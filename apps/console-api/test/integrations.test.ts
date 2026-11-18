@@ -55,6 +55,11 @@ describe('connections', () => {
 
   it('routes, refuses to delete a routed connection, and takes delivery reports on its webhook', async () => {
     expect((await h.c('PUT', '/console/v1/integrations/routes', { token: t, body: { capability: 'payments', schoolId: null, connectionId: id } })).status).toBe(400);
+    // A draft (its form not filled in) carries nothing.
+    const draft = (await h.c('POST', '/console/v1/integrations/connections', { token: t, body: { provider: 'twilio', name: 'Half set up', scope: 'platform', settings: {}, secrets: {}, draft: true } })).json;
+    const refused = await h.c('PUT', '/console/v1/integrations/routes', { token: t, body: { capability: 'sms', schoolId: null, connectionId: draft.id } });
+    expect(refused.status).toBe(400);
+    expect(refused.json.message).toMatch(/Finish setting up/);
     expect((await h.c('PUT', '/console/v1/integrations/routes', { token: t, body: { capability: 'sms', schoolId: null, connectionId: id, settings: { senderId: 'GRDEON' } } })).status).toBe(204);
     expect((await h.c('DELETE', `/console/v1/integrations/connections/${id}`, { token: t })).status).toBe(409);
     await h.registry.query("insert into message_log (id, school_slug, channel, to_addr, body, status, connection_id, provider_message_id) values ('msg_t1','demo','sms','9822011002','Hello','sent',$1,'m-1')", [id]);

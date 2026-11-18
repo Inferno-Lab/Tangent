@@ -163,6 +163,8 @@ export class Integrations implements OnModuleInit {
       if (!cid) continue;
       const c = await this.raw(cid);
       if (!providerDef(c.provider)?.capabilities.includes(b.capability)) throw new ApiError('validation', tx('{name} cannot do {capability}.', { name: c.name, capability: b.capability }), { fields: { [`${role}Id`]: 'This connection cannot do that.' } });
+      // A draft has not passed its checks: nothing is sent through it until it is set up and tested.
+      if (c.state === 'draft') throw new ApiError('validation', tx('Finish setting up {name} (fill in its form and Test it) before routing to it.', { name: c.name }), { fields: { [`${role}Id`]: tx('Not set up yet.') } });
       if (c.scope === 'school' && c.school_id !== b.schoolId) throw new ApiError('validation', tx('{name} belongs to one school and can only be routed for it.', { name: c.name }), { fields: { [`${role}Id`]: 'This connection belongs to another school.' } });
     }
     if (b.fallbackId && b.fallbackId === b.connectionId) throw new ApiError('validation', 'The fallback must be a different connection.', { fields: { fallbackId: 'Choose a different connection.' } });
