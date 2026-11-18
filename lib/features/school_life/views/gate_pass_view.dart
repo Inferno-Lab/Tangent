@@ -43,6 +43,7 @@ class GatePassScreen extends GetView<GatePassController> {
           child: v == null ? const SizedBox.shrink() : Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const SizedBox(height: 12),
               if (v.code != null)
                 Rise(
                   index: 1,

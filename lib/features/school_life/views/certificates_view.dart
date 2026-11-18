@@ -37,6 +37,7 @@ class CertificatesView extends GetView<CertificatesController> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const SizedBox(height: 12),
               if (v == null || v.certificates.isEmpty) const EmptyState(art: EmptyArt.results, title: 'certificates.empty', body: 'certificates.empty_body'),
               for (final (i, c) in (v?.certificates ?? const []).indexed)
                 Rise(

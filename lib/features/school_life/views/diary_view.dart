@@ -148,6 +148,7 @@ class TeacherDiaryView extends GetView<TeacherDiaryController> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const SizedBox(height: 12),
               if (controller.classes.length > 1)
                 Wrap(spacing: 8, runSpacing: 8, children: [for (final c in controller.classes) Chip2(c.name, on: c.id == cls?.id, onTap: () => unawaited(controller.pick(c.id)))]),
               if (controller.entries.isEmpty)

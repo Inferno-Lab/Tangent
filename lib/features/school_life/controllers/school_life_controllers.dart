@@ -103,7 +103,7 @@ class DiaryController extends GetxController with Loadable {
   @override
   Future<void> load() => run(() async {
     final id = _child;
-    entries = id == null ? [] : await _repo.diary(id);
+    entries = id == null ? [] : (await _repo.diary(id)..sort((a, b) => b.date.compareTo(a.date)));
   }, isEmpty: () => entries.isEmpty);
 
   int get unread => entries.where((e) => e.needsAck).length;
@@ -133,7 +133,7 @@ class TeacherDiaryController extends GetxController with Loadable {
       kinds = r.kinds;
       classId.value ??= classes.firstOrNull?.id;
     }
-    entries = classId.value == null ? [] : await _repo.classDiary(classId.value!);
+    entries = classId.value == null ? [] : (await _repo.classDiary(classId.value!)..sort((a, b) => b.date.compareTo(a.date)));
   }, isEmpty: () => classes.isEmpty);
 
   Future<void> pick(String id) async {

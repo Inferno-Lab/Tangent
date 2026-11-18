@@ -37,6 +37,7 @@ class InviteView extends GetView<InviteController> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const SizedBox(height: 12),
               if (controller.invites.isEmpty) const EmptyState(art: EmptyArt.events, title: 'visitors.empty', body: 'visitors.empty_body'),
               for (final (i, v) in controller.invites.indexed)
                 Rise(

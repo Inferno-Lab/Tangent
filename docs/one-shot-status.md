@@ -73,7 +73,17 @@ other twenty-five modules of section 6, by the owner's choice.
 
 ## Gates (section 9)
 
-See the end of this file for the results of the last full run.
+Last run, 18 and 19 November 2026:
+
+- Build and types: pass. Package tests: pass (security 8, api-client 7, config-engine 25, tenancy 1, contracts 46,
+  integrations 11, web-ui 25, db 35). Console API 73/73. API 187 (7 stale tests fixed and those files re-run: 89/89;
+  the whole API suite was not run again after the fix).
+- App: `tool/verify.sh` pass (analyze clean, 55 tests). Screenshots of the new screens, parent and teacher, light and
+  dark: checked; spacing and diary order fixed afterwards.
+- Browser flows: 60/60 (five new ones for the modules).
+- UI audit, every page, four widths, light and dark: clean.
+- **Not run yet:** the right-to-left audit (`node tools/audit-ui.mjs --rtl`), the scans (`scan-cutoff`, `scan-fit`,
+  `scan-gaps`, `scan-scroll`), the load script (`node tools/load.mjs`), and one full `pnpm test` after the last fixes.
 
 ## Needs the owner (section 10)
 

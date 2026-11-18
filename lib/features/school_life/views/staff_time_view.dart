@@ -44,6 +44,7 @@ class StaffTimeView extends GetView<StaffTimeController> {
           child: d == null ? const SizedBox.shrink() : Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const SizedBox(height: 12),
               const Rise(index: 1, child: CheckInCard()),
               Rise(index: 2, child: SectionLabel('staff.balances'.tr, top: 24)),
               Rise(
@@ -85,7 +86,7 @@ class StaffTimeView extends GetView<StaffTimeController> {
                                 children: [
                                   Text(r.typeName, style: context.type.ts),
                                   Text(
-                                    '${r.from == r.to ? _day(r.from) : '${_day(r.from)} – ${_day(r.to)}'}${r.halfDay != null ? ' · ${(r.halfDay == 'am' ? 'staff.morning' : 'staff.afternoon').tr}' : ''} · ${'staff.days_n'.trp({'n': _days(r.days)})}',
+                                    '${r.from == r.to ? _day(r.from) : '${_day(r.from)} – ${_day(r.to)}'}${r.halfDay != null ? ' · ${(r.halfDay == 'am' ? 'staff.morning' : 'staff.afternoon').tr}' : ''} · ${'staff.days_n'.trn(r.days, {'n': _days(r.days)})}',
                                     style: context.type.cap,
                                   ),
                                   if (r.note.isNotEmpty) Text(r.note, style: context.type.cap, maxLines: 2, overflow: TextOverflow.ellipsis),
