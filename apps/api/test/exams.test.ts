@@ -59,6 +59,29 @@ describe('exams the school’s way', () => {
     }
   });
 
+  it('marks a rubric subject on its criteria: every level within its top, the mark worked out on the paper’s maximum', async () => {
+    const [a] = await subjects();
+    await h.setSettings({ 'grading.schemes': [{ key: 'myp', name: 'Criteria', kind: 'rubric', passPct: 40, subjects: [a],
+      criteria: [{ key: 'a', name: 'Knowing', max: 8 }, { key: 'b', name: 'Inquiring', max: 8 }], bands: [{ grade: '7', minPct: 85 }, { grade: '4', minPct: 50 }, { grade: '1', minPct: 0 }] }] });
+    try {
+      const day = addDays(schoolToday(), -2);
+      const e = (await call('POST', '/v1/exams', { name: `Rubric ${Date.now()}`, classId: 'cls_6a', startsOn: day, endsOn: day, subjects: [{ subjectId: a, maxMarks: 40 }] })).json;
+      expect(e.subjects[0].criteria.map((c: any) => c.key)).toEqual(['a', 'b']);
+      const stu = (await call('GET', `/v1/exams/${e.id}/marks`)).json.students[0].studentId;
+      const put = (criteria: Record<string, number>) => call('PUT', `/v1/exams/${e.id}/marks`, { marks: [{ studentId: stu, subjectId: a, score: null, criteria }] });
+      expect((await put({ a: 6 })).status).toBe(400);
+      expect((await put({ a: 6, b: 9 })).status).toBe(400);
+      expect((await put({ a: 6, b: 5, z: 1 })).status).toBe(400);
+      // 11 of 16 on a paper out of 40: 27.5.
+      expect((await put({ a: 6, b: 5 })).json.students.find((s: any) => s.studentId === stu).marks[a]).toMatchObject({ score: 27.5, criteria: { a: 6, b: 5 } });
+      // A total typed straight in (the teachers' app) is taken as it is.
+      const plain = await call('PUT', `/v1/exams/${e.id}/marks`, { marks: [{ studentId: stu, subjectId: a, score: 30 }] });
+      expect(plain.json.students.find((s: any) => s.studentId === stu).marks[a]).toMatchObject({ score: 30, criteria: null });
+      await call('DELETE', `/v1/exams/${e.id}`);
+    } finally {
+      await h.setSettings({ 'grading.schemes': [] });
+    }
+  });
   it('ranks across the year group when the school says so, and weighs each kind of exam in the year’s result', async () => {
     const [a] = await subjects();
     const day = addDays(schoolToday(), -3);
@@ -87,8 +110,12 @@ describe('exams the school’s way', () => {
       const r = (await call('GET', '/v1/reports/results-year?classId=cls_9b')).json;
       expect(r.columns.map((c: any) => c.key)).toEqual(['student', 'class', 'exams', 'pct', 'grade']);
       expect(r.rows.length).toBeGreaterThan(10);
+      // Only the best term exam counts: every 9B student scored full marks in this one.
+      await h.setSettings({ 'exams.weights': { term: 1 }, 'exams.bestOf': { term: 1 }, 'results.decimals': 1 });
+      const best = (await call('GET', '/v1/reports/results-year?classId=cls_9b')).json;
+      expect(best.rows.filter((x: any) => x.pct !== '–').every((x: any) => x.pct === '100%')).toBe(true);
     } finally {
-      await h.setSettings({ 'exams.weights': {} });
+      await h.setSettings({ 'exams.weights': {}, 'exams.bestOf': {}, 'results.decimals': 0 });
     }
   });
 

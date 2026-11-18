@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
 import {
-  schoolToday, gpaOf, gradeIn, gradesOf, pctOfGrade, type ExamRemarksPut,
+  schoolToday, gpaOf, roundPct, gradeIn, gradesOf, pctOfGrade, type ExamRemarksPut,
   type ExamCreate, type ExamMarksPut, type ExamMarksView, type ExamResults, type ExamRow, type HomeworkCreate, type HomeworkDetail, type HomeworkMarks, type HomeworkRow, tx } from '@tangent/contracts';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
@@ -186,7 +186,8 @@ export class LearningService {
       const grading = gradings.get(r.grade)!;
       const subjects = subs.rows.filter((s) => s.exam_id === r.id).map((s) => {
         const scheme = grading.schemeOf(s.subject_id);
-        return { subjectId: s.subject_id, name: s.name, onDate: s.on_date, maxMarks: s.max_marks, startsAt: s.starts_at, endsAt: s.ends_at, room: s.room, invigilatorId: s.invigilator_id, invigilatorName: s.invigilator, grades: scheme.entry === 'grade' ? gradesOf(scheme) : [] };
+        return { subjectId: s.subject_id, name: s.name, onDate: s.on_date, maxMarks: s.max_marks, startsAt: s.starts_at, endsAt: s.ends_at, room: s.room, invigilatorId: s.invigilator_id, invigilatorName: s.invigilator, grades: scheme.entry === 'grade' ? gradesOf(scheme) : [],
+          criteria: scheme.kind === 'rubric' ? scheme.criteria ?? [] : [] };
       });
       return { id: r.id, name: r.name, kind: r.kind, classId: r.class_id, className: r.class_name, startsOn: r.starts_on, endsOn: r.ends_on, status: r.status, subjects, entered: enteredBy.get(r.id) ?? 0, expected: Number(r.students) * subjects.length, reopenedNote: r.reopened_note };
     });
@@ -265,13 +266,13 @@ export class LearningService {
     const exam = await this.exam(t, id);
     const [stu, marks, remarks] = await Promise.all([
       t.pool.query<{ id: string; name: string; roll_no: string }>("select id, name, roll_no from students where class_id = $1 and status = 'active' order by roll_no, name", [exam.classId]),
-      t.pool.query<{ student_id: string; subject_id: string; score: string | null; absent: boolean; grade: string | null }>('select student_id, subject_id, score, absent, grade from exam_marks where exam_id = $1', [id]),
+      t.pool.query<{ student_id: string; subject_id: string; score: string | null; absent: boolean; grade: string | null; criteria: Record<string, number> | null }>('select student_id, subject_id, score, absent, grade, criteria from exam_marks where exam_id = $1', [id]),
       t.pool.query<{ student_id: string; remark: string }>('select student_id, remark from exam_remarks where exam_id = $1', [id]),
     ]);
-    const by = new Map<string, Record<string, { score: number | null; absent: boolean; grade: string | null }>>();
+    const by = new Map<string, Record<string, { score: number | null; absent: boolean; grade: string | null; criteria: Record<string, number> | null }>>();
     for (const m of marks.rows) {
       const cur = by.get(m.student_id) ?? {};
-      cur[m.subject_id] = { score: m.score == null ? null : Number(m.score), absent: m.absent, grade: m.grade };
+      cur[m.subject_id] = { score: m.score == null ? null : Number(m.score), absent: m.absent, grade: m.grade, criteria: m.criteria };
       by.set(m.student_id, cur);
     }
     const said = new Map(remarks.rows.map((r) => [r.student_id, r.remark]));
@@ -328,7 +329,22 @@ export class LearningService {
     const max = new Map(exam.subjects.map((s) => [s.subjectId, s.maxMarks]));
     const students = new Set((await t.pool.query<{ id: string }>('select id from students where class_id = $1', [exam.classId])).rows.map((r) => r.id));
     const byGrade = new Map(exam.subjects.filter((s) => s.grades.length).map((s) => [s.subjectId, s.grades]));
+    const rubric = new Map(exam.subjects.filter((s) => s.criteria.length).map((s) => [s.subjectId, s.criteria]));
     for (const m of body.marks) {
+      // A rubric subject: a level for every criterion within its top, and the score is their share of the paper's maximum.
+      const crit = rubric.get(m.subjectId);
+      if (m.criteria && !crit) throw new ApiError('validation', tx('This subject is not marked on criteria.'));
+      if (crit && m.criteria && !m.absent) {
+        const missing = crit.filter((c) => m.criteria![c.key] === undefined);
+        if (missing.length) throw new ApiError('validation', tx('Give a level for every criterion: {names}.', { names: missing.map((c) => c.name).join(', ') }));
+        const over = crit.find((c) => m.criteria![c.key]! > c.max);
+        if (over) throw new ApiError('validation', tx('{name} goes up to {max}.', { name: over.name, max: over.max }));
+        const extra = Object.keys(m.criteria).find((k) => !crit.some((c) => c.key === k));
+        if (extra) throw new ApiError('validation', tx('There is no criterion “{key}”.', { key: extra }));
+        const sum = crit.reduce((a, c) => a + m.criteria![c.key]!, 0);
+        const most = crit.reduce((a, c) => a + c.max, 0);
+        m.score = Math.round((sum / most) * max.get(m.subjectId)! * 100) / 100;
+      } else if (!crit || m.absent) m.criteria = undefined;
       const cap = max.get(m.subjectId);
       if (cap === undefined) throw new ApiError('validation', 'That subject is not part of this exam.');
       if (!students.has(m.studentId)) throw new ApiError('validation', 'One of those students is not in this class.');
@@ -349,9 +365,9 @@ export class LearningService {
       for (const m of body.marks) {
         if (m.score == null && !m.grade && !m.absent) await client.query('delete from exam_marks where exam_id = $1 and student_id = $2 and subject_id = $3', [id, m.studentId, m.subjectId]);
         else await client.query(
-          `insert into exam_marks (exam_id, student_id, subject_id, score, absent, grade) values ($1,$2,$3,$4,$5,$6)
-           on conflict (exam_id, student_id, subject_id) do update set score = excluded.score, absent = excluded.absent, grade = excluded.grade`,
-          [id, m.studentId, m.subjectId, m.absent ? null : m.score, m.absent, m.absent ? null : m.grade ?? null]);
+          `insert into exam_marks (exam_id, student_id, subject_id, score, absent, grade, criteria) values ($1,$2,$3,$4,$5,$6,$7)
+           on conflict (exam_id, student_id, subject_id) do update set score = excluded.score, absent = excluded.absent, grade = excluded.grade, criteria = excluded.criteria`,
+          [id, m.studentId, m.subjectId, m.absent ? null : m.score, m.absent, m.absent ? null : m.grade ?? null, m.criteria ? JSON.stringify(m.criteria) : null]);
       }
       // Marks that change after publishing no longer match what families see, so the exam goes back to marking.
       await client.query("update exams set status = 'marking' where id = $1 and status in ('upcoming','published')", [id]);
@@ -371,6 +387,7 @@ export class LearningService {
     const { exam, students } = await this.marksView(t, id);
     const year = (await t.pool.query<{ grade: number }>('select grade from classes where id = $1', [exam.classId])).rows[0]?.grade ?? null;
     const grading = await this.settings.grading(t, { grade: year });
+    const mode = await this.settings.value<'nearest' | 'up' | 'down'>(t, 'results.rounding', 'nearest');
     const max = new Map(exam.subjects.map((s) => [s.subjectId, s.maxMarks]));
     const rows = students.filter((s) => Object.keys(s.marks).length).map((s) => {
       let total = 0;
@@ -386,7 +403,7 @@ export class LearningService {
         total += asPct !== null ? (asPct / 100) * cap : m.score ?? 0;
         if (!m.absent) points.push(gradeIn(scheme, asPct ?? Math.round(((m.score ?? 0) / cap) * 100)).points);
       }
-      const pct = outOf ? Math.round((total / outOf) * 100) : 0;
+      const pct = outOf ? roundPct((total / outOf) * 100, mode) : 0;
       return { studentId: s.studentId, name: s.name, rollNo: s.rollNo, total: Math.round(total * 100) / 100, max: outOf, pct, grade: grading.grade(pct), rank: 0, gpa: gpaOf(points) };
     });
     return { exam, grading, rows };

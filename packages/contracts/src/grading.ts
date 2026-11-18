@@ -7,9 +7,9 @@ import { isLanguage, localizedLabels, tx } from './i18n.js';
  * A scheme is percentage bands; a band may carry points (for a GPA or CGPA) and a descriptor (Secure, Exceeding). A pass or
  * fail scheme only says whether the mark reached the pass mark.
  */
-export const SCHEME_KINDS = ['bands', 'points', 'passfail'] as const;
+export const SCHEME_KINDS = ['bands', 'points', 'passfail', 'rubric'] as const;
 export type SchemeKind = (typeof SCHEME_KINDS)[number];
-export const SCHEME_KIND_LABELS: Record<SchemeKind, string> = localizedLabels({ bands: 'Grades by percentage', points: 'Grades with points (GPA)', passfail: 'Pass or fail' });
+export const SCHEME_KIND_LABELS: Record<SchemeKind, string> = localizedLabels({ bands: 'Grades by percentage', points: 'Grades with points (GPA)', passfail: 'Pass or fail', rubric: 'Criteria and levels (rubric)' });
 
 export const GradeBand = z.object({
   grade: z.string().trim().min(1).max(6),
@@ -18,6 +18,10 @@ export const GradeBand = z.object({
   descriptor: z.string().trim().max(40).optional(),
 });
 export type GradeBand = z.infer<typeof GradeBand>;
+
+/** One criterion of a rubric: its name ("A: Knowing and understanding") and its top level. */
+export const RubricCriterion = z.object({ key: z.string().regex(/^[a-z0-9_-]{1,16}$/), name: z.string().trim().min(1).max(60), max: z.number().int().min(1).max(100) });
+export type RubricCriterion = z.infer<typeof RubricCriterion>;
 
 export const GradingScheme = z.object({
   key: z.string().regex(/^[a-z0-9_-]{1,24}$/),
@@ -32,7 +36,11 @@ export const GradingScheme = z.object({
   subjects: z.array(z.string()).max(40).optional(),
   /** How a teacher enters it: marks (graded by percentage), or the grade itself (early years, descriptors). */
   entry: z.enum(['marks', 'grade']).optional(),
+  /** A rubric's criteria: a level for each is entered, and the grade comes from their total as a percentage of the most. */
+  criteria: z.array(RubricCriterion).max(12).optional(),
 }).refine((s) => s.kind === 'passfail' || s.bands.length > 0, { message: 'Add the grades', path: ['bands'] })
+  .refine((s) => s.kind !== 'rubric' || (s.criteria?.length ?? 0) > 0, { message: 'Add the criteria', path: ['criteria'] })
+  .refine((s) => new Set((s.criteria ?? []).map((c) => c.key)).size === (s.criteria ?? []).length, { message: 'Two criteria have the same key', path: ['criteria'] })
   .refine((s) => s.kind !== 'points' || s.bands.every((b) => b.points !== undefined), { message: 'Give every grade its points', path: ['bands'] });
 export type GradingScheme = z.infer<typeof GradingScheme>;
 export const GradingSchemes = z.array(GradingScheme).max(12).refine((l) => new Set(l.map((s) => s.key)).size === l.length, 'Two schemes have the same key');
@@ -70,6 +78,20 @@ export function pctOfGrade(s: GradingScheme, grade: string): number | null {
 export const gradesOf = (s: GradingScheme): string[] => (s.kind === 'passfail' ? [tx('Pass'), tx('Fail')] : [...s.bands].sort((a, b) => b.minPct - a.minPct).map((b) => b.grade));
 
 /** A grade point average of subjects' points, to two places (null when no subject earned points). */
+/** A percentage rounded the school's way (results.rounding): to the nearest, always up or always down, to so many decimals. */
+export function roundPct(pct: number, mode: 'nearest' | 'up' | 'down' = 'nearest', decimals = 0): number {
+  const f = 10 ** decimals;
+  // The small nudge keeps 84.999999 (floating point for 85) from rounding down.
+  const x = pct * f;
+  const r = mode === 'up' ? Math.ceil(x - 1e-9) : mode === 'down' ? Math.floor(x + 1e-9) : Math.round(x + 1e-9 * Math.sign(x));
+  return r / f;
+}
+
+/** The marks that count when only the best `n` of them do (0 or more than there are: all of them). */
+export function bestOf<T>(items: readonly T[], n: number | undefined, score: (x: T) => number): T[] {
+  return !n || n >= items.length ? [...items] : [...items].sort((a, b) => score(b) - score(a)).slice(0, n);
+}
+
 export function gpaOf(points: readonly (number | null)[]): number | null {
   const got = points.filter((p): p is number => p !== null);
   return got.length ? Math.round((got.reduce((a, p) => a + p, 0) / got.length) * 100) / 100 : null;

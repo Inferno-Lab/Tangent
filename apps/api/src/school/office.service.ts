@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
-import { tx, fmtNumber, fmtMoney, fmtDate, addDays, dayMonth, schoolToday, latestSchoolDay, type DataRequestCreate, type DataRequestDecision, type DataRequestRow, type EventReply, type EventRow, type EventSave, type FeeStatus, type InvoiceListQuery, type InvoiceListRow, type InvoiceListSummary, type Paged, type ReceiptRow, type ReportData, type ReportInfo, type ReportQuery, type ThreadCreate, type ThreadDetail, type ThreadPatch, type ThreadReply, type ThreadRow } from '@tangent/contracts';
+import { bestOf, roundPct, tx, fmtNumber, fmtMoney, fmtDate, addDays, dayMonth, schoolToday, latestSchoolDay, type DataRequestCreate, type DataRequestDecision, type DataRequestRow, type EventReply, type EventRow, type EventSave, type FeeStatus, type InvoiceListQuery, type InvoiceListRow, type InvoiceListSummary, type Paged, type ReceiptRow, type ReportData, type ReportInfo, type ReportQuery, type ThreadCreate, type ThreadDetail, type ThreadPatch, type ThreadReply, type ThreadRow } from '@tangent/contracts';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
@@ -181,22 +181,32 @@ export class OfficeService {
     if (id === 'results-year') {
       // Published exams of this school year; each kind of exam counts as its weight (exams.weights), or every exam alike when none are set.
       const weights = await this.settings.value<Record<string, number>>(t, 'exams.weights', {});
+      const best = await this.settings.value<Record<string, number>>(t, 'exams.bestOf', {});
+      const mode = await this.settings.value<'nearest' | 'up' | 'down'>(t, 'results.rounding', 'nearest');
+      const decimals = await this.settings.value<number>(t, 'results.decimals', 0);
       const weighted = Object.keys(weights).length > 0;
       const { rows } = await t.pool.query<{ id: string; name: string; class_name: string; grade: number; kind: string; pct: number }>(
         `select s.id, s.name, c.name class_name, c.grade, e.kind, r.pct from exams e join classes c on c.id = e.class_id
          join students s on s.class_id = c.id and s.status = 'active' join exam_results r on r.student_id = s.id and r.exam = e.name
          where e.status = 'published' and e.starts_on >= coalesce((select starts_on from academic_years where current limit 1), '1900-01-01') and ($1::text is null or c.id = $1)`, [q.classId ?? null]);
-      const by = new Map<string, { name: string; cls: string; grade: number; sum: number; w: number; n: number }>();
+      const by = new Map<string, { name: string; cls: string; grade: number; sum: number; w: number; n: number; kinds: Map<string, number[]> }>();
       for (const r of rows) {
-        const w = weighted ? weights[r.kind] ?? 0 : 1;
-        const cur = by.get(r.id) ?? { name: r.name, cls: r.class_name, grade: r.grade, sum: 0, w: 0, n: 0 };
+        const cur = by.get(r.id) ?? { name: r.name, cls: r.class_name, grade: r.grade, sum: 0, w: 0, n: 0, kinds: new Map() };
         cur.n++;
-        if (w > 0) { cur.sum += w * r.pct; cur.w += w; }
+        cur.kinds.set(r.kind, [...(cur.kinds.get(r.kind) ?? []), Number(r.pct)]);
         by.set(r.id, cur);
+      }
+      // Each kind: only its best so many (exams.bestOf), each counting the kind's weight.
+      for (const v of by.values()) {
+        for (const [kind, pcts] of v.kinds) {
+          const w = weighted ? weights[kind] ?? 0 : 1;
+          if (w <= 0) continue;
+          for (const p of bestOf(pcts, best[kind], (x) => x)) { v.sum += w * p; v.w += w; }
+        }
       }
       const out = [];
       for (const [studentId, v] of [...by].sort((a, b) => a[1].cls.localeCompare(b[1].cls) || a[1].name.localeCompare(b[1].name))) {
-        const pct = v.w ? Math.round(v.sum / v.w) : null;
+        const pct = v.w ? roundPct(v.sum / v.w, mode, decimals) : null;
         out.push({ _student: studentId, student: v.name, class: v.cls, exams: v.n, pct: pct === null ? '–' : `${pct}%`, grade: pct === null ? '–' : (await this.settings.grading(t, { grade: v.grade })).grade(pct) });
       }
       return { ...base, scope: scope(), summary: [{ label: tx('Students'), value: String(out.length) }, { label: tx('Counted'), value: weighted ? tx('By kind of exam') : tx('Every exam alike') }],

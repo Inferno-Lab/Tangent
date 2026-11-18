@@ -147,8 +147,8 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
       const w = (value ?? {}) as Record<string, number>;
       return box(
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {kinds.map((k) => <div key={k.key} style={{ width: 170 }}><NumberField label={listLabel(kinds, k.key, currentLanguage())} min={0} max={100} value={w[k.key] === undefined ? '' : String(w[k.key])} disabled={disabled}
-            onChange={(v) => { const next = { ...w }; if (v === '') delete next[k.key]; else next[k.key] = Math.min(100, Math.max(0, Number(v) || 0)); onChange(next); }} /></div>)}
+          {kinds.map((k) => <div key={k.key} style={{ width: 170 }}><NumberField label={listLabel(kinds, k.key, currentLanguage())} min={0} max={meta.max ?? 100} value={w[k.key] === undefined ? '' : String(w[k.key])} disabled={disabled}
+            onChange={(v) => { const next = { ...w }; if (v === '') delete next[k.key]; else next[k.key] = Math.min(meta.max ?? 100, Math.max(0, Number(v) || 0)); onChange(next); }} /></div>)}
           {!kinds.length && <div className="help" style={{ margin: 0 }}>{tr('ui.settings.add_kinds_of_exam_first')}</div>}
         </div>,
       );
@@ -606,7 +606,7 @@ function GradingSchemesEditor({ value, subjects, disabled, onChange }: { value: 
         <div key={s.key} className="card" style={{ padding: 12, marginTop: 8 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 160 }}><Field label={tr('ui.settings.scheme')} value={s.name} maxLength={40} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
-            <div style={{ width: 220 }}><SelectField label={tr('ui.settings.grades_by')} value={s.kind} disabled={disabled} onChange={(k) => put(i, { kind: k as GradingScheme['kind'] })} options={SCHEME_KINDS.map((k) => ({ value: k, label: SCHEME_KIND_LABELS[k] }))} /></div>
+            <div style={{ width: 220 }}><SelectField label={tr('ui.settings.grades_by')} value={s.kind} disabled={disabled} onChange={(k) => put(i, { kind: k as GradingScheme['kind'], ...(k === 'rubric' && !s.criteria?.length ? { criteria: ['a', 'b', 'c', 'd'].map((x) => ({ key: x, name: tr('ui.settings.criterion_n', { n: x.toUpperCase() }), max: 8 })) } : {}) })} options={SCHEME_KINDS.map((k) => ({ value: k, label: SCHEME_KIND_LABELS[k] }))} /></div>
             <div style={{ width: 130 }}><NumberField label={tr('ui.settings.pass_mark')} min={0} max={100} value={String(s.passPct)} disabled={disabled} onChange={(v) => put(i, { passPct: v === '' ? 0 : Number(v) })} /></div>
             <button type="button" className="btn sm" disabled={disabled} onClick={() => onChange(value.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
           </div>
@@ -618,6 +618,22 @@ function GradingSchemesEditor({ value, subjects, disabled, onChange }: { value: 
               const on = !!s.subjects?.includes(sub.id);
               return <button key={sub.id} type="button" className={`chip ${on ? 'v' : ''}`} aria-pressed={on} disabled={disabled} onClick={() => { const next = on ? (s.subjects ?? []).filter((x) => x !== sub.id) : [...(s.subjects ?? []), sub.id]; put(i, { subjects: next.length ? next : undefined }); }}>{sub.name}</button>;
             })}</div>
+          </div>}
+          {s.kind === 'rubric' && <div className="fld" style={{ marginTop: 8 }}>
+            <label>{tr('ui.settings.criteria')}</label>
+            {(s.criteria ?? []).map((c, ci) => (
+              <div key={c.key} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 4 }}>
+                <div style={{ flex: 1, minWidth: 180 }}><Field label={tr('ui.settings.criterion')} value={c.name} maxLength={60} disabled={disabled} onChange={(v) => put(i, { criteria: s.criteria!.map((x, j) => (j === ci ? { ...x, name: v } : x)) })} /></div>
+                <div style={{ width: 120 }}><NumberField label={tr('ui.settings.top_level')} min={1} max={100} value={String(c.max)} disabled={disabled} onChange={(v) => put(i, { criteria: s.criteria!.map((x, j) => (j === ci ? { ...x, max: Math.max(1, Math.min(100, Number(v) || 1)) } : x)) })} /></div>
+                <button type="button" className="btn sm" style={{ marginBottom: 6 }} disabled={disabled || s.criteria!.length <= 1} onClick={() => put(i, { criteria: s.criteria!.filter((_, j) => j !== ci) })}>{tr('ui.settings.remove')}</button>
+              </div>
+            ))}
+            {(s.criteria?.length ?? 0) < 12 && <button type="button" className="btn sm" style={{ marginTop: 6 }} disabled={disabled} onClick={() => {
+              let n = (s.criteria?.length ?? 0) + 1;
+              while (s.criteria?.some((c) => c.key === `c${n}`)) n++;
+              put(i, { criteria: [...(s.criteria ?? []), { key: `c${n}`, name: tr('ui.settings.criterion_n', { n }), max: 8 }] });
+            }}>{tr('ui.settings.add_a_criterion')}</button>}
+            <div className="help">{tr('ui.settings.rubric_help')}</div>
           </div>}
           {s.kind !== 'passfail' && <div style={{ marginTop: 8 }}><GradingEditor value={s.bands} max={15} disabled={disabled} points={s.kind === 'points'} onChange={(b) => put(i, { bands: b as GradeBand[] })} /></div>}
         </div>

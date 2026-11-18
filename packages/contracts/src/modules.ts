@@ -83,7 +83,8 @@ export type ExamCreate = z.infer<typeof ExamCreate>;
 
 export const ExamMarksPut = z.object({
   // A subject graded without marks (its scheme's entry is "grade") takes `grade`, one of the scheme's grades, and no score.
-  marks: z.array(z.object({ studentId: z.string().min(1), subjectId: z.string().min(1), score: z.number().min(0).max(200).nullable(), absent: z.boolean().default(false), grade: z.string().trim().max(12).optional() })).min(1).max(2000),
+  marks: z.array(z.object({ studentId: z.string().min(1), subjectId: z.string().min(1), score: z.number().min(0).max(200).nullable(), absent: z.boolean().default(false), grade: z.string().trim().max(12).optional(),
+    criteria: z.record(z.string(), z.number().int().min(0).max(100)).optional() })).min(1).max(2000),
 });
 export type ExamMarksPut = z.infer<typeof ExamMarksPut>;
 
@@ -101,6 +102,8 @@ export interface ExamRow {
     subjectId: string; name: string; onDate: string | null; maxMarks: number; startsAt: string | null; endsAt: string | null; room: string; invigilatorId: string | null; invigilatorName: string | null;
     /** The grades a teacher picks from when this subject is graded without marks; none when it takes marks. */
     grades: string[];
+    /** A rubric subject's criteria (a level for each, the score their total on the paper's maximum); none otherwise. */
+    criteria: { key: string; name: string; max: number }[];
   }[];
   /** Why published results were reopened (empty unless they were). */
   reopenedNote: string;
@@ -111,7 +114,7 @@ export interface ExamRow {
 
 export interface ExamMarksView {
   exam: ExamRow;
-  students: { studentId: string; name: string; rollNo: string; marks: Record<string, { score: number | null; absent: boolean; grade: string | null }>; remark: string }[];
+  students: { studentId: string; name: string; rollNo: string; marks: Record<string, { score: number | null; absent: boolean; grade: string | null; criteria?: Record<string, number> | null }>; remark: string }[];
 }
 
 /** Each student's remark on an exam, written or picked from the school's remarks (exams.remarks); empty removes it. */

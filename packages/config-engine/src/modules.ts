@@ -238,7 +238,7 @@ export const MODULES: ModuleManifest[] = localized([
     ],
     pages: [P('ex', 'Exams', 'exams', 'G X', '/exams', 'Teach', ['exams.read'])],
     app: [A('home', 'nextExam', 'Next exam', FAMILY), A('quick', 'enterMarks', 'Enter marks', ['teacher'])],
-    settings: ['exams.types', 'exams.weights', 'exams.remarks', 'results.showRank', 'results.rankWithin', 'grading.scale', 'grading.passPct', 'grading.schemes', 'exams.defaultMaxMarks', 'exams.leadDays'],
+    settings: ['exams.types', 'exams.weights', 'exams.bestOf', 'exams.remarks', 'results.showRank', 'results.rankWithin', 'results.rounding', 'results.decimals', 'grading.scale', 'grading.passPct', 'grading.schemes', 'exams.defaultMaxMarks', 'exams.leadDays'],
     permissions: ['exams.read', 'exams.write', 'exams.publish'],
     messages: ['exam.results', 'exam.reopened'],
     imports: ['marks'],

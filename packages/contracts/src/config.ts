@@ -169,6 +169,11 @@ export const SchoolSettingsSchema = z.object({
   'exams.types': schoolList([{ key: 'unit', name: 'Unit test' }, { key: 'term', name: 'Term exam' }, { key: 'final', name: 'Final exam' }], 1, 12),
   // How much each kind of exam counts towards the year's result (by its key, out of any total); none: every exam the same.
   'exams.weights': z.record(z.string().max(32), z.number().min(0).max(100)).default({}),
+  // Per kind of exam: only the best so many count in the year's result (best 3 of 4 unit tests); none: all of them.
+  'exams.bestOf': z.record(z.string().max(32), z.number().int().min(0).max(20)).default({}),
+  // How percentages are rounded in results: to the nearest, up or down, and the year's result to so many decimals.
+  'results.rounding': z.enum(['nearest', 'up', 'down']).default('nearest'),
+  'results.decimals': z.number().int().min(0).max(2).default(0),
   // Remarks a teacher picks from for a student's report (a school list, each in the school's languages).
   'exams.remarks': schoolList([], 0, 60),
   // Where a student's rank is counted: in their class, or across every class of their year sitting the same exam.

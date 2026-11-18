@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { addDays, listLabel, listOptions, schoolToday, type ExamRow, type ListItem } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, Field, Segmented, Select, SelectField, TimeField, currentLanguage, useShake, EmptyState, t } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, Field, NumberField, Segmented, Select, SelectField, TimeField, currentLanguage, useShake, EmptyState, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { AddBtn, Avatar, dateLabel, problem, useOpenParam, useSetting } from '../../app/kit';
@@ -152,7 +152,8 @@ function ExamDialog({ exam, defaultClass, onClose, onDone }: { exam?: ExamRow; d
   );
 }
 
-type Cell = { score: string; absent: boolean; grade: string };
+type Cell = { score: string; absent: boolean; grade: string; criteria?: Record<string, string> };
+const levels = (c?: Record<string, string> | null) => JSON.stringify(Object.entries(c ?? {}).filter(([, v]) => v !== '').sort());
 
 function ExamSheet({ id, onClose, onChange, onChanged, onRemoved }: { id: string; onClose: () => void; onChange: (e: ExamRow) => void; onChanged: (msg?: string) => void; onRemoved: () => void }) { const app = useApp();
   const [tab, setTab] = useState<'marks' | 'results' | 'remarks'>('marks');
@@ -171,7 +172,9 @@ function ExamSheet({ id, onClose, onChange, onChanged, onRemoved }: { id: string
   const canWrite = app.user.permissions.includes('exams.write');
   const canPublish = app.user.permissions.includes('exams.publish');
   const key = (stu: string, sub: string) => `${stu}|${sub}`;
-  const saved = (stu: string, sub: string): Cell => { const x = m?.students.find((s) => s.studentId === stu)?.marks[sub]; return { score: x?.score == null ? '' : String(x.score), absent: !!x?.absent, grade: x?.grade ?? '' }; };
+  const saved = (stu: string, sub: string): Cell => { const x = m?.students.find((s) => s.studentId === stu)?.marks[sub];
+    return { score: x?.score == null ? '' : String(x.score), absent: !!x?.absent, grade: x?.grade ?? '', criteria: x?.criteria ? Object.fromEntries(Object.entries(x.criteria).map(([k, v]) => [k, String(v)])) : undefined }; };
+  const [levelsFor, setLevelsFor] = useState<{ stu: string; name: string; sub: string } | null>(null);
   const cell = (stu: string, sub: string): Cell => draft[key(stu, sub)] ?? saved(stu, sub);
   useEffect(() => { setDraft({}); setSaid({}); }, [m]);
   const remarkOf = (stu: string) => said[stu] ?? m?.students.find((s) => s.studentId === stu)?.remark ?? '';
@@ -179,8 +182,10 @@ function ExamSheet({ id, onClose, onChange, onChanged, onRemoved }: { id: string
   const saveRemarks = useMutation({ mutationFn: () => app.api.exams.putRemarks(id, { remarks: remarksDirty.map((studentId) => ({ studentId, remark: said[studentId]!.trim() })) }),
     onSuccess: () => { setErr(''); void marks.refetch(); onChanged(t('admin.exams_page.remarks_saved')); },
     onError: (e) => { setErr(problem(e)._ ?? t('admin.exams_page.could_not_save')); shake.hit(); } });
-  const dirty = Object.keys(draft).filter((k) => { const [a, b] = k.split('|') as [string, string]; const s = saved(a, b); const d = draft[k]!; return s.score !== d.score || s.absent !== d.absent || s.grade !== d.grade; });
-  const save = useMutation({ mutationFn: () => app.api.exams.putMarks(id, { marks: dirty.map((k) => { const [studentId, subjectId] = k.split('|') as [string, string]; const d = draft[k]!; return { studentId, subjectId, score: d.absent || d.score === '' ? null : Number(d.score), absent: d.absent, grade: d.absent || !d.grade ? undefined : d.grade }; }) }),
+  const dirty = Object.keys(draft).filter((k) => { const [a, b] = k.split('|') as [string, string]; const s = saved(a, b); const d = draft[k]!; return s.score !== d.score || s.absent !== d.absent || s.grade !== d.grade || levels(s.criteria) !== levels(d.criteria); });
+  const save = useMutation({ mutationFn: () => app.api.exams.putMarks(id, { marks: dirty.map((k) => { const [studentId, subjectId] = k.split('|') as [string, string]; const d = draft[k]!; return { studentId, subjectId, score: d.absent || d.criteria || d.score === '' ? null : Number(d.score), absent: d.absent, grade: d.absent || !d.grade ? undefined : d.grade,
+      // A rubric's levels: the server works the score out from them; none given clears the mark.
+      ...(d.criteria && !d.absent && Object.values(d.criteria).some((v) => v !== '') ? { criteria: Object.fromEntries(Object.entries(d.criteria).filter(([, v]) => v !== '').map(([k, v]) => [k, Number(v)])) } : {}) }; }) }),
     onSuccess: () => { setErr(''); void marks.refetch(); void results.refetch(); onChanged(t('admin.exams_page.marks_saved')); },
     onError: (e) => { setErr(problem(e)._ ?? t('admin.exams_page.could_not_save')); shake.hit(); } });
   const publish = useMutation({ mutationFn: () => app.api.exams.publish(id),
@@ -202,6 +207,22 @@ function ExamSheet({ id, onClose, onChange, onChanged, onRemoved }: { id: string
   const editable = canWrite && ex?.status !== 'published';
   return (
     <Dialog title={ex ? ex.name : t('admin.exams_page.exam')} tag={ex ? { text: t('admin.exams_page.class_3', { className: ex.className, p1: LABEL[ex.status] }), tone: ex.status === 'published' ? 'g' : 'v' } : undefined} onClose={onClose} width={860} shake={shake.cls}>
+      {levelsFor && ex && (() => {
+        const sub = ex.subjects.find((x) => x.subjectId === levelsFor.sub)!;
+        const c = cell(levelsFor.stu, sub.subjectId);
+        const put = (k: string, v: string) => setDraft({ ...draft, [key(levelsFor.stu, sub.subjectId)]: { ...c, absent: false, grade: '', criteria: { ...(c.criteria ?? {}), [k]: v } } });
+        const total = sub.criteria.reduce((a, cr) => a + (Number(c.criteria?.[cr.key]) || 0), 0);
+        const most = sub.criteria.reduce((a, cr) => a + cr.max, 0);
+        return (
+          <Dialog title={t('admin.exams_page.levels_for', { name: levelsFor.name, subject: sub.name })} onClose={() => setLevelsFor(null)} width={460}>
+            <div className="stack">
+              {sub.criteria.map((cr) => <NumberField key={cr.key} label={t('admin.exams_page.criterion_up_to', { name: cr.name, max: cr.max })} min={0} max={cr.max} value={c.criteria?.[cr.key] ?? ''} onChange={(v) => put(cr.key, v)} />)}
+              <p className="help" style={{ margin: 0 }}>{t('admin.exams_page.levels_total', { total, most, max: sub.maxMarks })}</p>
+              <div className="tgrow" style={{ justifyContent: 'flex-end' }}><button className="btn pri" onClick={() => setLevelsFor(null)}>{t('admin.exams_page.done')}</button></div>
+            </div>
+          </Dialog>
+        );
+      })()}
       {!m || !ex ? <div className="skc" style={{ height: 280, borderRadius: 16 }} /> : (
         <>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', margin: '4px 0 12px' }}>
@@ -223,7 +244,10 @@ function ExamSheet({ id, onClose, onChange, onChanged, onRemoved }: { id: string
                       const over = c.score !== '' && Number(c.score) > sub.maxMarks;
                       return (
                         <span key={sub.subjectId} className="mkc">
-                          {sub.grades.length ? (
+                          {sub.criteria.length ? (
+                            <button type="button" className="hws" style={{ cursor: editable && !c.absent ? 'pointer' : 'default' }} disabled={!editable || c.absent} aria-label={t('admin.exams_page.levels_for', { name: s.name, subject: sub.name })}
+                              onClick={() => setLevelsFor({ stu: s.studentId, name: s.name, sub: sub.subjectId })}>{c.absent ? t('admin.exams_page.abs') : c.criteria && Object.values(c.criteria).some((v) => v !== '') && levels(c.criteria) !== levels(saved(s.studentId, sub.subjectId).criteria) ? '…' : c.score || '–'}</button>
+                          ) : sub.grades.length ? (
                             <Select compact aria-label={`${s.name}, ${sub.name}`} value={c.absent ? '' : c.grade} disabled={!editable || c.absent}
                               onChange={(grade) => setDraft({ ...draft, [key(s.studentId, sub.subjectId)]: { score: '', absent: false, grade } })}
                               options={[{ value: '', label: c.absent ? t('admin.exams_page.abs') : '–' }, ...sub.grades.map((g) => ({ value: g, label: g }))]} />
