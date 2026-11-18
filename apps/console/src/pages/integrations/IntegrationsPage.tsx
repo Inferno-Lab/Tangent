@@ -3,7 +3,7 @@ import { useParams } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
 import {
-  CAPABILITIES, CAPABILITY_LABELS, DELIVERY_STATUSES, INTEGRATION_PROVIDERS, LANGUAGES, MESSAGE_EVENTS, PLATFORM_CAPABILITIES, SYSTEM_MESSAGES, fieldProblem, providerDef,
+  CAPABILITIES, CAPABILITY_LABELS, DELIVERY_STATUSES, INTEGRATION_PROVIDERS, LANGUAGES, MESSAGE_EVENTS, PLATFORM_CAPABILITIES, SUGGESTED_PROVIDERS, SYSTEM_MESSAGES, fieldProblem, providerDef, suggestedFirst,
   type Capability, type ConnectionRow, type DeliveryRow, type IntegrationsView, type ProviderField, type RouteRow, type SchoolRow, type TemplateRow,
 } from '@tangent/contracts';
 import { Checkbox, Dialog, Field, FilePick, NumberField, Segmented, Select, SelectField, useShake, Icon, type IconName, EmptyState, useMore, EmptyNote, t as tr } from '@tangent/web-ui';
@@ -207,13 +207,16 @@ function ConnectionDialog({ c: initial, schools, onClose, onDone }: { c?: Connec
   const shake = useShake();
   const [c, setC] = useState<ConnectionRow | undefined>(initial);
   const [cap, setCap] = useState<Capability>(c ? (providerDef(c.provider)?.capabilities[0] ?? 'sms') : 'sms');
-  const providers = INTEGRATION_PROVIDERS.filter((p) => p.key !== 'sandbox' && p.capabilities.includes(cap));
-  const [provider, setProvider] = useState(c?.provider ?? providers[0]?.key ?? '');
+  const [provider, setProvider] = useState(c?.provider ?? INTEGRATION_PROVIDERS.find((p) => p.key !== 'sandbox' && p.capabilities.includes(cap))?.key ?? '');
   const def = providerDef(provider);
   const platformOnly = !!def && def.capabilities.every((k) => PLATFORM_CAPABILITIES.includes(k));
   const [name, setName] = useState(c?.name ?? '');
   const [scope, setScope] = useState<'platform' | 'school'>(c?.scope ?? 'platform');
   const [schoolId, setSchoolId] = useState(c?.schoolId ?? schools[0]?.id ?? '');
+  // For one school, its country's usual providers come first.
+  const country = scope === 'school' ? schools.find((x) => x.id === schoolId)?.country : undefined;
+  const providers = suggestedFirst(INTEGRATION_PROVIDERS.filter((p) => p.key !== 'sandbox' && p.capabilities.includes(cap)), country);
+  const suggested = new Set((SUGGESTED_PROVIDERS[country ?? ''] ?? []));
   const [vals, setVals] = useState<Record<string, string>>(() => Object.fromEntries(Object.entries(c?.settings ?? {}).map(([k, v]) => [k, typeof v === 'string' ? v : JSON.stringify(v)])));
   const [err, setErr] = useState<Record<string, string>>({});
   const set = (k: string) => (x: string) => { setVals((o) => ({ ...o, [k]: x })); setErr((e) => ({ ...e, [k]: '', _: '' })); };
@@ -258,7 +261,7 @@ function ConnectionDialog({ c: initial, schools, onClose, onDone }: { c?: Connec
           <div className="two">
             <SelectField label={tr('console.integrations_page.what_it_does')} value={cap} onChange={(x) => { setCap(x as Capability); setProvider(INTEGRATION_PROVIDERS.find((p) => p.key !== 'sandbox' && p.capabilities.includes(x as Capability))?.key ?? ''); }}
               options={CAPABILITIES.filter((k) => INTEGRATION_PROVIDERS.some((p) => p.key !== 'sandbox' && p.capabilities.includes(k))).map((k) => ({ value: k, label: CAPABILITY_LABELS[k] }))} />
-            <SelectField label={tr('console.integrations_page.provider')} value={provider} onChange={setProvider} options={providers.map((p) => ({ value: p.key, label: p.name }))} />
+            <SelectField label={tr('console.integrations_page.provider')} value={provider} onChange={setProvider} options={providers.map((p) => ({ value: p.key, label: suggested.has(p.key) ? tr('console.integrations_page.suggested', { name: p.name }) : p.name }))} />
           </div>
           <Field label={tr('console.integrations_page.name')} value={name} onChange={(x) => { setName(x); setErr((e) => ({ ...e, name: '' })); }} error={err.name} placeholder={def ? tr('console.integrations_page.for_every_school', { name: def.name }) : ''} />
           {!platformOnly && <>

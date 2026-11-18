@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { customHttp } from './providers/generic.js';
 import { razorpay } from './providers/payments.js';
+import { checkoutCom, gocardless, stripe, vonage } from './providers/regional.js';
 import { metaCloud } from './providers/whatsapp.js';
 import { readLink, signLink } from './token.js';
 import { e164, fill, segments, type Ctx } from './types.js';
@@ -68,5 +69,36 @@ describe('translation drafts', () => {
     // The app's own placeholders.
     expect(keepsValues('@n files from @name', '@name के @n फ़ाइल')).toBe(true);
     expect(keepsValues('@n files from @name', '@n फ़ाइल')).toBe(false);
+  });
+});
+
+describe('regional providers', () => {
+  it('accepts a Stripe payment only when signed in the last five minutes', async () => {
+    const body = JSON.stringify({ type: 'checkout.session.completed', data: { object: { id: 'cs_1', client_reference_id: 'greenfield:ord_1', payment_intent: 'pi_1', amount_total: 4500, payment_status: 'paid', payment_method_types: ['card'] } } });
+    const c = ctx({}, { webhookSecret: 'whsec_x' });
+    const sign = (t: number) => `t=${t},v1=${createHmac('sha256', 'whsec_x').update(`${t}.${body}`).digest('hex')}`;
+    const now = Math.floor(Date.now() / 1000);
+    expect((await stripe.inbound!(c, req(body, { 'stripe-signature': sign(now - 600) }))).ok).toBe(false);
+    expect((await stripe.inbound!(c, req(body, { 'stripe-signature': 't=1,v1=nope' }))).ok).toBe(false);
+    const good = await stripe.inbound!(c, req(body, { 'stripe-signature': sign(now) }));
+    expect(good.payments).toEqual([{ kind: 'paid', reference: 'greenfield:ord_1', providerPaymentId: 'pi_1', amountMinor: 4500, method: 'card' }]);
+    // An unpaid session (a bank debit still clearing) is not a payment yet.
+    const pending = JSON.stringify({ type: 'checkout.session.completed', data: { object: { id: 'cs_2', payment_status: 'unpaid', amount_total: 100 } } });
+    const t = now;
+    expect((await stripe.inbound!(c, req(pending, { 'stripe-signature': `t=${t},v1=${createHmac('sha256', 'whsec_x').update(`${t}.${pending}`).digest('hex')}` }))).payments).toEqual([]);
+  });
+  it('checks Checkout.com and GoCardless signatures', async () => {
+    const body = JSON.stringify({ type: 'payment_captured', data: { id: 'pay_1', reference: 'greenfield:ord_2', amount: 12500 } });
+    const c = ctx({}, { webhookSecret: 'sec' });
+    expect((await checkoutCom.inbound!(c, req(body, { 'cko-signature': 'nope' }))).ok).toBe(false);
+    expect((await checkoutCom.inbound!(c, req(body, { 'cko-signature': createHmac('sha256', 'sec').update(body).digest('hex') }))).payments)
+      .toEqual([{ kind: 'paid', reference: 'greenfield:ord_2', providerPaymentId: 'pay_1', amountMinor: 12500, method: 'card' }]);
+    const gc = JSON.stringify({ events: [] });
+    expect((await gocardless.inbound!(c, req(gc, { 'webhook-signature': 'nope' }))).ok).toBe(false);
+    expect((await gocardless.inbound!(c, req(gc, { 'webhook-signature': createHmac('sha256', 'sec').update(gc).digest('hex') }))).ok).toBe(true);
+  });
+  it('reads a Vonage delivery receipt', async () => {
+    const r = await vonage.inbound!(ctx(), req('', {}, { messageId: 'm1', status: 'delivered', 'err-code': '0' }));
+    expect(r.deliveries).toEqual([{ providerId: 'm1', status: 'delivered', error: undefined }]);
   });
 });

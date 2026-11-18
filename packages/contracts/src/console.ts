@@ -260,6 +260,8 @@ export interface SchoolRow {
   cell: string;
   target: DeployTarget;
   region: string;
+  /** The school's country (ISO 3166-1), copied from its settings. */
+  country: string;
   versions: { api: string; admin: string; app: string };
   configVersion: number;
   students: number;

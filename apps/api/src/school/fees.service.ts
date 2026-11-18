@@ -112,7 +112,7 @@ export class FeesService {
   /** Asks for a desk receipt to be cancelled (recorded by mistake); someone else who may refund decides. */
   async requestReceiptCancel(t: TenantCtx, user: { id: string; name: string }, paymentId: string, b: ReceiptCancel): Promise<InvoiceDetail> {
     const p = (await t.pool.query<{ invoice_id: string; receipt_no: string; amount: number; cancelled_at: Date | null; online: boolean }>(
-      "select invoice_id, receipt_no, amount, cancelled_at, (method = 'online') online from payments where id = $1", [paymentId])).rows[0];
+      "select invoice_id, receipt_no, amount, cancelled_at, (provider_payment_id is not null or method = 'online') online from payments where id = $1", [paymentId])).rows[0];
     if (!p) throw notFound('That receipt');
     if (p.cancelled_at) throw new ApiError('conflict', 'That receipt is already cancelled.');
     if (p.online) throw new ApiError('conflict', 'An online payment is refunded from Online payments, not cancelled.');

@@ -823,6 +823,7 @@
  "console.integrations_page.starting": "Starting…",
  "console.integrations_page.status": "Status",
  "console.integrations_page.steps_to_get_each_value": "steps to get each value from",
+ "console.integrations_page.suggested": "{name} (suggested for this school)",
  "console.integrations_page.switch_to_live": "Switch to live…",
  "console.integrations_page.tangent_default": "Tangent default",
  "console.integrations_page.tangent_itself_uses_this_so": "Tangent itself uses this, so it serves every school.",

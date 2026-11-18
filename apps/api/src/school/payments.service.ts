@@ -9,7 +9,8 @@ import { FeesService } from './fees.service.js';
 import { HubService } from './hub.service.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
 
-const METHODS: Record<string, 'upi' | 'card' | 'netbanking'> = { upi: 'upi', card: 'card', netbanking: 'netbanking', nb: 'netbanking', wallet: 'upi' };
+// The provider's word for how it was paid, as the school's method kinds; anything else is "online".
+const METHODS: Record<string, string> = { upi: 'upi', card: 'card', netbanking: 'netbanking', nb: 'netbanking', wallet: 'wallet', bank: 'bank' };
 
 
 
@@ -101,7 +102,7 @@ export class PaymentsService implements OnModuleInit {
     const paid = roundMoney(ev.amountMinor / 10 ** currencyDigits(t.info.currency));
     try {
       const done = await this.fees.pay(t, { id: 'online', name: 'Online payment' }, {
-        studentId: claimed.student_id, invoiceId: claimed.invoice_id, amount: paid, method: METHODS[ev.method ?? ''] ?? 'upi', reference: ev.providerPaymentId.slice(0, 60),
+        studentId: claimed.student_id, invoiceId: claimed.invoice_id, amount: paid, method: METHODS[ev.method ?? ''] ?? 'online', reference: ev.providerPaymentId.slice(0, 60),
       }, { providerPaymentId: ev.providerPaymentId });
       await t.pool.query('update payment_orders set payment_id = $2 where id = $1', [orderId, done.paymentId]);
       return `Paid ${fmtMoney(paid)}: receipt ${done.receiptNo}`;

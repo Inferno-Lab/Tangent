@@ -92,6 +92,15 @@ export const INTEGRATION_PROVIDERS: ProviderDef[] = localized([
     steps: [...DLT_STEPS, 'At Kaleyra, add the header and templates, then copy the SID and API key from Developers → API keys.', 'Fill in the form; delivery reports come with each message.'],
     fields: [f('sid', 'Account SID', 'text', { help: 'Kaleyra → Developers → API keys' }), f('apiKey', 'API key', 'secret', { help: 'Kaleyra → Developers → API keys' }), f('sender', 'Sender ID', 'text', { help: 'Your DLT-approved header', ...SENDER })],
     webhooks: { events: 'Delivery reports', verifies: 'The secret token in the webhook address' } },
+  { key: 'vonage', name: 'Vonage', capabilities: ['sms'], testAction: SMS_TEST, docs: 'https://developer.vonage.com/en/api/sms',
+    steps: ['In the Vonage API dashboard, copy the API key and API secret from the home page.', 'Buy a number or register a sender name for the countries you text (some need a registered sender first).',
+      'Fill in the form; delivery receipts are requested with each text, nothing to paste back.'],
+    fields: [f('apiKey', 'API key', 'text', { help: 'Vonage dashboard home page' }), f('apiSecret', 'API secret', 'secret', { help: 'Vonage dashboard home page' }),
+      f('from', 'From number or sender name', 'text', { placeholder: '447700900000', help: 'A Vonage number, or an approved sender name' })],
+    webhooks: { events: 'Delivery receipts', verifies: 'The secret token in the webhook address' } },
+  { key: 'unifonic', name: 'Unifonic', capabilities: ['sms'], testAction: SMS_TEST, docs: 'https://docs.unifonic.com/',
+    steps: ['In Unifonic Console, register the sender name with the regulator for each country you text (the UAE and Saudi Arabia need this first).', 'Products → SMS → Applications: create an application and copy its App SID.', 'Fill in the form and Test.'],
+    fields: [f('appSid', 'App SID', 'secret', { help: 'Unifonic Console → SMS → Applications' }), f('senderId', 'Sender name', 'text', { help: 'As registered with the regulator', pattern: '^[\\w .-]{2,11}$', patternHint: 'Up to 11 letters and digits.' })] },
   // WhatsApp
   { key: 'meta-cloud', name: 'WhatsApp Cloud API (Meta)', capabilities: ['whatsapp'], testAction: WA_TEST, docs: 'https://developers.facebook.com/docs/whatsapp/cloud-api',
     steps: ['In Meta Business Manager, add a WhatsApp Business account and a phone number; copy its Phone number ID (WhatsApp → API setup).',
@@ -127,6 +136,16 @@ export const INTEGRATION_PROVIDERS: ProviderDef[] = localized([
   { key: 'resend', name: 'Resend', capabilities: ['email'], testAction: MAIL_TEST, docs: 'https://resend.com/docs/api-reference/emails/send-email',
     steps: ['Add and verify the sending domain at Resend → Domains (it gives the DNS records).', 'Create an API key with sending access (API keys).', 'Fill in the form and Test.'],
     fields: [f('apiKey', 'API key', 'secret', { help: 'Resend → API keys', pattern: '^re_\\w+$', patternHint: 'Starts with re_.' }), f('from', 'From address', 'text', { help: 'On the verified domain', pattern: '^(.+<)?[^@\\s<>]+@[^@\\s<>]+\\.[^@\\s<>]+>?$', patternHint: 'An address, or a name with the address in <>.' })] },
+  { key: 'sendgrid', name: 'SendGrid', capabilities: ['email'], testAction: MAIL_TEST, docs: 'https://www.twilio.com/docs/sendgrid/api-reference/mail-send/mail-send',
+    steps: ['In SendGrid, authenticate the sending domain (Settings → Sender authentication) and add its DNS records.', 'Settings → API keys → Create: restricted access with Mail Send.', 'Fill in the form and Test.'],
+    fields: [f('apiKey', 'API key', 'secret', { help: 'Settings → API keys', pattern: '^SG\\.[\\w-]+\\.[\\w-]+$', patternHint: 'Starts with SG.' }), f('from', 'From address', 'text', { help: 'On a verified domain or sender', pattern: '^(.+<)?[^@\\s<>]+@[^@\\s<>]+\\.[^@\\s<>]+>?$', patternHint: 'An address, or a name with the address in <>.' })] },
+  { key: 'mailgun', name: 'Mailgun', capabilities: ['email'], testAction: MAIL_TEST, docs: 'https://documentation.mailgun.com/docs/mailgun/api-reference/',
+    steps: ['In Mailgun, add and verify the sending domain (Sending → Domains) with its DNS records.', 'API security → Add new key; copy it.', 'Fill in the form (EU if the account is in the EU region) and Test.'],
+    fields: [f('apiKey', 'API key', 'secret', { help: 'API security' }), f('domain', 'Sending domain', 'text', { placeholder: 'mail.example.org', pattern: '^[a-z0-9.-]+\\.[a-z]{2,}$', patternHint: 'A domain, like mail.example.org.' }),
+      f('region', 'Region', 'select', { options: [['us', 'United States'], ['eu', 'Europe']] }), f('from', 'From address', 'text', { help: 'On a verified domain or sender', pattern: '^(.+<)?[^@\\s<>]+@[^@\\s<>]+\\.[^@\\s<>]+>?$', patternHint: 'An address, or a name with the address in <>.' })] },
+  { key: 'postmark', name: 'Postmark', capabilities: ['email'], testAction: MAIL_TEST, docs: 'https://postmarkapp.com/developer/api/email-api',
+    steps: ['In Postmark, add a sender signature or verify the domain (Sender signatures).', 'Open the server → API tokens; copy the Server API token.', 'Fill in the form and Test.'],
+    fields: [f('serverToken', 'Server API token', 'secret', { help: 'Your server → API tokens' }), f('from', 'From address', 'text', { help: 'On a verified domain or sender', pattern: '^(.+<)?[^@\\s<>]+@[^@\\s<>]+\\.[^@\\s<>]+>?$', patternHint: 'An address, or a name with the address in <>.' }), opt(f('stream', 'Message stream', 'text', { placeholder: 'outbound' }))] },
   // Phone notifications
   { key: 'fcm', name: 'Firebase Cloud Messaging', capabilities: ['push'], testAction: 'Checks the service account by asking Google for an access token.', docs: 'https://firebase.google.com/docs/cloud-messaging/send-message',
     steps: ['Create a Firebase project (console.firebase.google.com) and add an Android app with the package name of the Tangent app, and an iOS app with its bundle ID.',
@@ -147,6 +166,36 @@ export const INTEGRATION_PROVIDERS: ProviderDef[] = localized([
     steps: ['In Cashfree Payments, finish KYC (the sandbox works before that).', 'Developers → API keys: copy the App ID and Secret key for the environment you use.', 'Save, then Developers → Webhooks → add the webhook address shown here for payment links and refunds.'],
     fields: [f('appId', 'App ID', 'text', { help: 'Developers → API keys' }), f('secretKey', 'Secret key', 'secret', { help: 'Developers → API keys' }), f('environment', 'Environment', 'select', { options: [['sandbox', 'Test'], ['production', 'Live']] })],
     webhooks: { events: 'PAYMENT_LINK_EVENT, REFUND_STATUS_WEBHOOK', verifies: 'x-webhook-signature with the secret key' } },
+  { key: 'stripe', name: 'Stripe', capabilities: ['payments'], testAction: 'Reads the account balance with the secret key.', docs: 'https://docs.stripe.com/api/checkout/sessions',
+    steps: ['In Stripe, finish account activation (test keys work before that) and turn on the payment methods families use (Settings → Payment methods: cards, Apple Pay, Google Pay, Bacs, SEPA or ACH debit).',
+      'Developers → API keys: copy the Secret key (sk_test_ for test, sk_live_ for live). A restricted key needs write access to Checkout Sessions and Refunds.',
+      'Save, then Developers → Webhooks → Add endpoint: the webhook address shown here, events checkout.session.completed, checkout.session.async_payment_succeeded, checkout.session.async_payment_failed, refund.created and refund.updated. Copy its signing secret into the form.'],
+    fields: [f('secretKey', 'Secret key', 'secret', { help: 'Developers → API keys', pattern: '^(sk|rk)_(test|live)_\\w+$', patternHint: 'Starts with sk_test_, sk_live_ or rk_.' }),
+      f('webhookSecret', 'Webhook signing secret', 'secret', { help: 'Developers → Webhooks → the endpoint → Signing secret', pattern: '^whsec_\\w+$', patternHint: 'Starts with whsec_.' })],
+    webhooks: { events: 'checkout.session.completed, checkout.session.async_payment_succeeded, checkout.session.async_payment_failed, refund.created, refund.updated', verifies: 'Stripe-Signature with the signing secret (five-minute window)' } },
+  { key: 'paypal', name: 'PayPal', capabilities: ['payments'], testAction: 'Asks PayPal for an access token with the client ID and secret.', docs: 'https://developer.paypal.com/docs/api/orders/v2/',
+    steps: ['In the PayPal developer dashboard (developer.paypal.com), open Apps & Credentials and create an app for the business account (Sandbox to try, Live to take money).',
+      'Copy its Client ID and Secret.', 'In the app, add a webhook: the webhook address shown here, events Checkout order approved, Payment capture completed, Payment capture denied and Payment capture refunded. Copy the Webhook ID into the form.'],
+    fields: [f('clientId', 'Client ID', 'text', { help: 'Apps & Credentials → your app' }), f('clientSecret', 'Secret', 'secret', { help: 'Apps & Credentials → your app' }),
+      f('webhookId', 'Webhook ID', 'text', { help: 'Your app → Webhooks', pattern: '^\\w{10,}$', patternHint: 'The ID PayPal shows beside the webhook.' }), f('environment', 'Environment', 'select', { options: [['sandbox', 'Test (sandbox)'], ['live', 'Live']] })],
+    webhooks: { events: 'CHECKOUT.ORDER.APPROVED, PAYMENT.CAPTURE.COMPLETED, PAYMENT.CAPTURE.DENIED, PAYMENT.CAPTURE.REFUNDED', verifies: 'PayPal’s own signature check with the webhook ID' } },
+  { key: 'gocardless', name: 'GoCardless', capabilities: ['payments'], testAction: 'Reads the account (creditor) with the access token.', docs: 'https://developer.gocardless.com/api-reference#billing-requests',
+    steps: ['In GoCardless (sandbox first, then live once verified), open Developers → Create → Access token with read-write access.',
+      'Developers → Create → Webhook endpoint: the webhook address shown here and a secret of your choice (type the same below).',
+      'Direct debits take a few working days: a fee shows as paid only when GoCardless confirms the money was collected.'],
+    fields: [f('accessToken', 'Access token', 'secret', { help: 'Developers → Access tokens' }), f('webhookSecret', 'Webhook secret', 'secret', { help: 'The secret you typed for the webhook endpoint' }),
+      f('scheme', 'Direct debit scheme', 'select', { options: [['bacs', 'Bacs (UK)'], ['sepa_core', 'SEPA (Europe)'], ['ach', 'ACH (US)'], ['becs', 'BECS (Australia)'], ['pad', 'PAD (Canada)']] }),
+      f('environment', 'Environment', 'select', { options: [['sandbox', 'Test (sandbox)'], ['live', 'Live']] })],
+    webhooks: { events: 'payments (confirmed, failed), refunds (refund_settled)', verifies: 'Webhook-Signature with the webhook secret' } },
+  { key: 'checkout-com', name: 'Checkout.com', capabilities: ['payments'], testAction: 'Checks the secret key against the account.', docs: 'https://www.checkout.com/docs/payments/accept-payments/send-a-payment-link',
+    steps: ['In the Checkout.com dashboard (sandbox first), open Developers → Keys and create a secret key with the Payment Links and Payments scopes.',
+      'Note the processing channel ID (Settings → Processing channels) if the account has more than one.',
+      'Developers → Webhooks → New webhook: the webhook address shown here, events payment_captured, payment_declined, payment_capture_declined and payment_refunded. Copy the secret key it shows into the form.'],
+    fields: [f('secretKey', 'Secret key', 'secret', { help: 'Developers → Keys', pattern: '^sk_(sbox_)?[\\w-]+$', patternHint: 'Starts with sk_ (sk_sbox_ in the sandbox).' }),
+      f('webhookSecret', 'Webhook secret', 'secret', { help: 'Developers → Webhooks → the webhook' }), opt(f('processingChannelId', 'Processing channel ID', 'text', { help: 'Settings → Processing channels', placeholder: 'pc_…' })),
+      f('country', 'The school’s country (two letters)', 'text', { placeholder: 'AE', pattern: '^[A-Z]{2}$', patternHint: 'Two capital letters, like AE.' }),
+      f('environment', 'Environment', 'select', { options: [['sandbox', 'Test (sandbox)'], ['live', 'Live']] })],
+    webhooks: { events: 'payment_captured, payment_declined, payment_capture_declined, payment_refunded', verifies: 'Cko-Signature with the webhook secret' } },
   // File storage
   { key: 's3', name: 'S3-compatible storage', capabilities: ['storage'], testAction: 'Writes, reads and deletes a small file in the bucket.', docs: 'https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html',
     steps: ['Create a private bucket (AWS S3, Cloudflare R2, MinIO or DigitalOcean Spaces).', 'In its CORS rules allow PUT and GET from the admin’s and the app’s addresses (uploads go straight to the bucket).', 'Make an access key that can read and write only this bucket.', 'Fill in the form (endpoint blank for AWS) and Test. School backups are kept here too.'],
@@ -240,7 +289,7 @@ export const INTEGRATION_PROVIDERS: ProviderDef[] = localized([
 // What a message costs, for billing and the console's totals: set on every paid messaging connection.
 for (const p of INTEGRATION_PROVIDERS) {
   if (p.key !== 'sandbox' && p.capabilities.some((c) => c === 'sms' || c === 'whatsapp' || c === 'email')) {
-    p.fields.push(opt(f('costPaise', 'Cost per message or SMS part (paise)', 'number', { placeholder: '18', help: 'From the provider’s price list; the console totals cost from it' })));
+    p.fields.push(opt(f('costPaise', 'Cost per message or SMS part (in the smallest unit of Tangent’s price currency)', 'number', { placeholder: '18', help: 'From the provider’s price list; the console totals cost from it' })));
   }
 }
 
@@ -262,6 +311,20 @@ export const SYSTEM_MESSAGES = [
 ] as const;
 
 export const providerDef = (key: string): ProviderDef | undefined => INTEGRATION_PROVIDERS.find((p) => p.key === key);
+
+/** The providers each country's schools usually use, suggested first when a connection is for one school (D1 countries). */
+export const SUGGESTED_PROVIDERS: Record<string, string[]> = {
+  IN: ['razorpay', 'cashfree', 'msg91', 'gupshup', 'kaleyra', 'gupshup-wa', 'interakt', 'ses'],
+  GB: ['stripe', 'gocardless', 'paypal', 'twilio', 'vonage', 'sendgrid', 'postmark', 'mailgun'],
+  US: ['stripe', 'paypal', 'twilio', 'vonage', 'sendgrid', 'postmark', 'mailgun', 'ses'],
+  AE: ['checkout-com', 'stripe', 'paypal', 'unifonic', 'twilio', 'vonage', 'sendgrid', 'ses'],
+};
+/** Providers with the school's country's suggestions first, in their order; the rest after, as listed. */
+export function suggestedFirst<T extends { key: string }>(providers: T[], country: string | undefined): T[] {
+  const first = SUGGESTED_PROVIDERS[(country ?? '').toUpperCase()] ?? [];
+  const rank = (k: string) => (first.includes(k) ? first.indexOf(k) : first.length);
+  return [...providers].sort((a, b) => rank(a.key) - rank(b.key));
+}
 
 export const CONNECTION_STATES = ['draft', 'test', 'live', 'paused'] as const;
 export type ConnectionState = (typeof CONNECTION_STATES)[number];

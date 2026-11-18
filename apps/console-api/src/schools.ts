@@ -31,7 +31,7 @@ export class Schools {
   row(r: SchoolRecord): SchoolRow {
     return {
       id: r.id, slug: r.slug, name: r.name, shortName: r.shortName, color: r.color, logoText: r.logoText, status: r.status as SchoolStatus, plan: r.plan, cell: r.cell, target: r.target as DeployTarget,
-      region: r.region, versions: { api: r.apiVersion, admin: r.adminVersion, app: r.appVersion }, configVersion: r.configVersion, students: r.studentsCount, health: r.health as SchoolRow['health'],
+      region: r.region, country: r.country, versions: { api: r.apiVersion, admin: r.adminVersion, app: r.appVersion }, configVersion: r.configVersion, students: r.studentsCount, health: r.health as SchoolRow['health'],
       healthMs: r.healthMs, onboarding: { done: r.onboardingDone, total: r.onboardingTotal }, lastIncident: r.lastIncident, adminUrl: adminUrlFor(this.env, r.slug, r.addressing, r.customDomain), createdAt: r.createdAt.toISOString(), wentLiveAt: r.wentLiveAt?.toISOString() ?? null,
     };
   }
