@@ -185,7 +185,8 @@ export class Actions {
     if (school && (body.action === 'school.erase' || body.action === 'retention.erase') && !body.dryRun && body.confirmCode?.trim() !== school.slug) {
       throw new ApiError('validation', 'That does not match. Nothing was erased.', { fields: { confirmCode: tx('Type {slug} exactly.', { slug: school.slug }) } });
     }
-    let needs = pol.approvals[body.action]?.needed && !body.dryRun;
+    // Re-applying a pack overwrites what the school chose: always a second person.
+    let needs = (pol.approvals[body.action]?.needed || body.action === 'pack.apply') && !body.dryRun;
     let summary = this.describe(body.action, school?.name ?? 'every school', body.params);
     if (school && body.action === 'entitlements.push') {
       // Checked now, so a bad change never waits for approval; taking anything away from a school always needs a second person.
@@ -231,6 +232,7 @@ export class Actions {
     return ({
       'integration.live': `Take ${String(params.name ?? 'a connection')} live for ${school}`,
       'integration.mode': 'Switch every school to live messages (real providers, no Test inbox)',
+      'pack.apply': `Re-apply ${Array.isArray(params.groups) ? params.groups.join(', ') : 'part'} of the ${String(params.country ?? '')}${params.curriculum ? ` ${String(params.curriculum)}` : ''} starter pack to ${school}`,
       'retention.erase': `Erase the records of people who left ${school} past the retention period`,
       'school.golive': `Take ${school} live (moving in ends)`, 'school.suspend': `Pause ${school}`, 'school.resume': `Resume ${school}`, 'school.erase': `Erase ${school}`, 'entitlements.push': `Push the plan and locks to ${school}`,
       'migration.run': `Run pending migrations for ${school}`, 'domain.set': `Change the address of ${school}`, 'build.app': `Build the app for ${school}`, 'backup.take': `Back up ${school}`, 'backup.restore': `Put ${school} back as it was in a backup`, 'config.apply': `Change risky settings for ${school}`, 'school.move': `Move ${school} to another cell`,

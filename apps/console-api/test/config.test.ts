@@ -165,6 +165,22 @@ describe('modules per school', () => {
     expect(none).toEqual([]);
   }, 60_000);
 
+  it('re-applies part of a starter pack only after a second person approves, and only what differs', async () => {
+    const parts = (await h.c('GET', `/console/v1/schools/${id}/packs/preview?country=GB&curriculum=IB`, { token: t })).json;
+    const exams = parts.find((p: { group: string }) => p.group === 'exams');
+    expect(exams.changes.some((c: { key: string }) => c.key === 'grading.scale')).toBe(true);
+    expect((await h.c('POST', `/console/v1/schools/${id}/packs/apply`, { token: t, body: { country: 'GB', curriculum: 'IB', groups: [] } })).status).toBe(400);
+    const asked = await h.c('POST', `/console/v1/schools/${id}/packs/apply`, { token: t, body: { country: 'GB', curriculum: 'IB', groups: ['exams'], note: 'Moving to IB grading' } });
+    expect(asked.json.status).toBe('pending_approval');
+    // Nothing changes until someone else approves.
+    expect((await h.c('GET', `/console/v1/schools/${id}/packs/preview?country=GB&curriculum=IB`, { token: t })).json.some((p: { group: string }) => p.group === 'exams')).toBe(true);
+    const done = await h.c('POST', `/console/v1/actions/${asked.json.actionId}/approve`, { token: second });
+    expect(done.json.status, JSON.stringify(done.json)).toBe('done');
+    const after = (await h.c('GET', `/console/v1/schools/${id}/packs/preview?country=GB&curriculum=IB`, { token: t })).json;
+    expect(after.some((p: { group: string }) => p.group === 'exams')).toBe(false);
+    // The other parts were left as they were.
+    expect(after.length).toBe(parts.length - 1);
+  }, 60_000);
   it('bills in the contract’s currency at its rate, never mixing currencies, and keeps the data in its region', async () => {
     await push({ trialUntil: null });
     const d = (await h.c('GET', `/console/v1/schools/${id}`, { token: t })).json;

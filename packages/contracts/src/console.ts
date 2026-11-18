@@ -325,16 +325,26 @@ export interface BuildRow {
   createdAt: string;
 }
 
-export const ACTIONS = ['school.golive', 'school.suspend', 'school.resume', 'school.erase', 'entitlements.push', 'migration.run', 'domain.set', 'build.app', 'backup.take', 'backup.restore', 'school.move', 'config.apply', 'integration.live', 'integration.mode', 'retention.erase'] as const;
+export const ACTIONS = ['school.golive', 'school.suspend', 'school.resume', 'school.erase', 'entitlements.push', 'migration.run', 'domain.set', 'build.app', 'backup.take', 'backup.restore', 'school.move', 'config.apply', 'integration.live', 'integration.mode', 'pack.apply', 'retention.erase'] as const;
 /** What each action is called on every console page (approvals, rules for risky changes, history). */
 export const ACTION_LABELS: Record<(typeof ACTIONS)[number], string> = localizedLabels({
   'school.golive': 'Take a school live', 'school.suspend': 'Pause a school', 'school.resume': 'Bring a school back', 'school.erase': 'Erase a school',
   'entitlements.push': 'Change a school’s plan and modules', 'migration.run': 'Run database changes', 'domain.set': 'Change a school’s address',
   'build.app': 'Build a school’s app', 'backup.take': 'Take a backup', 'backup.restore': 'Restore a backup', 'school.move': 'Move a school to another cell',
-  'config.apply': 'Change a risky setting', 'integration.live': 'Take a connection live', 'integration.mode': 'Switch the platform to live messages',
+  'config.apply': 'Change a risky setting', 'pack.apply': 'Re-apply part of a starter pack', 'integration.live': 'Take a connection live', 'integration.mode': 'Switch the platform to live messages',
   'retention.erase': 'Erase leavers past retention',
 });
 export const ActionKey = z.enum(ACTIONS);
+
+/** One part (a module's or a school-wide group's settings) of a starter pack, and what re-applying it would change. */
+export interface PackPart { group: string; label: string; changes: { key: string; label: string; before: unknown; after: unknown }[] }
+export const PackApply = z.object({
+  country: z.string().regex(/^[A-Z]{2}$/),
+  curriculum: z.string().max(40).default(''),
+  groups: z.array(z.string().min(1).max(40)).min(1, 'Choose a part to re-apply').max(40),
+  note: z.string().trim().max(300).default(''),
+});
+export type PackApply = z.infer<typeof PackApply>;
 export type ActionKey = z.infer<typeof ActionKey>;
 
 export const ActionRequest = z.object({

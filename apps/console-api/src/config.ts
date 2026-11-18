@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Inject, Injectable, Param, Patch, Post, Put, Query, type OnModuleInit } from '@nestjs/common';
-import { activeFeatures, activeModules, resolveConfig, validateSettingsChanges } from '@tangent/config-engine';
+import { activeFeatures, activeModules, moduleByKey, resolveConfig, validateSettingsChanges } from '@tangent/config-engine';
 import {
-  ConfigPatch, PERMISSIONS, RoleDefSave, SETTINGS_META, SettingLockPut,
+  ConfigPatch, PERMISSIONS, PackApply, RoleDefSave, SETTINGS_META, SettingLockPut, packSettings, type PackPart,
   type ChangeRequestRow, type ConfigTemplateRow, type ConfigVersionRow, type EffectiveConfig, type EntitlementDoc, type RoleDef, type SchoolConfig } from '@tangent/contracts';
 import { RoleError, StaleSettings, deleteRole, newId, readSettings, recordSettingsVersion, saveRole, writeSettings, type pg } from '@tangent/db';
 import { ApiError, ZodPipe, notFound } from '@tangent/nest-kit';
@@ -39,6 +39,29 @@ export class ConfigService implements OnModuleInit {
       const r = await this.apply(schoolId, by, { changes: params.changes as Record<string, unknown>, note: String(params.note ?? ''), expectedVersion: params.expectedVersion as number | undefined });
       return `Applied. The configuration is now version ${r.version}.`;
     });
+    // Worked out again when approved, so it applies what differs then, not what differed when asked.
+    this.actions.handle('pack.apply', async (schoolId, params, by) => {
+      const p = PackApply.parse(params);
+      const parts = (await this.packParts(schoolId, p.country, p.curriculum)).filter((x) => p.groups.includes(x.group));
+      const changes = Object.fromEntries(parts.flatMap((x) => x.changes.map((c) => [c.key, c.after])));
+      if (!Object.keys(changes).length) return 'Nothing to change: the school already has those values.';
+      const r = await this.apply(schoolId, by, { changes, note: p.note || `Re-applied ${p.groups.join(', ')} from the ${p.country}${p.curriculum ? ` ${p.curriculum}` : ''} pack` });
+      return `Re-applied ${Object.keys(changes).length} settings. The configuration is now version ${r.version}.`;
+    });
+  }
+
+  /** A pack's values for this school, by part (each setting's group), only where the school has something else. */
+  async packParts(schoolId: string, country: string, curriculum: string): Promise<PackPart[]> {
+    const now = (await this.get(schoolId)).values;
+    const by = new Map<string, PackPart>();
+    for (const [key, after] of Object.entries(packSettings(country, curriculum))) {
+      const meta = SETTINGS_META[key as keyof typeof SETTINGS_META];
+      if (!meta || JSON.stringify(now[key] ?? null) === JSON.stringify(after)) continue;
+      const part = by.get(meta.group) ?? { group: meta.group, label: moduleByKey(meta.group)?.name ?? meta.group, changes: [] };
+      part.changes.push({ key, label: meta.label, before: now[key] ?? null, after });
+      by.set(meta.group, part);
+    }
+    return [...by.values()];
   }
 
   private school<T>(schoolId: string, fn: (pool: pg.Pool) => Promise<T>): Promise<T> {
@@ -241,6 +264,19 @@ export class ConfigController {
   @Get('schools/:id/config') @Needs('schools.read')
   get(@Param('id') id: string): Promise<SchoolConfig> {
     return this.config.get(id);
+  }
+
+  /** What re-applying a country's (and curriculum's) starter pack would change, part by part. */
+  @Get('schools/:id/packs/preview') @Needs('schools.read')
+  packPreview(@Param('id') id: string, @Query(new ZodPipe(PackApply.pick({ country: true, curriculum: true }))) q: { country: string; curriculum: string }): Promise<PackPart[]> {
+    return this.config.packParts(id, q.country, q.curriculum);
+  }
+
+  /** Asks to re-apply some parts: a second person approves, then what differs then is applied. */
+  @Post('schools/:id/packs/apply') @HttpCode(200) @Needs('schools.configure')
+  async packApply(@Me() me: ConsoleUser, @Param('id') id: string, @Body(new ZodPipe(PackApply)) body: PackApply): Promise<{ actionId: string; status: string }> {
+    const a = await this.actions.request(me, { action: 'pack.apply', schoolId: id, params: body, dryRun: false });
+    return { actionId: a.id, status: a.status };
   }
 
   /** Risky settings (marked in SETTINGS_META) wait for a second person; the rest apply at once. */

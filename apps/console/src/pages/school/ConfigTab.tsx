@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
 import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, MODULES } from '@tangent/config-engine';
-import { tx, DEFAULT_BRAND, SETTING_GROUPS, SETTINGS_META, SchoolSettingsSchema, TIGHTEN, settingOwner, type SchoolConfig, type SettingKey, hueContrast, hueOf, hueTokens } from '@tangent/contracts';
+import { COUNTRY_PACKS, curriculaFor, tx, DEFAULT_BRAND, SETTING_GROUPS, SETTINGS_META, SchoolSettingsSchema, TIGHTEN, settingOwner, type SchoolConfig, type SettingKey, hueContrast, hueOf, hueTokens } from '@tangent/contracts';
 import { Checkbox, Dialog, EmptyCard, ErrorLine, Field, SelectField, SettingRow, useShake, Icon, EmptyNote, t as tr } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { ago } from '../../app/format';
@@ -122,6 +122,7 @@ export function ConfigTab({ schoolId, say }: { schoolId: string; say: Say }) { c
       </div>
 
       <History cfg={cfg} schoolId={schoolId} can={can} say={say} />
+      <Packs cfg={cfg} schoolId={schoolId} can={can} say={say} />
       <Templates schoolId={schoolId} can={can} say={say} />
       <Preview cfg={cfg} schoolId={schoolId} />
     </section>
@@ -150,6 +151,49 @@ function History({ cfg, schoolId, can, say }: { cfg: SchoolConfig; schoolId: str
             : <button className="btn sm" onClick={() => setSure(v.id)}>{tr('console.config_tab.roll_back')}</button>)}
         </div>
       ))}
+    </div>
+  );
+}
+
+/** A value as one short line: words as they are, anything else as its JSON, cut short. */
+const brief = (v: unknown) => { const s = typeof v === 'string' ? v : JSON.stringify(v); return s.length > 80 ? `${s.slice(0, 77)}…` : s; };
+
+/**
+ * Re-applies part of a starter pack to a live school (one-shot plan 3.2): what each part would change is shown first, and a
+ * second person approves before anything changes. Only what differs is written, worked out again when it is approved.
+ */
+function Packs({ cfg, schoolId, can, say }: { cfg: SchoolConfig; schoolId: string; can: boolean; say: Say }) { const app = useApp();
+  const [country, setCountry] = useState(String(cfg.values['school.country'] ?? '') || Object.keys(COUNTRY_PACKS)[0]!);
+  const [curriculum, setCurriculum] = useState('');
+  const [groups, setGroups] = useState<string[]>([]);
+  const [note, setNote] = useState('');
+  const parts = useQuery({ queryKey: ['packs', schoolId, country, curriculum], queryFn: () => app.api.packPreview(schoolId, country, curriculum) });
+  const ask = useMutation({ mutationFn: () => app.api.packApply(schoolId, { country, curriculum, groups, note: note.trim() }),
+    onSuccess: (r) => { setGroups([]); setNote(''); say(r.status === 'pending_approval' ? tr('console.config_tab.pack_waits') : tr('console.config_tab.pack_applied')); },
+    onError: (e) => say((e as Error).message, 'bad') });
+  return (
+    <div className="card s12 rise">
+      <div className="ch"><h2>{tr('console.config_tab.starter_packs')}</h2></div>
+      <div className="help">{tr('console.config_tab.starter_packs_help')}</div>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 10 }}>
+        <div style={{ width: 200 }}><SelectField label={tr('console.config_tab.country_pack')} value={country} onChange={(v) => { setCountry(v); setGroups([]); }} options={Object.keys(COUNTRY_PACKS).map((c) => ({ value: c, label: c }))} /></div>
+        <div style={{ width: 260 }}><SelectField label={tr('console.config_tab.curriculum_pack')} value={curriculum} onChange={(v) => { setCurriculum(v); setGroups([]); }}
+          options={[{ value: '', label: tr('console.config_tab.none') }, ...curriculaFor(country).map((c) => ({ value: c.key, label: c.name }))]} /></div>
+      </div>
+      {parts.isLoading ? <div className="skc" style={{ height: 120, borderRadius: 16, marginTop: 12 }} />
+        : !(parts.data ?? []).length ? <EmptyNote icon="checkCircle" title={tr('console.config_tab.pack_nothing_differs')} body={tr('console.config_tab.pack_nothing_differs_body')} />
+        : (parts.data ?? []).map((p) => (
+          <div key={p.group} style={{ marginTop: 12 }}>
+            <Checkbox label={`${groupLabel(p.group)} (${p.changes.length})`} checked={groups.includes(p.group)} disabled={!can} onChange={(on) => setGroups(on ? [...groups, p.group] : groups.filter((g) => g !== p.group))} />
+            {p.changes.map((c) => <div key={c.key} className="kv" style={{ alignItems: 'flex-start' }}><span>{c.label}</span><b style={{ minWidth: 0, textAlign: 'end' }}><s style={{ color: 'var(--ink3)' }}>{brief(c.before)}</s> → {brief(c.after)}</b></div>)}
+          </div>
+        ))}
+      {can && groups.length > 0 && (
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 12 }}>
+          <div style={{ flex: 1, minWidth: 220 }}><Field label={tr('console.config_tab.why_kept_in_the_history')} value={note} onChange={setNote} maxLength={300} /></div>
+          <button className="btn pri" disabled={ask.isPending} onClick={() => ask.mutate()}>{tr('console.config_tab.ask_to_reapply')}</button>
+        </div>
+      )}
     </div>
   );
 }

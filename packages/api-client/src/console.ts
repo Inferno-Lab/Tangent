@@ -1,6 +1,6 @@
 import type {
   ActionRequest, ActionRow, LoginChallenge, AuditRow, BackupRow, RestoreDrillRow, ChangeRequestRow, ConfigPatch, ConfigTemplateRow, EffectiveConfig, RoleDef, RoleDefSave, SchoolConfig, BlueprintInput, BlueprintRow, BuildRow, ConsoleLoginResponse, ConsoleTokens, ConsoleUserRow, ErrorGroup, FleetSummary, FlagRow, InvoiceRowC, LoginRequest,
-  CellCreate, CellPatch, ComplianceCreate, ComplianceRow, ComplianceUpdate, DataRequestAcross, MigrationRow, PlanRow, PlanSave, SubprocessorRow, RoleTemplate, SchoolDetailsPatch, PolicyDoc, ProvisionRunRow, ReleaseRow, SandboxMessage, SchoolDetail, SchoolRow, StepKey, SupportSessionRow, SupportToken, VerifyRequest, WizardDraftRow,
+  CellCreate, CellPatch, PackPart, ComplianceCreate, ComplianceRow, ComplianceUpdate, DataRequestAcross, MigrationRow, PlanRow, PlanSave, SubprocessorRow, RoleTemplate, SchoolDetailsPatch, PolicyDoc, ProvisionRunRow, ReleaseRow, SandboxMessage, SchoolDetail, SchoolRow, StepKey, SupportSessionRow, SupportToken, VerifyRequest, WizardDraftRow,
   WizardPayload, WizardReview, EntitlementRow, ImportBatchRow, ImportInput, ImportPreview, MigrationView, ReadinessMark, UploadRow,
   DraftResult, I18nSurface, LanguageSummary, TranslationPut, TranslationRow, ActivityQuery, ActivityView, ConnectionInput, ConnectionPatch, HookEventRow, IntegrationsView, JobRow, RouteInput as IntRouteInput, TemplateInput } from '@tangent/contracts';
 import type { Http } from './http';
@@ -87,6 +87,8 @@ export function consoleApi(h: Http) {
     school: (id: string) => h.get<SchoolDetail>(`${base}/schools/${id}`),
     setChecklist: (id: string, key: string, state: 'done' | 'waiting' | 'todo') => h.patch<{ ok: true }>(`${base}/schools/${id}/checklist`, { key, state }),
     setDetails: (id: string, b: SchoolDetailsPatch) => h.patch<{ ok: true }>(`${base}/schools/${id}/details`, b),
+    packPreview: (id: string, country: string, curriculum: string) => h.get<PackPart[]>(`${base}/schools/${id}/packs/preview`, { country, curriculum }),
+    packApply: (id: string, b: { country: string; curriculum: string; groups: string[]; note: string }) => h.post<{ actionId: string; status: string }>(`${base}/schools/${id}/packs/apply`, b),
     plans: () => h.get<PlanRow[]>(`${base}/plans`),
     plan: {
       add: (b: PlanSave) => h.post<PlanRow[]>(`${base}/plans`, b),
