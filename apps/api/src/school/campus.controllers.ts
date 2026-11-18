@@ -41,6 +41,7 @@ const Search = z.object({ q: z.string().max(80).default('') });
 /** Uploads and downloads for staff and families alike: what each may touch is checked per kind (FilesService). */
 const PhotoReport = z.object({ reason: z.string().trim().min(3, 'Say what is wrong').max(300) });
 const Resolve = z.object({ remove: z.boolean() });
+const Thumb = z.object({ data: z.string().max(600_000) });
 
 @Controller('v1/files')
 @Core()
@@ -52,6 +53,10 @@ export class FilesController {
 
   @Post(':id/done') @HttpCode(200)
   done(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string): Promise<FileRow> { return this.files.done(t, u.id, id); }
+
+  /** The photo's small copy, as a data URL (made by the browser or the phone). */
+  @Post(':id/thumb') @HttpCode(200)
+  thumb(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(Thumb)) b: z.infer<typeof Thumb>): Promise<FileRow> { return this.files.thumb(t, u, id, b.data); }
 
   @Get(':id/url')
   async url(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Query('download') dl?: string): Promise<{ url: string }> {

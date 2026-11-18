@@ -480,6 +480,7 @@ class GalleryPhoto {
     required this.url,
     required this.caption,
     this.tagged = const [],
+    this.thumbUrl = '',
   });
 
   factory GalleryPhoto.fromJson(Map<String, dynamic> json) =>
@@ -488,6 +489,12 @@ class GalleryPhoto {
   final String id;
   final String url;
   final String caption;
+
+  /// Its small copy, for covers and strips ('' until the school's upload made one).
+  final String thumbUrl;
+
+  /// What a list shows: the small copy when there is one.
+  String get small => thumbUrl.isNotEmpty ? thumbUrl : url;
 
   /// Students who appear in the photo.
   @JsonKey(defaultValue: <String>[])

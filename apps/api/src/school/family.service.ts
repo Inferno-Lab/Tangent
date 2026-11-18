@@ -958,7 +958,7 @@ export class FamilyService {
     for (const a of albums) {
       const photos = await this.gallerySvc.photos(t, a.id, w.kind !== 'staff');
       const shown = [];
-      for (const p of photos) shown.push({ id: p.id, url: await this.files.url(t, user, p.id).catch(() => ''), caption: p.name.replace(/\.[^.]+$/, ''), tagged: p.students.map((s) => s.id) });
+      for (const p of photos) shown.push({ id: p.id, url: await this.files.url(t, user, p.id).catch(() => ''), thumbUrl: await this.files.thumbUrl(t, user, p).catch(() => ''), caption: p.name.replace(/\.[^.]+$/, ''), tagged: p.students.map((s) => s.id) });
       const day = a.createdAt.slice(0, 10);
       out.push({ id: a.id, title: a.title, date: a.createdAt, blurb: a.className ?? tx('Whole school'), photos: shown.filter((p) => p.url), downloads: cfg.features.includes('gallery.downloads'),
         yearLabel: years.find((y) => y.s <= day && day <= y.e)?.label ?? '' });

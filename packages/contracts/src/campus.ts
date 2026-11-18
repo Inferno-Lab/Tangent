@@ -20,7 +20,9 @@ export const FileStart = z.object({
 });
 export type FileStart = z.infer<typeof FileStart>;
 
-export interface FileRow { id: string; kind: FileKind; ownerId: string | null; name: string; mime: string; bytes: number; status: 'uploading' | 'pending' | 'clean' | 'infected'; width: number | null; height: number | null; createdAt: string }
+export interface FileRow { id: string; kind: FileKind; ownerId: string | null; name: string; mime: string; bytes: number;
+  /** Its small copy (a photo's), once one was made. */
+  thumbId?: string | null; status: 'uploading' | 'pending' | 'clean' | 'infected'; width: number | null; height: number | null; createdAt: string }
 export interface FileUpload { fileId: string; upload: { url: string; method: 'PUT'; headers: Record<string, string> } }
 
 // ── Refunds and reconciliation ────────────────────────────────────────────────

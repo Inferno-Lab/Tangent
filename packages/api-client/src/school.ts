@@ -240,6 +240,7 @@ export function schoolApi(h: Http) {
     files: {
       start: (b: FileStart) => h.post<FileUpload>('/v1/files', b),
       done: (id: string) => h.post<FileRow>(`/v1/files/${id}/done`),
+      thumb: (id: string, data: string) => h.post<FileRow>(`/v1/files/${id}/thumb`, { data }),
       url: (id: string, download = false) => h.get<{ url: string }>(`/v1/files/${id}/url`, download ? { download: '1' } : undefined),
       list: (kind: FileKind, owner: string) => h.get<FileRow[]>('/v1/files', { kind, owner }),
       remove: (id: string) => h.del<void>(`/v1/files/${id}`),
@@ -311,6 +312,22 @@ export async function uploadFile(api: ReturnType<typeof schoolApi>, kind: FileKi
   const { fileId, upload } = await api.files.start({ kind, ownerId, name: file.name, mime: file.type, bytes: file.size });
   const res = await fetch(upload.url, { method: upload.method, headers: upload.headers, body: file });
   if (!res.ok) throw new Error('The upload did not go through. Try again.');
-  return api.files.done(fileId);
+  const row = await api.files.done(fileId);
+  // A photo gets a small copy for lists, made here by the browser; without one, lists show the photo itself.
+  if (file.type.startsWith('image/') && typeof createImageBitmap === 'function') await smallCopy(file).then((data) => (data ? api.files.thumb(fileId, data) : null)).catch(() => undefined);
+  return row;
+}
+
+/** A photo at most 480 pixels on its long side, as a JPEG data URL (null when the browser cannot read it). */
+async function smallCopy(file: File): Promise<string | null> {
+  const img = await createImageBitmap(file);
+  const scale = Math.min(1, 480 / Math.max(img.width, img.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(img.width * scale));
+  canvas.height = Math.max(1, Math.round(img.height * scale));
+  canvas.getContext('2d')?.drawImage(img, 0, 0, canvas.width, canvas.height);
+  img.close();
+  const url = canvas.toDataURL('image/jpeg', 0.8);
+  return url.startsWith('data:image/jpeg') ? url : null;
 }
 

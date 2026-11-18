@@ -52,4 +52,22 @@ describe('photos from a zip', () => {
     expect(photos.map((p: any) => p.owner_id).sort()).toEqual([a.id, b.id].sort());
     expect(photos.find((p: any) => p.owner_id === b.id).mime).toBe('image/png');
   });
+
+  it('keeps a photo’s small copy beside it: only an image, only small, only by whoever added the photo', async () => {
+    const me = (await h.call('GET', '/v1/me', { token: admin })).json;
+    const userId = me.user?.id ?? me.id;
+    await h.schoolSql("insert into files (id, kind, owner_id, name, mime, bytes, storage_key, status, created_by) values ('fil_ph1', 'gallery', 'alb_x', 'p.jpg', 'image/jpeg', 204, 'schools/x/gallery/fil_ph1/p.jpg', 'clean', $1)", [userId]);
+    const data = (b: Buffer) => `data:image/jpeg;base64,${b.toString('base64')}`;
+    expect((await h.call('POST', '/v1/files/fil_ph1/thumb', { token: teacher, body: { data: data(jpeg) } })).status).toBe(403);
+    expect((await h.call('POST', '/v1/files/fil_ph1/thumb', { token: admin, body: { data: `data:text/plain;base64,${Buffer.from('hello').toString('base64')}` } })).status).toBe(400);
+    expect([400, 413]).toContain((await h.call('POST', '/v1/files/fil_ph1/thumb', { token: admin, body: { data: data(Buffer.concat([jpeg, Buffer.alloc(410 * 1024)])) } })).status);
+    const ok = await h.call('POST', '/v1/files/fil_ph1/thumb', { token: admin, body: { data: data(jpeg) } });
+    expect(ok.status, JSON.stringify(ok.json)).toBe(200);
+    expect(ok.json.thumbId).toMatch(/^fil_/);
+    // A second copy replaces the first; neither is listed as a photo of its own.
+    const again = (await h.call('POST', '/v1/files/fil_ph1/thumb', { token: admin, body: { data: data(jpeg) } })).json;
+    expect(again.thumbId).not.toBe(ok.json.thumbId);
+    expect((await h.schoolSql("select count(*)::int n from files where owner_id = 'thumb:fil_ph1' and deleted_at is null"))[0].n).toBe(1);
+    expect((await h.schoolSql("select count(*)::int n from files where owner_id = 'alb_x' and deleted_at is null"))[0].n).toBe(1);
+  });
 });

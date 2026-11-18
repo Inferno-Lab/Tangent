@@ -327,6 +327,7 @@ GalleryPhoto _$GalleryPhotoFromJson(Map<String, dynamic> json) => GalleryPhoto(
   tagged:
       (json['tagged'] as List<dynamic>?)?.map((e) => e as String).toList() ??
       [],
+  thumbUrl: json['thumbUrl'] as String? ?? '',
 );
 
 Map<String, dynamic> _$GalleryPhotoToJson(GalleryPhoto instance) =>

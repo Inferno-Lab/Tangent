@@ -215,8 +215,45 @@ export class FilesService implements OnModuleInit {
     return virus ? `Infected (${virus}): removed.` : 'Clean.';
   }
 
+  /**
+   * A photo's small copy, made where it was chosen (the browser or the phone; the server has no image tools): an image of at
+   * most 400 KB and 1024 px, checked and scanned like any upload, kept beside the photo and shown in lists instead of it.
+   */
+  async thumb(t: TenantCtx, user: AuthedUser, id: string, dataUrl: string): Promise<FileRow> {
+    const f = (await t.pool.query('select * from files where id = $1 and deleted_at is null', [id])).rows[0];
+    if (!f) throw notFound('That file');
+    if (f.created_by !== user.id) throw forbidden('That photo is not yours.');
+    if (!IMAGES.includes(f.mime)) throw new ApiError('validation', tx('Only a photo has a small copy.'));
+    const data = Buffer.from(dataUrl.replace(/^data:[^,]*,/, ''), 'base64');
+    const mime = sniff(data);
+    const dim = dimensions(data);
+    if (!mime || !IMAGES.includes(mime) || data.length > 400 * 1024 || (dim && Math.max(dim.width, dim.height) > 1024)) throw new ApiError('validation', tx('The small copy must be a photo of at most 400 KB and 1024 pixels.'));
+    const thumbId = newId('fil');
+    const key = `${f.storage_key.replace(/\/[^/]*$/, '')}/thumb-${thumbId}.${mime.split('/')[1]}`;
+    const { s, ctx } = await this.storage(t);
+    await s.put(ctx, key, data, mime);
+    // Owned by the photo, so it is never listed as a photo of its own.
+    await t.pool.query("insert into files (id, kind, owner_id, name, mime, bytes, storage_key, created_by, status, width, height) values ($1,$2,$3,$4,$5,$6,$7,$8,'pending',$9,$10)",
+      [thumbId, f.kind, `thumb:${id}`, `thumb-${f.name}`, mime, data.length, key, user.id, dim?.width ?? null, dim?.height ?? null]);
+    const old = (await t.pool.query<{ thumb_id: string | null }>('update files set thumb_id = $2 where id = $1 returning (select thumb_id from files where id = $1) thumb_id', [id, thumbId])).rows[0]?.thumb_id;
+    if (old) await t.pool.query('update files set deleted_at = now() where id = $1', [old]);
+    if (await this.hubs.hub.platform('scanning')) await enqueue(this.hubs.hub.o.pool as never, 'files.scan', t.info.id, { fileId: thumbId });
+    else await this.markScanned(t.pool, thumbId, null);
+    return this.row((await t.pool.query('select * from files where id = $1', [id])).rows[0]);
+  }
+
+  /** A link to a photo's small copy when it has a clean one, else to the photo. */
+  async thumbUrl(t: TenantCtx, user: AuthedUser | null, f: { id: string; thumbId?: string | null }): Promise<string> {
+    const full = await this.url(t, user, f.id);
+    // Whoever may see the photo may see its copy (checked on the photo above).
+    const th = f.thumbId ? (await t.pool.query<{ storage_key: string }>("select storage_key from files where id = $1 and status = 'clean' and deleted_at is null", [f.thumbId])).rows[0] : undefined;
+    if (!th) return full;
+    const { s, ctx } = await this.storage(t);
+    return s.presignGet(ctx, th.storage_key, 300);
+  }
+
   row(f: Record<string, any>): FileRow {
-    return { id: f.id, kind: f.kind, ownerId: f.owner_id, name: f.name, mime: f.mime, bytes: Number(f.bytes), status: f.status, width: f.width, height: f.height, createdAt: new Date(f.created_at).toISOString() };
+    return { id: f.id, kind: f.kind, ownerId: f.owner_id, thumbId: f.thumb_id ?? null, name: f.name, mime: f.mime, bytes: Number(f.bytes), status: f.status, width: f.width, height: f.height, createdAt: new Date(f.created_at).toISOString() };
   }
 
   /** A link to read the file, valid five minutes. */

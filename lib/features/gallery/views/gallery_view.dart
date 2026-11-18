@@ -177,7 +177,7 @@ class _Hero extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 if (album.photos.isNotEmpty)
-                  _Photo(url: album.photos.first.url, wash: _wash[0])
+                  _Photo(url: album.photos.first.small, wash: _wash[0])
                 else
                   ColoredBox(color: _wash[0]),
                 DecoratedBox(
@@ -269,7 +269,7 @@ class _AlbumTile extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (album.photos.isNotEmpty) _Photo(url: album.photos.first.url, wash: wash) else ColoredBox(color: wash),
+              if (album.photos.isNotEmpty) _Photo(url: album.photos.first.small, wash: wash) else ColoredBox(color: wash),
               DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -523,7 +523,7 @@ class _GalleryViewerState extends State<GalleryViewer> with SingleTickerProvider
                             : null,
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(10),
-                          child: _Photo(url: photos[i].url, wash: _wash[0]),
+                          child: _Photo(url: photos[i].small, wash: _wash[0]),
                         ),
                       ),
                     ),),
