@@ -19,6 +19,12 @@ import 'package:tangent/features/driver/controllers/driver_controller.dart';
 import 'package:tangent/features/events/views/events_view.dart';
 import 'package:tangent/features/exams_results/controllers/results_controller.dart';
 import 'package:tangent/features/exams_results/views/results_view.dart';
+import 'package:tangent/features/exams_results/controllers/exam_timetable_controller.dart';
+import 'package:tangent/features/forms/controllers/forms_controller.dart';
+import 'package:tangent/features/forms/views/forms_view.dart';
+import 'package:tangent/features/exams_results/views/exam_timetable_view.dart';
+import 'package:tangent/features/teacher_tools/controllers/roster_controller.dart';
+import 'package:tangent/features/teacher_tools/views/roster_view.dart';
 import 'package:tangent/features/fees/controllers/fees_controller.dart';
 import 'package:tangent/features/fees/views/fees_view.dart';
 import 'package:tangent/features/gallery/controllers/gallery_controller.dart';
@@ -101,6 +107,9 @@ class AppPages {
     GetPage(name: AppRoutes.homeworkScan, page: () => const HomeworkScanView(), middlewares: [AuthMiddleware()], transition: Transition.downToUp),
     _page(AppRoutes.timetable, const TimetableView(), TimetableController.new),
     _page(AppRoutes.results, const ResultsView(), ResultsController.new),
+    _page(AppRoutes.examTimetable, const ExamTimetableView(), ExamTimetableController.new),
+    _page(AppRoutes.forms, const FormsView(), FormsController.new),
+    _page(AppRoutes.teacherRoster, const RosterView(), RosterController.new),
     _page(AppRoutes.fees, const FeesView(), FeesController.new),
     GetPage(name: AppRoutes.receipt, page: () => const ReceiptView(), middlewares: [AuthMiddleware()], transition: Transition.fadeIn),
     _page(AppRoutes.notices, const NoticesView(), NoticesController.new),

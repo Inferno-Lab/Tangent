@@ -624,7 +624,8 @@ class StatsRow extends StatelessWidget {
           if (exam)
           Expanded(
             child: EduCard(
-              onTap: () => Get.toNamed<void>(AppRoutes.results),
+              // The next exam opens its timetable; with none coming, the results.
+              onTap: () => Get.toNamed<void>(next == null ? AppRoutes.results : AppRoutes.examTimetable),
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

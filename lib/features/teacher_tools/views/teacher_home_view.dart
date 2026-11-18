@@ -497,6 +497,7 @@ class _ClassCard extends StatelessWidget {
       if (mine) ('teacher.attendance', () => Get.toNamed<void>(_attendanceRoute(cls.id))),
       ('teacher.marks', () => Get.toNamed<void>(_marksRoute(cls.id))),
       ('teacher.homework', () => Get.toNamed<void>(AppRoutes.teacherAssign, arguments: {'classId': cls.id})),
+      ('teacher.roster', () => Get.toNamed<void>(AppRoutes.teacherRoster.replaceFirst(':classId', cls.id))),
     ];
     return EduCard(
       ring: mine ? context.app.brand : null,

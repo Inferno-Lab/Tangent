@@ -177,7 +177,7 @@ const _$ExamStatusEnumMap = {
 
 ExamPaper _$ExamPaperFromJson(Map<String, dynamic> json) => ExamPaper(
   subject: json['subject'] as String,
-  date: DateTime.parse(json['date'] as String),
+  date: json['date'] == null ? null : DateTime.parse(json['date'] as String),
   subjectName: json['subjectName'] as String? ?? '',
   startsAt: json['startsAt'] as String? ?? '',
   endsAt: json['endsAt'] as String? ?? '',
@@ -188,7 +188,7 @@ ExamPaper _$ExamPaperFromJson(Map<String, dynamic> json) => ExamPaper(
 Map<String, dynamic> _$ExamPaperToJson(ExamPaper instance) => <String, dynamic>{
   'subject': instance.subject,
   'subjectName': instance.subjectName,
-  'date': instance.date.toIso8601String(),
+  'date': instance.date?.toIso8601String(),
   'startsAt': instance.startsAt,
   'endsAt': instance.endsAt,
   'room': instance.room,

@@ -8,6 +8,8 @@ abstract final class AppRoutes {
   static const homeworkScan = '/scan/homework';
   static const timetable = '/timetable';
   static const results = '/results';
+  static const examTimetable = '/exams/timetable';
+  static const forms = '/forms';
   static const fees = '/fees';
   static const receipt = '/fees/receipt';
   static const notices = '/notices';
@@ -34,4 +36,5 @@ abstract final class AppRoutes {
   static const teacherGrade = '/teacher/grading';
   static const teacherMarks = '/teacher/marks/:classId';
   static const teacherNotice = '/teacher/notice';
+  static const teacherRoster = '/teacher/class/:classId';
 }

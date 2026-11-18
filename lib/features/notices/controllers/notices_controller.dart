@@ -124,8 +124,9 @@ class NoticeDetailController extends GetxController with Loadable {
     if (e == null) return const [];
     if (e.papers.isNotEmpty) {
       final byDay = <DateTime, List<String>>{};
-      for (final p in [...e.papers]..sort((a, b) => a.date.compareTo(b.date))) {
-        byDay.putIfAbsent(DateUtils.dateOnly(p.date), () => []).add(p.subject);
+      // A paper without its day yet is not on the list of sittings.
+      for (final p in [...e.papers.where((x) => x.date != null)]..sort((a, b) => a.date!.compareTo(b.date!))) {
+        byDay.putIfAbsent(DateUtils.dateOnly(p.date!), () => []).add(p.subject);
       }
       return [for (final d in byDay.entries) (d.key, d.value)];
     }

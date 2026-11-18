@@ -344,6 +344,8 @@ class _Tiles extends StatelessWidget {
       if (!teacher)
         (PhosphorIconsRegular.calendarCheck, 'menu.leave', AppRoutes.leave, s('english').fill, s('english').on),
       if (teacher) (PhosphorIconsRegular.bell, 'menu.notifications', AppRoutes.notifications, c.mariSoft, c.mariText),
+      // The school's forms to answer (consent, surveys); a student has none of their own.
+      if (Get.find<AuthService>().role != UserRole.student) (PhosphorIconsRegular.clipboardText, 'menu.forms', AppRoutes.forms, s('maths').fill, s('maths').on),
     ];
     return LayoutBuilder(
       builder: (context, box) {

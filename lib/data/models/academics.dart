@@ -271,14 +271,16 @@ class Exam {
 
 @JsonSerializable()
 class ExamPaper {
-  const ExamPaper({required this.subject, required this.date, this.subjectName = '', this.startsAt = '', this.endsAt = '', this.room = '', this.maxMarks = 0});
+  const ExamPaper({required this.subject, this.date, this.subjectName = '', this.startsAt = '', this.endsAt = '', this.room = '', this.maxMarks = 0});
 
   factory ExamPaper.fromJson(Map<String, dynamic> json) => _$ExamPaperFromJson(json);
 
   final String subject;
   @JsonKey(defaultValue: '')
   final String subjectName;
-  final DateTime date;
+
+  /// Null while the school has not set the paper's day.
+  final DateTime? date;
   @JsonKey(defaultValue: '')
   final String startsAt;
   @JsonKey(defaultValue: '')
