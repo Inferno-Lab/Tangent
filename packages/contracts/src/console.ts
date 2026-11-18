@@ -126,10 +126,24 @@ export type PlanSave = z.infer<typeof PlanSave>;
 export const SCHOOL_BOARDS = ['CBSE', 'ICSE', 'State', 'British', 'Cambridge', 'IB', 'American', 'International', 'Other'] as const;
 
 /** What Tangent keeps about a school beside its own settings: the contact for Tangent, tax number and board. */
+/**
+ * What a school is billed under (D13): its currency (empty: Tangent's price list's), how many of it one unit of the price
+ * list is worth (fixed in the contract; needed for another currency), and an agreed price per student a year in it.
+ */
+export const SchoolContract = z.object({
+  currency: z.string().trim().toUpperCase().refine((c) => c === '' || isCurrency(c), 'Write a currency code like USD').default(''),
+  rate: z.number().positive().max(1_000_000).nullable().default(null),
+  perStudentYear: z.number().min(0).max(10_000_000).nullable().default(null),
+});
+export type SchoolContract = z.infer<typeof SchoolContract>;
+
 export const SchoolDetailsPatch = z.object({
   contact: z.object({ name: z.string().trim().min(2, 'Enter the contact’s name').max(80), phone: z.string().trim().min(8, 'Enter a phone number').max(24), email: z.string().trim().email('Enter a valid email') }),
   gstin: z.string().trim().max(20).default(''),
   board: z.enum(SCHOOL_BOARDS),
+  contract: SchoolContract.default({ currency: '', rate: null, perStudentYear: null }),
+  /** The region (a cell's region) the school's data must stay in; empty: anywhere. */
+  residency: z.string().trim().max(40).default(''),
 });
 export type SchoolDetailsPatch = z.infer<typeof SchoolDetailsPatch>;
 
@@ -279,6 +293,8 @@ export interface SchoolDetail extends SchoolRow {
   contact: { name: string; phone: string; email: string };
   gstin: string;
   board: string;
+  contract: SchoolContract;
+  residency: string;
   entitlement: {
     plan: string;
     /** As granted (with what they need), before dates are applied. */
@@ -475,6 +491,8 @@ export interface InvoiceRowC {
   schoolName: string;
   period: string;
   amount: number;
+  /** The currency it was made in (the school's contract's). */
+  currency: string;
   /** How the amount was worked out: the plan, then each module added on top of it. */
   lines: { label: string; amount: number }[];
   /** Overdue is worked out: sent and not paid by the due date. */

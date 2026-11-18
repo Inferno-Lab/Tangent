@@ -4,6 +4,7 @@ import { useParams } from '@tanstack/react-router';
 import { HttpError } from '@tangent/api-client';
 import { CURRICULA, SchoolDetailsPatch, STEP_LABELS, auditLabel, type ActionKey, type ProvisionRunRow, type SchoolDetail } from '@tangent/contracts';
 import { DateField, Dialog, EmptyCard, Field, NumberField, PageScope, Select, SelectField, useShake, useToast, EmptyNote, t as tr } from '@tangent/web-ui';
+import { PRICE_CURRENCY } from '@tangent/config-engine';
 import { useApp } from '../../app/context';
 import { url } from '../../app/base';
 import { useShellChrome } from '../../app/Layout';
@@ -367,11 +368,15 @@ function GoLive({ d, say, onDone }: { d: SchoolDetail; say: (m: string, tone?: '
 function DetailsDialog({ d, onClose, onDone }: { d: SchoolDetail; onClose: () => void; onDone: () => void }) {
   const app = useApp();
   const shake = useShake();
-  const [f, setF] = useState({ name: d.contact.name, phone: d.contact.phone, email: d.contact.email, gstin: d.gstin, board: d.board });
+  const [f, setF] = useState({ name: d.contact.name, phone: d.contact.phone, email: d.contact.email, gstin: d.gstin, board: d.board,
+    currency: d.contract.currency, rate: d.contract.rate == null ? '' : String(d.contract.rate), perStudentYear: d.contract.perStudentYear == null ? '' : String(d.contract.perStudentYear), residency: d.residency });
+  const cells = useQuery({ queryKey: ['cells'], queryFn: app.api.cells, staleTime: 60_000 });
+  const regions = [...new Set([d.region, ...(cells.data ?? []).map((c) => c.region)])].filter(Boolean).sort();
   const [err, setErr] = useState<Record<string, string>>({});
   const set = (k: keyof typeof f) => (v: string) => { setF((x) => ({ ...x, [k]: v })); setErr((e) => ({ ...e, [k]: '', _: '' })); };
   const save = useMutation({
-    mutationFn: () => app.api.setDetails(d.id, SchoolDetailsPatch.parse({ contact: { name: f.name, phone: f.phone, email: f.email }, gstin: f.gstin, board: f.board })),
+    mutationFn: () => app.api.setDetails(d.id, SchoolDetailsPatch.parse({ contact: { name: f.name, phone: f.phone, email: f.email }, gstin: f.gstin, board: f.board,
+      contract: { currency: f.currency.trim(), rate: f.rate === '' ? null : Number(f.rate), perStudentYear: f.perStudentYear === '' ? null : Number(f.perStudentYear) }, residency: f.residency })),
     onSuccess: onDone,
     onError: (e) => {
       const issues = (e as { issues?: { path: (string | number)[]; message: string }[] }).issues;
@@ -392,6 +397,15 @@ function DetailsDialog({ d, onClose, onDone }: { d: SchoolDetail; onClose: () =>
           <Field label={tr('console.school_page.tax_number_gstin')} value={f.gstin} onChange={set('gstin')} error={err.gstin} maxLength={20} hint={tr('console.school_page.on_the_school_s_invoices')} />
           <SelectField label={tr('console.school_page.curriculum')} value={f.board} onChange={set('board')} error={err.board} options={CURRICULA.map((c) => ({ value: c.key, label: c.name }))} />
         </div>
+        <div className="lbl" style={{ marginTop: 6 }}>{tr('console.school_page.contract')}</div>
+        <div className="two">
+          <Field label={tr('console.school_page.billed_in', { list: PRICE_CURRENCY })} value={f.currency} onChange={(v) => set('currency')(v.toUpperCase().slice(0, 3))} error={err.currency} placeholder={PRICE_CURRENCY} />
+          <NumberField label={tr('console.school_page.rate', { list: PRICE_CURRENCY })} decimals value={f.rate} onChange={set('rate')} error={err.rate} min={0} />
+        </div>
+        <NumberField label={tr('console.school_page.agreed_price')} decimals value={f.perStudentYear} onChange={set('perStudentYear')} error={err.perStudentYear} min={0}
+          hint={tr('console.school_page.agreed_price_hint')} />
+        <SelectField label={tr('console.school_page.data_stays_in')} value={f.residency} onChange={set('residency')} error={err.residency}
+          options={[{ value: '', label: tr('console.school_page.any_region') }, ...regions.map((r) => ({ value: r, label: r }))]} />
         {err._ && <div className="emsg" role="alert">{err._}</div>}
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>

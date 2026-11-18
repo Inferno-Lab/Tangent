@@ -1,4 +1,4 @@
-import {
+import { numeric,
   boolean,
   customType,
   index,
@@ -85,6 +85,9 @@ export const schools = pgTable(
     appName: text('app_name').notNull().default(''),
     /** A copy of the school's own settings (school.country, .timezone, .locale, .currency), so every server knows its "today". */
     country: text('country').notNull().default(''),
+    /** What it is billed under (D13) and the region its data must stay in (3.7). */
+    contract: jsonb('contract').$type<Record<string, unknown>>().notNull().default({}),
+    residency: text('residency').notNull().default(''),
     timezone: text('timezone').notNull().default('UTC'),
     locale: text('locale').notNull().default('en'),
     currency: text('currency').notNull().default('USD'),
@@ -313,9 +316,10 @@ export const invoices = pgTable('invoices', {
   schoolId: text('school_id').notNull(),
   schoolName: text('school_name').notNull(),
   period: text('period').notNull(),
-  amount: integer('amount').notNull(),
+  amount: numeric('amount', { precision: 16, scale: 3 }).notNull(),
   status: text('status').notNull(),
   lines: jsonb('lines').$type<{ label: string; amount: number }[]>().notNull().default([]),
+  currency: text('currency').notNull().default('INR'), // india-pack: invoices before contracts were in rupees
   sentAt: timestamp('sent_at', { withTimezone: true }),
   sentTo: text('sent_to'),
   paidOn: date('paid_on'),

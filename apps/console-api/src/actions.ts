@@ -320,6 +320,9 @@ export class Actions {
         if (to === school.cell) throw new Error(`${school.name} already runs in ${to}.`);
         if (!target.accepting) throw new Error(`Cell ${to} is closed to new schools.`);
         if (Number(target.n) >= target.max_schools) throw new Error(`Cell ${to} is full.`);
+        // A school whose contract keeps its data in one region moves only within it.
+        const keep = (await this.db.pool.query<{ residency: string; region: string }>('select s.residency, c.region from schools s, cells c where s.id = $1 and c.key = $2', [school.id, to])).rows[0];
+        if (keep?.residency && keep.region !== keep.residency) throw new Error(`${school.name}’s data must stay in ${keep.residency}; cell ${to} is in ${keep.region}.`);
         const moved = await moveSchool({
           db: this.db, env: this.env, hub: this.platform, school: { ...school, dbName: school.dbName ?? null }, to,
           backup: () => this.backups.take(school.id, 'manual', `${a.requestedBy} (before moving)`), log: () => done(),

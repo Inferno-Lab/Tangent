@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Inject, Injectable, Param, Patch, Query } from '@nestjs/common';
 import { POOLS } from './tokens.js';
-import { activeModules, closeModules } from '@tangent/config-engine';
-import { SchoolDetailsPatch, isZone, type BuildRow, type DeployTarget, type FleetSummary, type SchoolDetail, type SchoolRow, type SchoolStatus } from '@tangent/contracts';
+import { PRICE_CURRENCY, activeModules, closeModules } from '@tangent/config-engine';
+import { SchoolDetailsPatch, isZone, tx, type BuildRow, type DeployTarget, type FleetSummary, type SchoolDetail, type SchoolRow, type SchoolStatus } from '@tangent/contracts';
 import { notFound, ApiError, ZodPipe } from '@tangent/nest-kit';
 import type { PoolManager } from '@tangent/tenancy';
 import { unseal } from '@tangent/security';
@@ -71,7 +71,7 @@ export class Schools {
     const ent = r.entitlement;
     return {
       ...this.row(r),
-      contact: r.contact, gstin: r.gstin, board: r.board, entitlement: {
+      contact: r.contact, gstin: r.gstin, board: r.board, contract: { currency: '', rate: null, perStudentYear: null, ...(r.contract as object) }, residency: r.residency, entitlement: {
         plan: r.plan, modules: closeModules(ent.modules), active: activeModules(ent), features: ent.features ?? {}, dates: ent.dates ?? {}, trialUntil: ent.trialUntil ?? null,
         limits: ent.limits, locks: ent.locks, version: ent.version,
       },
@@ -86,8 +86,14 @@ export class Schools {
 
   async setDetails(user: string, id: string, b: SchoolDetailsPatch): Promise<void> {
     const r = await this.raw(id);
-    await this.db.pool.query('update schools set contact = $2, gstin = $3, board = $4 where id = $1', [r.id, JSON.stringify(b.contact), b.gstin, b.board]);
-    await this.db.audit(user, 'school.details', 'school', r.id, { board: b.board });
+    // Another currency needs the rate it is billed at: the price list is in one currency.
+    if (b.contract.currency && b.contract.currency !== PRICE_CURRENCY && !b.contract.rate && b.contract.perStudentYear === null) {
+      throw new ApiError('validation', tx('Billing in {currency} needs the rate from {list}, or a price per student.', { currency: b.contract.currency, list: PRICE_CURRENCY }), { fields: { rate: tx('Give the rate.') } });
+    }
+    // The data stays where the contract says: the school must already run in that region.
+    if (b.residency && b.residency !== r.region) throw new ApiError('validation', tx('{name} runs in {region}. Move it to a cell in {residency} first.', { name: r.name, region: r.region, residency: b.residency }), { fields: { residency: tx('Move the school first.') } });
+    await this.db.pool.query('update schools set contact = $2, gstin = $3, board = $4, contract = $5, residency = $6 where id = $1', [r.id, JSON.stringify(b.contact), b.gstin, b.board, JSON.stringify(b.contract), b.residency]);
+    await this.db.audit(user, 'school.details', 'school', r.id, { board: b.board, contract: b.contract, residency: b.residency });
   }
 
   async setChecklist(user: string, id: string, key: string, state: string): Promise<void> {

@@ -165,6 +165,22 @@ describe('modules per school', () => {
     expect(none).toEqual([]);
   }, 60_000);
 
+  it('bills in the contract’s currency at its rate, never mixing currencies, and keeps the data in its region', async () => {
+    await push({ trialUntil: null });
+    const d = (await h.c('GET', `/console/v1/schools/${id}`, { token: t })).json;
+    const details = (b: Record<string, unknown>) => h.c('PATCH', `/console/v1/schools/${id}/details`, { token: t,
+      body: { contact: { name: d.contact.name || 'Office', phone: d.contact.phone || '+14155550100', email: d.contact.email || 'office@example.org' }, gstin: d.gstin, board: d.board, ...b } });
+    expect((await details({ contract: { currency: 'USD', rate: null, perStudentYear: null } })).status).toBe(400);
+    expect((await details({ residency: 'somewhere-else' })).status).toBe(400);
+    const ok = await details({ contract: { currency: 'USD', rate: 0.012, perStudentYear: null }, residency: d.region });
+    expect(ok.status, JSON.stringify(ok.json)).toBe(200);
+    await h.c('POST', '/console/v1/billing/generate', { token: t, body: { period: '2032-01' } });
+    const inv = (await h.c('GET', '/console/v1/billing/invoices', { token: t })).json.find((i: { schoolId: string; period: string }) => i.schoolId === id && i.period === '2032-01');
+    expect(inv.currency).toBe('USD');
+    expect(inv.amount).toBeCloseTo(inv.lines.reduce((a: number, l: { amount: number }) => a + l.amount, 0), 2);
+    await details({ contract: { currency: '', rate: null, perStudentYear: null }, residency: '' });
+  }, 60_000);
+
   it('starts a school in another country with its own ways, and nothing of India', async () => {
     const base = wizardPayload('ukschool');
     const run = await launch('ukschool', { ...base, basics: { ...base.basics, country: 'GB', timezone: 'Europe/London', locale: 'en-GB', currency: 'GBP', board: 'British', contactPhone: '+44 20 7946 0000' } });

@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
-import { CAPABILITY_LABELS, schoolToday, type Capability, type InvoiceRowC } from '@tangent/contracts';
+import { CAPABILITY_LABELS, fmtMoney, schoolToday, type Capability, type InvoiceRowC } from '@tangent/contracts';
 import { DateField, Dialog, EmptyCard, Field, MonthField, Select, useShake, EmptyState, EmptyNote, t as tr } from '@tangent/web-ui';
+import { PRICE_CURRENCY } from '@tangent/config-engine';
 import { Card, Page, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
 import { count, price, when } from '../../app/format';
@@ -38,7 +39,14 @@ export function BillingPage() { const app = useApp();
   // The tiles are for one month (the one filtered, else the latest), with all time beside them.
   const shownMonth = month || all[0]?.period || '';
   const inMonth = all.filter((r) => r.period === shownMonth);
-  const sum = (l: InvoiceRowC[]) => l.reduce((n, r) => n + r.amount, 0);
+  // Invoices in different contract currencies are never added together: one total per currency.
+  const sum = (l: InvoiceRowC[], minus: InvoiceRowC[] = []) => {
+    const by = new Map<string, number>();
+    for (const r of l) by.set(r.currency, (by.get(r.currency) ?? 0) + r.amount);
+    for (const r of minus) by.set(r.currency, (by.get(r.currency) ?? 0) - r.amount);
+    const parts = [...by].filter(([, v]) => v !== 0).map(([c, v]) => fmtMoney(v, c));
+    return parts.length ? parts.join(' + ') : fmtMoney(0, PRICE_CURRENCY);
+  };
   const paid = (l: InvoiceRowC[]) => l.filter((r) => r.status === 'paid');
   const months = [...new Set(all.map((r) => r.period))];
   const schools = [...new Map(all.map((r) => [r.schoolId, r.schoolName])).entries()];
@@ -54,9 +62,9 @@ export function BillingPage() { const app = useApp();
       overlays={open && <InvoiceDialog r={open} can={canWrite} onClose={() => setOpen(null)} onDone={(m) => { setOpen(null); refresh(); say(m); }} />}>
       {all.length > 0 && (
         <section className="grid">
-          <div className="tile t-v s4 rise"><span className="lbl">{tr('console.billing_page.invoiced')}{' '}{shownMonth}</span><div className="fd" style={{ fontSize: 30, letterSpacing: '-.04em', marginTop: 8 }}>{price(sum(inMonth))}</div><div style={{ opacity: .75, font: '600 13px var(--fb)' }}>{inMonth.length} {tr('console.billing_page.invoices')}{' '}{price(sum(all))} {tr('console.billing_page.all_time')}</div></div>
-          <div className="tile t-g s4 rise" style={{ '--d': '.05s' } as React.CSSProperties}><span className="lbl">{tr('console.billing_page.paid_2')}{' '}{shownMonth}</span><div className="fd" style={{ fontSize: 30, letterSpacing: '-.04em', marginTop: 8 }}>{price(sum(paid(inMonth)))}</div><div style={{ opacity: .8, font: '600 13px var(--fb)' }}>{price(sum(paid(all)))} {tr('console.billing_page.all_time')}</div></div>
-          <div className="tile t-a s4 rise" style={{ '--d': '.1s' } as React.CSSProperties}><span className="lbl">{tr('console.billing_page.still_to_collect')}</span><div className="fd" style={{ fontSize: 30, letterSpacing: '-.04em', marginTop: 8 }}>{price(sum(all) - sum(paid(all)))}</div><div style={{ opacity: .75, font: '600 13px var(--fb)' }}>{all.filter((r) => r.status === 'overdue').length} {tr('console.billing_page.overdue_all_time')}</div></div>
+          <div className="tile t-v s4 rise"><span className="lbl">{tr('console.billing_page.invoiced')}{' '}{shownMonth}</span><div className="fd" style={{ fontSize: 30, letterSpacing: '-.04em', marginTop: 8 }}>{sum(inMonth)}</div><div style={{ opacity: .75, font: '600 13px var(--fb)' }}>{inMonth.length} {tr('console.billing_page.invoices')}{' '}{sum(all)} {tr('console.billing_page.all_time')}</div></div>
+          <div className="tile t-g s4 rise" style={{ '--d': '.05s' } as React.CSSProperties}><span className="lbl">{tr('console.billing_page.paid_2')}{' '}{shownMonth}</span><div className="fd" style={{ fontSize: 30, letterSpacing: '-.04em', marginTop: 8 }}>{sum(paid(inMonth))}</div><div style={{ opacity: .8, font: '600 13px var(--fb)' }}>{sum(paid(all))} {tr('console.billing_page.all_time')}</div></div>
+          <div className="tile t-a s4 rise" style={{ '--d': '.1s' } as React.CSSProperties}><span className="lbl">{tr('console.billing_page.still_to_collect')}</span><div className="fd" style={{ fontSize: 30, letterSpacing: '-.04em', marginTop: 8 }}>{sum(all, paid(all))}</div><div style={{ opacity: .75, font: '600 13px var(--fb)' }}>{all.filter((r) => r.status === 'overdue').length} {tr('console.billing_page.overdue_all_time')}</div></div>
         </section>
       )}
       {all.length === 0 ? (
@@ -74,7 +82,7 @@ export function BillingPage() { const app = useApp();
                 <div className="grd th" style={{ '--cols': COLS } as React.CSSProperties}><span>{tr('console.billing_page.school')}</span><span>{tr('console.billing_page.month')}</span><span>{tr('console.billing_page.amount')}</span><span>{tr('console.billing_page.status')}</span><span></span></div>
                 {rows.map((r) => (
                   <div key={r.id} className="grd rw" style={{ '--cols': COLS } as React.CSSProperties}>
-                    <b style={{ font: '700 14px var(--fb)' }}>{r.schoolName}</b><span>{r.period}</span><span className="num" style={{ font: '700 14px var(--fb)' }}>{price(r.amount)}</span>
+                    <b style={{ font: '700 14px var(--fb)' }}>{r.schoolName}</b><span>{r.period}</span><span className="num" style={{ font: '700 14px var(--fb)' }}>{fmtMoney(r.amount, r.currency)}</span>
                     <span className={`st ${TONE[r.status]}`} data-tip={r.status === 'paid' ? `${r.paidOn} · ${r.paidRef}` : tr('console.billing_page.due', { dueOn: r.dueOn })}><i></i>{WORDS[r.status]}</span>
                     <span><button className="btn sm" onClick={() => setOpen(r)}>{tr('console.billing_page.open')}</button></span>
                   </div>
@@ -115,8 +123,8 @@ function InvoiceDialog({ r, can, onClose, onDone }: { r: InvoiceRowC; can: boole
     if (!w) return;
     w.document.write(`<!doctype html><meta charset="utf-8"><title>Invoice ${esc(r.schoolName)} ${r.period}</title><body style="font:15px/1.5 system-ui,sans-serif;max-width:640px;margin:40px auto;padding:0 16px">
       <h1 style="font-size:22px">Tangent invoice</h1><p>${esc(r.schoolName)}<br>Month: ${r.period}<br>Due by: ${r.dueOn}</p>
-      <table style="width:100%;border-collapse:collapse">${r.lines.map((l) => `<tr><td style="padding:6px 0;border-bottom:1px solid color-mix(in srgb,currentColor 20%,transparent)">${esc(l.label)}</td><td style="text-align:right;border-bottom:1px solid color-mix(in srgb,currentColor 20%,transparent)">${price(l.amount)}</td></tr>`).join('')}
-      <tr><td style="padding:10px 0"><b>Total</b></td><td style="text-align:right"><b>${price(r.amount)}</b></td></tr></table>
+      <table style="width:100%;border-collapse:collapse">${r.lines.map((l) => `<tr><td style="padding:6px 0;border-bottom:1px solid color-mix(in srgb,currentColor 20%,transparent)">${esc(l.label)}</td><td style="text-align:right;border-bottom:1px solid color-mix(in srgb,currentColor 20%,transparent)">${fmtMoney(l.amount, r.currency)}</td></tr>`).join('')}
+      <tr><td style="padding:10px 0"><b>Total</b></td><td style="text-align:right"><b>${fmtMoney(r.amount, r.currency)}</b></td></tr></table>
       ${r.status === 'paid' ? `<p>Paid on ${r.paidOn}, reference ${esc(r.paidRef ?? '')}.</p>` : ''}</body>`);
     w.document.close();
     w.focus();
@@ -125,8 +133,8 @@ function InvoiceDialog({ r, can, onClose, onDone }: { r: InvoiceRowC; can: boole
   return (
     <Dialog title={`${r.schoolName} · ${r.period}`} tag={{ text: WORDS[r.status], tone: r.status === 'paid' ? 'g' : r.status === 'overdue' ? 'a' : 'v' }} onClose={onClose} width={520} shake={shake.cls}>
       <div className="stack">
-        {r.lines.map((l) => <div key={l.label} className="kv">{l.label}<b className="num">{price(l.amount)}</b></div>)}
-        <div className="kv"><b style={{ color: 'var(--ink)' }}>{tr('console.billing_page.total')}</b><b className="num">{price(r.amount)}</b></div>
+        {r.lines.map((l) => <div key={l.label} className="kv">{l.label}<b className="num">{fmtMoney(l.amount, r.currency)}</b></div>)}
+        <div className="kv"><b style={{ color: 'var(--ink)' }}>{tr('console.billing_page.total')}</b><b className="num">{fmtMoney(r.amount, r.currency)}</b></div>
         <div className="help">{tr('console.billing_page.due_by')}{' '}{r.dueOn}.{r.sentAt ? tr('console.billing_page.sent_to_on', { sentTo: r.sentTo, when: when(r.sentAt) }) : tr('console.billing_page.not_sent_yet')}{r.status === 'paid' ? tr('console.billing_page.paid_on_reference', { paidOn: r.paidOn, paidRef: r.paidRef }) : ''}</div>
         {paying && (
           <div className="two">
