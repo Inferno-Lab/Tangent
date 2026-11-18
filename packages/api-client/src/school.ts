@@ -176,6 +176,9 @@ export function schoolApi(h: Http) {
     reports: {
       list: () => h.get<ReportInfo[]>('/v1/reports'),
       periods: () => h.get<{ name: string; from: string; to: string; kind: 'term' | 'period' }[]>('/v1/reports/periods'),
+      schedules: () => h.get<ReportScheduleRow[]>('/v1/reports/schedules'),
+      schedule: (b: { reportId: string; classId: string | null; every: 'week' | 'month'; day: number; to: string[] }) => h.post<ReportScheduleRow[]>('/v1/reports/schedules', b),
+      unschedule: (id: string) => h.del<ReportScheduleRow[]>(`/v1/reports/schedules/${id}`),
       get: (id: string, q: ReportQuery = {}) => h.get<ReportData>(`/v1/reports/${id}`, q as Query),
       csv: (id: string, q: ReportQuery = {}) => h.text(`/v1/reports/${id}/csv`, q as Query),
     },
@@ -296,6 +299,9 @@ export function schoolApi(h: Http) {
     },
   };
 }
+
+/** A report sent by itself every week or month to chosen staff. */
+export interface ReportScheduleRow { id: string; reportId: string; classId: string | null; every: 'week' | 'month'; day: number; to: string[]; title: string; toNames: string[]; lastSent: string | null }
 
 /** How far a zip of students' photos got (Moving in). */
 export interface PhotoImportRow { id: string; status: 'waiting' | 'running' | 'done' | 'failed'; total: number; done: number; matched: number; unmatched: string[]; error: string | null; by: string; createdAt: string; doneAt: string | null }
