@@ -248,6 +248,7 @@ export function StudentsView({ v }: { v: any }) {
                 <span className={`fs ${v.d.fcls ?? ""}`}>{v.d.fees}</span>
                 {v.d.house && <span className="chip">{v.d.house} {tr('admin.students.view.house')}</span>}
                 {v.d.route && <span className="chip v">{v.d.route}</span>}
+                {v.certificate && <button className="btn sm" onClick={v.certificate}>{tr('admin.students.view.ask_for_a_certificate')}</button>}
               </div>
             </div>
             <div className="db">

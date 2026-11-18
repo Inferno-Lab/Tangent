@@ -383,7 +383,7 @@ export const MODULES: ModuleManifest[] = localized([
     imports: ['leave_balances'],
     approvals: ['staff_leave'],
     blocks: { workflows: ['staff_leave'], templates: [], series: [], entities: [], vocabulary: [] },
-    dashboard: [{ kind: 'widget', key: 'staffToday', label: 'Staff today', blurb: 'Who is in, late or away today', anyOf: ['staffAttendance.read'] }],
+    dashboard: [],
   },
   {
     key: 'diary', state: 'live', addOnPerStudentYear: 20, requires: ['people'], backend: true,
@@ -427,7 +427,7 @@ export const MODULES: ModuleManifest[] = localized([
     imports: ['pickup_people'],
     approvals: ['gate_pass', 'visitor'],
     blocks: { workflows: ['gate_pass', 'visitor'], templates: ['visitorBadge', 'gatePass'], series: ['visitors.badgeNumber', 'visitors.gatePassNumber'], entities: ['visitor'], vocabulary: [] },
-    dashboard: [{ kind: 'widget', key: 'onSite', label: 'On site now', blurb: 'Visitors signed in and students who left early', anyOf: ['visitors.read'] }],
+    dashboard: [],
   },
   {
     key: 'certificates', state: 'live', addOnPerStudentYear: 10, requires: ['people'], backend: true,

@@ -217,6 +217,8 @@ function StudentList({ tabs }: { tabs: React.ReactNode }) { const app = useApp()
     left: detail.data?.left ? { line: [LEAVING_KIND_LABELS[detail.data.left.kind], detail.data.left.transferTo, tr('admin.students_page.left_on', { fmtDate: fmtDate(detail.data.left.on, 'dayYear'), p1: detail.data.left.reason ? `: ${detail.data.left.reason}` : '' })].filter(Boolean).join(' · '),
       back: app.user.permissions.includes('year.manage') ? () => void app.api.year.rejoin(detail.data!.id).then(() => { say(tr('admin.students_page.is_back_on_the_roll', { name: detail.data!.name })); refreshAll(); }).catch((e: Error) => say(e.message)) : null } : null,
     own: customLines(own, detail.data?.custom),
+    // A certificate for this student, asked for on the Certificates page.
+    certificate: mods.includes('certificates') && app.user.permissions.includes('certificates.read') && openId ? () => app.go(`/certificates?ask=${openId}`) : null,
     edit: () => setDialog({ kind: 'edit' }), editGuardians: () => setDialog({ kind: 'guardians' }), leave: () => setDialog({ kind: 'leave' }), away: () => setDialog({ kind: 'away' }),
     guardians: (detail.data?.guardians ?? []).map((g) => ({ n: g.name, ini: g.name.split(' ').map((w) => w[0]).slice(0, 2).join(''), primary: g.isPrimary,
       line: [listLabel(rels, g.relation, currentLanguage()), g.isPrimary ? tr('admin.students_page.contacted_first') : '', g.canCollect ? tr('admin.students_page.may_collect_from_school') : tr('admin.students_page.may_not_collect'), g.getsMessages ? tr('admin.students_page.gets_messages') : '', g.getsBills ? tr('admin.students_page.gets_bills') : '', g.hasApp ? tr('admin.students_page.uses_the_app') : ''].filter(Boolean).join(' · '),
