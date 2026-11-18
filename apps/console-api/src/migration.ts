@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Header, HttpCode, Inject, Injectable, Param, Patch, Post, type OnModuleInit } from '@nestjs/common';
 import { activeFeatures, activeModules } from '@tangent/config-engine';
-import { fmtMoney, IMPORT_KINDS, ImportInput, ReadinessMark, SampleLoad, importKind, type EntitlementDoc, type ImportBatchRow, type ImportPreview, type MigrationView, type UploadRow, tx } from '@tangent/contracts';
-import { commitImport, exportAll, listBatches, pg, previewImport, sampleSchool, templateXlsx, undoBatch } from '@tangent/db';
+import { fmtMoney, IMPORT_KINDS, ImportInput, type ImportRunRow, ReadinessMark, SampleLoad, importKind, type EntitlementDoc, type ImportBatchRow, type ImportPreview, type MigrationView, type UploadRow, tx } from '@tangent/contracts';
+import { commitImport, exportAll, listBatches, newId, pg, previewImport, readTable, sampleSchool, templateXlsx, undoBatch } from '@tangent/db';
 import { ApiError, ZodPipe, notFound } from '@tangent/nest-kit';
 import { z } from 'zod';
 import type { Registry } from '@tangent/tenancy';
@@ -12,6 +12,9 @@ import { withSchoolDb } from './school-db.js';
 import { REGISTRY } from './tokens.js';
 
 const n = async (pool: pg.Pool, sql: string) => Number((await pool.query<{ n: string }>(sql)).rows[0]!.n);
+/** An import this big runs in the background: the page does not wait for it, and the console shows it running, then done. */
+const BIG_ROWS = 2000;
+const BIG_BYTES = 1024 * 1024;
 
 /** Tangent's onboarding team moves a school in: files in, checked, imported as batches that add up, and undone if wrong. */
 @Injectable()
@@ -19,6 +22,8 @@ export class Migration implements OnModuleInit {
   constructor(private readonly db: Db, private readonly actions: Actions, @Inject(ENV) private readonly env: Env, @Inject(REGISTRY) private readonly registry: Registry) {}
 
   onModuleInit(): void {
+    // A run this server was doing when it stopped never finishes: it is failed so it can be run again.
+    void this.db.pool.query("update import_runs set status = 'failed', error = 'The server restarted while it ran. Run it again.', done_at = now() where status = 'running' and started_at < now() - interval '2 hours'").catch(() => undefined);
     // Go live is the end of moving in: the school's Moving in page closes and the day is kept. Only with every item green.
     this.actions.handle('school.golive', async (schoolId, _params, by) => {
       const r = (await this.db.pool.query<{ name: string; slug: string; status: string; went_live_at: Date | null }>('select name, slug, status, went_live_at from schools where id = $1 and deleted_at is null', [schoolId])).rows[0];
@@ -100,7 +105,7 @@ export class Migration implements OnModuleInit {
         { key: 'families_invited', label: 'Families are invited', done: families > 0 && invited === families, detail: `${invited} of ${families}` },
         { key: 'families_in', label: 'Most families have signed in', done: families > 0 && signed / families >= 0.8, detail: `${signed} of ${families}` },
       ];
-      return { kinds: IMPORT_KINDS.filter((k) => s.kinds.includes(k.key)), batches, uploads, readiness, dues: fees ? { outstanding, oldSystem: oldDues } : undefined, students, studentLimit: s.entitlement.limits.students };
+      return { kinds: IMPORT_KINDS.filter((k) => s.kinds.includes(k.key)), batches, runs: await this.runs(id), uploads, readiness, dues: fees ? { outstanding, oldSystem: oldDues } : undefined, students, studentLimit: s.entitlement.limits.students };
     });
   }
 
@@ -134,7 +139,28 @@ export class Migration implements OnModuleInit {
     return this.with(id, (pool) => previewImport(pool, input));
   }
 
-  async commit(id: string, input: ImportInput, by: string): Promise<ImportBatchRow> {
+  /** Small imports apply at once; a big one starts in the background and its run is returned instead. */
+  async commit(id: string, input: ImportInput, by: string): Promise<ImportBatchRow | { run: ImportRunRow }> {
+    await this.kindFor(id, input.kind);
+    const rows = input.rows?.length ?? (() => { try { return Math.max(0, readTable(input.csv ?? '').length - 1); } catch { return 0; } })();
+    if (rows <= BIG_ROWS && (input.csv?.length ?? 0) <= BIG_BYTES) return this.commitNow(id, input, by);
+    if ((await this.db.pool.query("select 1 from import_runs where school_id = $1 and status = 'running'", [id])).rowCount) throw new ApiError('conflict', tx('Another import is running for this school. Wait for it to finish.'));
+    const runId = newId('run');
+    await this.db.pool.query('insert into import_runs (id, school_id, kind, file_name, rows, by) values ($1,$2,$3,$4,$5,$6)', [runId, id, input.kind, input.fileName, rows, by]);
+    void this.commitNow(id, input, by).then(
+      (b) => this.db.pool.query("update import_runs set status = 'done', batch_id = $2, created = $3, updated = $4, skipped = $5, done_at = now() where id = $1", [runId, b.id, b.created, b.updated, b.skipped]),
+      (e: Error) => this.db.pool.query("update import_runs set status = 'failed', error = $2, done_at = now() where id = $1", [runId, e.message.slice(0, 500)]),
+    ).catch(() => undefined);
+    return { run: (await this.runs(id))[0]! };
+  }
+
+  async runs(id: string): Promise<ImportRunRow[]> {
+    const { rows } = await this.db.pool.query('select * from import_runs where school_id = $1 order by started_at desc limit 20', [id]);
+    return rows.map((r) => ({ id: r.id, kind: r.kind, fileName: r.file_name, rows: r.rows, status: r.status, created: r.created, updated: r.updated, skipped: r.skipped, error: r.error, by: r.by,
+      startedAt: r.started_at.toISOString(), doneAt: r.done_at?.toISOString() ?? null }));
+  }
+
+  private async commitNow(id: string, input: ImportInput, by: string): Promise<ImportBatchRow> {
     const s = await this.kindFor(id, input.kind);
     return this.with(id, async (pool) => {
       if (input.kind === 'students') {
@@ -218,7 +244,7 @@ export class MigrationController {
   }
 
   @Post('commit') @HttpCode(200) @Needs('schools.configure')
-  commit(@Me() me: ConsoleUser, @Param('id') id: string, @Body(new ZodPipe(ImportInput)) body: ImportInput): Promise<ImportBatchRow> {
+  commit(@Me() me: ConsoleUser, @Param('id') id: string, @Body(new ZodPipe(ImportInput)) body: ImportInput): Promise<ImportBatchRow | { run: ImportRunRow }> {
     return this.migration.commit(id, body, me.email);
   }
 

@@ -193,9 +193,14 @@ export type FamilyInvite = z.infer<typeof FamilyInvite>;
 export interface LetterRow { studentId: string; student: string; admissionNo: string; className: string; guardian: string; phoneEnd: string }
 
 /** The console's Migration workspace for one school: what can be imported, what was, what the school sent, and how ready it is to go live. */
+/** A big import running in the background: its state, and once done, what it did (or why it failed). */
+export interface ImportRunRow { id: string; kind: string; fileName: string; rows: number; status: 'running' | 'done' | 'failed'; created: number | null; updated: number | null; skipped: number | null; error: string | null; by: string; startedAt: string; doneAt: string | null }
+
 export interface MigrationView {
   kinds: ImportKind[];
   batches: ImportBatchRow[];
+  /** Big imports in the background, newest first. */
+  runs: ImportRunRow[];
   uploads: UploadRow[];
   /** Worked out from the school's data; `manual` items are ticked by Tangent's team; `fees` compares with the old system's total. */
   readiness: { key: string; label: string; done: boolean; detail: string; manual?: boolean }[];

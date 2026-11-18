@@ -84,6 +84,20 @@ describe('the Migration workspace', () => {
     expect((await view()).uploads.find((u: any) => u.id === file.id).status).toBe('new');
   }, 60_000);
 
+  it('runs a big import in the background, one at a time, and shows its result', async () => {
+    const day = (i: number) => new Date(Date.UTC(2040, 0, 1) + i * 86_400_000).toISOString().slice(0, 10);
+    const csv = ['name,starts_on', ...Array.from({ length: 2100 }, (_, i) => `Closed day ${i},${day(i)}`)].join('\n');
+    const r = await post('/commit', { kind: 'holidays', csv, fileName: 'many-holidays.csv' });
+    expect(r.json.run).toMatchObject({ kind: 'holidays', rows: 2100, status: 'running' });
+    expect((await post('/commit', { kind: 'holidays', csv, fileName: 'again.csv' })).status).toBe(409);
+    let run: any;
+    for (let i = 0; i < 300; i++) {
+      run = (await view()).runs.find((x: any) => x.id === r.json.run.id);
+      if (run.status !== 'running') break;
+      await new Promise((ok) => setTimeout(ok, 200));
+    }
+    expect(run).toMatchObject({ status: 'done', created: 2100, skipped: 0 });
+  }, 120_000);
   it('refuses to take a school past its plan’s student limit', async () => {
     const { students, studentLimit } = await view();
     const rows = Array.from({ length: studentLimit - students + 1 }, (_, i) => `X/${i},Child ${i},1 A,2019-01-01,Parent ${i},9876${String(i).padStart(6, '0')}`).join('\n');

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ImportInputIn } from '@tangent/api-client';
-import { IMPORT_SOURCES, type ImportBatchRow, type ImportColumn, type ImportKind, type ImportPreview, type MigrationView, type SchoolDetail } from '@tangent/contracts';
+import { IMPORT_KINDS, IMPORT_SOURCES, type ImportBatchRow, type ImportColumn, type ImportKind, type ImportPreview, type MigrationView, type SchoolDetail } from '@tangent/contracts';
 import { Dialog, EmptyCard, Field, FilePick, Select, EmptyNote, t as tr } from '@tangent/web-ui';
 import { RecordsTab } from './IntegrationsTab';
 import { useApp } from '../../app/context';
@@ -27,7 +27,8 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
   const about = useQuery({ queryKey: ['about'], queryFn: app.api.about, staleTime: Infinity });
   const [undoing, setUndoing] = useState<ImportBatchRow | null>(null);
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ['migration', schoolId], queryFn: () => app.api.migration.view(schoolId) });
+  // While a big import runs in the background, the page looks again every few seconds.
+  const q = useQuery({ queryKey: ['migration', schoolId], queryFn: () => app.api.migration.view(schoolId), refetchInterval: (x) => ((x.state.data?.runs ?? []).some((r) => r.status === 'running') ? 4000 : false) });
   const can = app.can('schools.configure');
   const [kindKey, setKindKey] = useState('');
   const [job, setJob] = useState<{ src: Source | null; mapping?: Record<string, string>; values?: Record<string, Record<string, string>>; rev: number }>({ src: null, rev: 0 });
@@ -48,7 +49,7 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
   const fail = (e: unknown) => say((e as Error).message, 'bad');
   const commit = useMutation({
     mutationFn: () => app.api.migration.commit(schoolId, input()!),
-    onSuccess: (b) => { change(null); refresh(); say(tr('console.data_tab.imported_added_updated', { p0: kind!.label.toLowerCase(), created: b.created, updated: b.updated, p3: b.skipped ? tr('console.data_tab.left_out_2', { skipped: b.skipped }) : '' })); },
+    onSuccess: (b) => { change(null); refresh(); if ('run' in b) { say(tr('console.data_tab.importing_in_background', { rows: b.run.rows })); return; } say(tr('console.data_tab.imported_added_updated', { p0: kind!.label.toLowerCase(), created: b.created, updated: b.updated, p3: b.skipped ? tr('console.data_tab.left_out_2', { skipped: b.skipped }) : '' })); },
     onError: fail,
   });
   const undo = useMutation({ mutationFn: (id: string) => app.api.migration.undo(schoolId, id), onSuccess: (batches) => { setUndoing(null); refresh({ batches }); say(tr('console.data_tab.undone_everything_it_changed_is')); }, onError: fail });
@@ -88,6 +89,12 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
       <div className="card s12 rise">
         <div className="ch"><h2>{tr('console.data_tab.imports')}</h2><span className="chip">{v.batches.length}</span></div>
         <div className="help">{tr('console.data_tab.each_import_is_one_batch')}</div>
+        {v.runs.map((r) => (
+          <div key={r.id} className="kv" style={{ alignItems: 'center' }}>
+            <span>{IMPORT_KINDS.find((k) => k.key === r.kind)?.label ?? r.kind} · {r.fileName} · {tr('console.data_tab.rows_n', { n: r.rows })}<small style={{ display: 'block', color: r.error ? 'var(--bad)' : 'var(--ink3)' }}>{r.error ?? `${r.by} · ${when(r.startedAt)}`}</small></span>
+            <b><span className={`chip ${r.status === 'done' ? 'g' : r.status === 'failed' ? 'c' : 'a'}`}>{r.status === 'running' ? tr('console.data_tab.running') : r.status === 'done' ? tr('console.data_tab.run_done', { created: r.created ?? 0, updated: r.updated ?? 0, skipped: r.skipped ?? 0 }) : tr('console.data_tab.run_failed')}</span></b>
+          </div>
+        ))}
         {v.batches.length === 0 ? <div style={{ marginTop: 10 }}><EmptyNote icon="upload" title={tr('console.data_tab.nothing_imported_yet')} body={tr('console.data_tab.each_import_shows_here_with')} /></div> : v.batches.map((b) => <BatchRow key={b.id} b={b} kinds={v.kinds} canUndo={can && b.canUndo} busy={undo.isPending} onUndo={() => setUndoing(b)} />)}
         {undoing && (
           <Dialog title={tr('console.data_tab.undo_this_import')} tag={{ text: v.kinds.find((k) => k.key === undoing.kind)?.label ?? undoing.kind, tone: 'a' }} onClose={() => setUndoing(null)} width={460}>

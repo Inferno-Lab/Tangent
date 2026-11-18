@@ -1,6 +1,6 @@
 import type {
   ActionRequest, ActionRow, LoginChallenge, AuditRow, BackupRow, RestoreDrillRow, ChangeRequestRow, ConfigPatch, ConfigTemplateRow, EffectiveConfig, RoleDef, RoleDefSave, SchoolConfig, BlueprintInput, BlueprintRow, BuildRow, ConsoleLoginResponse, ConsoleTokens, ConsoleUserRow, ErrorGroup, FleetSummary, FlagRow, InvoiceRowC, LoginRequest,
-  CellCreate, CellPatch, PackPart, ComplianceCreate, ComplianceRow, ComplianceUpdate, DataRequestAcross, MigrationRow, PlanRow, PlanSave, SubprocessorRow, RoleTemplate, SchoolDetailsPatch, PolicyDoc, ProvisionRunRow, ReleaseRow, SandboxMessage, SchoolDetail, SchoolRow, StepKey, SupportSessionRow, SupportToken, VerifyRequest, WizardDraftRow,
+  CellCreate, CellPatch, PackPart, ImportRunRow, ComplianceCreate, ComplianceRow, ComplianceUpdate, DataRequestAcross, MigrationRow, PlanRow, PlanSave, SubprocessorRow, RoleTemplate, SchoolDetailsPatch, PolicyDoc, ProvisionRunRow, ReleaseRow, SandboxMessage, SchoolDetail, SchoolRow, StepKey, SupportSessionRow, SupportToken, VerifyRequest, WizardDraftRow,
   WizardPayload, WizardReview, EntitlementRow, ImportBatchRow, ImportInput, ImportPreview, MigrationView, ReadinessMark, UploadRow,
   DraftResult, I18nSurface, LanguageSummary, TranslationPut, TranslationRow, ActivityQuery, ActivityView, ConnectionInput, ConnectionPatch, HookEventRow, IntegrationsView, JobRow, RouteInput as IntRouteInput, TemplateInput } from '@tangent/contracts';
 import type { Http } from './http';
@@ -45,7 +45,7 @@ export function consoleApi(h: Http) {
       upload: (schoolId: string, uploadId: string) => h.get<{ fileName: string; content: string }>(`${base}/schools/${schoolId}/import/uploads/${uploadId}`),
       setAside: (schoolId: string, uploadId: string, reason: string) => h.post<UploadRow[]>(`${base}/schools/${schoolId}/import/uploads/${uploadId}/set-aside`, { reason }),
       preview: (schoolId: string, b: ImportInputIn) => h.post<ImportPreview>(`${base}/schools/${schoolId}/import/preview`, b),
-      commit: (schoolId: string, b: ImportInputIn) => h.post<ImportBatchRow>(`${base}/schools/${schoolId}/import/commit`, b),
+      commit: (schoolId: string, b: ImportInputIn) => h.post<ImportBatchRow | { run: ImportRunRow }>(`${base}/schools/${schoolId}/import/commit`, b),
       undo: (schoolId: string, batchId: string) => h.post<ImportBatchRow[]>(`${base}/schools/${schoolId}/import/batches/${batchId}/undo`),
       exportAll: (schoolId: string) => h.blob(`${base}/schools/${schoolId}/import/export`),
       sample: (schoolId: string, students: number) => h.post<ImportBatchRow[]>(`${base}/schools/${schoolId}/import/sample`, { students }),
