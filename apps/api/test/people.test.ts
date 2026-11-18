@@ -86,7 +86,7 @@ describe('line managers', () => {
     expect((await call('PATCH', `/v1/staff/${kavita.id}`, { managerId: meera.id })).json.managerName).toBe(meera.name);
     expect((await call('PATCH', `/v1/staff/${meera.id}`, { managerId: kavita.id })).status).toBe(400);
     const view = (await call('GET', '/v1/settings/edit')).json;
-    await call('PATCH', '/v1/settings', { expectedVersion: view.version, changes: { 'workflows.steps': { leave: [{ key: 'manager', name: 'Line manager', who: 'lineManager' }] } } });
+    await call('PATCH', '/v1/settings', { expectedVersion: view.version, changes: { 'workflows.steps': { staff_leave: [{ key: 'manager', name: 'Line manager', who: 'lineManager' }] } } });
     const office = await h.login('meera.nair@greenfield.edu.in');
     const decide = (token: string, decision: string) => call('POST', '/v1/approvals/apr_leave_kavita/decision', { decision }, token);
     expect((await decide(principal, 'approve')).status).toBe(403);

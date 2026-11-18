@@ -13,7 +13,8 @@ import { FamilyService } from './family.service.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
 
 type User = { id: string; name: string };
-type Year = { label: string; from: string; to: string };
+/** A leave year; `fallback` when the school counts by academic year but the day is in none of its years. */
+type Year = { label: string; from: string; to: string; fallback?: boolean };
 type LeaveRaw = { id: string; subject_ref: string; name: string; status: StaffLeaveRow['status']; payload: { type: string; from: string; to: string; halfDay: 'am' | 'pm' | null; days: number; reason?: string };
   decision_note: string | null; decided_by_name: string | null; created_at: Date };
 const mins = (s: string) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5));
@@ -66,18 +67,19 @@ export class StaffTimeService implements OnModuleInit {
 
   /** The leave year a day falls in: the academic year (or, without one, the calendar year), or the calendar year by choice. */
   private async yearOf(t: TenantCtx, day: string): Promise<Year> {
-    if ((await this.settings.value<string>(t, 'staffLeave.year', 'academic')) === 'academic') {
+    const academic = (await this.settings.value<string>(t, 'staffLeave.year', 'academic')) === 'academic';
+    if (academic) {
       const y = (await t.pool.query<{ label: string; s: string; e: string }>(
         'select label, starts_on::text s, ends_on::text e from academic_years where starts_on <= $1 and ends_on >= $1 order by current desc limit 1', [day])).rows[0];
       if (y) return { label: y.label, from: y.s, to: y.e };
     }
-    return { label: day.slice(0, 4), from: `${day.slice(0, 4)}-01-01`, to: `${day.slice(0, 4)}-12-31` };
+    return { label: day.slice(0, 4), from: `${day.slice(0, 4)}-01-01`, to: `${day.slice(0, 4)}-12-31`, fallback: academic };
   }
 
+  /** The leave year before this one; none in a school's first academic year (nothing to carry over). */
   private async yearBefore(t: TenantCtx, y: Year): Promise<Year | null> {
-    const before = addDays(y.from, -1);
-    const prev = await this.yearOf(t, before);
-    return prev.to === before || prev.label !== y.label ? prev : null;
+    const prev = await this.yearOf(t, addDays(y.from, -1));
+    return prev.fallback && !y.fallback ? null : prev;
   }
 
   // ── Balances ─────────────────────────────────────────────────────────────────

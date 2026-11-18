@@ -160,7 +160,7 @@ describe('the school’s own fields on its records', () => {
 describe('the school’s own steps for a request', () => {
   it('takes a leave request through the office and then the head, each a different person, and undoes back to the start', async () => {
     const office = await h.login('meera.nair@greenfield.edu.in');
-    await change({ 'workflows.steps': { leave: [{ key: 'office', name: 'Office checks', who: 'role', ref: 'office' }, { key: 'head', name: 'Head decides', who: 'permission' }] } });
+    await change({ 'workflows.steps': { staff_leave: [{ key: 'office', name: 'Office checks', who: 'role', ref: 'office' }, { key: 'head', name: 'Head decides', who: 'permission' }] } });
     const decide = (token: string, decision: string, note?: string) => h.call('POST', '/v1/approvals/apr_leave_kavita/decision', { token, body: { decision, note } });
     // The first step is the office's: the principal waits for it.
     expect((await decide(principal, 'approve')).status).toBe(403);
@@ -178,7 +178,7 @@ describe('the school’s own steps for a request', () => {
   });
 
   it('approves a step that waited past its days when the school says so', async () => {
-    await change({ 'workflows.steps': { leave: [{ key: 'decide', name: 'Decide', who: 'permission', days: 2, then: 'approve' }] } });
+    await change({ 'workflows.steps': { staff_leave: [{ key: 'decide', name: 'Decide', who: 'permission', days: 2, then: 'approve' }] } });
     const { ApprovalsService } = await import('../src/school/approvals.service.js');
     const { TenantService } = await import('../src/tenancy/tenant.js');
     const t = await h.app.get(TenantService).resolve(h.slug);

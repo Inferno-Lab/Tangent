@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { customHttp } from './providers/generic.js';
 import { razorpay } from './providers/payments.js';
 import { checkoutCom, gocardless, nagerDate, stripe, vonage } from './providers/regional.js';
+import { keepsValues } from './providers/translation.js';
 import { metaCloud } from './providers/whatsapp.js';
 import { readLink, signLink } from './token.js';
 import { e164, fill, segments, type Ctx } from './types.js';
@@ -60,8 +61,7 @@ describe('webhooks', () => {
 });
 
 describe('translation drafts', () => {
-  it('keeps a draft only when its values and words are all still there', async () => {
-    const { keepsValues } = await import('./providers/translation.js');
+  it('keeps a draft only when its values and words are all still there', () => {
     expect(keepsValues('Add {name} to {@class}', 'Ajouter {name} à {@class}')).toBe(true);
     expect(keepsValues('Add {name} to {@class}', 'Ajouter {nom} à {@class}')).toBe(false);
     expect(keepsValues('{n, plural, one {# book} other {# books}}', '{n, plural, one {# livre} many {# livres} other {# livres}}')).toBe(true);

@@ -931,6 +931,54 @@ await flow('admin: year-end drafts the next year and previews promotion', { stor
   await expectVisible(p.getByRole('tab', { name: 'Refunds' }), 'online payments');
 });
 
+// ── the five modules of the one shot ────────────────────────────────────
+await flow('admin: staff attendance takes a mark and saves it', { storage: adminStore }, async (p) => {
+  await p.goto(A('/staff-attendance'), { waitUntil: 'networkidle' });
+  await p.getByLabel(/^Mark for /).first().click();
+  await p.getByRole('option', { name: /^On duty elsewhere/ }).click();
+  await p.getByRole('button', { name: /^Save 1 mark/ }).click();
+  await expectVisible(p.getByText('The marks are saved.'), 'the saved toast');
+  await p.goto(A('/staff-attendance/balances'), { waitUntil: 'networkidle' });
+  await expectVisible(p.getByText(/^Leave year /), 'the balances');
+});
+
+await flow('admin: the diary takes an entry', { storage: adminStore }, async (p) => {
+  await p.goto(A('/diary'), { waitUntil: 'networkidle' });
+  await p.getByRole('button', { name: 'Write an entry' }).first().click();
+  await p.getByRole('dialog').getByLabel('Entry').fill('E2E: bring your atlas tomorrow.');
+  await p.getByRole('dialog').getByRole('button', { name: 'Save' }).click();
+  await expectVisible(p.getByText('E2E: bring your atlas tomorrow.'), 'the entry in the list');
+});
+
+await flow('admin: a parent-teacher meeting is planned with its times', { storage: adminStore }, async (p) => {
+  await p.goto(A('/meetings'), { waitUntil: 'networkidle' });
+  await p.getByRole('button', { name: 'Plan a meeting' }).first().click();
+  await p.getByRole('dialog').getByLabel('Title').fill('E2E meeting');
+  await p.getByRole('dialog').getByRole('checkbox').first().click();
+  await p.getByRole('dialog').getByRole('button', { name: 'Save' }).click();
+  await expectVisible(p.getByText('E2E meeting'), 'the meeting in the list');
+  await p.getByRole('button', { name: /booked$/ }).first().click();
+  await expectVisible(p.getByRole('dialog'), 'the times');
+  await p.keyboard.press('Escape');
+});
+
+await flow('admin: a visitor is signed in with a badge and shows on the roll call', { storage: adminStore }, async (p) => {
+  await p.goto(A('/visitors'), { waitUntil: 'networkidle' });
+  await p.getByRole('button', { name: 'Sign someone in' }).first().click();
+  await p.getByRole('dialog').getByLabel('Name', { exact: true }).fill('E2E Visitor');
+  await p.getByRole('dialog').getByRole('button', { name: 'Sign in' }).click();
+  await expectVisible(p.getByText(/E2E Visitor is signed in with badge VIS-/), 'the badge number');
+  await p.goto(A('/visitors/roll'), { waitUntil: 'networkidle' });
+  await expectVisible(p.getByText('E2E Visitor'), 'the visitor on the roll call');
+});
+
+await flow('admin: certificates show the waiting request and the register', { storage: adminStore }, async (p) => {
+  await p.goto(A('/certificates'), { waitUntil: 'networkidle' });
+  await expectVisible(p.getByText(/^Character certificate · /), 'the waiting request');
+  await p.goto(A('/certificates/register'), { waitUntil: 'networkidle' });
+  await expectVisible(p.getByText(/^CERT-\d{4}-0001/), 'the issued certificate');
+});
+
 await browser.close();
 console.log(`\n${passed} flows passed${errors.length ? `, ${errors.length} failed:\n - ${errors.join('\n - ')}` : ''}`);
 process.exit(errors.length ? 1 : 0);

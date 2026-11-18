@@ -266,8 +266,8 @@ describe('money lists and reports', () => {
     // Narrowed to a class and a period, and named after them.
     const low = await get(`/v1/reports/attendance-class?classId=cls_8a&from=${addDays(schoolToday(), -10)}&to=${schoolToday()}`);
     expect(low.json.rows).toHaveLength(1);
-    expect(low.json.scope).toMatch(/^Class 8 A, /);
-    expect((await get('/v1/reports/attendance-low/csv?classId=cls_8a')).headers['content-disposition']).toMatch(/Low attendance - Class 8 A/);
+    expect(low.json.scope).toMatch(/^8 A, /);
+    expect((await get('/v1/reports/attendance-low/csv?classId=cls_8a')).headers['content-disposition']).toMatch(/Low attendance - 8 A/);
     expect((await get('/v1/reports/nope')).status).toBe(404);
   });
 });

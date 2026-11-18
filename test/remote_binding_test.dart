@@ -7,6 +7,7 @@ import 'package:tangent/data/repositories/academic_repository.dart';
 import 'package:tangent/data/repositories/auth_repository.dart';
 import 'package:tangent/data/repositories/campus_repository.dart';
 import 'package:tangent/data/repositories/directory_repository.dart';
+import 'package:tangent/data/repositories/school_life_repository.dart';
 
 void main() {
   tearDown(() {
@@ -35,5 +36,6 @@ void main() {
     expect(Get.find<LeaveRepository>(), isA<RemoteLeaveRepository>());
     expect(Get.find<GalleryRepository>(), isA<RemoteGalleryRepository>());
     expect(Get.find<NotificationRepository>(), isA<RemoteNotificationRepository>());
+    expect(Get.find<SchoolLifeRepository>(), isA<RemoteSchoolLifeRepository>());
   });
 }

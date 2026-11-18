@@ -19,6 +19,7 @@ import 'package:tangent/data/repositories/academic_repository.dart';
 import 'package:tangent/data/repositories/auth_repository.dart';
 import 'package:tangent/data/repositories/campus_repository.dart';
 import 'package:tangent/data/repositories/directory_repository.dart';
+import 'package:tangent/data/repositories/school_life_repository.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 Future<void> bootMock() async {
@@ -58,6 +59,7 @@ Future<void> bootMock() async {
     ..put<TransportRepository>(MockTransportRepository(source), permanent: true)
     ..put<LeaveRepository>(MockLeaveRepository(source), permanent: true)
     ..put<GalleryRepository>(MockGalleryRepository(source), permanent: true)
+    ..put<SchoolLifeRepository>(MockSchoolLifeRepository(source), permanent: true)
     ..put<NotificationRepository>(
       MockNotificationRepository(source),
       permanent: true,

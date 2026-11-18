@@ -170,8 +170,8 @@ export class ApprovalsService implements OnModuleInit {
 
   async needsYou(t: TenantCtx, user: Person): Promise<ApprovalRow[]> {
     const kinds = await this.mine(t, user.permissions);
-    const order = { leave: 1, fee_waiver: 2, notice: 3 } as Record<string, number>;
-    const rows = (await this.waitingFor(t, user, "and a.kind in ('leave','fee_waiver','notice')")).sort((a, b) => (order[a.kind] ?? 9) - (order[b.kind] ?? 9)).slice(0, 8);
+    const order = { leave: 1, staff_leave: 1, fee_waiver: 2, notice: 3 } as Record<string, number>;
+    const rows = (await this.waitingFor(t, user, "and a.kind in ('leave','staff_leave','fee_waiver','notice')")).sort((a, b) => (order[a.kind] ?? 9) - (order[b.kind] ?? 9)).slice(0, 8);
     const flow = await this.flow(t);
     const items = await Promise.all(rows.map(async (r) => this.toRow(r, await this.doneText(t, r), this.stepsOf(flow, r))));
     const unmarked = kinds.includes('attendance') ? await this.attendance.unmarked(t) : [];

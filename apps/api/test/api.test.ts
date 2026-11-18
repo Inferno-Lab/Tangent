@@ -239,7 +239,7 @@ describe('dashboard and approvals', () => {
     expect(d.charts.attendance.points).toHaveLength(6);
     expect(d.classRolls).toHaveLength(6);
     expect(d.feeHeads.map((x: any) => x.head)).toEqual(['tuition', 'transport', 'activities', 'lab']);
-    expect(d.needsYou.map((n: any) => n.kind)).toEqual(['leave', 'fee_waiver', 'attendance', 'notice']);
+    expect(d.needsYou.map((n: any) => n.kind)).toEqual(['staff_leave', 'fee_waiver', 'attendance', 'notice']);
     expect(d.timeline.length).toBeGreaterThan(3);
   });
   it('approves, then undoes, a concession and applies it to the invoice', async () => {
