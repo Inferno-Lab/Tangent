@@ -15,7 +15,7 @@ import 'package:tangent/core/widgets/glass.dart';
 import 'package:tangent/core/widgets/page.dart';
 import 'package:tangent/core/widgets/sheets.dart';
 import 'package:tangent/core/widgets/states.dart';
-import 'package:tangent/core/widgets/toast.dart';
+import 'package:tangent/core/utils/open_link.dart';
 import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/data/models/campus.dart';
 import 'package:tangent/data/models/student.dart';
@@ -459,7 +459,16 @@ class ChatThreadView extends GetView<ChatThreadController> {
                           child: Column(
                             crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                             children: [
-                              GestureDetector(onLongPress: () => unawaited(controller.onHold(m)), child: _Bubble(text: m.text, mine: mine)),
+                              if (m.text.isNotEmpty) GestureDetector(onLongPress: () => unawaited(controller.onHold(m)), child: _Bubble(text: m.text, mine: mine)),
+                              for (final f in m.files)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Pressable(
+                                    onTap: () => unawaited(openFile(f)),
+                                    label: 'chat.open_file'.tr,
+                                    child: Chip2('chat.attachment'.tr, icon: PhosphorIconsRegular.paperclip, background: c.paper, foreground: c.ink),
+                                  ),
+                                ),
                               if (endsRun)
                                 Padding(
                                   padding: const EdgeInsets.fromLTRB(6, 4, 6, 0),
@@ -590,7 +599,7 @@ class ChatThreadView extends GetView<ChatThreadController> {
                         button: true,
                         label: 'chat.attach'.tr,
                         child: Pressable(
-                          onTap: () => ToastHelper.show('chat.attach_soon'),
+                          onTap: () => unawaited(controller.attach()),
                           child: Container(
                             width: 44,
                             height: 44,

@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:tangent/data/datasources/remote_datasource.dart';
+import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/services/live_stream.dart';
 import 'package:tangent/core/widgets/sheets.dart';
@@ -180,6 +183,32 @@ class ChatThreadController extends GetxController with Loadable, LiveListen {
     } on AppException catch (error) {
       text.text = value;
       ToastHelper.show(error.message, kind: ToastKind.error);
+    }
+  }
+
+  final attaching = false.obs;
+
+  /// A photo or a picture of a page from the phone, sent in the conversation (the one upload path: checked and scanned on the server).
+  Future<void> attach({bool camera = false}) async {
+    final id = thread?.id;
+    final userId = me;
+    if (id == null || userId == null || attaching.value) return;
+    if (!AppConfig.live) {
+      ToastHelper.show('common.sample_only');
+      return;
+    }
+    final picked = await ImagePicker().pickImage(source: camera ? ImageSource.camera : ImageSource.gallery, imageQuality: 80, maxWidth: 2400);
+    if (picked == null) return;
+    attaching.value = true;
+    try {
+      final fileId = await Get.find<RemoteDataSource>().client.upload(kind: 'chat', ownerId: id, path: picked.path);
+      final value = text.text.trim();
+      text.clear();
+      await Get.find<ChatRepository>().send(threadId: id, senderId: userId, text: value, fileIds: [fileId]);
+    } on AppException catch (error) {
+      ToastHelper.show(error.message, kind: ToastKind.error);
+    } finally {
+      attaching.value = false;
     }
   }
 

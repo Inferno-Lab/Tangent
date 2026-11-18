@@ -181,6 +181,7 @@ ChatMessage _$ChatMessageFromJson(Map<String, dynamic> json) => ChatMessage(
   text: json['text'] as String,
   sentAt: DateTime.parse(json['sentAt'] as String),
   read: json['read'] as bool,
+  files: (json['files'] as List<dynamic>?)?.map((e) => '$e').toList() ?? const [],
 );
 
 Map<String, dynamic> _$ChatMessageToJson(ChatMessage instance) =>

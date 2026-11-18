@@ -273,6 +273,7 @@ class ChatMessage {
     required this.text,
     required this.sentAt,
     required this.read,
+    this.files = const [],
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) =>
@@ -284,6 +285,9 @@ class ChatMessage {
   final String text;
   final DateTime sentAt;
   final bool read;
+
+  /// Files sent with it (their ids, opened from the server).
+  final List<String> files;
 
   Map<String, dynamic> toJson() => _$ChatMessageToJson(this);
 }
