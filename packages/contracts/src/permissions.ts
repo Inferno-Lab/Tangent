@@ -51,6 +51,16 @@ export const PERMISSIONS = [
   'gallery.write',
   'year.manage',
   'forms.manage',
+  'staffAttendance.read',
+  'staffAttendance.manage',
+  'diary.read',
+  'diary.write',
+  'meetings.read',
+  'meetings.manage',
+  'visitors.read',
+  'visitors.manage',
+  'certificates.read',
+  'certificates.issue',
 ] as const;
 export const Permission = z.enum(PERMISSIONS);
 export type Permission = z.infer<typeof Permission>;
@@ -78,6 +88,8 @@ export const PERMISSION_NEEDS: Partial<Record<Permission, string>> = {
   'library.read': 'library', 'library.write': 'library',
   'transport.read': 'transport', 'transport.write': 'transport',
   'gallery.read': 'gallery', 'gallery.write': 'gallery',
+  'staffAttendance.read': 'staffAttendance', 'staffAttendance.manage': 'staffAttendance', 'diary.read': 'diary', 'diary.write': 'diary',
+  'meetings.read': 'ptm', 'meetings.manage': 'ptm', 'visitors.read': 'visitors', 'visitors.manage': 'visitors', 'certificates.read': 'certificates', 'certificates.issue': 'certificates',
 };
 
 /** Whether a school with these modules and features can use the permission. */
@@ -130,6 +142,16 @@ export const PERMISSION_CATALOG: PermissionInfo[] = localized([
   { key: 'gallery.write', area: 'Gallery', label: 'Add albums and photos, publish them to families' },
   { key: 'year.manage', area: 'School setup', label: 'Promote students, start a new year and record leavers', sensitive: true },
   { key: 'forms.manage', area: 'Forms', label: 'Make forms and read their answers' },
+  { key: 'staffAttendance.read', area: 'Staff attendance', label: 'See staff attendance, leave and balances' },
+  { key: 'staffAttendance.manage', area: 'Staff attendance', label: 'Mark staff attendance, record leave and change balances', sensitive: true },
+  { key: 'diary.read', area: 'Diary', label: 'Read every class’s diary' },
+  { key: 'diary.write', area: 'Diary', label: 'Write in the diary of classes they teach' },
+  { key: 'meetings.read', area: 'Meetings', label: 'See parent-teacher meetings and bookings' },
+  { key: 'meetings.manage', area: 'Meetings', label: 'Set up parent-teacher meetings and change bookings' },
+  { key: 'visitors.read', area: 'Visitors', label: 'See visitors, gate passes and pick-ups' },
+  { key: 'visitors.manage', area: 'Visitors', label: 'Sign visitors in and out, let students leave and record pick-ups' },
+  { key: 'certificates.read', area: 'Certificates', label: 'See certificates and the issue register' },
+  { key: 'certificates.issue', area: 'Certificates', label: 'Issue, cancel and revoke certificates; print ID cards', sensitive: true },
   { key: 'setup.write', area: 'School setup', label: 'Edit classes, subjects, periods, terms, holidays and fee structures (where Tangent allows)' },
 ]);
 
@@ -160,7 +182,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       'students.read', 'students.write', 'staff.read', 'attendance.read', 'notices.read', 'notices.write', 'notices.pin',
       'approvals.read', 'timetable.read', 'timetable.edit', 'reports.read', 'admissions.read', 'admissions.write', 'messages.read', 'messages.write',
       'events.read', 'events.write', 'homework.read', 'exams.read', 'setup.write', 'library.read', 'library.write', 'transport.read', 'transport.write', 'gallery.read', 'gallery.write',
-      'forms.manage',
+      'forms.manage', 'staffAttendance.read', 'diary.read', 'meetings.read', 'meetings.manage', 'visitors.read', 'visitors.manage', 'certificates.read',
     ],
   },
   {
@@ -175,7 +197,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
     description: 'Marks attendance and sees their classes.',
     permissions: [
       'students.read', 'attendance.read', 'attendance.mark', 'notices.read', 'timetable.read', 'homework.read', 'homework.write', 'exams.read', 'exams.write',
-      'messages.read', 'messages.write', 'events.read',
+      'messages.read', 'messages.write', 'events.read', 'diary.write', 'meetings.read',
     ],
   },
 ];

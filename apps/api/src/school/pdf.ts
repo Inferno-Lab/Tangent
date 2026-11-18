@@ -12,9 +12,9 @@ import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
  * assets/fonts (SIL Open Font License); only the ones a document uses are embedded.
  */
 /** A line of a document. `page` starts a new page first; `qr` draws a QR code of that text at the right, beside the lines after it. */
-export interface PdfLine { text: string; right?: string; size?: number; bold?: boolean; gap?: number; rule?: boolean; page?: boolean; qr?: string; align?: 'start' | 'center' | 'end' }
-/** Page sizes in points (§3.6.2). */
-const PAGES = { A4: [595, 842], Letter: [612, 792], A5: [420, 595] } as const;
+export interface PdfLine { text: string; right?: string; size?: number; bold?: boolean; gap?: number; rule?: boolean; page?: boolean; qr?: string; align?: 'start' | 'center' | 'end'; image?: Buffer }
+/** Page sizes in points (§3.6.2); Card is a bank card's (ID cards and badges). */
+const PAGES = { A4: [595, 842], Letter: [612, 792], A5: [420, 595], Card: [243, 153] } as const;
 
 const FONTS = new URL('../../assets/fonts/', import.meta.url);
 /** Each script's letters and the Noto font that has them (Latin, Cyrillic and Greek are in Noto Sans itself). */
@@ -52,6 +52,10 @@ const MARGIN = 50;
 
 export async function pdf(lines: PdfLine[], opts: { logo?: Buffer | null; size?: keyof typeof PAGES } = {}): Promise<Buffer> {
   const [WIDTH, HEIGHT] = PAGES[opts.size ?? 'A4'];
+  // A card has narrow edges, its photo at the top right and its code at the bottom right; the words keep clear of both.
+  const card = HEIGHT < 300;
+  const M = card ? 12 : MARGIN;
+  const side = card ? 60 : 0;
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
   // Only the scripts this document has are embedded (each subset to the letters it uses).
@@ -95,39 +99,51 @@ export async function pdf(lines: PdfLine[], opts: { logo?: Buffer | null; size?:
   };
 
   let page = doc.addPage([WIDTH, HEIGHT]);
-  let y = HEIGHT - MARGIN;
-  if (opts.logo) {
+  let y = HEIGHT - M;
+  if (opts.logo && !card) {
     const img = await (opts.logo[0] === 0x89 ? doc.embedPng(opts.logo) : doc.embedJpg(opts.logo)).catch(() => null);
     if (img) {
       const s = 56 / Math.max(img.width, img.height);
-      page.drawImage(img, { x: WIDTH - MARGIN - img.width * s, y: y - img.height * s + 8, width: img.width * s, height: img.height * s });
+      page.drawImage(img, { x: WIDTH - M - img.width * s, y: y - img.height * s + 8, width: img.width * s, height: img.height * s });
     }
   }
   for (const l of lines) {
-    if (l.page && y < HEIGHT - MARGIN) { page = doc.addPage([WIDTH, HEIGHT]); y = HEIGHT - MARGIN; }
+    if (l.page && y < HEIGHT - M) { page = doc.addPage([WIDTH, HEIGHT]); y = HEIGHT - M; }
+    if (l.image) {
+      // A person's photo at the right margin from here down (a card's at its top right); a format PDF cannot carry is left out.
+      const img = await (l.image[0] === 0x89 ? doc.embedPng(l.image) : doc.embedJpg(l.image)).catch(() => null);
+      if (img) {
+        const w = card ? 48 : 90;
+        const h = Math.min(w * 1.3, (w * img.height) / img.width);
+        page.drawImage(img, { x: WIDTH - M - w, y: (card ? HEIGHT - M : y) - h, width: w, height: h });
+      }
+      continue;
+    }
     if (l.qr) {
-      // A QR code, 108 points wide, at the right margin from here down.
+      // A QR code, 108 points wide, at the right margin from here down (a card's, smaller, at its bottom right).
       const code = qrcode(0, 'M');
       code.addData(l.qr);
       code.make();
       const n = code.getModuleCount();
-      const cell = 108 / n;
+      const size = card ? 44 : 108;
+      const cell = size / n;
+      const top = card ? M + size : y - 12;
       for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
-        if (code.isDark(r, c)) page.drawRectangle({ x: WIDTH - MARGIN - 108 + c * cell, y: y - 12 - (r + 1) * cell, width: cell, height: cell, color: rgb(0, 0, 0) });
+        if (code.isDark(r, c)) page.drawRectangle({ x: WIDTH - M - size + c * cell, y: top - (r + 1) * cell, width: cell, height: cell, color: rgb(0, 0, 0) });
       }
       continue;
     }
     const size = l.size ?? 11;
-    const room = WIDTH - 2 * MARGIN - (l.right ? width(l.right, size, l.bold) + 16 : 0);
+    const room = WIDTH - 2 * M - side - (l.right ? width(l.right, size, l.bold) + 16 : 0);
     const parts = l.rule ? [''] : wrap(l.text, size, room, l.bold);
     const need = (l.gap ?? Math.round(size * 1.5)) + (parts.length - 1) * size * 1.35;
-    if (y - need < MARGIN) { page = doc.addPage([WIDTH, HEIGHT]); y = HEIGHT - MARGIN; }
+    if (y - need < M) { page = doc.addPage([WIDTH, HEIGHT]); y = HEIGHT - M; }
     y -= l.gap ?? Math.round(size * 1.5);
-    if (l.rule) { page.drawLine({ start: { x: MARGIN, y: y + size }, end: { x: WIDTH - MARGIN, y: y + size }, thickness: 0.6, color: rgb(0.7, 0.7, 0.74) }); continue; }
+    if (l.rule) { page.drawLine({ start: { x: M, y: y + size }, end: { x: WIDTH - M, y: y + size }, thickness: 0.6, color: rgb(0.7, 0.7, 0.74) }); continue; }
     // Centred or at the end, each wrapped line on its own; the default is the start of the line.
-    const at = (p: string) => (l.align === 'center' ? (WIDTH - width(p, size, l.bold)) / 2 : l.align === 'end' ? WIDTH - MARGIN - width(p, size, l.bold) : MARGIN);
+    const at = (p: string) => (l.align === 'center' ? (WIDTH - side - width(p, size, l.bold)) / 2 : l.align === 'end' ? WIDTH - M - side - width(p, size, l.bold) : M);
     parts.forEach((p, i) => draw(page, p, at(p), y - i * size * 1.35, size, l.bold));
-    if (l.right) draw(page, l.right, WIDTH - MARGIN - width(l.right, size, l.bold), y, size, l.bold);
+    if (l.right) draw(page, l.right, WIDTH - M - side - width(l.right, size, l.bold), y, size, l.bold);
     y -= (parts.length - 1) * size * 1.35;
   }
   const pages = doc.getPages();

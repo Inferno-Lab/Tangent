@@ -25,3 +25,8 @@ export * from './theme.js';
 export * from './hue.js';
 export * from './integrations.js';
 export * from './campus.js';
+export * from './staff-time.js';
+export * from './diary.js';
+export * from './meetings.js';
+export * from './visitors.js';
+export * from './certificates.js';

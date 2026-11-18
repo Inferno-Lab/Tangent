@@ -18,14 +18,36 @@ type Person = { id: string; name: string; permissions: readonly string[] };
 /** Stands for the time limit when a step waiting too long is approved by itself. */
 const SYSTEM = 'system';
 
-const TONE: Record<ApprovalKind, ApprovalRow['tone']> = { leave: 'blue', fee_waiver: 'mint', attendance: 'amber', notice: 'violet', admission: 'coral', photo: 'violet', receipt_cancel: 'coral', settings: 'amber' };
-const ACTION: Record<ApprovalKind, string> = { leave: 'Review', fee_waiver: 'Approve', attendance: 'Remind', notice: 'Publish', admission: 'Approve', photo: 'Use photo', receipt_cancel: 'Cancel receipt', settings: 'Apply' };
+const TONE: Record<ApprovalKind, ApprovalRow['tone']> = {
+  leave: 'blue', fee_waiver: 'mint', attendance: 'amber', notice: 'violet', admission: 'coral', photo: 'violet', receipt_cancel: 'coral', settings: 'amber',
+  staff_leave: 'blue', gate_pass: 'amber', certificate: 'mint', visitor: 'violet',
+};
+const ACTION: Record<ApprovalKind, string> = {
+  leave: 'Review', fee_waiver: 'Approve', attendance: 'Remind', notice: 'Publish', admission: 'Approve', photo: 'Use photo', receipt_cancel: 'Cancel receipt', settings: 'Apply',
+  staff_leave: 'Review', gate_pass: 'Review', certificate: 'Issue', visitor: 'Review',
+};
+/** The module each kind belongs to (a school without it has none of them); null: every school. */
+const KIND_NEEDS: Record<ApprovalKind, string | null> = {
+  leave: null, fee_waiver: 'fees', notice: 'notices', admission: 'people.admissions', attendance: 'attendance', photo: null, receipt_cancel: 'fees', settings: null,
+  staff_leave: 'staffAttendance', gate_pass: 'visitors', certificate: 'certificates', visitor: 'visitors',
+};
 /** What a person needs to be allowed to decide each kind. */
-const KIND_NEEDS: Record<ApprovalKind, string | null> = { leave: null, fee_waiver: 'fees', notice: 'notices', admission: 'people.admissions', attendance: 'attendance', photo: null, receipt_cancel: 'fees', settings: null };
 const NEEDS: Record<ApprovalKind, Permission[]> = {
   leave: ['approvals.decide'], fee_waiver: ['approvals.decide', 'fees.waive'], notice: ['approvals.decide', 'notices.publish'], admission: ['approvals.decide'], attendance: ['attendance.read'],
   photo: ['approvals.decide', 'students.write'], receipt_cancel: ['approvals.decide', 'fees.refund'], settings: ['approvals.decide', 'settings.manage'],
+  staff_leave: ['approvals.decide'], gate_pass: ['approvals.decide'], certificate: ['approvals.decide', 'certificates.issue'], visitor: ['approvals.decide'],
 };
+type Client = { query: (q: string, p?: unknown[]) => Promise<{ rows: Record<string, unknown>[]; rowCount: number | null }> };
+/**
+ * What a module does when one of its requests is decided: `check` before anything is saved (it may refuse, like a certificate
+ * while fees are owed), `apply` inside the decision's transaction, `tell` after it (messages), and `done` the line shown.
+ */
+export interface ApprovalEffect {
+  check?: (t: TenantCtx, r: { id: string; subject_ref: string | null; payload: Record<string, unknown> }, decision: ApprovalDecision['decision']) => Promise<void>;
+  apply?: (client: Client, r: { id: string; subject_ref: string | null; payload: Record<string, unknown> }, decision: ApprovalDecision['decision'], by: { id: string; name: string }, t: TenantCtx) => Promise<void>;
+  tell?: (t: TenantCtx, r: { id: string; subject_ref: string | null; payload: Record<string, unknown> }, status: string) => Promise<void>;
+  done: string;
+}
 
 @Injectable()
 export class ApprovalsService implements OnModuleInit {
@@ -38,6 +60,12 @@ export class ApprovalsService implements OnModuleInit {
     private readonly hubs: HubService,
     private readonly tenants: TenantService,
   ) {}
+
+  private readonly effects = new Map<ApprovalKind, ApprovalEffect>();
+  /** A module says what its kind of request does when decided (each module's service registers its own). */
+  effect(kind: ApprovalKind, e: ApprovalEffect): void {
+    this.effects.set(kind, e);
+  }
 
   onModuleInit(): void {
     this.hubs.handle('approvals.timeLimits', async (job: Job) => {
@@ -64,6 +92,8 @@ export class ApprovalsService implements OnModuleInit {
     if (r.kind === 'admission') return 'Admission approved';
     if (r.kind === 'photo') return 'New photo in use';
     if (r.kind === 'settings') return 'Setting changed';
+    const own = this.effects.get(r.kind);
+    if (own) return own.done;
     const noticeId = (r.payload as { noticeId?: string }).noticeId;
     const n = noticeId ? await t.pool.query<{ n: string }>(
       `select count(distinct sg.guardian_id) n from notices x left join students s on x.class_id is null or s.class_id = x.class_id
@@ -90,7 +120,7 @@ export class ApprovalsService implements OnModuleInit {
     if (s.who === 'role') return (await roles()).includes(s.ref ?? '');
     if (s.who === 'person') return user.id === s.ref;
     // A child's class teacher decides their leave where the school keeps the one step every school starts with.
-    if (s.who === 'permission' && r.kind === 'leave' && (r.payload as { studentLeave?: boolean }).studentLeave && r.subject_ref
+    if (s.who === 'permission' && ((r.kind === 'leave' && (r.payload as { studentLeave?: boolean }).studentLeave) || r.kind === 'gate_pass') && r.subject_ref
       && (await t.pool.query('select 1 from students s join classes c on c.id = s.class_id where s.id = $1 and c.class_teacher_id = $2', [r.subject_ref, user.id])).rowCount) return true;
     if (s.who === 'classTeacher') {
       return !!r.subject_ref && !!(await t.pool.query('select 1 from students s join classes c on c.id = s.class_id where s.id = $1 and c.class_teacher_id = $2', [r.subject_ref, user.id])).rowCount;
@@ -105,7 +135,7 @@ export class ApprovalsService implements OnModuleInit {
 
   private async managerOf(t: TenantCtx, r: Row): Promise<string | null> {
     // Who asked; a member of staff's own leave from before requests named their asker is about them.
-    const asker = r.requested_by || (r.kind === 'leave' && !(r.payload as { studentLeave?: boolean }).studentLeave ? r.subject_ref : null);
+    const asker = r.requested_by || (r.kind === 'staff_leave' ? r.subject_ref : null);
     if (!asker) return null;
     return (await t.pool.query<{ manager_id: string | null }>("select s.manager_id from staff s join users u on u.id = s.manager_id and u.status = 'active' where s.user_id = $1", [asker])).rows[0]?.manager_id ?? null;
   }
@@ -217,10 +247,13 @@ export class ApprovalsService implements OnModuleInit {
       const p = r.payload as { changes: Record<string, unknown>; note?: string; expectedVersion?: number };
       await this.settings.apply(t, { id: r.requested_by ?? user.id, name: `${r.requester_name}, approved by ${user.name}` }, p.changes, p.note ?? '', p.expectedVersion);
     }
+    const effect = this.effects.get(r.kind);
+    if (effect?.check) await effect.check(t, r, body.decision);
     const client = await t.pool.connect();
     try {
       await client.query('begin');
       let payload = r.payload;
+      if (effect?.apply) await effect.apply(client as unknown as Client, r, body.decision, { id: system ? '' : user.id, name: user.name }, t);
       if (r.kind === 'fee_waiver') payload = await this.applyWaiver(client, r, body.decision, payload);
       if (r.kind === 'notice') await this.applyNotice(client, r, body.decision, user.id);
       if (r.kind === 'photo') await this.applyPhoto(client, r, body.decision);
@@ -238,6 +271,7 @@ export class ApprovalsService implements OnModuleInit {
     await this.audit.record(t, { actorId: system ? null : user.id, actorName: user.name, action: `approval.${body.decision}`, entity: r.kind, entityId: id, detail: { title: r.title } });
     if (body.decision !== 'undo' && r.kind === 'leave') await this.tellLeave(t, r, next);
     if (body.decision === 'approve' && r.kind === 'notice') await this.notices.approved(t, String((r.payload as { noticeId?: string }).noticeId ?? ''));
+    if (body.decision !== 'undo' && effect?.tell) await effect.tell(t, r, next).catch(() => undefined);
     const after = await t.pool.query<Row>('select * from approvals where id = $1', [id]);
     return this.toRow(after.rows[0]!, await this.doneText(t, after.rows[0]!), steps);
   }

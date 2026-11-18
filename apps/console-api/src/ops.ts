@@ -382,7 +382,7 @@ export class Bootstrap implements OnApplicationBootstrap {
     if (!cell) return;
     const payload = WizardPayload.parse({
       basics: { name: 'Greenfield International School', shortName: 'Greenfield', slug: 'greenfield', board: 'CBSE', address: '42, Baner Road, Baner', city: 'Pune', contactName: 'Neha Menon', contactPhone: '+91 98220 41200', contactEmail: 'neha.menon@greenfield.edu.in', language: 'en', country: 'IN', timezone: 'Asia/Kolkata', locale: 'en-IN', currency: 'INR' },
-      plan: { plan: 'premium', modules: ['people', 'attendance', 'fees', 'notices', 'timetable', 'homework', 'events', 'exams', 'chat', 'transport', 'library', 'gallery'], students: 1500 },
+      plan: { plan: 'premium', modules: ['people', 'attendance', 'fees', 'notices', 'timetable', 'homework', 'events', 'exams', 'chat', 'transport', 'library', 'gallery', 'staffAttendance', 'diary', 'ptm', 'visitors', 'certificates'], students: 1500 },
       branding: { color: '#6A4CF5', logoText: 'G', appName: 'Greenfield', tagline: 'Curiosity first. Kindness always.' },
       placement: { target: cell.target, cell: cell.key, addressing: 'path' },
       admin: { name: 'Neha Menon', email: 'neha.menon@greenfield.edu.in', phone: '+91 98220 41200', invite: 'both', roles: ['principal'] },

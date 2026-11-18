@@ -14,7 +14,7 @@ const regionName = (c: string): string => {
 export type SettingKind =
   | 'text' | 'textarea' | 'number' | 'bool' | 'enum' | 'color' | 'time' | 'date' | 'language'
   | 'multi' | 'appRoles' | 'appLayout' | 'notifyRules' | 'templates' | 'classes' | 'logo'
-  | 'houses' | 'categories' | 'strings' | 'gradingScale' | 'paymentMethods' | 'attendanceMarks' | 'vocabulary' | 'list' | 'customFields' | 'workflows' | 'taxSplit' | 'addressFormat' | 'gradingSchemes' | 'documentTemplates' | 'admissionStages' | 'timetableCycle' | 'weights' | 'lateRule' | 'reminderDays' | 'hours' | 'libraryTypes' | 'libraryMembers' | 'tripSessions';
+  | 'houses' | 'categories' | 'strings' | 'gradingScale' | 'paymentMethods' | 'attendanceMarks' | 'vocabulary' | 'list' | 'customFields' | 'workflows' | 'taxSplit' | 'addressFormat' | 'gradingSchemes' | 'documentTemplates' | 'admissionStages' | 'timetableCycle' | 'weights' | 'lateRule' | 'reminderDays' | 'hours' | 'libraryTypes' | 'libraryMembers' | 'tripSessions' | 'leaveTypes' | 'certificateTypes';
 
 export interface SettingMeta {
   /** One of the school-wide groups, or the key of the module that owns the setting (config-engine's MODULES lists it there too). */
@@ -210,4 +210,38 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = localized({
   'transport.nearMinutes': { group: 'transport', label: 'Tell families the bus is near (minutes away)', kind: 'number', min: 2, max: 30 },
   'transport.sessions': { group: 'transport', label: 'Trips a day', kind: 'tripSessions', help: 'Each bus trip the school runs (morning, afternoon, late bus, activity bus) and from what time the driver’s app offers it. A route can run only some of them.' },
   'transport.familyCalls': { group: 'transport', label: 'Families call about the bus', kind: 'enum', options: [['office', 'The office'], ['attendant', 'The bus attendant'], ['none', 'Nobody: messages only']], help: 'Never the driver, who is driving.' },
+
+  // Staff attendance and leave
+  'staffAttendance.checkIn': { group: 'staffAttendance', label: 'How staff attendance is taken', kind: 'enum', options: [['app', 'Staff check in from the app'], ['office', 'Only the office marks staff']] },
+  'staffAttendance.from': { group: 'staffAttendance', label: 'Check-in opens at', kind: 'time' },
+  'staffAttendance.lateAfter': { group: 'staffAttendance', label: 'Late after', kind: 'time', help: 'A check-in after this time is marked late.' },
+  'staffAttendance.until': { group: 'staffAttendance', label: 'Check-in closes at', kind: 'time', help: 'After this, the office marks anyone who did not check in.' },
+  'staffAttendance.earlyBefore': { group: 'staffAttendance', label: 'Leaving before this is early', kind: 'time' },
+  'staffAttendance.place': { group: 'staffAttendance', label: 'Where the school is (latitude, longitude)', kind: 'text', help: 'From a map, like 51.5074, -0.1278. With a distance below, staff check in only near it.' },
+  'staffAttendance.radius': { group: 'staffAttendance', label: 'Check in within (metres; 0: anywhere)', kind: 'number', min: 0, max: 5000 },
+  'staffAttendance.marks': { group: 'staffAttendance', label: 'Marks for staff', kind: 'attendanceMarks', max: 20, help: 'Each with its name, letter and what it means. Approved leave shows as the first mark that means authorised absence.' },
+  'staffLeave.types': { group: 'staffAttendance', label: 'Leave types', kind: 'leaveTypes', help: 'Days a year (0 keeps no balance, like unpaid leave), given at the start of the year or a twelfth a month, what carries over, and whether half days and pay apply.' },
+  'staffLeave.year': { group: 'staffAttendance', label: 'The leave year', kind: 'enum', options: [['academic', 'The academic year'], ['calendar', 'The calendar year']] },
+
+  // Diary
+  'diary.kinds': { group: 'diary', label: 'Kinds of diary entry', kind: 'list', max: 20 },
+  'diary.writers': { group: 'diary', label: 'Who writes a class’s diary', kind: 'enum', options: [['classTeacher', 'The class teacher'], ['subjectTeachers', 'Every teacher of the class']] },
+  'diary.ack': { group: 'diary', label: 'Families acknowledge each entry', kind: 'bool', help: 'The app asks families to tick that they read it, and the class teacher sees who has.' },
+
+  // Parent-teacher meetings
+  'ptm.remind': { group: 'ptm', label: 'Remind families the day before', kind: 'bool' },
+  'ptm.familiesCancel': { group: 'ptm', label: 'Families may cancel their booking', kind: 'bool', help: 'Until the booking closes. The office can always cancel one.' },
+
+  // Visitors
+  'visitors.purposes': { group: 'visitors', label: 'Why visitors come', kind: 'list', max: 30 },
+  'visitors.idTypes': { group: 'visitors', label: 'Identity documents the desk accepts', kind: 'list', max: 20 },
+  'visitors.invitesNeedApproval': { group: 'visitors', label: 'Visitors staff invite need approval', kind: 'bool', help: 'Their pass is sent once the school’s steps for visitors approve them.' },
+  'visitors.badgeNumber': { group: 'visitors', label: 'Visitor badge numbers', kind: 'text', help: 'A pattern, like VIS-{yyyy}-{seq:4}. Tokens: {yyyy} {yy} {mm} {ay} {seq}.' },
+  'visitors.gatePassNumber': { group: 'visitors', label: 'Gate pass numbers', kind: 'text', help: 'A pattern, like GP-{yyyy}-{seq:4}. Tokens: {yyyy} {yy} {mm} {ay} {seq}.' },
+  'visitors.passConsent': { group: 'visitors', label: 'A gate pass the school starts needs the family’s OK', kind: 'bool', help: 'The family answers in the app before the pass goes for approval.' },
+  'visitors.pickupCode': { group: 'visitors', label: 'The gate asks for the family’s pick-up code', kind: 'bool', help: 'Families show a code from the app; whoever collects a child is checked against the people the family named.' },
+
+  // Certificates
+  'certificates.types': { group: 'certificates', label: 'Certificates', kind: 'certificateTypes', help: 'Each with its words and {placeholders}, its own numbering if it has one, its fee, and whether it needs nothing to be owed.' },
+  'certificates.number': { group: 'certificates', label: 'Certificate numbers', kind: 'text', help: 'For certificates without their own numbering. A pattern, like CERT-{yyyy}-{seq:4}. Tokens: {yyyy} {yy} {mm} {ay} {seq}.' },
 });

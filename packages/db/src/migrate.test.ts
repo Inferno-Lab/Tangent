@@ -43,7 +43,9 @@ describe('migrations', () => {
       const money = await pool.query<{ c: string; t: string }>(
         `select table_name || '.' || column_name c, data_type t from information_schema.columns where table_schema = 'public'
            and column_name ~ '(^|_)(amount|amounts|fee|fine|fines|refunded|price|cost|total|owed|paid|balance)$' and data_type <> 'numeric'
-           and data_type not in ('jsonb', 'boolean', 'text', 'date', 'timestamp with time zone')`);
+           and data_type not in ('jsonb', 'boolean', 'text', 'date', 'timestamp with time zone')
+           -- Counts that happen to be called a total (photos in a zip), not money.
+           and table_name || '.' || column_name not in ('photo_imports.total')`);
       expect(money.rows.map((r) => `${r.c}: ${r.t}`)).toEqual([]);
     } finally { await pool.end(); }
   });

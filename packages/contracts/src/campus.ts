@@ -8,7 +8,7 @@ const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a date like 2026-04-01'
 
 // ── Files ─────────────────────────────────────────────────────────────────────
 
-export const FILE_KINDS = ['photo_zip', 'homework_submission', 'homework_attachment', 'notice_attachment', 'chat', 'student_photo', 'student_document', 'logo', 'gallery', 'receipt', 'report_card'] as const;
+export const FILE_KINDS = ['photo_zip', 'homework_submission', 'homework_attachment', 'notice_attachment', 'chat', 'student_photo', 'student_document', 'logo', 'gallery', 'receipt', 'report_card', 'staff_photo', 'visitor_photo', 'pickup_photo', 'diary_attachment'] as const;
 export type FileKind = (typeof FILE_KINDS)[number];
 
 export const FileStart = z.object({

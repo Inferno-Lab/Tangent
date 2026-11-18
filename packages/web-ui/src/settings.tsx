@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, hasKey, type AppRole } from '@tangent/config-engine';
-import { AdmissionStages, DEFAULT_ADMISSION_STAGES, DEFAULT_TRIP_SESSIONS, TimetableCycle, listLabel, type LateRule, type LibraryMember, type LibraryTypeRule, type TripSession, type AdmissionStage, rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, ADDRESS_PARTS, ADDRESS_PART_LABELS, SCHEME_KINDS, SCHEME_KIND_LABELS, BLOCK_KINDS, BLOCK_KIND_LABELS, DEFAULT_TEMPLATES, DOC_KINDS, DOC_KIND_LABELS, DOC_PLACEHOLDERS, PAGE_SIZES, type Block, type DocKind, type DocTemplate, type DocTemplates, type GradeBand, type GradingScheme, type AddressFormat, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
+import { AdmissionStages, CERTIFICATE_PLACEHOLDERS, DEFAULT_ADMISSION_STAGES, DEFAULT_CERTIFICATE_TYPES, DEFAULT_LEAVE_TYPES, DEFAULT_TRIP_SESSIONS, TimetableCycle, type CertificateType, type LeaveType, listLabel, type LateRule, type LibraryMember, type LibraryTypeRule, type TripSession, type AdmissionStage, rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, ADDRESS_PARTS, ADDRESS_PART_LABELS, SCHEME_KINDS, SCHEME_KIND_LABELS, BLOCK_KINDS, BLOCK_KIND_LABELS, DEFAULT_TEMPLATES, DOC_KINDS, DOC_KIND_LABELS, DOC_PLACEHOLDERS, PAGE_SIZES, type Block, type DocKind, type DocTemplate, type DocTemplates, type GradeBand, type GradingScheme, type AddressFormat, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
 import { Checkbox, DateField, FilePick, NumberField, TimeField } from './fields';
 import { ColourField } from './ColourPicker';
 import { ErrorLine, Field, SelectField } from './forms';
@@ -258,6 +258,54 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
         </div>,
       );
     }
+    case 'leaveTypes': {
+      const types = (Array.isArray(value) && value.length ? value : DEFAULT_LEAVE_TYPES) as LeaveType[];
+      const put = (i: number, p: Partial<LeaveType>) => onChange(types.map((x, j) => (j === i ? { ...x, ...p } : x)));
+      // A key nobody sees, made once, so leave already taken keeps its type when the name changes.
+      const add = () => onChange([...types, { key: `lt${Date.now().toString(36).slice(-6)}`, name: '', days: 0, accrual: 'year', carry: 0, halfDays: true, paid: true }]);
+      return box(
+        <div className="stack" style={{ gap: 10 }}>
+          {types.map((x, i) => (
+            <div key={x.key} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <div style={{ width: 180 }}><Field label={tr('ui.settings.name')} value={x.name} disabled={disabled} maxLength={40} onChange={(v) => put(i, { name: v })} /></div>
+              <div style={{ width: 110 }}><NumberField label={tr('ui.settings.days_a_year')} min={0} max={366} value={String(x.days)} disabled={disabled} onChange={(v) => put(i, { days: Math.max(0, Number(v) || 0) })} /></div>
+              <div style={{ width: 210 }}><SelectField label={tr('ui.settings.given')} value={x.accrual} disabled={disabled} onChange={(v) => put(i, { accrual: v as LeaveType['accrual'] })}
+                options={[{ value: 'year', label: tr('ui.settings.all_at_the_start') }, { value: 'month', label: tr('ui.settings.a_twelfth_each_month') }]} /></div>
+              <div style={{ width: 120 }}><NumberField label={tr('ui.settings.carries_over')} min={0} max={366} value={String(x.carry)} disabled={disabled} onChange={(v) => put(i, { carry: Math.max(0, Number(v) || 0) })} /></div>
+              <Checkbox checked={x.halfDays} disabled={disabled} label={tr('ui.settings.half_days')} onChange={(on) => put(i, { halfDays: on })} />
+              <Checkbox checked={x.paid} disabled={disabled} label={tr('ui.settings.paid')} onChange={(on) => put(i, { paid: on })} />
+              <Checkbox checked={x.active !== false} disabled={disabled} label={tr('ui.settings.offered')} onChange={(on) => put(i, { active: on ? undefined : false })} />
+            </div>
+          ))}
+          {types.length < 20 && <button type="button" className="btn sm" style={{ alignSelf: 'flex-start' }} disabled={disabled} onClick={add}><Icon name="plus" />{tr('ui.settings.add_a_leave_type')}</button>}
+        </div>,
+      );
+    }
+    case 'certificateTypes': {
+      const types = (Array.isArray(value) && value.length ? value : DEFAULT_CERTIFICATE_TYPES) as CertificateType[];
+      const put = (i: number, p: Partial<CertificateType>) => onChange(types.map((x, j) => (j === i ? { ...x, ...p } : x)));
+      const add = () => onChange([...types, { key: `ct${Date.now().toString(36).slice(-6)}`, name: '', text: '', series: '', fee: 0, noDues: false, families: true }]);
+      return box(
+        <div className="stack" style={{ gap: 14 }}>
+          <small className="help">{tr('ui.settings.certificate_words_help', { names: CERTIFICATE_PLACEHOLDERS.map((p) => `{${p}}`).join(' ') })}</small>
+          {types.map((x, i) => (
+            <div key={x.key} className="stack" style={{ gap: 6 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <div style={{ width: 220 }}><Field label={tr('ui.settings.name')} value={x.name} disabled={disabled} maxLength={60} onChange={(v) => put(i, { name: v })} /></div>
+                <div style={{ width: 190 }}><Field label={tr('ui.settings.own_numbering')} value={x.series} disabled={disabled} maxLength={40} onChange={(v) => put(i, { series: v })} /></div>
+                <div style={{ width: 120 }}><NumberField label={tr('ui.settings.fee')} min={0} max={1000000} decimals value={String(x.fee)} disabled={disabled} onChange={(v) => put(i, { fee: Math.max(0, Number(v) || 0) })} /></div>
+                <Checkbox checked={x.noDues} disabled={disabled} label={tr('ui.settings.only_when_nothing_is_owed')} onChange={(on) => put(i, { noDues: on })} />
+                <Checkbox checked={x.families} disabled={disabled} label={tr('ui.settings.families_ask_in_the_app')} onChange={(on) => put(i, { families: on })} />
+                <Checkbox checked={x.active !== false} disabled={disabled} label={tr('ui.settings.offered')} onChange={(on) => put(i, { active: on ? undefined : false })} />
+              </div>
+              <div className="inp" style={{ height: 'auto' }}><textarea style={ta} value={x.text} disabled={disabled} maxLength={3000} aria-label={tr('ui.settings.words')} placeholder={tr('ui.settings.words')}
+                onChange={(e) => put(i, { text: e.target.value })} /></div>
+            </div>
+          ))}
+          {types.length < 30 && <button type="button" className="btn sm" style={{ alignSelf: 'flex-start' }} disabled={disabled} onClick={add}><Icon name="plus" />{tr('ui.settings.add_a_certificate')}</button>}
+        </div>,
+      );
+    }
     case 'hours': {
       const h = (value ?? null) as { from: string; to: string } | null;
       return box(
@@ -496,7 +544,7 @@ function ListItemsEditor({ value, languages, max, disabled, onChange }: { value:
   );
 }
 
-const ENTITY_LABEL: Record<CustomEntity, string> = { student: tr('ui.settings.student_records'), staff: tr('ui.settings.staff_records') };
+const ENTITY_LABEL: Record<CustomEntity, string> = { student: tr('ui.settings.student_records'), staff: tr('ui.settings.staff_records'), visitor: tr('ui.settings.visitor_records') };
 const KIND_LABEL: Record<FieldKind, string> = {
   text: tr('ui.settings.kind_text'), longText: tr('ui.settings.kind_long_text'), number: tr('ui.settings.kind_number'), date: tr('ui.settings.kind_date'), choice: tr('ui.settings.kind_choice'),
   multi: tr('ui.settings.kind_multi'), yesno: tr('ui.settings.kind_yesno'), phone: tr('ui.settings.kind_phone'), email: tr('ui.settings.kind_email'),

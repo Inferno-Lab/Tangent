@@ -776,6 +776,62 @@ const transport = kind<RouteLookups>({
   async export(db) { return (await db.query<Row>('select s.admission_no, t.route from transport_assignments t join students s on s.id = t.student_id order by t.route, s.admission_no')).rows; },
 });
 
+// ── staff leave balances and pick-up people ────────────────────────────────
+const halfDays = (v: string) => { const n = Number(v.trim().replace(',', '.')); return Number.isFinite(n) && Number.isInteger(n * 2) && Math.abs(n) <= 366 ? n : null; };
+type BalanceLookups = { staff: Map<string, string>; types: ListItem[]; year: string; had: Set<string> };
+// A row adds to the leave year's balance once: importing the same sheet again changes the days, never adds them twice.
+const balanceId = (uid: string, type: string, year: string) => `sla_imp_${createHash('md5').update(`${uid}|${type}|${year}`).digest('hex').slice(0, 20)}`;
+const leaveBalances = kind<BalanceLookups>({
+  async load(db) {
+    const which = await savedSetting(db, 'staffLeave.year');
+    const ay = which === 'academic' ? (await db.query<{ label: string }>('select label from academic_years where current limit 1')).rows[0]?.label : undefined;
+    const had = (await db.query<{ id: string }>("select id from staff_leave_adjustments where id like 'sla_imp_%'")).rows;
+    return { staff: await staffMap(db), types: await savedSetting(db, 'staffLeave.types') as ListItem[], year: ay ?? schoolToday().slice(0, 4), had: new Set(had.map((r) => r.id)) };
+  },
+  check(r, l) {
+    const uid = l.staff.get(lc(r.email!));
+    const type = listKey(l.types, r.type!);
+    const errors = [
+      ...(!uid ? [`No member of staff has the email ${r.email}: import staff first.`] : []),
+      ...(!type ? [tx('Leave type is one of the school’s: {names}.', { names: l.types.map((x) => x.name).join(', ') })] : []),
+      ...(halfDays(r.days!) === null ? ['Days is a number of whole or half days, like 4 or 4.5.'] : []),
+    ];
+    const year = r.year?.trim() || l.year;
+    return ok(`${lc(r.email!)}|${type}|${year}`, errors, !!uid && !!type && l.had.has(balanceId(uid, type, year)));
+  },
+  writes: (rows, l) => [{ table: 'staff_leave_adjustments', pk: ['id'], cols: ['days', 'note'], rows: rows.map((r) => {
+    const uid = l.staff.get(lc(r.email!))!;
+    const type = listKey(l.types, r.type!)!;
+    const year = r.year?.trim() || l.year;
+    return { id: balanceId(uid, type, year), user_id: uid, type, year_label: year, days: halfDays(r.days!), note: (r.note ?? '').trim() || 'Brought from the old system' };
+  }) }],
+  totals: (rows) => [{ label: 'Balances', value: String(rows.length) }, { label: 'Staff', value: String(new Set(rows.map((r) => lc(r.email!))).size) }],
+  async export(db) {
+    return (await db.query<Row>("select u.email, a.type, a.days::text days, a.year_label as year, a.note from staff_leave_adjustments a join users u on u.id = a.user_id where a.id like 'sla_imp_%' order by u.email, a.type")).rows;
+  },
+});
+
+const pickupId = (studentId: string, name: string) => `pkp_imp_${createHash('md5').update(`${studentId}|${lc(name)}`).digest('hex').slice(0, 20)}`;
+const pickupPeople = kind<{ students: Map<string, { id: string }>; had: Set<string> }>({
+  async load(db) {
+    const had = (await db.query<{ id: string }>('select id from pickup_people')).rows;
+    return { students: await studentMap(db), had: new Set(had.map((r) => r.id)) };
+  },
+  check(r, l) {
+    const s = l.students.get(lc(r.admission_no!));
+    const errors = [...needStudent(l.students, r.admission_no!), ...(r.phone?.trim() && !digits(r.phone) ? [badPhone(r.phone)] : [])];
+    return ok(`${lc(r.admission_no!)}|${lc(r.name!)}`, errors, !!s && l.had.has(pickupId(s.id, r.name!)));
+  },
+  writes: (rows, l) => [{ table: 'pickup_people', pk: ['id'], cols: ['relation', 'phone', 'active'], rows: rows.map((r) => {
+    const sid = l.students.get(lc(r.admission_no!))!.id;
+    return { id: pickupId(sid, r.name!), student_id: sid, name: r.name!.trim(), relation: r.relation!.trim(), phone: r.phone?.trim() ? digits(r.phone) : '', active: true };
+  }) }],
+  totals: (rows) => [{ label: 'People', value: String(rows.length) }, { label: 'Children', value: String(new Set(rows.map((r) => lc(r.admission_no!))).size) }],
+  async export(db) {
+    return (await db.query<Row>('select s.admission_no, p.name, p.relation, p.phone from pickup_people p join students s on s.id = p.student_id where p.active order by s.admission_no, p.name')).rows;
+  },
+});
+
 // ── family phone numbers from a contact list ───────────────────────────────
 type Waiting = { id: string; name: string; student: string; class: string };
 type ContactLookups = { waiting: Waiting[]; known: Set<string> };
@@ -835,5 +891,5 @@ function matchFamily(r: Row, waiting: Waiting[]): Waiting[] {
 }
 
 export const KINDS: Record<string, Impl<never>> = {
-  years, terms, reporting_periods: reportingPeriods, holidays, subjects, classes, periods, staff, students, admissions, fee_heads: feeHeads, fee_structures: feeStructures, fee_dues: feeDues, payments, attendance, marks, timetable, library_loans: libraryLoans, library_books: libraryBooks, transport, contacts,
+  years, terms, reporting_periods: reportingPeriods, holidays, subjects, classes, periods, staff, students, admissions, fee_heads: feeHeads, fee_structures: feeStructures, fee_dues: feeDues, payments, attendance, marks, timetable, library_loans: libraryLoans, library_books: libraryBooks, transport, contacts, leave_balances: leaveBalances, pickup_people: pickupPeople,
 } as unknown as Record<string, Impl<never>>;

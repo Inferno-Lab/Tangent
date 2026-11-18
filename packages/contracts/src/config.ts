@@ -10,6 +10,10 @@ import { TimetableCycle } from './cycles.js';
 import { AddressFormat, DEFAULT_ADDRESS_FORMAT } from './address.js';
 import { GradingSchemes } from './grading.js';
 import { DocTemplates } from './templates.js';
+import { DEFAULT_LEAVE_TYPES, LeaveTypes, readPlace, STAFF_CHECK_IN } from './staff-time.js';
+import { DEFAULT_DIARY_KINDS, DIARY_WRITERS } from './diary.js';
+import { DEFAULT_ID_TYPES, DEFAULT_VISITOR_PURPOSES } from './visitors.js';
+import { CertificateTypes, DEFAULT_CERTIFICATE_TYPES } from './certificates.js';
 
 
 /** Attendance marks the data model knows; a school picks which it uses (`attendance.statuses`). */
@@ -39,6 +43,12 @@ const AttendanceMarks = z.preprocess(
 export const DEFAULT_ATTENDANCE_MARKS: AttendanceMarkDef[] = [
   { key: 'present', name: 'Present', meaning: 'present', code: 'P' }, { key: 'absent', name: 'Absent', meaning: 'absent', code: 'A' },
   { key: 'late', name: 'Late', meaning: 'late', code: 'L' }, { key: 'leave', name: 'On leave', meaning: 'leave', code: 'V' },
+];
+/** Staff marks: approved leave fills in the first that means authorised absence; a late check-in the first that means late. */
+export const DEFAULT_STAFF_MARKS: AttendanceMarkDef[] = [
+  { key: 'present', name: 'Present', meaning: 'present', code: 'P' }, { key: 'absent', name: 'Absent', meaning: 'absent', code: 'A' },
+  { key: 'late', name: 'Late', meaning: 'late', code: 'L' }, { key: 'half_day', name: 'Half day', meaning: 'half_day', code: 'H' },
+  { key: 'leave', name: 'On leave', meaning: 'leave', code: 'V' }, { key: 'duty', name: 'On duty elsewhere', meaning: 'present', code: 'D' },
 ];
 /** The meaning of a mark the school uses; a meaning's own name (an app sending "present") stands for the first mark with it. */
 export function markMeaning(marks: readonly AttendanceMarkDef[], key: string): AttendanceMark | null {
@@ -73,7 +83,7 @@ export function seriesProblem(pattern: string): string | null {
   return pattern.length > 40 ? 'Keep the pattern under 40 characters.' : null;
 }
 /** The settings that hold a number series' pattern (each module declares its own in its building blocks). */
-export const NUMBER_SERIES = ['fees.receiptPrefix', 'people.admissionNumber'] as const;
+export const NUMBER_SERIES = ['fees.receiptPrefix', 'people.admissionNumber', 'certificates.number', 'visitors.badgeNumber', 'visitors.gatePassNumber'] as const;
 const seriesCheck = (v: string, ctx: z.RefinementCtx) => {
   const problem = seriesProblem(v);
   if (problem) ctx.addIssue({ code: 'custom', message: problem });
@@ -327,6 +337,35 @@ export const SchoolSettingsSchema = z.object({
   'events.showGoing': z.boolean().default(false),
   // Who a family may call about the bus from the app (never the driver while driving).
   'transport.familyCalls': z.enum(['attendant', 'office', 'none']).default('office'),
+  // Staff attendance and leave: when staff may check in from the app, how near the school, and the year's leave types.
+  'staffAttendance.checkIn': z.enum(STAFF_CHECK_IN).default('app'),
+  'staffAttendance.from': z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('07:00'),
+  'staffAttendance.lateAfter': z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('08:15'),
+  'staffAttendance.until': z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('11:00'),
+  'staffAttendance.earlyBefore': z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('14:00'),
+  'staffAttendance.place': z.string().trim().max(60).refine((v) => !v || !!readPlace(v), 'Write the latitude and longitude, like 51.5074, -0.1278').default(''),
+  'staffAttendance.radius': z.number().int().min(0).max(5000).default(0),
+  'staffAttendance.marks': AttendanceMarks.default(DEFAULT_STAFF_MARKS),
+  'staffLeave.types': LeaveTypes.default(DEFAULT_LEAVE_TYPES),
+  'staffLeave.year': z.enum(['academic', 'calendar']).default('academic'),
+  // The class diary: its kinds of entry, who writes it, and whether families acknowledge each entry.
+  'diary.kinds': schoolList(DEFAULT_DIARY_KINDS, 1, 20),
+  'diary.writers': z.enum(DIARY_WRITERS).default('subjectTeachers'),
+  'diary.ack': z.boolean().default(true),
+  // Parent-teacher meetings: a reminder the day before, and whether families may cancel their own booking.
+  'ptm.remind': z.boolean().default(true),
+  'ptm.familiesCancel': z.boolean().default(true),
+  // Visitors, gate passes and pick-up.
+  'visitors.purposes': schoolList(DEFAULT_VISITOR_PURPOSES, 1, 30),
+  'visitors.idTypes': schoolList(DEFAULT_ID_TYPES, 1, 20),
+  'visitors.invitesNeedApproval': z.boolean().default(false),
+  'visitors.badgeNumber': z.string().trim().min(1).max(40).superRefine(seriesCheck).default('VIS-{yyyy}-{seq:4}'),
+  'visitors.gatePassNumber': z.string().trim().min(1).max(40).superRefine(seriesCheck).default('GP-{yyyy}-{seq:4}'),
+  'visitors.passConsent': z.boolean().default(true),
+  'visitors.pickupCode': z.boolean().default(true),
+  // Certificates: each kind's words, fee and checks, and the series they are numbered in.
+  'certificates.types': CertificateTypes.default(DEFAULT_CERTIFICATE_TYPES),
+  'certificates.number': z.string().trim().min(1).max(40).superRefine(seriesCheck).default('CERT-{yyyy}-{seq:4}'),
   // Who signs in to the app, and what each role sees: its bottom tabs, Home cards and quick buttons.
   'app.roles': z.array(z.enum(APP_ROLE_KEYS)).default(['parent', 'teacher']),
   'app.layout': z.object({ parent: APP_LAYOUT, student: APP_LAYOUT, teacher: APP_LAYOUT, driver: APP_LAYOUT }).default(DEFAULT_APP_LAYOUT),

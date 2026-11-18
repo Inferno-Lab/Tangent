@@ -1,4 +1,5 @@
-import { addDays, schoolToday, latestSchoolDay } from '@tangent/contracts';
+import { addDays, schoolInstant, schoolToday, latestSchoolDay } from '@tangent/contracts';
+import { randomBytes } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { newId } from '../ids.js';
 import { bulkInsert } from './bulk.js';
@@ -142,6 +143,126 @@ export async function seedModulesDemo(db: Db, todayIn?: string): Promise<string[
       ['dsr_2', 'correction', 'Anika Rao', 'Lakshmi Rao', 'done', 'Date of birth was wrong on the record. Corrected from the birth certificate.', `${addDays(last, -9)}T06:30:00Z`, `${addDays(last, -7)}T06:30:00Z`],
     ]);
     did.push('privacy');
+  }
+
+  const staff = (await db.query<{ id: string; name: string }>("select u.id, u.name from users u join staff s on s.user_id = u.id where u.kind = 'staff' and u.status = 'active' order by u.name")).rows;
+  const teacherOf = async (cls: string) => (await db.query<{ id: string | null }>('select class_teacher_id id from classes where id = $1', [cls])).rows[0]?.id ?? staff[0]?.id ?? null;
+  const today = todayIn ?? schoolToday();
+  const kidsOf = async (cls: string) => (await db.query<{ id: string; name: string }>("select id, name from students where class_id = $1 and status = 'active' order by roll_no limit 40", [cls])).rows;
+
+  // Staff attendance: the last two weeks of check-ins (a few late, one away), and this morning so far.
+  if (staff.length && (await count(db, 'staff_attendance')) === 0) {
+    const rows: unknown[][] = [];
+    for (let back = 14; back >= 0; back--) {
+      const day = addDays(today, -back);
+      if (new Date(`${day}T00:00:00Z`).getUTCDay() === 0) continue;
+      staff.forEach((s, i) => {
+        const roll = r.next();
+        if (back === 0 && i % 3 === 2) return;
+        if (roll < 0.04) { rows.push([s.id, day, 'absent', null, null, false, false, 'office', '', admin]); return; }
+        const late = roll > 0.9;
+        const inAt = new Date(schoolInstant(day, late ? '08:25' : '07:45').getTime() + Math.floor(r.next() * 20) * 60_000);
+        const outAt = back === 0 ? null : new Date(schoolInstant(day, '15:10').getTime() + Math.floor(r.next() * 40) * 60_000);
+        rows.push([s.id, day, late ? 'late' : 'present', inAt.toISOString(), outAt?.toISOString() ?? null, late, false, 'app', '', null]);
+      });
+    }
+    await bulkInsert(db, 'staff_attendance', ['user_id', 'date', 'status', 'check_in', 'check_out', 'late', 'early', 'source', 'note', 'marked_by'], rows);
+    const meera = staff.find((s) => s.name === 'Meera Nair') ?? staff[1];
+    if (meera) {
+      const from = addDays(today, -9);
+      await db.query("insert into approvals (id, kind, title, subtitle, requester_name, requested_by, subject_ref, payload, status, decided_by, decided_at) values ('apr_leave_meera','staff_leave',$1,$2,$3,$4,$4,$5,'approved',$6,$7)",
+        [`${meera.name}: Sick leave`, `${from} · 1 day`, meera.name, meera.id, JSON.stringify({ type: 'sick', from, to: from, halfDay: null, days: 1, reason: 'Fever' }), admin, `${addDays(today, -10)}T06:00:00Z`]);
+    }
+    did.push('staff attendance');
+  }
+
+  // The class diary: an entry or two for every school day of the last week and for tomorrow, in Aarav's and Ananya's classes.
+  if ((await count(db, 'diary_entries')) === 0) {
+    const entries: unknown[][] = [];
+    const remarks: unknown[][] = [];
+    const acks: unknown[][] = [];
+    for (const cls of ['cls_8a', 'cls_5b', 'cls_5a']) {
+      if (!classes.has(cls)) continue;
+      const tid = await teacherOf(cls);
+      const name = staff.find((s) => s.id === tid)?.name ?? 'Class teacher';
+      const kids = await kidsOf(cls);
+      for (let back = 7; back >= -1; back--) {
+        const day = addDays(today, -back);
+        if (new Date(`${day}T00:00:00Z`).getUTCDay() === 0) continue;
+        const id = `dia_${cls}_${day}`;
+        const sub = SUBJECTS_5[(back + 7) % SUBJECTS_5.length]!;
+        entries.push([id, cls, day, 'classwork', sub, back < 0 ? 'Tomorrow we start the next chapter: read its first two pages.' : ['We practised long division with remainders.', 'Read chapter 4 aloud and discussed the main characters.', 'Did the experiment on how plants take in water.', 'Wrote a short letter to a friend about the holidays.', 'Looked at maps of the rivers of the region.'][(back + 7) % 5], '[]', tid, name, `${day}T09:30:00Z`]);
+        if (back % 2 === 0) entries.push([`${id}_bring`, cls, day, 'bring', null, 'Please bring an old newspaper and glue for the art lesson.', '[]', tid, name, `${day}T10:00:00Z`]);
+        if (kids[0] && back === 1) remarks.push([id, kids[0].id, 'Worked very well in class today and helped others.']);
+        if (back > 0) kids.slice(0, Math.max(0, kids.length - 3 - back)).forEach((k) => acks.push([id, k.id, null, `${day}T15:00:00Z`]));
+      }
+    }
+    await bulkInsert(db, 'diary_entries', ['id', 'class_id', 'date', 'kind', 'subject_id', 'text', 'file_ids', 'created_by', 'by_name', 'created_at'], entries);
+    if (remarks.length) await bulkInsert(db, 'diary_remarks', ['entry_id', 'student_id', 'text'], remarks);
+    if (acks.length) await bulkInsert(db, 'diary_acks', ['entry_id', 'student_id', 'user_id', 'at'], acks);
+    did.push('diary');
+  }
+
+  // A parent-teacher meeting in five days for Class 8 A and 5 B, open to book, with a few times already taken.
+  if ((await count(db, 'meetings')) === 0) {
+    const day = addDays(today, new Date(`${addDays(today, 5)}T00:00:00Z`).getUTCDay() === 0 ? 6 : 5);
+    const teachers = [...new Set([await teacherOf('cls_8a'), await teacherOf('cls_5b')].filter((x): x is string => !!x))];
+    await db.query("insert into meetings (id, title, date, from_time, to_time, slot_minutes, gap_minutes, mode, place, class_ids, teacher_ids, status, created_by) values ('mtg_term2',$1,$2,'09:00','12:00',10,0,'either','Class rooms, first floor',$3,'[]','open',$4)",
+      ['Term 2 parent-teacher meeting', day, JSON.stringify(['cls_8a', 'cls_5b']), admin]);
+    const slots: unknown[][] = [];
+    for (const tid of teachers) {
+      for (let m = 0; m < 18; m++) {
+        const at = schoolInstant(day, `${String(9 + Math.floor(m / 6)).padStart(2, '0')}:${String((m % 6) * 10).padStart(2, '0')}`);
+        slots.push([`mts_${tid}_${m}`, 'mtg_term2', tid, at.toISOString(), new Date(at.getTime() + 600_000).toISOString(), m === 9]);
+      }
+    }
+    await bulkInsert(db, 'meeting_slots', ['id', 'meeting_id', 'teacher_id', 'starts_at', 'ends_at', 'closed'], slots);
+    const t8 = await teacherOf('cls_8a');
+    const k8 = (await kidsOf('cls_8a')).filter((k) => k.id !== 'stu_aarav').slice(0, 3);
+    for (const [i, k] of k8.entries()) await db.query("update meeting_slots set student_id = $2, booked_mode = 'inPerson', booked_at = now() where id = $1", [`mts_${t8}_${i * 2}`, k.id]);
+    did.push('meetings');
+  }
+
+  // Visitors at the desk today, one expected tomorrow; a gate pass, the people who collect Aarav, and two late arrivals.
+  if ((await count(db, 'visitors')) === 0) {
+    const host = staff[0]?.id ?? null;
+    const y = today.slice(0, 4);
+    await bulkInsert(db, 'visitors', ['id', 'name', 'phone', 'purpose', 'host_id', 'id_type', 'id_number', 'badge_no', 'code', 'state', 'expected_on', 'in_at', 'out_at', 'created_by', 'created_by_name'], [
+      ['vis_1', 'Daniel Okafor', '+919822011101', 'delivery', null, 'licence', 'DL-4471', `VIS-${y}-0001`, null, 'out', null, schoolInstant(today, '08:40').toISOString(), schoolInstant(today, '08:55').toISOString(), admin, 'Front desk'],
+      ['vis_2', 'Maria Santos', '+919822011102', 'meeting', host, 'national', 'X-20391', `VIS-${y}-0002`, null, 'in', null, schoolInstant(today, '10:05').toISOString(), null, admin, 'Front desk'],
+      ['vis_3', 'Tom Becker', '+919822011103', 'contractor', host, 'national', 'X-88120', `VIS-${y}-0003`, null, 'in', null, schoolInstant(today, '11:20').toISOString(), null, admin, 'Front desk'],
+      ['vis_4', 'Leila Haddad', '+919822011104', 'interview', host, '', '', null, '482913', 'invited', addDays(today, 1), null, null, host, staff[0]?.name ?? 'Staff'],
+    ]);
+    const k8 = await kidsOf('cls_8a');
+    const leaver = k8.find((k) => k.id !== 'stu_aarav');
+    if (leaver) {
+      await db.query("insert into gate_passes (id, number, student_id, leave_at, reason, collector, state, requested_by_name, created_at) values ('gtp_1',$1,$2,$3,'Dentist appointment','Mother','approved','Parent',now())",
+        [`GP-${y}-0001`, leaver.id, schoolInstant(today, '12:30').toISOString()]);
+    }
+    if (k8.some((k) => k.id === 'stu_aarav')) {
+      await bulkInsert(db, 'pickup_people', ['id', 'student_id', 'name', 'relation', 'phone', 'active'], [
+        ['pkp_1', 'stu_aarav', 'Rohan Sharma', 'Father', '+919822011201', true], ['pkp_2', 'stu_aarav', 'Sunita Sharma', 'Grandmother', '+919822011202', true],
+      ]);
+    }
+    await bulkInsert(db, 'late_arrivals', ['id', 'student_id', 'at', 'reason'], k8.slice(5, 7).map((k, i) => [`lat_${i + 1}`, k.id, schoolInstant(today, i ? '08:22' : '08:14').toISOString(), i ? 'Bus was late' : 'Doctor visit']));
+    did.push('visitors');
+  }
+
+  // Certificates: Aarav's enrolment certificate issued, and a character certificate waiting for a decision.
+  if ((await count(db, 'certificates')) === 0 && (await db.query("select 1 from students where id = 'stu_aarav'")).rowCount) {
+    const y = today.slice(0, 4);
+    await db.query(`insert into certificates (id, type, type_name, student_id, purpose, number, state, token, body, requested_by_name, issued_at, issued_by)
+      values ('crt_1','bonafide','Enrolment certificate','stu_aarav','a passport application',$1,'issued',$2,$3,'Priya Sharma',$4,$5)`,
+      [`CERT-${y}-0001`, randomBytes(16).toString('base64url'), 'This is to certify that Aarav Sharma is a student of 8 A at Greenfield International School this year. This certificate is issued for a passport application.',
+        `${addDays(today, -6)}T07:00:00Z`, admin]);
+    const other = (await kidsOf('cls_8a')).find((k) => k.id !== 'stu_aarav');
+    if (other) {
+      await db.query("insert into certificates (id, type, type_name, student_id, purpose, state, token, requested_by_name) values ('crt_2','character','Character certificate',$1,'a scholarship form','pending',$2,'Front desk')",
+        [other.id, randomBytes(16).toString('base64url')]);
+      await db.query("insert into approvals (id, kind, title, subtitle, requester_name, requested_by, subject_ref, payload) values ('apr_cert_2','certificate',$1,'a scholarship form','Front desk',$2,$3,$4)",
+        [`Character certificate for ${other.name}`, admin, other.id, JSON.stringify({ certificateId: 'crt_2' })]);
+    }
+    did.push('certificates');
   }
   return did;
 }

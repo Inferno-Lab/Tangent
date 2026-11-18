@@ -6,11 +6,12 @@ import { isLanguage, localizedLabels } from './i18n.js';
  * in order. One step (anyone allowed to decide that kind) is how every school starts; a school adds steps (the bursar, then
  * the principal for a large waiver), says who takes each one, and what happens when a step waits too long.
  */
-export const WORKFLOW_PROCESSES = ['leave', 'fee_waiver', 'notice', 'admission', 'photo', 'receipt_cancel'] as const;
+export const WORKFLOW_PROCESSES = ['leave', 'fee_waiver', 'notice', 'admission', 'photo', 'receipt_cancel', 'staff_leave', 'gate_pass', 'certificate', 'visitor'] as const;
 export type WorkflowProcess = (typeof WORKFLOW_PROCESSES)[number];
 export const PROCESS_LABELS: Record<WorkflowProcess, string> = localizedLabels({
   leave: 'Leave requests', fee_waiver: 'Fee waivers and concessions', notice: 'Notices before they go out', admission: 'Admissions',
-  photo: 'Photos families send', receipt_cancel: 'Cancelled receipts',
+  photo: 'Photos families send', receipt_cancel: 'Cancelled receipts', staff_leave: 'Staff leave', gate_pass: 'Gate passes (leaving early)', certificate: 'Certificates',
+  visitor: 'Visitors staff invite',
 });
 
 /** Who takes a step: whoever may decide the kind (its permissions), a role, one named person, or the child's class teacher. */

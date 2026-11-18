@@ -26,6 +26,12 @@ const RULES: Record<FileKind, { mimes: string[]; max: number; module: string; wr
   gallery: { mimes: IMAGES, max: 15 * MB, module: 'gallery', write: 'gallery.write' },
   receipt: { mimes: ['application/pdf'], max: 2 * MB, module: 'fees', write: 'console' },
   report_card: { mimes: ['application/pdf'], max: 5 * MB, module: 'exams', write: 'console' },
+  staff_photo: { mimes: IMAGES, max: 5 * MB, module: 'people', write: 'staff.write' },
+  visitor_photo: { mimes: IMAGES, max: 5 * MB, module: 'visitors', write: 'visitors.manage' },
+  // A photo of someone who collects a child: the family adds it (owner "pickup:<student>"), or the front desk.
+  pickup_photo: { mimes: IMAGES, max: 5 * MB, module: 'visitors', write: 'family' },
+  // Owned by the class the entry is for (it is attached before the entry is saved).
+  diary_attachment: { mimes: DOCS, max: 15 * MB, module: 'diary', write: 'diary.write' },
 };
 
 /** The first bytes of each type we accept: a file must be what it says it is. */
@@ -100,6 +106,7 @@ export class FilesService implements OnModuleInit {
       if (!(await this.children(t, user.id)).includes(ownerId.slice(8))) throw forbidden('You can send a photo only of your own child.');
       return;
     }
+    if (kind === 'pickup_photo' && user.permissions.includes('visitors.manage') && (await this.isStaff(t, user.id))) return;
     if (rule.write === 'family') {
       const [, studentId] = ownerId.split(':');
       if (!studentId || !(await this.children(t, user.id)).includes(studentId)) throw forbidden('You can hand in work only for your own children.');
@@ -116,9 +123,12 @@ export class FilesService implements OnModuleInit {
   }
 
   /** Whether this person may read a file. */
-  private async mayRead(t: TenantCtx, user: AuthedUser, f: { kind: FileKind; owner_id: string | null }): Promise<void> {
+  private async mayRead(t: TenantCtx, user: AuthedUser, f: { id: string; kind: FileKind; owner_id: string | null }): Promise<void> {
     if (await this.isStaff(t, user.id)) {
-      const need: Partial<Record<FileKind, string>> = { student_photo: 'students.read', student_document: 'students.read', homework_submission: 'homework.read', gallery: 'gallery.read', chat: 'messages.read' };
+      const need: Partial<Record<FileKind, string>> = {
+        student_photo: 'students.read', student_document: 'students.read', homework_submission: 'homework.read', gallery: 'gallery.read', chat: 'messages.read',
+        visitor_photo: 'visitors.read', pickup_photo: 'visitors.read',
+      };
       const p = need[f.kind];
       if (!p || user.permissions.includes(p)) return;
       throw forbidden('You do not have access to this file.');
@@ -127,7 +137,8 @@ export class FilesService implements OnModuleInit {
     const owner = f.owner_id ?? '';
     const ok = await (async () => {
       switch (f.kind) {
-        case 'homework_submission': return kids.includes(owner.split(':')[1] ?? '');
+        case 'homework_submission': case 'pickup_photo': return kids.includes(owner.split(':')[1] ?? '');
+        case 'diary_attachment': return (await t.pool.query('select 1 from diary_entries e join students s on s.class_id = e.class_id where e.file_ids ? $1 and s.id = any($2)', [f.id, kids])).rowCount! > 0;
         case 'student_photo': case 'student_document': return kids.includes(owner);
         case 'homework_attachment': return (await t.pool.query('select 1 from homework h join students s on s.class_id = h.class_id where h.id = $1 and s.id = any($2)', [owner, kids])).rowCount! > 0;
         case 'notice_attachment': return (await t.pool.query("select 1 from notices where id = $1 and status = 'published'", [owner])).rowCount! > 0;
@@ -257,6 +268,20 @@ export class FilesService implements OnModuleInit {
   }
 
   /** A link to read the file, valid five minutes. */
+  /** A clean file's bytes (a photo printed on a card), or null when it is missing or cannot be read. */
+  async bytes(t: TenantCtx, id: string | null): Promise<Buffer | null> {
+    const f = id ? (await t.pool.query("select storage_key from files where id = $1 and deleted_at is null and status = 'clean'", [id])).rows[0] : null;
+    if (!f) return null;
+    const { s, ctx } = await this.storage(t);
+    return s.get(ctx, f.storage_key).catch(() => null);
+  }
+
+  /** A student's or member of staff's current photo, for their card. */
+  async photoOf(t: TenantCtx, kind: 'student_photo' | 'staff_photo', ownerId: string): Promise<Buffer | null> {
+    const f = (await t.pool.query<{ id: string }>("select id from files where kind = $1 and owner_id = $2 and deleted_at is null and status = 'clean' order by created_at desc limit 1", [kind, ownerId])).rows[0];
+    return this.bytes(t, f?.id ?? null);
+  }
+
   /** The school's logo image itself (for printed receipts and report cards), or null while it has only letters. */
   async logoBytes(t: TenantCtx): Promise<Buffer | null> {
     const id = await this.settings.value<string>(t, 'brand.logoFileId', '');

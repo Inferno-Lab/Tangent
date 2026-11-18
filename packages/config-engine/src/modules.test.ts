@@ -66,7 +66,7 @@ describe('every piece of the product belongs to one module', () => {
     expect(missing).toEqual([]);
   });
   it('approval kinds', () => {
-    once((m) => m.approvals, ['leave', 'fee_waiver', 'admission', 'notice', 'attendance', 'photo', 'receipt_cancel', 'settings'], 'Approval kind');
+    once((m) => m.approvals, ['leave', 'fee_waiver', 'admission', 'notice', 'attendance', 'photo', 'receipt_cancel', 'settings', 'staff_leave', 'gate_pass', 'certificate', 'visitor'], 'Approval kind');
   });
 });
 

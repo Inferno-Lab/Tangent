@@ -10,7 +10,7 @@ import { isLanguage, tx } from './i18n.js';
 export const FIELD_KINDS = ['text', 'longText', 'number', 'date', 'choice', 'multi', 'yesno', 'phone', 'email'] as const;
 export type FieldKind = (typeof FIELD_KINDS)[number];
 /** The records that take custom fields. */
-export const CUSTOM_ENTITIES = ['student', 'staff'] as const;
+export const CUSTOM_ENTITIES = ['student', 'staff', 'visitor'] as const;
 export type CustomEntity = (typeof CUSTOM_ENTITIES)[number];
 
 export const FieldDef = z.object({

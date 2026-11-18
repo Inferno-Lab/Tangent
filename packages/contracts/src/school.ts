@@ -406,7 +406,7 @@ export interface NoticeRow {
 }
 
 // Approvals
-export type ApprovalKind = 'leave' | 'fee_waiver' | 'admission' | 'notice' | 'attendance' | 'photo' | 'receipt_cancel' | 'settings';
+export type ApprovalKind = 'leave' | 'fee_waiver' | 'admission' | 'notice' | 'attendance' | 'photo' | 'receipt_cancel' | 'settings' | 'staff_leave' | 'gate_pass' | 'certificate' | 'visitor';
 export interface ApprovalRow {
   id: string;
   kind: ApprovalKind;

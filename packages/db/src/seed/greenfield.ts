@@ -559,7 +559,7 @@ async function seedOffice(ctx: Ctx, classes: ClassRow[], students: StudentRow[],
   await bulkInsert(db, 'notices', ['id', 'title', 'body', 'audience', 'class_id', 'status', 'author_id', 'published_at'], noticeRows);
   const leaveFrom = addDays(last, 2);
   await bulkInsert(db, 'approvals', ['id', 'kind', 'title', 'subtitle', 'requester_name', 'requested_by', 'subject_ref', 'payload'], [
-    ['apr_leave_kavita', 'leave', 'Kavita Iyer asked for leave', '16–17 Oct · Maths, Class 8 A', 'Kavita Iyer', kavita.id, kavita.id, JSON.stringify({ from: leaveFrom, to: addDays(leaveFrom, 1) })],
+    ['apr_leave_kavita', 'staff_leave', 'Kavita Iyer: Casual leave', `${leaveFrom} – ${addDays(leaveFrom, 1)} · 2 days`, 'Kavita Iyer', kavita.id, kavita.id, JSON.stringify({ type: 'casual', from: leaveFrom, to: addDays(leaveFrom, 1), halfDay: null, days: 2, reason: 'A family wedding' })],
     ['apr_waiver_kabir', 'fee_waiver', 'Concession for Kabir Singh', '25% sibling · ₹4,625 a term', 'Kabir Singh', '', kabir.id, JSON.stringify({ percent: 25, amountPerTerm: 4625 })],
     ['apr_notice_ptm', 'notice', 'PTM notice, Class 5', 'Drafted by Meera Nair', 'Meera Nair', '', 'ntc_ptm', JSON.stringify({ noticeId: 'ntc_ptm' })],
   ]);

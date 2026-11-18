@@ -84,6 +84,12 @@ export const IMPORT_KINDS: ImportKind[] = localized([
       c('student', 'Child', 'Aarav Sharma', { aliases: ['child', 'student name', 'ward'] }), c('class', 'Class', '8 A', { aliases: ['class name', 'section'] })] },
   { key: 'transport', label: 'Bus routes', blurb: 'Which route each student takes.', module: 'transport', matchOn: ['admission_no'],
     columns: [req('admission_no', 'Admission number', '2019/0412', ['admission no', 'admn no', 'adm no']), req('route', 'Route', 'Route 4 · Baner', ['route name', 'bus route', 'route no'])] },
+  { key: 'leave_balances', label: 'Staff leave balances', blurb: 'Leave each member of staff has left from the old system, added to this year’s balance.', module: 'staffAttendance', matchOn: ['email', 'type', 'year'],
+    columns: [req('email', 'Staff email', 'sam.lee@school.org', ['email', 'teacher email', 'staff']), req('type', 'Leave type', 'Casual leave', ['leave', 'leave type']),
+      req('days', 'Days', '4.5', ['balance', 'days left', 'opening balance']), c('year', 'Leave year', '', { aliases: ['session', 'academic year'] }), c('note', 'Note', 'From the old system')] },
+  { key: 'pickup_people', label: 'Who may collect each child', blurb: 'The people each family named to collect their child, from the old register.', module: 'visitors', matchOn: ['admission_no', 'name'],
+    columns: [req('admission_no', 'Admission number', '2019/0412', ['admission no', 'admn no', 'adm no']), req('name', 'Name', 'Alex Morgan', ['pickup person', 'collector']),
+      req('relation', 'Relation', 'Uncle', ['relationship', 'who']), c('phone', 'Phone', '', { aliases: ['mobile', 'contact'] })] },
 ]);
 
 export function importKind(key: string): ImportKind | undefined {

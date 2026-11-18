@@ -37,7 +37,7 @@ export class DocumentsService {
    * the starter layout. Words of the starter layout come from the catalogue; the school's own come in the reader's language
    * where it wrote them. `items` is the document's own lines.
    */
-  async render(t: TenantCtx, kind: DocKind, fill: Record<string, string>, items: PdfLine[], draft?: DocTemplate): Promise<{ data: Buffer }> {
+  async render(t: TenantCtx, kind: DocKind, fill: Record<string, string>, items: PdfLine[], draft?: DocTemplate, extra: { photo?: Buffer | null; qr?: string } = {}): Promise<{ data: Buffer }> {
     const own = draft ?? (await this.settings.value<DocTemplates>(t, 'documents.templates', {}))[kind];
     const tpl = own ?? DEFAULT_TEMPLATES[kind];
     const lang = schoolContext.getStore()?.lang ?? 'en';
@@ -54,6 +54,8 @@ export class DocumentsService {
       else if (b.kind === 'rule') lines.push({ text: '', rule: true, gap: 18 });
       else if (b.kind === 'gap') lines.push({ text: '', gap: (b.size ?? 12) * 2 });
       else if (b.kind === 'pageBreak') lines.push({ text: '', page: true });
+      else if (b.kind === 'photo') { if (extra.photo) lines.push({ text: '', image: extra.photo }); }
+      else if (b.kind === 'qr') { if (extra.qr) lines.push({ text: '', qr: extra.qr }); }
       else if (b.kind === 'signatures') {
         // Two places to sign a row, under room to sign.
         const names = say(b, 'value').split('\n').map((x) => x.trim()).filter(Boolean);
@@ -93,7 +95,7 @@ export class DocumentsService {
     if (kind === 'receipt') {
       const id = (await t.pool.query<{ id: string }>('select id from payments order by created_at desc limit 1')).rows[0]?.id;
       if (id) return this.receipt(t, id, null, draft);
-    } else {
+    } else if (kind === 'reportCard') {
       const r = (await t.pool.query<{ exam: string; student: string }>(
         "select e.id exam, m.student_id student from exams e join exam_marks m on m.exam_id = e.id where e.status = 'published' order by e.published_at desc nulls last, m.student_id limit 1")).rows[0];
       if (r) return this.reportCard(t, r.exam, r.student, null, draft);
@@ -102,10 +104,13 @@ export class DocumentsService {
     const fill: Record<string, string> = {
       school, student: 'Alex Morgan', class: '5 A', admissionNo: '2026/0001', rollNo: '12', receiptNo: 'RCPT-2026-00001', date: date(schoolToday()), title: tx('Tuition, first term'),
       amount: fmtMoney(1000), method: tx('Cash'), reference: '', taxName: 'none', taxNumber: '', exam: tx('Mid-term exams'), percent: '82', grade: 'A', gpa: '', result: tx('Passed'), rank: '', classSize: '30', remark: tx('Works carefully and asks good questions.'),
+      ...(kind === 'certificate' ? { title: tx('Enrolment certificate') } : {}), number: 'CERT-2026-0001', body: tx('This is to certify that Alex Morgan, admission number 2026/0001, is a student of 5 A this year.'),
+      name: 'Alex Morgan', role: tx('Student'), bloodGroup: 'O+', phone: '', validUntil: date(schoolToday()), purpose: tx('Meeting a member of staff'), host: 'Sam Lee', time: '10:30',
+      reason: tx('Unwell'), collector: tx('Mother'), approvedBy: tx('Class teacher'),
     };
     const items: PdfLine[] = kind === 'receipt' ? [{ text: fill.title!, right: fill.amount, bold: true, gap: 22 }]
-      : [{ text: tx('Subject'), right: tx('Marks · grade'), bold: true, gap: 22 }, { text: tx('Mathematics'), right: '82 / 100 · A' }, { text: tx('Science'), right: '78 / 100 · B' }];
-    return { name: 'preview.pdf', ...(await this.render(t, kind, fill, items, draft)) };
+      : kind === 'reportCard' ? [{ text: tx('Subject'), right: tx('Marks · grade'), bold: true, gap: 22 }, { text: tx('Mathematics'), right: '82 / 100 · A' }, { text: tx('Science'), right: '78 / 100 · B' }] : [];
+    return { name: 'preview.pdf', ...(await this.render(t, kind, fill, items, draft, { qr: 'https://example.org/verify' })) };
   }
 
   /** A report card for one student in one published exam. */
