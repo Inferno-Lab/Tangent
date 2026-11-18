@@ -113,14 +113,14 @@ describe('staff and roles', () => {
     const off = await send('PATCH', `/v1/staff/${pooja.id}`, { status: 'inactive', designation: 'Maths teacher' });
     expect(off.json).toMatchObject({ status: 'inactive', designation: 'Maths teacher' });
   });
-  it('shows the school’s roles, and lets it put staff in them only while the console allows it', async () => {
+  it('shows the school’s roles, and lets it put staff in them unless Tangent holds its roles', async () => {
     const roles = (await get('/v1/roles')).json;
     expect(roles.find((r: any) => r.key === 'principal')).toMatchObject({ locked: true });
     const pooja = (await get('/v1/staff?query=Pooja')).json[0];
     expect((await send('PATCH', '/v1/staff/' + pooja.id, { roleId: 'role_office' })).status).toBe(200);
-    await h.setSettings({ 'staff.schoolAssignsRoles': false });
+    await h.setSettings({ 'roles.schoolEdits': false });
     expect((await send('PATCH', '/v1/staff/' + pooja.id, { roleId: 'role_teacher' })).status).toBe(403);
-    await h.setSettings({ 'staff.schoolAssignsRoles': true });
+    await h.setSettings({ 'roles.schoolEdits': true });
   }, 30_000);
   it('imports staff from a sheet, invites one who never signed in, edits their email, and exports everyone', async () => {
     const r = await send('POST', '/v1/staff/import', { csv: 'name,email,phone,designation,role\nSam Okafor,sam.okafor@greenfield.edu.in,+91 90000 55555,Teacher,Teacher' });

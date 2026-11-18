@@ -1,4 +1,4 @@
-import { IMPORT_KINDS, MESSAGE_EVENTS, PERMISSIONS, PERMISSION_CATALOG, PERMISSION_NEEDS, SETTING_GROUPS, SETTINGS_META, SchoolSettingsSchema, DEFAULT_APP_LAYOUT, APP_ROLE_KEYS } from '@tangent/contracts';
+import { CUSTOM_ENTITIES, DOC_KINDS, NUMBER_SERIES, VOCAB_CONCEPTS, WORKFLOW_PROCESSES, settingOwner, IMPORT_KINDS, MESSAGE_EVENTS, PERMISSIONS, PERMISSION_CATALOG, PERMISSION_NEEDS, SETTING_GROUPS, SETTINGS_META, SchoolSettingsSchema, DEFAULT_APP_LAYOUT, APP_ROLE_KEYS } from '@tangent/contracts';
 import { describe, expect, it } from 'vitest';
 import { ADMIN_PAGES, APP_CATALOG, APP_ROLES, MODULES, featureByKey, moduleByKey } from './index.js';
 
@@ -50,6 +50,20 @@ describe('every piece of the product belongs to one module', () => {
       if (moduleByKey(m)?.core) expect(k.module === 'core' || within(k.module, m), k.key).toBe(true);
       else expect(within(k.module, m), `${k.key} is gated by ${k.module}, not ${m}`).toBe(true);
     }
+  });
+  it('building blocks: workflows, document templates, number series, custom-field entities and vocabulary', () => {
+    once((m) => m.blocks.workflows, WORKFLOW_PROCESSES, 'Workflow');
+    once((m) => m.blocks.templates, DOC_KINDS, 'Document template');
+    once((m) => m.blocks.entities, CUSTOM_ENTITIES, 'Custom-field entity');
+    once((m) => m.blocks.vocabulary, VOCAB_CONCEPTS.map((c) => c.key), 'Vocabulary word');
+    const series = once((m) => m.blocks.series, NUMBER_SERIES, 'Number series');
+    // A series is edited on its module's Settings: it is one of the module's own settings.
+    for (const [k, [m]] of series) expect(moduleByKey(m!)!.settings, k).toContain(k);
+  });
+  it('every school-owned setting is on an admin page (its module’s Settings tab, or School profile)', () => {
+    const shown = new Set(ADMIN_PAGES.flatMap((p) => p.settings ?? []));
+    const missing = MODULES.filter((m) => m.state !== 'planned').flatMap((m) => m.settings.filter((k) => settingOwner(k) === 'school' && !shown.has(k)).map((k) => `${k} (${m.key})`));
+    expect(missing).toEqual([]);
   });
   it('approval kinds', () => {
     once((m) => m.approvals, ['leave', 'fee_waiver', 'admission', 'notice', 'attendance', 'photo', 'receipt_cancel', 'settings'], 'Approval kind');

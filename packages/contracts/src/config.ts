@@ -72,6 +72,8 @@ export function seriesProblem(pattern: string): string | null {
   if (unknown) return `${unknown} is not a token. Use {yyyy}, {yy}, {mm}, {ay} or {seq}.`;
   return pattern.length > 40 ? 'Keep the pattern under 40 characters.' : null;
 }
+/** The settings that hold a number series' pattern (each module declares its own in its building blocks). */
+export const NUMBER_SERIES = ['fees.receiptPrefix', 'people.admissionNumber'] as const;
 const seriesCheck = (v: string, ctx: z.RefinementCtx) => {
   const problem = seriesProblem(v);
   if (problem) ctx.addIssue({ code: 'custom', message: problem });
@@ -204,7 +206,6 @@ export const SchoolSettingsSchema = z.object({
   'security.webSessionDays': z.number().int().min(1).max(30).default(7),
   'security.appSessionDays': z.number().int().min(1).max(90).default(30),
   // Whether the school may put its own staff into the roles Tangent made for it. Roles themselves are set from the console only.
-  'staff.schoolAssignsRoles': z.boolean().default(true),
   // Whether the school makes and changes its own roles (D4); Tangent can hold them for a school group.
   'roles.schoolEdits': z.boolean().default(true),
   // The school's own data (its timetable today; classes, terms, holidays and fee structures as their screens arrive) stays with the

@@ -37,9 +37,9 @@ export class PeopleService {
     private readonly settings: SettingsService,
   ) {}
 
-  /** The console decides whether the school may put its own staff into roles (the roles themselves are always Tangent's). */
+  /** The school puts its staff into roles, unless Tangent holds its roles (roles.schoolEdits off): then Tangent does both. */
   private async schoolAssignsRoles(t: TenantCtx): Promise<boolean> {
-    return (await this.settings.value<boolean>(t, 'staff.schoolAssignsRoles', true)) !== false;
+    return (await this.settings.value<boolean>(t, 'roles.schoolEdits', true)) !== false;
   }
 
   // Staff

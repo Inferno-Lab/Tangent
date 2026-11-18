@@ -1,4 +1,4 @@
-import { localizedLabels, localized, SETTINGS_META, schoolToday, settingOwner, type ApprovalKind, type EntitlementDoc, type Permission } from '@tangent/contracts';
+import { localizedLabels, localized, SETTINGS_META, schoolToday, settingOwner, type ApprovalKind, type CustomEntity, type DocKind, type VocabConcept, type WorkflowProcess, type EntitlementDoc, type Permission } from '@tangent/contracts';
 
 /** The admin menu's groups, in order (docs/product-map.md §3). A group shows once a page in it does. */
 export const ADMIN_GROUPS = ['Home', 'People', 'Teach', 'Care', 'Money', 'Reach', 'Campus', 'School'] as const;
@@ -101,6 +101,11 @@ export interface ModuleManifest {
   /** Kinds of request it puts in the approvals queue. */
   approvals: ApprovalKind[];
   dashboard: DashboardPiece[];
+  /**
+   * The shared building blocks it uses (one-shot plan 3.9.6): its workflows, document templates, number series (by setting),
+   * entities that take custom fields, and the vocabulary it lets a school rename. Empty is fine; missing is not.
+   */
+  blocks: { workflows: WorkflowProcess[]; templates: DocKind[]; series: string[]; entities: CustomEntity[]; vocabulary: VocabConcept[] };
 }
 
 /**
@@ -109,7 +114,7 @@ export interface ModuleManifest {
  */
 export const PRICE_CURRENCY = 'INR'; // india-pack: Tangent's one price list is in rupees today (D13).
 
-const NONE = { pages: [], app: [], settings: [], permissions: [], messages: [], imports: [], approvals: [], dashboard: [] };
+const NONE = { pages: [], app: [], settings: [], permissions: [], messages: [], imports: [], approvals: [], dashboard: [], blocks: { workflows: [], templates: [], series: [], entities: [], vocabulary: [] } };
 const planned = (key: string, name: string, blurb: string): ModuleManifest =>
   ({ key, name, blurb, state: 'planned', addOnPerStudentYear: 0, features: [], requires: ['people'], backend: false, ...NONE });
 const P = (id: string, label: string, icon: string, keys: string, path: string, group: AdminGroup, anyOf: Permission[], extra: Partial<AdminPage> = {}): AdminPage =>
@@ -145,6 +150,7 @@ export const MODULES: ModuleManifest[] = localized([
     messages: ['privacy.answered', 'approval.waiting'],
     imports: ['years', 'terms', 'holidays', 'subjects', 'periods', 'classes'],
     approvals: ['settings'],
+    blocks: { workflows: [], templates: [], series: [], entities: [], vocabulary: ['principal', 'term'] },
     dashboard: [],
   },
   {
@@ -157,11 +163,12 @@ export const MODULES: ModuleManifest[] = localized([
       P('adm', 'Admissions', 'admissions', 'G M', '/admissions', 'People', ['admissions.read'], { feature: 'people.admissions' }),
     ],
     app: [A('dock', 'academics', 'Academics', FAMILY), A('dock', 'classes', 'My classes', ['teacher'])],
-    settings: ['vocab.words', 'people.nameOrder', 'people.admissionNumber', 'people.admissionStart', 'people.houses', 'students.required', 'lists.genders', 'lists.relationships', 'lists.bloodGroups', 'fields.custom', 'people.addressFormat', 'letters.family', 'letters.student', 'admissions.sources', 'admissions.stages', 'admissions.onlineForm', 'staff.schoolAssignsRoles'],
+    settings: ['vocab.words', 'people.nameOrder', 'people.admissionNumber', 'people.admissionStart', 'people.houses', 'students.required', 'lists.genders', 'lists.relationships', 'lists.bloodGroups', 'fields.custom', 'people.addressFormat', 'letters.family', 'letters.student', 'admissions.sources', 'admissions.stages', 'admissions.onlineForm'],
     permissions: ['students.read', 'students.write', 'staff.read', 'staff.write', 'admissions.read', 'admissions.write'],
     messages: ['admissions.offer', 'admissions.stage', 'admissions.received', 'family.invite', 'student.invite', 'staff.invite', 'office.message'],
     imports: ['staff', 'students', 'contacts', 'admissions'],
     approvals: ['admission', 'photo'],
+    blocks: { workflows: ['admission', 'photo'], templates: [], series: ['people.admissionNumber'], entities: ['student', 'staff'], vocabulary: ['student', 'guardian', 'teacher', 'class', 'section', 'house', 'rollNumber', 'admissionNumber'] },
     dashboard: [{ kind: 'new', key: 'addStudent', label: 'Add student', blurb: 'A new student and their family', to: '/students?add=1', keys: 'N S', icon: 'students', anyOf: ['students.write'] }],
   },
   {
@@ -182,6 +189,7 @@ export const MODULES: ModuleManifest[] = localized([
     messages: ['attendance.absent', 'attendance.reminder', 'leave.decided'],
     imports: ['attendance'],
     approvals: ['leave', 'attendance'],
+    blocks: { workflows: ['leave'], templates: [], series: [], entities: [], vocabulary: [] },
     dashboard: [
       { kind: 'widget', key: 'rolls', label: 'Class rolls', blurb: 'Attendance of each class today' },
       { kind: 'new', key: 'markAttendance', label: 'Mark attendance', blurb: 'Today’s roll call', to: '/attendance', keys: 'N A', icon: 'attendance', anyOf: ['attendance.mark'] },
@@ -201,6 +209,7 @@ export const MODULES: ModuleManifest[] = localized([
     messages: ['timetable.published'],
     imports: ['timetable'],
     approvals: [],
+    blocks: { workflows: [], templates: [], series: [], entities: [], vocabulary: ['period'] },
     dashboard: [{ kind: 'widget', key: 'day', label: 'Today at school', blurb: 'The timeline of the school day' }],
   },
   {
@@ -217,6 +226,7 @@ export const MODULES: ModuleManifest[] = localized([
     messages: ['homework.new', 'homework.graded'],
     imports: [],
     approvals: [],
+    blocks: { workflows: [], templates: [], series: [], entities: [], vocabulary: ['homework'] },
     dashboard: [],
   },
   {
@@ -233,6 +243,7 @@ export const MODULES: ModuleManifest[] = localized([
     messages: ['exam.results', 'exam.reopened'],
     imports: ['marks'],
     approvals: [],
+    blocks: { workflows: [], templates: ['reportCard'], series: [], entities: [], vocabulary: ['reportCard'] },
     dashboard: [{ kind: 'new', key: 'scheduleExam', label: 'Schedule an exam', blurb: 'Dates and subjects for a class', to: '/exams?new=1', keys: 'N E', icon: 'exams', anyOf: ['exams.write'] }],
   },
   {
@@ -255,6 +266,7 @@ export const MODULES: ModuleManifest[] = localized([
     messages: ['fees.reminder', 'fees.overdue', 'fees.receipt', 'fees.refunded'],
     imports: ['fee_heads', 'fee_structures', 'fee_dues', 'payments'],
     approvals: ['fee_waiver', 'receipt_cancel'],
+    blocks: { workflows: ['fee_waiver', 'receipt_cancel'], templates: ['receipt'], series: ['fees.receiptPrefix'], entities: [], vocabulary: ['fees'] },
     dashboard: [
       { kind: 'widget', key: 'fees', label: 'Fees by type', blurb: 'What each kind of fee has collected' },
       { kind: 'new', key: 'collectFee', label: 'Collect a fee', blurb: 'Record a payment at the desk', to: '/fees?collect=1', keys: 'N F', icon: 'fees', anyOf: ['fees.collect'] },
@@ -274,6 +286,7 @@ export const MODULES: ModuleManifest[] = localized([
     messages: ['notice.published'],
     imports: [],
     approvals: ['notice'],
+    blocks: { workflows: ['notice'], templates: [], series: [], entities: [], vocabulary: [] },
     dashboard: [{ kind: 'new', key: 'postNotice', label: 'Post a notice', blurb: 'To families, a class or staff', to: '/notices?new=1', keys: 'N N', icon: 'notices', anyOf: ['notices.write'] }],
   },
   {
@@ -290,6 +303,7 @@ export const MODULES: ModuleManifest[] = localized([
     messages: ['chat.message'],
     imports: [],
     approvals: [],
+    blocks: { workflows: [], templates: [], series: [], entities: [], vocabulary: [] },
     dashboard: [],
   },
   {
@@ -306,6 +320,7 @@ export const MODULES: ModuleManifest[] = localized([
     messages: ['event.created'],
     imports: [],
     approvals: [],
+    blocks: { workflows: [], templates: [], series: [], entities: [], vocabulary: [] },
     dashboard: [],
   },
   {
@@ -319,6 +334,7 @@ export const MODULES: ModuleManifest[] = localized([
     messages: ['gallery.album'],
     imports: [],
     approvals: [],
+    blocks: { workflows: [], templates: [], series: [], entities: [], vocabulary: [] },
     dashboard: [],
   },
   {
@@ -332,6 +348,7 @@ export const MODULES: ModuleManifest[] = localized([
     messages: ['library.ready', 'library.overdue', 'library.cancelled'],
     imports: ['library_books', 'library_loans'],
     approvals: [],
+    blocks: { workflows: [], templates: [], series: [], entities: [], vocabulary: [] },
     dashboard: [],
   },
   {
@@ -347,6 +364,7 @@ export const MODULES: ModuleManifest[] = localized([
     messages: ['bus.near', 'bus.late', 'bus.dropped'],
     imports: ['transport'],
     approvals: [],
+    blocks: { workflows: [], templates: [], series: [], entities: [], vocabulary: [] },
     dashboard: [],
   },
   // Not built yet (features master): the switch exists so plans and prices can name them; it cannot be turned on until they ship.
