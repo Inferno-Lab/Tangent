@@ -62,16 +62,30 @@ async function check(db: Q, input: ImportInput): Promise<Checked> {
   const own = await ownFields(db, input.kind);
   const { headers, data } = readInput(kind, input);
   const source = input.rows ? 'typed' : detectSource(kind, headers);
-  const remembered = input.mapping ? null : (await db.query<{ mapping: Record<string, string> }>('select mapping from import_mappings where signature = $1', [signature(kind.key, headers)])).rows[0]?.mapping;
-  const mapping = input.mapping ?? remembered ?? autoMap(kind, headers, source);
+  const saved = input.rows ? undefined : (await db.query<{ mapping: Record<string, string>; value_map: Record<string, Record<string, string>> }>('select mapping, value_map from import_mappings where signature = $1', [signature(kind.key, headers)])).rows[0];
+  const mapping = input.mapping ?? saved?.mapping ?? autoMap(kind, headers, source);
+  // Typed rows are taken as typed; a file's values are read through the mapping it was given or had last time.
+  const values = input.rows ? {} : input.values ?? saved?.value_map ?? {};
+  const same = (v: string) => v.trim().toLowerCase();
+  const meaning = Object.fromEntries(Object.entries(values).map(([k, m]) => [k, new Map(Object.entries(m).map(([from, to]) => [same(from), to]))]));
   const mapped = new Set(Object.values(mapping).filter(Boolean));
   const missing = kind.columns.filter((c) => c.required && !mapped.has(c.key)).map((c) => c.label);
   const rows: Row[] = data.map((cells) => {
     const r: Row = {};
     for (const col of kind.columns) r[col.key] = '';
     headers.forEach((h, i) => { const k = mapping[h]; if (k && cells[i]) r[k] = r[k] ? `${r[k]} ${cells[i]}` : cells[i]!; });
+    for (const [k, m] of Object.entries(meaning)) if (r[k] && m.has(same(r[k]))) r[k] = m.get(same(r[k]))!;
     return r;
   });
+  // Values none of a column's choices match, for the person to say what each means.
+  const unmatched: Record<string, string[]> = {};
+  if (!input.rows) {
+    for (const c of kind.columns.filter((x) => x.options?.length)) {
+      const ok = new Set(c.options!.map(same));
+      const odd = [...new Set(rows.map((r) => r[c.key]!).filter((v) => v && !ok.has(same(v))))].slice(0, 30);
+      if (odd.length) unmatched[c.key] = odd;
+    }
+  }
   const lookups = await impl.load(db, rows);
   const seen = new Map<string, number>();
   const checks: ImportRowCheck[] = rows.map((r, i) => {
@@ -92,7 +106,7 @@ async function check(db: Q, input: ImportInput): Promise<Checked> {
   });
   const valid = rows.filter((_, i) => checks[i]!.action !== 'skip');
   const counts = { create: checks.filter((c) => c.action === 'create').length, update: checks.filter((c) => c.action === 'update').length, skip: checks.filter((c) => c.action === 'skip').length, total: checks.length };
-  return { preview: { kind: kind.key, source, headers, mapping, missing, rows: checks, counts, totals: impl.totals(valid, lookups), columns: kind.columns.map((c) => ({ ...rawOf(c), label: c.label })) }, valid, impl, lookups, own };
+  return { preview: { kind: kind.key, source, headers, mapping, values, unmatched, missing, rows: checks, counts, totals: impl.totals(valid, lookups), columns: kind.columns.map((c) => ({ ...rawOf(c), label: c.label })) }, valid, impl, lookups, own };
 }
 
 /** Reads, matches and checks a file without changing anything: what would be added, changed and left out, and the totals. */
@@ -179,8 +193,8 @@ export async function commitImport(pool: pg.Pool, input: ImportInput, byName: st
       'insert into import_batches (id, kind, source, file_name, created, updated, skipped, report, changes, by_name) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
       [id, preview.kind, preview.source, input.fileName, preview.counts.create, preview.counts.update, preview.counts.skip, JSON.stringify(report), JSON.stringify(changes), byName]);
     if (!input.rows) {
-      await client.query('insert into import_mappings (signature, mapping) values ($1,$2) on conflict (signature) do update set mapping = excluded.mapping, updated_at = now()',
-        [signature(preview.kind, preview.headers), JSON.stringify(preview.mapping)]);
+      await client.query('insert into import_mappings (signature, mapping, value_map) values ($1,$2,$3) on conflict (signature) do update set mapping = excluded.mapping, value_map = excluded.value_map, updated_at = now()',
+        [signature(preview.kind, preview.headers), JSON.stringify(preview.mapping), JSON.stringify(preview.values)]);
     }
     if (input.uploadId) await client.query("update import_uploads set status = 'imported', batch_id = $2 where id = $1", [input.uploadId, id]);
     await client.query('commit');

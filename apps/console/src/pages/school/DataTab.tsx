@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ImportInputIn } from '@tangent/api-client';
-import { IMPORT_SOURCES, type ImportBatchRow, type ImportKind, type ImportPreview, type MigrationView, type SchoolDetail } from '@tangent/contracts';
+import { IMPORT_SOURCES, type ImportBatchRow, type ImportColumn, type ImportKind, type ImportPreview, type MigrationView, type SchoolDetail } from '@tangent/contracts';
 import { Dialog, EmptyCard, Field, FilePick, Select, EmptyNote, t as tr } from '@tangent/web-ui';
 import { RecordsTab } from './IntegrationsTab';
 import { useApp } from '../../app/context';
@@ -30,15 +30,15 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
   const q = useQuery({ queryKey: ['migration', schoolId], queryFn: () => app.api.migration.view(schoolId) });
   const can = app.can('schools.configure');
   const [kindKey, setKindKey] = useState('');
-  const [job, setJob] = useState<{ src: Source | null; mapping?: Record<string, string>; rev: number }>({ src: null, rev: 0 });
-  const { src, mapping } = job;
+  const [job, setJob] = useState<{ src: Source | null; mapping?: Record<string, string>; values?: Record<string, Record<string, string>>; rev: number }>({ src: null, rev: 0 });
+  const { src, mapping, values } = job;
   // A new revision on every change: the query key stays small however big the file is.
-  const change = (s: Source | null, m?: Record<string, string>) => setJob((j) => ({ src: s, mapping: m, rev: j.rev + 1 }));
+  const change = (s: Source | null, m?: Record<string, string>, vals?: Record<string, Record<string, string>>) => setJob((j) => ({ src: s, mapping: m, values: vals, rev: j.rev + 1 }));
   const [sample, setSample] = useState('300');
   const v = q.data;
   const kind = v?.kinds.find((k) => k.key === (kindKey || v.kinds[0]?.key));
   const input = (): ImportInputIn | null => (!src || !kind ? null : src.kind === 'file'
-    ? { kind: kind.key, csv: src.content, fileName: src.fileName, uploadId: src.uploadId, mapping }
+    ? { kind: kind.key, csv: src.content, fileName: src.fileName, uploadId: src.uploadId, mapping, values }
     : { kind: kind.key, rows: src.rows, fileName: src.fileName, uploadId: src.uploadId });
   const preview = useQuery({
     queryKey: ['import-preview', schoolId, kind?.key, job.rev], enabled: !!src && !!kind,
@@ -80,7 +80,7 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
           </div>
           <div className="help" style={{ marginTop: 8 }}>{kind.blurb} {tr('console.data_tab.import_in_the_order_of')}</div>
           {src && <PreviewPanel kind={kind} src={src} preview={preview.data} loading={preview.isFetching} error={preview.isError ? (preview.error as Error).message : ''}
-            onMap={(m) => change(src, m)} onRows={(rows) => change({ kind: 'rows', fileName: src.fileName, rows, uploadId: src.uploadId })}
+            onMap={(m) => change(src, m, values)} onValues={(vals) => change(src, mapping, vals)} onRows={(rows) => change({ kind: 'rows', fileName: src.fileName, rows, uploadId: src.uploadId })}
             onCancel={() => change(null)} onCommit={() => commit.mutate()} committing={commit.isPending} />}
         </div>
       )}
@@ -168,9 +168,9 @@ function BatchRow({ b, kinds, canUndo, busy, onUndo }: { b: ImportBatchRow; kind
   );
 }
 
-function PreviewPanel({ kind: base, src, preview: p, loading, error, onMap, onRows, onCancel, onCommit, committing }: {
+function PreviewPanel({ kind: base, src, preview: p, loading, error, onMap, onValues, onRows, onCancel, onCommit, committing }: {
   kind: ImportKind; src: Source; preview: ImportPreview | undefined; loading: boolean; error: string;
-  onMap: (m: Record<string, string>) => void; onRows: (rows: Record<string, string>[]) => void; onCancel: () => void; onCommit: () => void; committing: boolean;
+  onMap: (m: Record<string, string>) => void; onValues: (v: Record<string, Record<string, string>>) => void; onRows: (rows: Record<string, string>[]) => void; onCancel: () => void; onCommit: () => void; committing: boolean;
 }) {
   // The school's own columns (its lists, its own fields) once the server has read the file.
   const kind = p?.columns ? { ...base, columns: p.columns } : base;
@@ -201,6 +201,7 @@ function PreviewPanel({ kind: base, src, preview: p, loading, error, onMap, onRo
             ))}
           </div>
           {p.missing.length > 0 && <div className="emsg" role="alert" style={{ marginTop: 10 }}>{tr('console.data_tab.match_a_column_to')}{' '}{p.missing.join(', ')}{tr('console.data_tab.these_are_needed')}</div>}
+          <ValueMap columns={kind.columns} values={p.values} unmatched={p.unmatched} onChange={onValues} />
         </div>
       )}
       {p && (
@@ -239,6 +240,50 @@ function PreviewPanel({ kind: base, src, preview: p, loading, error, onMap, onRo
         <button className="btn pri" disabled={!p || loading || committing || p.missing.length > 0 || p.counts.create + p.counts.update === 0} onClick={onCommit}>
           {committing ? tr('console.data_tab.importing') : p ? tr('console.data_tab.import_rows', { p0: p.counts.create + p.counts.update, p1: p.counts.skip ? tr('console.data_tab.leave_out_2', { skip: p.counts.skip }) : '' }) : tr('console.data_tab.import')}
         </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * What the file's values mean: each value no choice of a column matches is offered the column's choices, and any other value
+ * can be replaced ("VIII" is 8). Remembered with the column matching when the import goes ahead.
+ */
+function ValueMap({ columns, values, unmatched, onChange }: { columns: ImportColumn[]; values: Record<string, Record<string, string>>; unmatched: Record<string, string[]>; onChange: (v: Record<string, Record<string, string>>) => void }) {
+  const [col, setCol] = useState(columns[0]?.key ?? '');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const put = (k: string, f: string, v: string) => {
+    const m = { ...(values[k] ?? {}) };
+    if (v) m[f] = v; else delete m[f];
+    const next = { ...values, [k]: m };
+    if (!Object.keys(m).length) delete next[k];
+    onChange(next);
+  };
+  const label = (k: string) => columns.find((c) => c.key === k)?.label ?? k;
+  const kept = Object.entries(values).flatMap(([k, m]) => Object.entries(m).map(([f, v]) => ({ k, f, v })));
+  return (
+    <div style={{ marginTop: 14 }}>
+      {Object.keys(unmatched).length > 0 && <>
+        <div className="lbl" style={{ marginBottom: 6 }}>{tr('console.data_tab.values_to_match')}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 10 }}>
+          {Object.entries(unmatched).flatMap(([k, odd]) => odd.map((f) => (
+            <div className="fld" key={`${k}|${f}`}><label data-tip={f} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label(k)}: “{f}”</label>
+              <Select compact aria-label={`${label(k)}: ${f}`} value="" onChange={(v) => put(k, f, v)}
+                options={[{ value: '', label: tr('console.data_tab.leave_it_as_it_is') }, ...(columns.find((c) => c.key === k)?.options ?? []).map((o) => ({ value: o, label: o }))]} /></div>
+          )))}
+        </div>
+      </>}
+      <div className="lbl" style={{ margin: '12px 0 6px' }}>{tr('console.data_tab.values_replaced')}</div>
+      <div className="tgrow">
+        {kept.map((x) => <button key={`${x.k}|${x.f}`} type="button" className="chip v" data-tip={tr('console.data_tab.remove')} onClick={() => put(x.k, x.f, '')}>{label(x.k)}: {x.f} → {x.v} ×</button>)}
+        {!kept.length && <span className="help" style={{ margin: 0 }}>{tr('console.data_tab.none_yet_values_are_read')}</span>}
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 8 }}>
+        <div style={{ width: 180 }}><Select compact aria-label={tr('console.data_tab.column')} value={col} onChange={setCol} options={columns.map((c) => ({ value: c.key, label: c.label }))} /></div>
+        <div style={{ width: 150 }}><Field label={tr('console.data_tab.in_the_file')} value={from} onChange={setFrom} maxLength={200} placeholder="VIII" /></div>
+        <div style={{ width: 150 }}><Field label={tr('console.data_tab.means')} value={to} onChange={setTo} maxLength={200} placeholder="8" /></div>
+        <button type="button" className="btn sm" style={{ marginBottom: 6 }} disabled={!col || !from.trim() || !to.trim()} onClick={() => { put(col, from.trim(), to.trim()); setFrom(''); setTo(''); }}>{tr('console.data_tab.replace')}</button>
       </div>
     </div>
   );

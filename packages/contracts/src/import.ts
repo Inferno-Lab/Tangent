@@ -99,6 +99,8 @@ export const ImportInput = z.object({
   rows: z.array(z.record(z.string(), z.string().max(2000))).max(20_000).optional(),
   /** File column name -> import column key (or '' to leave it out). Missing: matched automatically or remembered. */
   mapping: z.record(z.string(), z.string()).optional(),
+  /** Per import column: a value in the file -> what it means ("M" -> "Male"); matched ignoring case and spaces at the ends. */
+  values: z.record(z.string(), z.record(z.string().max(200), z.string().max(200))).optional(),
   fileName: z.string().max(200).default(''),
   /** The school's upload this came from, if any. */
   uploadId: z.string().max(60).optional(),
@@ -118,6 +120,10 @@ export interface ImportPreview {
   source: string;
   headers: string[];
   mapping: Record<string, string>;
+  /** The value mapping in use (sent, remembered, or none). */
+  values: Record<string, Record<string, string>>;
+  /** Per column with fixed choices: values in the file that are none of them (at most 30 a column), to map. */
+  unmatched: Record<string, string[]>;
   /** Required columns nothing maps to: the import cannot go ahead until each has a column. */
   missing: string[];
   rows: ImportRowCheck[];

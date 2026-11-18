@@ -226,3 +226,23 @@ function deflatedZip(files: Record<string, string>): Buffer {
   end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(dir.length / 2, 8); end.writeUInt16LE(dir.length / 2, 10); end.writeUInt32LE(d.length, 12); end.writeUInt32LE(offset, 16);
   return Buffer.concat([...parts, d, end]);
 }
+
+describe('value mapping', () => {
+  it('reads a file’s values through the mapping, reports values no choice matches, and remembers the mapping', async () => {
+    const csv = 'Subject,Periods\nValue map check,six\nValue map extra,7\n';
+    const first = await previewImport(pool, { kind: 'subjects', csv, fileName: 'subjects.csv' });
+    expect(first.values).toEqual({});
+    const values = { per_week: { ' SIX ': '6' } };
+    const mapped = await previewImport(pool, { kind: 'subjects', csv, fileName: 'subjects.csv', values });
+    expect(mapped.rows[0]!.values.per_week).toBe('6');
+    await commitImport(pool, { kind: 'subjects', csv, fileName: 'subjects.csv', values }, 'Migration team');
+    // The same file's columns next term: the values are read the same way without asking.
+    expect((await previewImport(pool, { kind: 'subjects', csv, fileName: 'subjects.csv' })).rows[0]!.values.per_week).toBe('6');
+    // A value that is none of a column's choices is listed to map; mapped, it is not.
+    const students = 'Admission number,Name,Class,Status\nVM/1,Val Map,5 A,Current\n';
+    expect((await previewImport(pool, { kind: 'students', csv: students, fileName: 's.csv' })).unmatched).toEqual({ status: ['Current'] });
+    const fixed = await previewImport(pool, { kind: 'students', csv: students, fileName: 's.csv', values: { status: { current: 'active' } } });
+    expect(fixed.unmatched).toEqual({});
+    expect(fixed.rows[0]!.values.status).toBe('active');
+  });
+});
