@@ -148,7 +148,7 @@ export const MODULES: ModuleManifest[] = localized([
     settings: ['classes.schoolEdits', 'calendar.weeklyOff', 'calendar.weekStarts', 'calendar.schoolEdits', 'dashboard.rollClasses', 'workflows.steps', 'roles.schoolEdits'],
     permissions: ['approvals.read', 'approvals.decide', 'settings.read', 'settings.manage', 'privacy.manage', 'audit.read', 'reports.read', 'setup.write', 'year.manage'],
     messages: ['privacy.answered', 'approval.waiting'],
-    imports: ['years', 'terms', 'holidays', 'subjects', 'periods', 'classes'],
+    imports: ['years', 'terms', 'reporting_periods', 'holidays', 'subjects', 'periods', 'classes'],
     approvals: ['settings'],
     blocks: { workflows: [], templates: [], series: [], entities: [], vocabulary: ['principal', 'term'] },
     dashboard: [],

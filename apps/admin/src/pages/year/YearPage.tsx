@@ -15,7 +15,7 @@ const STATUS: Record<YearRow['status'], { text: string; tone: string }> = { curr
 type Kid = { id: string; name: string; className: string };
 
 /** Which of the school's setup records each tab of Academic year lists (config-engine: the school module's year page). */
-const KINDS: Record<string, string[]> = { terms: ['years', 'terms'], holidays: ['holidays'], classes: ['classes'], subjects: ['subjects'], bells: ['periods'] };
+const KINDS: Record<string, string[]> = { terms: ['years', 'terms', 'reporting_periods'], holidays: ['holidays'], classes: ['classes'], subjects: ['subjects'], bells: ['periods'] };
 const SUBS: Record<string, string> = { terms: t('admin.year_page.the_school_s_years_and'), holidays: t('admin.year_page.days_the_school_is_closed'),
   classes: t('admin.year_page.every_class_and_its_class'), subjects: t('admin.year_page.what_is_taught_and_how'), bells: t('admin.year_page.when_each_period_break_and') };
 

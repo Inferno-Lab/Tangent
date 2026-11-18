@@ -165,6 +165,7 @@ export function schoolApi(h: Http) {
     },
     reports: {
       list: () => h.get<ReportInfo[]>('/v1/reports'),
+      periods: () => h.get<{ name: string; from: string; to: string; kind: 'term' | 'period' }[]>('/v1/reports/periods'),
       get: (id: string, q: ReportQuery = {}) => h.get<ReportData>(`/v1/reports/${id}`, q as Query),
       csv: (id: string, q: ReportQuery = {}) => h.text(`/v1/reports/${id}/csv`, q as Query),
     },

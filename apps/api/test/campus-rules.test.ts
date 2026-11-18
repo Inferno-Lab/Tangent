@@ -167,3 +167,19 @@ describe('bus trips', () => {
     await call(admin, 'PUT', `/v1/transport/routes/${route.id}`, body({ sessions: [], attendantUserId: null }));
   });
 });
+
+describe('reporting periods', () => {
+  it('are kept apart from terms, offered to reports, and checked like terms', async () => {
+    const year = (await h.schoolSql('select label from academic_years where current'))[0].label;
+    const put = (row: Record<string, string>) => call(admin, 'PUT', '/v1/setup/reporting_periods', { row });
+    expect((await put({ year, name: 'Quarter 1', starts_on: '2026-07-01', ends_on: '2026-04-01' })).status).toBe(400);
+    expect((await put({ year: '1999-00', name: 'Quarter 1', starts_on: '2026-04-01', ends_on: '2026-06-30' })).status).toBe(400);
+    const ok = await put({ year, name: 'Quarter 1', starts_on: '2026-04-01', ends_on: '2026-06-30' });
+    expect(ok.status, JSON.stringify(ok.json)).toBe(200);
+    await call(admin, 'PUT', '/v1/setup/terms', { row: { year, name: 'Term check', starts_on: '2026-04-01', ends_on: '2026-09-30' } });
+    const periods = (await call(admin, 'GET', '/v1/reports/periods')).json;
+    expect(periods).toContainEqual({ name: 'Quarter 1', from: '2026-04-01', to: '2026-06-30', kind: 'period' });
+    expect(periods.some((p: any) => p.kind === 'term')).toBe(true);
+    expect((await call(parent, 'GET', '/v1/reports/periods')).status).toBe(403);
+  });
+});

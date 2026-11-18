@@ -72,6 +72,7 @@ export class YearService implements OnModuleInit {
         await client.query('update classes set year_id = $2 where year_id = $1', [old.id, id]);
         const shift = Math.round((y.starts_on.getTime() - old.starts_on.getTime()) / 86_400_000);
         await client.query(`insert into terms (id, year_id, name, starts_on, ends_on) select 'trm_' || substr(md5(random()::text), 1, 12), $2, name, starts_on + $3::int, ends_on + $3::int from terms where year_id = $1`, [old.id, id, shift]);
+        await client.query(`insert into reporting_periods (id, year_id, name, starts_on, ends_on) select 'rpd_' || substr(md5(random()::text), 1, 12), $2, name, starts_on + $3::int, ends_on + $3::int from reporting_periods where year_id = $1`, [old.id, id, shift]);
         await client.query('update fee_structures set due_on = due_on + $1::int', [shift]);
       }
       await client.query("update academic_years set status = 'current', current = true where id = $1", [id]);

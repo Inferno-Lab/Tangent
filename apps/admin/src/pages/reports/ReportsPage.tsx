@@ -25,6 +25,8 @@ export function ReportsPage() {
   const [busy, setBusy] = useState(false);
   const all = useQuery({ queryKey: ['reports'], queryFn: app.api.reports.list, staleTime: 10 * 60_000 });
   const classes = useQuery({ queryKey: ['classes'], queryFn: app.api.classes, staleTime: 5 * 60_000 });
+  const periods = useQuery({ queryKey: ['reports', 'periods'], queryFn: app.api.reports.periods, staleTime: 10 * 60_000 });
+  const span = (periods.data ?? []).find((p) => p.from === q.from && p.to === q.to);
   const list = all.data?.filter((r) => r.area === AREAS[tab]);
   const pick = (list?.some((r) => r.id === id) ? id : '') || list?.[0]?.id || '';
   const info = list?.find((r) => r.id === pick);
@@ -73,6 +75,9 @@ export function ReportsPage() {
                   <span className="grow"></span>
                   {info?.filters.includes('class') && <Select compact aria-label={t('admin.reports_page.class')} value={q.classId ?? ''} onChange={(v) => setQ({ ...q, classId: v || undefined })} options={[{ value: '', label: t('admin.reports_page.whole_school') }, ...(classes.data ?? []).map((c) => ({ value: c.id, label: t('admin.reports_page.class_2', { name: c.name }) }))]} />}
                   {info?.filters.includes('dates') && <>
+                    {(periods.data?.length ?? 0) > 0 && <Select compact aria-label={t('admin.reports_page.period')} value={span ? `${span.from}|${span.to}` : ''}
+                      onChange={(v) => { const [from, to] = v.split('|'); setQ({ ...q, from: from || undefined, to: to || undefined }); }}
+                      options={[{ value: '', label: t('admin.reports_page.any_dates') }, ...periods.data!.map((p) => ({ value: `${p.from}|${p.to}`, label: p.name }))]} />}
                     <DateField compact label={t('admin.reports_page.from')} value={q.from ?? ''} onChange={(v) => setQ({ ...q, from: v || undefined })} max={q.to} />
                     <DateField compact label={t('admin.reports_page.to')} value={q.to ?? ''} onChange={(v) => setQ({ ...q, to: v || undefined })} min={q.from} />
                   </>}

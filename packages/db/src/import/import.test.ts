@@ -137,8 +137,8 @@ describe('moving a school in', () => {
   it('exports everything in the same templates, and the export imports back cleanly', async () => {
     const zip = await exportAll(pool);
     expect(zip.subarray(0, 2).toString()).toBe('PK');
-    expect(zip.toString('latin1')).toContain('08-students.csv');
-    const start = zip.indexOf('08-students.csv') + '08-students.csv'.length;
+    expect(zip.toString('latin1')).toContain('09-students.csv');
+    const start = zip.indexOf('09-students.csv') + '09-students.csv'.length;
     const csv = zip.subarray(start, zip.indexOf('PK', start)).toString('utf8');
     const p = await previewImport(pool, { kind: 'students', csv, fileName: 'export.csv' });
     expect(p.rows.filter((r) => r.errors.length)).toEqual([]);

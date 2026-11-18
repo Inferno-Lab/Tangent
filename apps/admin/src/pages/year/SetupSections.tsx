@@ -102,7 +102,7 @@ function RowDialog({ section: s, row, all, onClose, onDone }: { section: SetupSe
     const name = c.required || c.label.includes('(') ? c.label : t('admin.setup_sections.optional', { label: c.label });
     const pick = (options: { value: string; label: string }[]) => <SelectField key={c.key} label={name} value={f[c.key] ?? ''} onChange={set(c.key)} options={options} disabled={fixed} />;
     if (c.key === 'class_teacher') return pick([{ value: '', label: t('admin.setup_sections.no_class_teacher') }, ...(staff.data ?? []).filter((p) => p.status === 'active' && p.email).map((p) => ({ value: p.email!, label: p.name }))]);
-    if (c.key === 'year' && s.kind === 'terms') return pick(years.map((y) => ({ value: y.label!, label: y.label! })));
+    if (c.key === 'year' && (s.kind === 'terms' || s.kind === 'reporting_periods')) return pick(years.map((y) => ({ value: y.label!, label: y.label! })));
     if (c.key === 'head') return pick(heads);
     if (c.key === 'kind') return pick(PERIOD_KINDS.map((k) => ({ value: k, label: k[0]!.toUpperCase() + k.slice(1) })));
     if (c.key === 'current') return pick([{ value: '', label: t('admin.setup_sections.no') }, { value: 'yes', label: t('admin.setup_sections.yes_the_year_the_school') }]);

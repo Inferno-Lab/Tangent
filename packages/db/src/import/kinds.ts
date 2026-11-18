@@ -155,6 +155,27 @@ const terms = kind<TermLookups>({
   async export(db) { return (await db.query<Row>('select t.id, y.label as year, t.name, t.starts_on::text, t.ends_on::text from terms t join academic_years y on y.id = t.year_id order by t.starts_on')).rows; },
 });
 
+// Reporting periods: the same shape as terms, in their own table; one may cross a term's end (a quarter over a break).
+const reportingPeriods = kind<TermLookups>({
+  async load(db) {
+    const y = (await db.query<{ id: string; label: string }>('select id, label from academic_years')).rows;
+    const t = (await db.query<{ id: string; year_id: string; name: string }>('select id, year_id, name from reporting_periods')).rows;
+    return { years: new Map(y.map((r) => [lc(r.label), r.id])), terms: new Map(t.map((r) => [`${r.year_id}|${lc(r.name)}`, r.id])) };
+  },
+  check(r, l) {
+    const year = l.years.get(lc(r.year!));
+    const [s, e] = [isoDay(r.starts_on!), isoDay(r.ends_on!)];
+    const errors = [...(!year ? [`Year “${r.year}” is not set up: import academic years first.`] : []), ...(!s || !e ? ['Write the dates as 2026-04-01 or 01/04/2026.'] : s > e ? ['The period ends before it starts.'] : [])];
+    return ok(`${year}|${lc(r.name!)}`, errors, l.terms.has(`${year}|${lc(r.name!)}`));
+  },
+  writes: (rows, l) => [{ table: 'reporting_periods', pk: ['id'], cols: ['starts_on', 'ends_on'], rows: rows.map((r) => {
+    const year = l.years.get(lc(r.year!))!;
+    return { id: l.terms.get(`${year}|${lc(r.name!)}`) ?? newId('rpd'), year_id: year, name: r.name, starts_on: isoDay(r.starts_on!), ends_on: isoDay(r.ends_on!) };
+  }) }],
+  totals: (rows) => [{ label: 'Reporting periods', value: String(rows.length) }],
+  async export(db) { return (await db.query<Row>('select p.id, y.label as year, p.name, p.starts_on::text, p.ends_on::text from reporting_periods p join academic_years y on y.id = p.year_id order by p.starts_on')).rows; },
+});
+
 const holidays = kind<Map<string, string>>({
   async load(db) {
     const { rows } = await db.query<{ id: string; title: string; day: string }>("select id, title, (starts_at at time zone $1)::date::text as day from events where kind = 'holiday'", [schoolZone()]);
@@ -814,5 +835,5 @@ function matchFamily(r: Row, waiting: Waiting[]): Waiting[] {
 }
 
 export const KINDS: Record<string, Impl<never>> = {
-  years, terms, holidays, subjects, classes, periods, staff, students, admissions, fee_heads: feeHeads, fee_structures: feeStructures, fee_dues: feeDues, payments, attendance, marks, timetable, library_loans: libraryLoans, library_books: libraryBooks, transport, contacts,
+  years, terms, reporting_periods: reportingPeriods, holidays, subjects, classes, periods, staff, students, admissions, fee_heads: feeHeads, fee_structures: feeStructures, fee_dues: feeDues, payments, attendance, marks, timetable, library_loans: libraryLoans, library_books: libraryBooks, transport, contacts,
 } as unknown as Record<string, Impl<never>>;

@@ -40,6 +40,8 @@ export const IMPORT_KINDS: ImportKind[] = localized([
     columns: [req('label', 'Year', '2026-27', ['academic year', 'session']), req('starts_on', 'Starts on', '2026-04-01', ['start date', 'from']), req('ends_on', 'Ends on', '2027-03-31', ['end date', 'to']), c('current', 'Current year', 'yes', { aliases: ['is current', 'active'], options: ['yes', 'no'] })] },
   { key: 'terms', label: 'Terms', blurb: 'Terms or semesters inside a year.', module: 'core', matchOn: ['year', 'name'],
     columns: [req('year', 'Year', '2026-27', ['academic year', 'session']), req('name', 'Term', 'Term 1', ['term name', 'semester']), req('starts_on', 'Starts on', '2026-04-01', ['start date', 'from']), req('ends_on', 'Ends on', '2026-09-30', ['end date', 'to'])] },
+  { key: 'reporting_periods', label: 'Reporting periods', blurb: 'Stretches the school reports on (quarters, half terms), apart from its terms.', module: 'core', matchOn: ['year', 'name'],
+    columns: [req('year', 'Year', '2026-27', ['academic year', 'session']), req('name', 'Period', 'Quarter 1', ['period name', 'quarter', 'marking period']), req('starts_on', 'Starts on', '2026-04-01', ['start date', 'from']), req('ends_on', 'Ends on', '2026-06-30', ['end date', 'to'])] },
   { key: 'holidays', label: 'Holidays', blurb: 'Days the school is closed.', module: 'core', matchOn: ['name', 'starts_on'],
     columns: [req('name', 'Holiday', 'Diwali break', ['holiday', 'occasion', 'title']), req('starts_on', 'From', '2026-11-08', ['date', 'start date', 'from date']), c('ends_on', 'To', '2026-11-12', { aliases: ['end date', 'to date'] })] },
   { key: 'subjects', label: 'Subjects', blurb: 'Subjects taught, with periods a week.', module: 'core', matchOn: ['name'],
@@ -154,7 +156,7 @@ export interface UploadRow { id: string; fileName: string; note: string; rows: n
 
 /** What the school edits itself in Classes and calendar: the same kinds and columns as the importers, behind a console lock each. */
 export const SETUP_KINDS = localized([
-  { key: 'years', lock: 'calendar.schoolEdits' }, { key: 'terms', lock: 'calendar.schoolEdits' }, { key: 'holidays', lock: 'calendar.schoolEdits' },
+  { key: 'years', lock: 'calendar.schoolEdits' }, { key: 'terms', lock: 'calendar.schoolEdits' }, { key: 'reporting_periods', lock: 'calendar.schoolEdits' }, { key: 'holidays', lock: 'calendar.schoolEdits' },
   { key: 'classes', lock: 'classes.schoolEdits' }, { key: 'subjects', lock: 'classes.schoolEdits' }, { key: 'periods', lock: 'classes.schoolEdits' },
   { key: 'fee_structures', lock: 'feeStructures.schoolEdits' },
 ] as const);

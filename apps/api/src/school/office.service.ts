@@ -89,6 +89,14 @@ export class OfficeService {
     return REPORTS.filter((r) => !r.needs || modules.includes(r.needs));
   }
 
+  async reportPeriods(t: TenantCtx): Promise<{ name: string; from: string; to: string; kind: 'term' | 'period' }[]> {
+    const { rows } = await t.pool.query<{ name: string; from: string; to: string; kind: 'term' | 'period' }>(
+      `select name, starts_on::text "from", ends_on::text "to", 'term' kind from terms where year_id = (select id from academic_years where current limit 1)
+       union all select name, starts_on::text, ends_on::text, 'period' from reporting_periods where year_id = (select id from academic_years where current limit 1)
+       order by 2, 4`);
+    return rows;
+  }
+
   async report(t: TenantCtx, id: string, q: ReportQuery = {}): Promise<ReportData> {
     const info = (await this.reportList(t)).find((r) => r.id === id);
     if (!info) throw notFound('That report');

@@ -237,6 +237,12 @@ export class OfficeController {
     return this.office.reportList(t);
   }
 
+  /** The current year's terms and reporting periods: the dates a report can cover in one pick. */
+  @Get('reports/periods') @Require('reports.read')
+  reportPeriods(@Tenant() t: TenantCtx): Promise<{ name: string; from: string; to: string; kind: 'term' | 'period' }[]> {
+    return this.office.reportPeriods(t);
+  }
+
   @Get('reports/:id') @Require('reports.read')
   report(@Tenant() t: TenantCtx, @Param('id') id: string, @Query(new ZodPipe(ReportQuery)) q: ReportQuery): Promise<ReportData> {
     return this.office.report(t, id, q);
