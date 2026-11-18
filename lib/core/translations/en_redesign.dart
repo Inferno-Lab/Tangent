@@ -35,31 +35,6 @@ const enRedesign = <String, String>{
   'subject_short.music': 'Music',
 
   // entry flow
-  'onboarding.one_kicker': 'For students',
-  'onboarding.one_title': 'Know where to be before the bell.',
-  'onboarding.one_body':
-      "Today's periods, rooms and teachers in one list, with the one on now in your school's colour.",
-  'onboarding.two_kicker': 'For parents',
-  'onboarding.two_title': 'Every child, at one glance.',
-  'onboarding.two_body':
-      'Arrival, attendance, fees and homework for each child, plus a reminder before anything is late. Switch children from the top of any screen.',
-  'onboarding.three_kicker': 'For teachers',
-  'onboarding.three_title': 'Attendance in six taps.',
-  'onboarding.three_body':
-      "Everyone starts present, so you tap only who isn't. Homework, grading, marks and notices are on the same screen.",
-  'onboarding.page_of': '@n of 3',
-  'onboarding.now': 'Now',
-  'onboarding.fee_title': 'Term 2 fees · due in 5 days',
-  'onboarding.fee_line': 'A reminder comes 3 days before',
-  'onboarding.kid_a_over': 'Aarav · Class 8 A',
-  'onboarding.kid_a_big': 'Arrived 7:52',
-  'onboarding.kid_a_line': 'Present · Computer now · 1 thing due',
-  'onboarding.kid_b_over': 'Ananya · Class 5 B',
-  'onboarding.kid_b_big': 'Arrived 8:04',
-  'onboarding.kid_b_line': 'Present · nothing due this week',
-  'onboarding.tally_present': '17 present',
-  'onboarding.tally_absent': '2 absent',
-  'onboarding.tally_late': '1 late',
   'auth.sign_in': 'Sign in',
   'auth.school_email': 'School email',
   'auth.email_or_phone': 'Email or phone number',

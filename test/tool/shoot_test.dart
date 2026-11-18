@@ -121,16 +121,6 @@ void main() {
     await _settle(tester);
     await _save(tester, '${_roleName}_tab0');
     if (guest) {
-      // The first-run story, page by page.
-      Get.offAllNamed<void>(AppRoutes.onboarding)?.ignore();
-      await _settle(tester);
-      for (var p = 0; p < 3; p++) {
-        if (p > 0) {
-          await tester.drag(find.byType(PageView), const Offset(-_width * 1.0, 0));
-          await _settle(tester);
-        }
-        await _save(tester, 'guest_onboard$p');
-      }
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump(const Duration(seconds: 10));
       return;

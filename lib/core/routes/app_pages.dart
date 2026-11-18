@@ -9,7 +9,6 @@ import 'package:tangent/features/attendance/views/attendance_view.dart';
 import 'package:tangent/features/auth/controllers/login_controller.dart';
 import 'package:tangent/features/auth/controllers/splash_controller.dart';
 import 'package:tangent/features/auth/views/login_view.dart';
-import 'package:tangent/features/auth/views/onboarding_view.dart';
 import 'package:tangent/features/auth/views/splash_view.dart';
 import 'package:tangent/features/chat/controllers/chat_controller.dart';
 import 'package:tangent/features/chat/views/chat_list_view.dart';
@@ -83,7 +82,6 @@ class AppPages {
       }),
       transition: Transition.fadeIn,
     ),
-    GetPage(name: AppRoutes.onboarding, page: () => const OnboardingView(), binding: BindingsBuilder<void>(() => Get.lazyPut(OnboardingController.new, fenix: true)), transition: Transition.fadeIn),
     GetPage(name: AppRoutes.login, page: () => const LoginView(), binding: BindingsBuilder<void>(() => Get.lazyPut(LoginController.new, fenix: true)), transition: Transition.fadeIn),
     GetPage(name: AppRoutes.shell, page: () => const ShellView(), binding: ShellBinding(), middlewares: [AuthMiddleware()], transition: Transition.fadeIn, transitionDuration: AppMotion.t3),
     _page(AppRoutes.attendance, const AttendanceView(), AttendanceController.new),
