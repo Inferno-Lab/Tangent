@@ -204,6 +204,8 @@ export function schoolApi(h: Http) {
     },
     movingIn: {
       uploads: () => h.get<UploadRow[]>('/v1/moving-in/uploads'),
+      photos: () => h.get<PhotoImportRow[]>('/v1/moving-in/photos'),
+      readPhotos: (fileId: string) => h.post<PhotoImportRow[]>('/v1/moving-in/photos', { fileId }),
       batches: () => h.get<ImportBatchRow[]>('/v1/moving-in/batches'),
       upload: (b: UploadCreate) => h.post<UploadRow[]>('/v1/moving-in/uploads', b),
       activation: () => h.get<Activation>('/v1/moving-in/activation'),
@@ -294,6 +296,9 @@ export function schoolApi(h: Http) {
     },
   };
 }
+
+/** How far a zip of students' photos got (Moving in). */
+export interface PhotoImportRow { id: string; status: 'waiting' | 'running' | 'done' | 'failed'; total: number; done: number; matched: number; unmatched: string[]; error: string | null; by: string; createdAt: string; doneAt: string | null }
 
 /** Uploads a file straight to storage (the address comes from the API), then tells the API it arrived. */
 export async function uploadFile(api: ReturnType<typeof schoolApi>, kind: FileKind, ownerId: string, file: File): Promise<FileRow> {

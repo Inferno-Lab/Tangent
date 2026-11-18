@@ -81,13 +81,13 @@ export function xlsx(sheets: XlsxSheet[]): Buffer {
 }
 
 /** A ZIP of text files, stored without compression: every unzip tool opens it, and it needs nothing beyond node:zlib's crc32. */
-export function zip(files: { name: string; content: string }[]): Buffer {
+export function zip(files: { name: string; content: string | Buffer }[]): Buffer {
   const parts: Buffer[] = [];
   const central: Buffer[] = [];
   let offset = 0;
   for (const f of files) {
     const name = Buffer.from(f.name, 'utf8');
-    const data = Buffer.from(f.content, 'utf8');
+    const data = Buffer.isBuffer(f.content) ? f.content : Buffer.from(f.content, 'utf8');
     const sum = crc32(data);
     const local = Buffer.alloc(30);
     local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(20, 4); local.writeUInt16LE(0x0800, 6); local.writeUInt16LE(0, 8);
@@ -109,7 +109,7 @@ export function zip(files: { name: string; content: string }[]): Buffer {
 }
 
 /** The files inside a ZIP (an .xlsx is one), by name. Stored and deflated entries, which is all Excel and Sheets write. */
-function unzip(buf: Buffer): Map<string, Buffer> {
+export function unzip(buf: Buffer): Map<string, Buffer> {
   const out = new Map<string, Buffer>();
   const eocd = buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
   if (eocd < 0) throw new ImportError('This file is not a spreadsheet Tangent can read. Save it as .xlsx or .csv.');

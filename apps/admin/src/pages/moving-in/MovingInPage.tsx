@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { uploadFile } from '@tangent/api-client';
 import { IMPORT_KINDS } from '@tangent/contracts';
 import { Field, FilePick, Select, EmptyState, t as tr } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
@@ -84,6 +85,8 @@ export function MovingInPage() { const app = useApp();
           {typing && <TypeRows key={kind} kind={IMPORT_KINDS.find((x) => x.key === kind)!} busy={typed.isPending} onSend={(csv, count) => typed.mutate({ csv, count })} onCancel={() => setTyping(false)} />}
         </Card>
 
+        <PhotosFromZip />
+
         {(batches.data ?? []).length > 0 && (
           <Card title={tr('admin.moving_in_page.what_tangent_imported')} chip={<span className="chip">{batches.data!.filter((b) => !b.undoneAt).length}</span>}>
             <p className="help" style={{ marginTop: 0 }}>{tr('admin.moving_in_page.each_import_with_its_totals')}</p>
@@ -105,5 +108,43 @@ export function MovingInPage() { const app = useApp();
 
       </div>
     </Page>
+  );
+}
+
+/**
+ * Every student's photo at once: a zip of photos, each named by the student's admission number (any folder; 2019/0412 can be
+ * 2019-0412.jpg). It is read in the background; this shows how far it got and the names that matched nobody.
+ */
+function PhotosFromZip() { const app = useApp();
+  const qc = useQueryClient();
+  const list = useQuery({ queryKey: ['photo-imports'], queryFn: app.api.movingIn.photos, refetchInterval: (q) => ((q.state.data ?? []).some((r) => r.status === 'waiting' || r.status === 'running') ? 3000 : false) });
+  const [err, setErr] = useState('');
+  const send = useMutation({
+    // Browsers name a zip's type differently; the server checks the bytes either way.
+    mutationFn: async (f: File) => { const file = await uploadFile(app.api, 'photo_zip', 'school', new File([f], f.name, { type: 'application/zip' })); return app.api.movingIn.readPhotos(file.id); },
+    onSuccess: (rows) => { setErr(''); qc.setQueryData(['photo-imports'], rows); },
+    onError: (e) => setErr((e as Error).message),
+  });
+  const state = { waiting: tr('admin.moving_in_page.photos_waiting'), running: tr('admin.moving_in_page.photos_running'), done: tr('admin.moving_in_page.photos_done'), failed: tr('admin.moving_in_page.photos_failed') };
+  return (
+    <Card title={tr('admin.moving_in_page.students_photos')} chip={<span className="chip">{(list.data ?? []).length}</span>}>
+      <p className="help" style={{ marginTop: 0 }}>{tr('admin.moving_in_page.photos_help')}</p>
+      <FilePick accept=".zip,application/zip" onPick={(f) => send.mutate(f)} disabled={send.isPending}>{send.isPending ? tr('admin.moving_in_page.sending') : tr('admin.moving_in_page.choose_a_zip')}</FilePick>
+      {err && <div className="emsg" role="alert" style={{ marginTop: 10 }}>{err}</div>}
+      {(list.data ?? []).map((r) => (
+        <div key={r.id} className="rw" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', columnGap: 16, rowGap: 6, height: 'auto', padding: '10px 0', cursor: 'default' }}>
+          <span style={{ minWidth: 0, flex: '1 1 220px' }}>
+            <b style={{ font: '700 14px var(--fb)' }}>{state[r.status]}</b>
+            <small style={{ display: 'block', color: 'var(--ink3)', font: '600 12px var(--fb)' }}>{r.by} · {stamp(r.createdAt)}</small>
+            {r.error && <small style={{ display: 'block', color: 'var(--bad)', font: '600 12px var(--fb)' }}>{r.error}</small>}
+            {r.unmatched.length > 0 && <small style={{ display: 'block', color: 'var(--ink2)', font: '600 12px var(--fb)', marginTop: 4 }}>{tr('admin.moving_in_page.matched_nobody', { names: r.unmatched.slice(0, 20).join(', ') })}{r.unmatched.length > 20 ? ' …' : ''}</small>}
+          </span>
+          <span className="tgrow" style={{ gap: 6 }}>
+            <span className="chip">{tr('admin.moving_in_page.photos_progress', { done: r.done, total: r.total })}</span>
+            <span className="chip g">{tr('admin.moving_in_page.photos_matched', { n: r.matched })}</span>
+          </span>
+        </div>
+      ))}
+    </Card>
   );
 }
