@@ -507,6 +507,17 @@ function CustomFieldsEditor({ value, languages, disabled, onChange }: { value: C
   const [entity, setEntity] = useState<CustomEntity>('student');
   const list = value[entity] ?? [];
   const setList = (next: FieldDef[]) => onChange({ ...value, [entity]: next });
+  return (
+    <div>
+      <div style={{ maxWidth: 260 }}><Select value={entity} onChange={(e) => setEntity(e as CustomEntity)} aria-label={tr('ui.settings.records')} options={CUSTOM_ENTITIES.map((e) => ({ value: e, label: ENTITY_LABEL[e] }))} /></div>
+      <FieldListEditor list={list} setList={setList} languages={languages} disabled={disabled} />
+      <div className="help">{tr('ui.settings.removing_a_field_keeps')}</div>
+    </div>
+  );
+}
+
+/** A list of fields (or a form's questions): name, kind, needed, shown in the app, hint, names in other languages, choices. */
+export function FieldListEditor({ list, setList, languages, disabled, inApp = true, max = 30 }: { list: FieldDef[]; setList: (next: FieldDef[]) => void; languages: string[]; disabled: boolean; inApp?: boolean; max?: number }) {
   const put = (i: number, patch: Partial<FieldDef>) => setList(list.map((f, j) => (j === i ? { ...f, ...patch } : f)));
   const add = () => {
     let n = list.length + 1;
@@ -515,7 +526,6 @@ function CustomFieldsEditor({ value, languages, disabled, onChange }: { value: C
   };
   return (
     <div>
-      <div style={{ maxWidth: 260 }}><Select value={entity} onChange={(e) => setEntity(e as CustomEntity)} aria-label={tr('ui.settings.records')} options={CUSTOM_ENTITIES.map((e) => ({ value: e, label: ENTITY_LABEL[e] }))} /></div>
       {!list.length && <div className="help">{tr('ui.settings.no_fields_yet')}</div>}
       {list.map((f, i) => (
         <div key={f.key} className="card" style={{ padding: 12, marginTop: 8 }}>
@@ -526,7 +536,7 @@ function CustomFieldsEditor({ value, languages, disabled, onChange }: { value: C
           </div>
           <div className="tgrow" style={{ marginTop: 8 }}>
             <Checkbox checked={!!f.required} disabled={disabled} label={tr('ui.settings.needed')} onChange={(on) => put(i, { required: on || undefined })} />
-            <Checkbox checked={!!f.app} disabled={disabled} label={tr('ui.settings.shown_in_the_app')} onChange={(on) => put(i, { app: on || undefined })} />
+            {inApp && <Checkbox checked={!!f.app} disabled={disabled} label={tr('ui.settings.shown_in_the_app')} onChange={(on) => put(i, { app: on || undefined })} />}
           </div>
           <div style={{ marginTop: 6 }}><Field label={tr('ui.settings.field_hint')} value={f.hint ?? ''} maxLength={120} disabled={disabled} onChange={(v) => put(i, { hint: v || undefined })} /></div>
           {languages.length > 0 && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>{languages.map((l) => (
@@ -539,8 +549,7 @@ function CustomFieldsEditor({ value, languages, disabled, onChange }: { value: C
           {(f.kind === 'choice' || f.kind === 'multi') && <div style={{ marginTop: 8 }}><div className="help" style={{ margin: 0 }}><b>{tr('ui.settings.choices')}</b></div><ListItemsEditor value={f.options ?? []} languages={languages} max={40} disabled={disabled} onChange={(o) => put(i, { options: o as ListItem[] })} /></div>}
         </div>
       ))}
-      {list.length < 30 && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={add}>{tr('ui.settings.add_a_field')}</button>}
-      <div className="help">{tr('ui.settings.removing_a_field_keeps')}</div>
+      {list.length < max && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={add}>{tr('ui.settings.add_a_field')}</button>}
     </div>
   );
 }

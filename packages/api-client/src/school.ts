@@ -1,5 +1,5 @@
 import type {
-  ChangeRequestCreate, ChangeRequestRow, PasswordChange, ReportQuery, EventReply, InvoiceDetail, WaiverRequest, ReceiptCancel, SlotCreate, WeekOf, StudentPatch, GuardiansPut, GuardianRow, DataRequestCreate, DataRequestDecision, DataRequestRow, EnquiryCreate, EnquiryEnrol, EnquiryPatch, EnquiryRow, EventRow, EventSave, ExamCreate, ExamMarksPut, ExamMarksView, ExamResults, ExamRow,
+  FormInput, FormRow, FormResponseRow, ChangeRequestCreate, ChangeRequestRow, PasswordChange, ReportQuery, EventReply, InvoiceDetail, WaiverRequest, ReceiptCancel, SlotCreate, WeekOf, StudentPatch, GuardiansPut, GuardianRow, DataRequestCreate, DataRequestDecision, DataRequestRow, EnquiryCreate, EnquiryEnrol, EnquiryPatch, EnquiryRow, EventRow, EventSave, ExamCreate, ExamMarksPut, ExamMarksView, ExamResults, ExamRow,
   HomeworkCreate, HomeworkDetail, HomeworkMarks, HomeworkRow, InvoiceListQuery, InvoiceListRow, InvoiceListSummary, ReceiptRow, ReportData, ReportInfo, RoleDefSave, RoleRow, StudentLeaveInput, ApplyInfo, EnquiryApply, RegisterPart, RoomRow, RoomSave, RoomDay, RoomBookingCreate, PeriodTimesRow, PeriodTimesPut, ExamRemarksPut, StaffCreate, StaffPatch, StaffRow,
   ThreadCreate, ThreadDetail, ThreadPatch, ThreadReply, ThreadRow,
   AttendanceDayPut, PeriodMarksPut, PeriodRoll, GalleryReportRow, ApprovalDecision, ApprovalKind, ApprovalRow, AssignFee, AttendanceDay, AuditRow, ClassInfo, ContactReveal, CoverRequest, DashboardData, EffectiveConfig, FeeHead, FeeHeadsPut, FeeSummary, ImportResult, InvoiceRow,
@@ -145,6 +145,16 @@ export function schoolApi(h: Http) {
       enrol: (id: string, b: EnquiryEnrol) => h.post<StudentDetail>(`/v1/admissions/${id}/enrol`, b),
     },
     // The school's application page, before anyone signs in.
+    forms: {
+      list: () => h.get<FormRow[]>('/v1/forms'),
+      add: (b: FormInput) => h.post<FormRow>('/v1/forms', b),
+      save: (id: string, b: FormInput) => h.put<FormRow>(`/v1/forms/${id}`, b),
+      remove: (id: string) => h.del<void>(`/v1/forms/${id}`),
+      responses: (id: string) => h.get<{ form: FormRow; rows: FormResponseRow[] }>(`/v1/forms/${id}/responses`),
+      csv: (id: string) => h.text(`/v1/forms/${id}/responses.csv`),
+      link: (token: string) => h.get<Pick<FormRow, 'title' | 'intro' | 'fields' | 'conditions'> & { open: boolean }>(`/v1/forms/link/${encodeURIComponent(token)}`),
+      answerLink: (token: string, b: { answers: Record<string, unknown>; website?: string }) => h.post<{ ok: true }>(`/v1/forms/link/${encodeURIComponent(token)}`, b),
+    },
     apply: {
       info: () => h.get<ApplyInfo>('/v1/apply'),
       send: (b: EnquiryApply) => h.post<{ ok: true }>('/v1/apply', b),

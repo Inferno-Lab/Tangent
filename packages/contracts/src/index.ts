@@ -6,6 +6,7 @@ export * from './config.js';
 export * from './lists.js';
 export * from './fields.js';
 export * from './workflows.js';
+export * from './forms.js';
 export * from './admissions.js';
 export * from './cycles.js';
 export * from './address.js';

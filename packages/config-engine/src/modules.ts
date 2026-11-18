@@ -132,6 +132,7 @@ export const MODULES: ModuleManifest[] = localized([
     pages: [
       P('dash', 'Dashboard', 'dashboard', 'G D', '/', 'Home', []),
       P('appr', 'Approvals', 'approvals', 'G Q', '/approvals', 'Home', ['approvals.read'], { settings: ['workflows.steps'], tabs: [{ key: 'waiting', label: 'Waiting for me' }, { key: 'sent', label: 'Sent by me' }, { key: 'decided', label: 'Decided' }] }),
+      P('forms', 'Forms', 'file', 'G K', '/forms', 'Home', ['forms.manage']),
       P('rep', 'Reports', 'reports', 'G R', '/reports', 'Home', ['reports.read'], { tabs: [{ key: 'attendance', label: 'Attendance', feature: 'attendance' }, { key: 'money', label: 'Money', feature: 'fees' }, { key: 'learning', label: 'Learning' }, { key: 'people', label: 'People' }] }),
       P('year', 'Academic year', 'year', 'G Y', '/year', 'School', ['settings.read', 'setup.write', 'year.manage'], {
         settings: ['calendar.weeklyOff', 'calendar.weekStarts', 'dashboard.rollClasses', 'classes.schoolEdits', 'calendar.schoolEdits'],
@@ -146,7 +147,7 @@ export const MODULES: ModuleManifest[] = localized([
     ],
     app: [A('dock', 'home', 'Home', EVERYONE)],
     settings: ['classes.schoolEdits', 'calendar.weeklyOff', 'calendar.weekStarts', 'calendar.schoolEdits', 'dashboard.rollClasses', 'workflows.steps', 'roles.schoolEdits'],
-    permissions: ['approvals.read', 'approvals.decide', 'settings.read', 'settings.manage', 'privacy.manage', 'audit.read', 'reports.read', 'setup.write', 'year.manage'],
+    permissions: ['approvals.read', 'approvals.decide', 'settings.read', 'settings.manage', 'privacy.manage', 'audit.read', 'reports.read', 'setup.write', 'year.manage', 'forms.manage'],
     messages: ['privacy.answered', 'approval.waiting'],
     imports: ['years', 'terms', 'reporting_periods', 'holidays', 'subjects', 'periods', 'classes'],
     approvals: ['settings'],

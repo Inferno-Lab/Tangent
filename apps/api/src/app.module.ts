@@ -40,6 +40,7 @@ import { GalleryService } from './school/gallery.service.js';
 import { HooksController } from './school/hooks.controller.js';
 import { HubService } from './school/hub.service.js';
 import { LibraryService } from './school/library.service.js';
+import { FamilyFormsController, FormsController, FormsService } from './school/forms.service.js';
 import { PaymentsService } from './school/payments.service.js';
 import { TransportService } from './school/transport.service.js';
 import { YearService } from './school/year.service.js';
@@ -71,6 +72,7 @@ export class AppModule {
     return {
       module: AppModule,
       controllers: [
+        FormsController, FamilyFormsController,
         AuthController, MeController, ClassesController, StudentsController, AttendanceController, FeesController, ApprovalsController, NoticesController,
         TimetableController, DashboardController, SettingsController, HealthController, LearningController, PeopleController, OfficeController, FamilyController, ErrorsController, I18nController, ChangeRequestsController, SetupController, MovingInController,
         HooksController, FilesController, SchoolLogoController, ChannelsController, FeesOnlineController, ReportCardsController, LibraryController, TransportController, GalleryController, YearController, FamilyCampusController, FinderController,
@@ -82,7 +84,7 @@ export class AppModule {
         { provide: OWNS, useValue: !shared },
         Shutdown,
         TenantService, AuthService, AuditService, Messenger, SettingsService, StudentsService, AttendanceService, FeesService, ApprovalsService, TimetableService, DashboardService, MetricsService, LearningService, PeopleService, OfficeService, FamilyService, StreamService, ChatService, NoticesService, SweepService, ErrorReports, SetupService, MovingInService,
-        HubService, FilesService, PaymentsService, DocumentsService, LibraryService, TransportService, GalleryService, YearService,
+        HubService, FilesService, PaymentsService, DocumentsService, LibraryService, FormsService, TransportService, GalleryService, YearService,
         // Order matters: find the school, then the person, then what they may do.
         { provide: APP_GUARD, useClass: TenantGuard },
         { provide: APP_GUARD, useClass: AuthGuard },

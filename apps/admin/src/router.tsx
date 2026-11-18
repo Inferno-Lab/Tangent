@@ -7,6 +7,7 @@ import { makeClient, session, type Client } from './app/client';
 import { SupportBanner } from './app/SupportBanner';
 import { LoginRoute } from './pages/login/LoginRoute';
 import { ApplyRoute } from './pages/apply/ApplyRoute';
+import { FormRoute } from './pages/forms/FormRoute';
 import { NotFoundPage } from './pages/status/StatusPages';
 import { PlanGate } from './pages/status/PlanGate';
 import { AppLayout } from './app/Layout';
@@ -22,6 +23,8 @@ const root = createRootRouteWithContext<RouterCtx>()({ component: Outlet, notFou
 const login = createRoute({ getParentRoute: () => root, path: '/login', component: LoginRoute });
 // A family's application for a seat, before anyone signs in (the school turns it on).
 const apply = createRoute({ getParentRoute: () => root, path: '/apply', component: ApplyRoute });
+// A school form anyone with its link fills, before anyone signs in.
+const formLink = createRoute({ getParentRoute: () => root, path: '/form/$token', component: FormRoute });
 
 /** Everything behind sign-in. Without a session the visitor is sent to /login. */
 const authed = createRoute({
@@ -78,6 +81,7 @@ const page = (path: string, load: () => Promise<Record<string, unknown>>, name: 
 const routeTree = root.addChildren([
   login,
   apply,
+  formLink,
   authed.addChildren([
     ...page('/', () => import('./pages/dashboard/DashboardPage'), 'DashboardPage'),
     ...page('/approvals', () => import('./pages/approvals/ApprovalsPage'), 'ApprovalsPage'),
@@ -91,6 +95,7 @@ const routeTree = root.addChildren([
     ...page('/staff', () => import('./pages/staff/StaffPage'), 'StaffPage'),
     ...page('/admissions', () => import('./pages/admissions/AdmissionsPage'), 'AdmissionsPage'),
     ...page('/reports', () => import('./pages/reports/ReportsPage'), 'ReportsPage'),
+    ...page('/forms', () => import('./pages/forms/FormsPage'), 'FormsPage'),
     ...page('/messages', () => import('./pages/messages/MessagesPage'), 'MessagesPage'),
     ...page('/events', () => import('./pages/events/EventsPage'), 'EventsPage'),
     ...page('/profile', () => import('./pages/profile/ProfilePage'), 'ProfilePage'),

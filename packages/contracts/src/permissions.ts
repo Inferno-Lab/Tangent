@@ -50,6 +50,7 @@ export const PERMISSIONS = [
   'gallery.read',
   'gallery.write',
   'year.manage',
+  'forms.manage',
 ] as const;
 export const Permission = z.enum(PERMISSIONS);
 export type Permission = z.infer<typeof Permission>;
@@ -128,6 +129,7 @@ export const PERMISSION_CATALOG: PermissionInfo[] = localized([
   { key: 'gallery.read', area: 'Gallery', label: 'See albums' },
   { key: 'gallery.write', area: 'Gallery', label: 'Add albums and photos, publish them to families' },
   { key: 'year.manage', area: 'School setup', label: 'Promote students, start a new year and record leavers', sensitive: true },
+  { key: 'forms.manage', area: 'Forms', label: 'Make forms and read their answers' },
   { key: 'setup.write', area: 'School setup', label: 'Edit classes, subjects, periods, terms, holidays and fee structures (where Tangent allows)' },
 ]);
 
@@ -158,6 +160,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       'students.read', 'students.write', 'staff.read', 'attendance.read', 'notices.read', 'notices.write', 'notices.pin',
       'approvals.read', 'timetable.read', 'timetable.edit', 'reports.read', 'admissions.read', 'admissions.write', 'messages.read', 'messages.write',
       'events.read', 'events.write', 'homework.read', 'exams.read', 'setup.write', 'library.read', 'library.write', 'transport.read', 'transport.write', 'gallery.read', 'gallery.write',
+      'forms.manage',
     ],
   },
   {
