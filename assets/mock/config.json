@@ -25,7 +25,12 @@
     "events",
     "gallery",
     "library",
-    "transport"
+    "transport",
+    "staffAttendance",
+    "diary",
+    "ptm",
+    "visitors",
+    "certificates"
   ],
   "features": [
     "people.admissions",
@@ -495,6 +500,7 @@
           "chat"
         ],
         "home": [
+          "checkIn",
           "dayRibbon",
           "notices",
           "events"
@@ -512,7 +518,9 @@
           "trips",
           "chat"
         ],
-        "home": [],
+        "home": [
+          "checkIn"
+        ],
         "quick": []
       }
     }

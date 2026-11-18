@@ -11,11 +11,12 @@ import { HubService } from './hub.service.js';
 import { PaymentsService } from './payments.service.js';
 import { DocumentsService } from './documents.service.js';
 import { FamilyService } from './family.service.js';
+import { CertificatesService } from './certificates.service.js';
 import { sendPdf } from './pdf.js';
 import { calendarFile, type CalEvent } from './ics.js';
 
 /** A document a family opens outside the app (docLink): the school, which document, whose children it may show, the reader's language. */
-export type DocLink = { p: 'doc'; slug: string; kind: 'receipt' | 'report'; id: string; exam?: string; kids: string[] | null; lang: string }
+export type DocLink = { p: 'doc'; slug: string; kind: 'receipt' | 'report' | 'certificate'; id: string; exam?: string; kids: string[] | null; lang: string }
   | { p: 'doc'; slug: string; kind: 'ics'; events: CalEvent[]; zone: string }
   // A week of lessons, built when it is opened (the link only says whose).
   | { p: 'doc'; slug: string; kind: 'lessons'; classId?: string; teacherId?: string };
@@ -48,6 +49,7 @@ export class HooksController {
     private readonly tenants: TenantService,
     private readonly docs: DocumentsService,
     private readonly family: FamilyService,
+    private readonly certificates: CertificatesService,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
@@ -63,7 +65,7 @@ export class HooksController {
     if (d.kind === 'lessons') return ics(await this.family.lessonEvents(t, d), t.info.timezone);
     const store = schoolContext.getStore();
     if (store) store.lang = d.lang;
-    sendPdf(reply, d.kind === 'receipt' ? await this.docs.receipt(t, d.id, d.kids) : await this.docs.reportCard(t, d.exam!, d.id, d.kids ?? [d.id]));
+    sendPdf(reply, d.kind === 'receipt' ? await this.docs.receipt(t, d.id, d.kids) : d.kind === 'certificate' ? await this.certificates.pdf(t, d.id, d.kids) : await this.docs.reportCard(t, d.exam!, d.id, d.kids ?? [d.id]));
   }
 
   // ── The school's app, from the QR code on a welcome letter ─────────────────

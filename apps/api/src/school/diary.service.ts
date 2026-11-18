@@ -45,6 +45,11 @@ export class DiaryService {
     return [...out.values()];
   }
 
+  /** The school's kinds of entry it offers now (the app's picker). */
+  async kindOptions(t: TenantCtx): Promise<{ key: string; name: string }[]> {
+    return listOptions(await this.kinds(t)).map((k) => ({ key: k.key, name: k.name }));
+  }
+
   /** The classes this person writes for, with the subjects they teach in each (the app's class picker). */
   async myClasses(t: TenantCtx, who: Who) {
     const w = await this.writable(t, who);
@@ -266,7 +271,7 @@ export class FamilyDiaryController {
   }
 
   @Get('classes')
-  async classes(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser) { return this.d.myClasses(t, await this.teacher(t, u)); }
+  async classes(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser) { return { classes: await this.d.myClasses(t, await this.teacher(t, u)), kinds: await this.d.kindOptions(t) }; }
 
   @Get()
   async list(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Query('classId') classId?: string) { return this.d.list(t, await this.teacher(t, u), { classId: classId || undefined }); }

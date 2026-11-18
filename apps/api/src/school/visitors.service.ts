@@ -73,6 +73,11 @@ export class VisitorsService implements OnModuleInit {
     });
   }
 
+  /** Why visitors come, as the app's invite form offers it. */
+  async purposes(t: TenantCtx): Promise<{ key: string; name: string }[]> {
+    return listOptions(await this.list(t, 'visitors.purposes', DEFAULT_VISITOR_PURPOSES)).map((p) => ({ key: p.key, name: p.name }));
+  }
+
   private list(t: TenantCtx, key: string, fallback: ListItem[]): Promise<ListItem[]> {
     return this.settings.value<ListItem[]>(t, key, fallback);
   }
@@ -661,7 +666,7 @@ export class FamilyVisitorsController {
   async invited(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser) {
     const w = await this.f.who(t, u);
     if (w.kind !== 'staff') throw forbidden(tx('This is for members of staff.'));
-    return this.v.invitedBy(t, w.id);
+    return { visitors: await this.v.invitedBy(t, w.id), purposes: await this.v.purposes(t) };
   }
 
   @Post('visitors') @HttpCode(200)

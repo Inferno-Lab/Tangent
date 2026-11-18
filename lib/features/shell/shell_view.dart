@@ -21,6 +21,7 @@ import 'package:tangent/features/homework/views/homework_view.dart';
 import 'package:tangent/features/library/views/library_view.dart';
 import 'package:tangent/features/notices/views/notices_view.dart';
 import 'package:tangent/features/profile/views/profile_view.dart';
+import 'package:tangent/features/school_life/views/diary_view.dart';
 import 'package:tangent/features/shell/shell_controller.dart';
 import 'package:tangent/features/teacher_tools/views/teacher_home_view.dart';
 import 'package:tangent/features/timetable/views/timetable_view.dart';
@@ -159,5 +160,6 @@ Map<String, (DockItem, Widget)> _tabsFor(bool teacher, {bool driver = false}) =>
   'transport': (const DockItem(icon: PhosphorIconsRegular.bus, activeIcon: PhosphorIconsBold.bus, label: 'nav.transport'), const TransportView()),
   'library': (const DockItem(icon: PhosphorIconsRegular.books, activeIcon: PhosphorIconsBold.books, label: 'nav.library'), const LibraryView()),
   'gallery': (const DockItem(icon: PhosphorIconsRegular.images, activeIcon: PhosphorIconsBold.images, label: 'nav.gallery'), const GalleryView()),
+  'diary': (const DockItem(icon: PhosphorIconsRegular.notePencil, activeIcon: PhosphorIconsBold.notePencil, label: 'nav.diary'), const DiaryView()),
   'profile': (const DockItem(icon: PhosphorIconsRegular.user, activeIcon: PhosphorIconsBold.user, label: 'nav.profile'), const ProfileView()),
 };

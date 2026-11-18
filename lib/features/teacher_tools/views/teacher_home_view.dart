@@ -20,6 +20,8 @@ import 'package:tangent/data/models/student.dart';
 import 'package:tangent/features/dashboard/views/dashboard_view.dart' show PeriodStrip, greeting, todayLine;
 import 'package:tangent/features/shell/shell_controller.dart';
 import 'package:tangent/features/teacher_tools/controllers/teacher_controller.dart';
+import 'package:tangent/features/school_life/views/staff_time_view.dart';
+import 'package:tangent/core/services/school_config.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:tangent/core/utils/clock.dart';
@@ -171,6 +173,11 @@ class _Body extends StatelessWidget {
       children: [
         Rise(child: Text(line, style: context.type.s)),
         const SizedBox(height: 16),
+        // Today's check-in, where the school keeps staff attendance and puts it on staff's Home (console: The app).
+        if (SchoolConfig.has('staffAttendance') && SchoolConfig.home.contains('checkIn')) ...[
+          const Rise(index: 1, child: CheckInCard(onHome: true)),
+          const SizedBox(height: 16),
+        ],
         Rise(
           index: 2,
           child: Row(

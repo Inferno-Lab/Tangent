@@ -10,6 +10,14 @@ abstract final class AppRoutes {
   static const results = '/results';
   static const examTimetable = '/exams/timetable';
   static const forms = '/forms';
+  static const staffMe = '/staff/me';
+  static const diary = '/diary';
+  static const teacherDiary = '/teacher/diary';
+  static const meetings = '/meetings';
+  static const teacherMeetings = '/teacher/meetings';
+  static const gatePass = '/gate-pass';
+  static const inviteVisitor = '/visitors/invite';
+  static const certificates = '/certificates';
   static const fees = '/fees';
   static const receipt = '/fees/receipt';
   static const notices = '/notices';

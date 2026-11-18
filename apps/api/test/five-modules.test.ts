@@ -151,6 +151,9 @@ describe('diary', () => {
     expect((await call(teacher, 'POST', '/v1/f/diary', { ...base, kind: 'nosuch' })).status).toBe(400);
     expect((await call(teacher, 'POST', '/v1/f/diary', { ...base, remarks: [{ studentId: outsider, text: 'Not mine' }] })).status).toBe(400);
     expect((await call(teacher, 'POST', '/v1/f/diary', { ...base, date: addDays(today(), 60) })).status).toBe(400);
+    const mineClasses = (await call(teacher, 'GET', '/v1/f/diary/classes')).json;
+    expect(mineClasses.classes.map((c: any) => c.classId)).toContain(mine);
+    expect(mineClasses.kinds.map((k: any) => k.key)).toContain('note');
     const e = await call(teacher, 'POST', '/v1/f/diary', { ...base, remarks: [{ studentId: kids[0].id, text: 'Lovely reading today.' }, { studentId: kids[1].id, text: 'Forgot the homework.' }] });
     expect(e.status).toBe(200);
     expect(e.json.remarks).toHaveLength(2);
@@ -233,7 +236,9 @@ describe('visitors, gate passes and pick-up', () => {
     expect((await call(admin, 'POST', `/v1/visitors/${asked.json.id}/in`)).status).toBe(409);
     const aid = (await h.schoolSql("select id from approvals where kind = 'visitor' and subject_ref = $1", [asked.json.id]))[0].id;
     expect((await decide(admin, aid, 'approve')).status).toBe(200);
-    expect((await call(teacher, 'GET', '/v1/f/visitors')).json.find((x: any) => x.id === asked.json.id).state).toBe('invited');
+    const mine = (await call(teacher, 'GET', '/v1/f/visitors')).json;
+    expect(mine.visitors.find((x: any) => x.id === asked.json.id).state).toBe('invited');
+    expect(mine.purposes.map((p: any) => p.key)).toContain('meeting');
     expect((await call(teacher, 'POST', '/v1/f/visitors', { name: 'No Day', purpose: 'meeting', expectedOn: null })).status).toBe(400);
     await h.setSettings({ 'visitors.invitesNeedApproval': false });
   });
@@ -301,6 +306,10 @@ describe('certificates', () => {
     expect(issued.number).toMatch(/^CERT-\d{4}-\d{4}$/);
     const file = await call(parent, 'GET', `/v1/f/certificates/${r.json.id}/certificate.pdf`);
     expect(file.headers['content-type']).toContain('pdf');
+    // The phone opens it outside the app from a ten-minute link, as receipts are.
+    const link = await call(parent, 'POST', `/v1/f/certificates/${r.json.id}/link`, {});
+    const opened = await h.call('GET', new URL(link.json.url).pathname);
+    expect(opened.headers['content-type']).toContain('pdf');
     const token = (await h.schoolSql('select token from certificates where id = $1', [r.json.id]))[0].token;
     const check = await h.call('GET', `/v1/certificates/verify/${token}`);
     expect(check.json.genuine).toBe(true);

@@ -344,6 +344,13 @@ class _Tiles extends StatelessWidget {
       if (!teacher)
         (PhosphorIconsRegular.calendarCheck, 'menu.leave', AppRoutes.leave, s('english').fill, s('english').on),
       if (teacher) (PhosphorIconsRegular.bell, 'menu.notifications', AppRoutes.notifications, c.mariSoft, c.mariText),
+      if (teacher && has('staffAttendance')) (PhosphorIconsRegular.clockUser, 'menu.my_attendance', AppRoutes.staffMe, s('english').fill, s('english').on),
+      if (has('diary')) (PhosphorIconsRegular.notePencil, 'menu.diary', teacher ? AppRoutes.teacherDiary : AppRoutes.diary, s('science').fill, s('science').on),
+      if (has('ptm') && Get.find<AuthService>().role != UserRole.student)
+        (PhosphorIconsRegular.calendarPlus, 'menu.meetings', teacher ? AppRoutes.teacherMeetings : AppRoutes.meetings, s('social').fill, s('social').on),
+      if (has('visitors') && teacher) (PhosphorIconsRegular.userPlus, 'menu.invite_visitor', AppRoutes.inviteVisitor, s('computer').fill, s('computer').on),
+      if (has('visitors') && Get.find<AuthService>().role == UserRole.parent) (PhosphorIconsRegular.doorOpen, 'menu.gate_pass', AppRoutes.gatePass, s('hindi').fill, s('hindi').on),
+      if (has('certificates') && Get.find<AuthService>().role == UserRole.parent) (PhosphorIconsRegular.certificate, 'menu.certificates', AppRoutes.certificates, s('maths').fill, s('maths').on),
       // The school's forms to answer (consent, surveys); a student has none of their own.
       if (Get.find<AuthService>().role != UserRole.student) (PhosphorIconsRegular.clipboardText, 'menu.forms', AppRoutes.forms, s('maths').fill, s('maths').on),
     ];

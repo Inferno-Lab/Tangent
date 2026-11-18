@@ -32,6 +32,9 @@ class QuickRow extends StatelessWidget {
     'timetable': ('quick.timetable', AppIcons.timetable, AppRoutes.timetable),
     'homework': ('quick.homework', AppIcons.homework, AppRoutes.homework),
     'events': ('quick.events', AppIcons.events, AppRoutes.events),
+    'bookMeeting': ('quick.book_meeting', PhosphorIconsRegular.calendarPlus, AppRoutes.meetings),
+    'gatePass': ('quick.gate_pass', PhosphorIconsRegular.doorOpen, AppRoutes.gatePass),
+    'certificates': ('quick.certificates', PhosphorIconsRegular.certificate, AppRoutes.certificates),
   };
 
   @override

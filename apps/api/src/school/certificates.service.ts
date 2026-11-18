@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Inject, Injectable, Param, Post, Query, Res, type OnModuleInit } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Inject, Injectable, Param, Post, Query, Req, Res, type OnModuleInit } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 import { randomBytes } from 'node:crypto';
 import {
@@ -8,6 +8,9 @@ import { newId, nextNumber } from '@tangent/db';
 import { ApiError, ZodPipe, forbidden, notFound } from '@tangent/nest-kit';
 import { CurrentUser, Public, Require, RequireModule } from '../auth/guards.js';
 import { ENV, type Env } from '../env.js';
+import { requestLanguage } from '@tangent/tenancy';
+import { signLink } from '@tangent/integrations';
+import type { DocLink } from './hooks.controller.js';
 import { Tenant, type AuthedUser, type TenantCtx } from '../tenancy/tenant.js';
 import { ApprovalsService } from './approvals.service.js';
 import { DocumentsService } from './documents.service.js';
@@ -289,7 +292,7 @@ export class CertificatesController {
 @Controller('v1/f/certificates')
 @RequireModule('certificates')
 export class FamilyCertificatesController {
-  constructor(private readonly c: CertificatesService, private readonly f: FamilyService) {}
+  constructor(private readonly c: CertificatesService, private readonly f: FamilyService, @Inject(ENV) private readonly env: Env) {}
 
   private async parent(t: TenantCtx, u: AuthedUser) {
     const w = await this.f.who(t, u);
@@ -317,5 +320,14 @@ export class FamilyCertificatesController {
   @Get(':id/certificate.pdf')
   async file(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Res() reply: FastifyReply) {
     sendPdf(reply, await this.c.pdf(t, id, (await this.parent(t, u)).children));
+  }
+
+  /** A ten-minute link the phone opens outside the app (as receipts are), checked now for this family's children. */
+  @Post(':id/link') @HttpCode(200)
+  async link(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Req() req: { headers: Record<string, string | string[] | undefined> }): Promise<{ url: string }> {
+    const kids = (await this.parent(t, u)).children;
+    await this.c.pdf(t, id, kids);
+    const token = signLink(this.env.SECRETS_KEY, { p: 'doc', slug: t.info.slug, kind: 'certificate', id, kids, lang: requestLanguage(req.headers['accept-language']) } satisfies DocLink, 600);
+    return { url: `${this.env.API_BASE_URL.replace(/\/$/, '')}/hooks/doc/${token}` };
   }
 }

@@ -16,6 +16,7 @@ import 'package:tangent/data/repositories/auth_repository.dart';
 import 'package:tangent/data/repositories/campus_repository.dart';
 import 'package:tangent/data/repositories/directory_repository.dart';
 import 'package:tangent/data/repositories/driver_repository.dart';
+import 'package:tangent/data/repositories/school_life_repository.dart';
 
 class InitialBinding extends Bindings {
   @override
@@ -64,6 +65,7 @@ class InitialBinding extends Bindings {
           () => MockNotificationRepository(source),
           fenix: true,
         )
+        ..lazyPut<SchoolLifeRepository>(() => MockSchoolLifeRepository(source), fenix: true)
         ..lazyPut<AssistantRepository>(MockAssistantRepository.new, fenix: true);
       return;
     }
@@ -118,6 +120,7 @@ class InitialBinding extends Bindings {
         () => RemoteNotificationRepository(remote),
         fenix: true,
       )
+      ..lazyPut<SchoolLifeRepository>(() => RemoteSchoolLifeRepository(remote), fenix: true)
       ..lazyPut<AssistantRepository>(() => RemoteAssistantRepository(remote), fenix: true);
   }
 }

@@ -69,8 +69,8 @@ export type AppLayout = z.infer<typeof APP_LAYOUT>;
 export const DEFAULT_APP_LAYOUT: Record<AppRoleKey, AppLayout> = {
   parent: { dock: ['home', 'academics', 'fees', 'chat'], home: ['dayRibbon', 'dueStack', 'attendance', 'nextExam', 'homework', 'notices', 'events'], quick: ['payFees', 'applyLeave', 'messageTeacher', 'timetable'] },
   student: { dock: ['home', 'homework', 'timetable', 'chat'], home: ['dayRibbon', 'homework', 'nextExam', 'notices', 'events'], quick: ['homework', 'timetable', 'events'] },
-  teacher: { dock: ['home', 'classes', 'timetable', 'chat'], home: ['dayRibbon', 'notices', 'events'], quick: ['markAttendance', 'assignHomework', 'grade', 'postNotice'] },
-  driver: { dock: ['home', 'trips', 'chat'], home: [], quick: [] },
+  teacher: { dock: ['home', 'classes', 'timetable', 'chat'], home: ['checkIn', 'dayRibbon', 'notices', 'events'], quick: ['markAttendance', 'assignHomework', 'grade', 'postNotice'] },
+  driver: { dock: ['home', 'trips', 'chat'], home: ['checkIn'], quick: [] },
 };
 
 /** Every setting a school can change (config layer 4). Defaults here are the platform defaults (layer 1). */
