@@ -65,3 +65,21 @@ describe('the account', () => {
     expect(other).toBeTruthy();
   });
 });
+
+describe('a copy of a family’s data', () => {
+  it('zips every kind of record the school keeps about them and their children', async () => {
+    const { unzip } = await import('@tangent/db');
+    const admin = await h.login();
+    expect((await call(parent, 'POST', '/v1/f/data-requests', { kind: 'access', note: 'Please send me a copy.' })).status).toBe(200);
+    const req = (await call(admin, 'GET', '/v1/privacy/requests')).json.find((r: any) => r.fromApp && r.kind === 'access');
+    expect((await call(teacher, 'GET', `/v1/privacy/requests/${req.id}/export`)).status).toBe(403);
+    const res = await h.call('GET', `/v1/privacy/requests/${req.id}/export`, { token: admin });
+    expect(res.status).toBe(200);
+    const files = unzip(res.raw);
+    expect([...files.keys()]).toEqual(expect.arrayContaining(['account.csv', 'students.csv', 'guardians.csv', 'attendance.csv', 'fees.csv']));
+    expect(files.get('students.csv')!.toString('utf8')).toContain('admission_no');
+    // Logged at the office (a name in words): answered by hand.
+    const office = (await call(admin, 'POST', '/v1/privacy/requests', { kind: 'access', subjectName: 'Someone', requestedBy: 'At the desk', note: '' })).json;
+    expect((await call(admin, 'GET', `/v1/privacy/requests/${office.id}/export`)).status).toBe(400);
+  });
+});

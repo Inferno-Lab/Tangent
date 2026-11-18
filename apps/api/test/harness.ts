@@ -18,7 +18,7 @@ export interface Harness {
   server: DevPostgres;
   registry: pg.Pool;
   slug: string;
-  call: (method: string, url: string, opts?: { token?: string; body?: unknown; school?: string; headers?: Record<string, string>; cookies?: Record<string, string> }) => Promise<{ status: number; json: any; text: string; cookies: Record<string, string>; headers: Record<string, string | string[] | undefined> }>;
+  call: (method: string, url: string, opts?: { token?: string; body?: unknown; school?: string; headers?: Record<string, string>; cookies?: Record<string, string> }) => Promise<{ status: number; json: any; text: string; raw: Buffer; cookies: Record<string, string>; headers: Record<string, string | string[] | undefined> }>;
   login: (identifier?: string, password?: string) => Promise<string>;
   close: () => Promise<void>;
   /** Writes a school's settings straight into its database, as the console does (schools cannot). */
@@ -91,7 +91,7 @@ export async function startHarness(port?: number): Promise<Harness> {
       const eq = pair.indexOf('=');
       if (eq > 0 && !cookies[pair.slice(0, eq)]) cookies[pair.slice(0, eq)] = decodeURIComponent(pair.slice(eq + 1));
     }
-    return { status: res.statusCode, json, text: res.body, cookies, headers: res.headers as Record<string, string | string[] | undefined> };
+    return { status: res.statusCode, json, text: res.body, raw: res.rawPayload, cookies, headers: res.headers as Record<string, string | string[] | undefined> };
   };
   const login = async (identifier = 'neha.menon@greenfield.edu.in', password = 'nest2026') => {
     const step1 = await call('POST', '/v1/auth/login', { body: { identifier, password } });

@@ -20,6 +20,17 @@ export function PrivacyPage() {
   const refresh = () => void qc.invalidateQueries({ queryKey: ['privacy'] });
   const rows = reqs.data ?? [];
   const open = rows.filter((r) => r.status === 'open').length;
+  // The copy an access request is answered with, saved as a zip of spreadsheets.
+  const download = async (r: DataRequestRow) => {
+    try {
+      const blob = await app.api.privacy.exportData(r.id);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${r.subjectName || 'data'}.zip`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) { say((e as Error).message, 'bad'); }
+  };
   return (
     <Page title={t('admin.privacy_page.privacy_requests')} sub={open ? t('admin.privacy_page.waiting_for_an_answer', { open }) : t('admin.privacy_page.requests_for_a_copy_of')} toast={toast} loading={reqs.isLoading}
       error={reqs.isError && !reqs.data ? { message: (reqs.error as Error).message, retry: () => void reqs.refetch() } : null}
@@ -40,6 +51,7 @@ export function PrivacyPage() {
                 {r.note && <small style={{ display: 'block' }}>“{r.note}”</small>}
                 {r.answer && <small style={{ display: 'block' }}>{t('admin.privacy_page.answer')}{' '}{r.answer}</small>}
               </div>
+              {r.fromApp && r.kind === 'access' && <button className="btn sm" style={{ marginInlineEnd: 8 }} onClick={() => void download(r)}>{t('admin.privacy_page.download_their_data')}</button>}
               {r.status === 'open'
                 ? <button className="btn sm pri" onClick={() => setDeciding(r)}>{t('admin.privacy_page.answer_2')}</button>
                 : <span className={`chip ${r.status === 'done' ? 'g' : ''}`}>{r.status === 'done' ? t('admin.privacy_page.done') : t('admin.privacy_page.declined')}</span>}

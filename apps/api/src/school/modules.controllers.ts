@@ -322,6 +322,14 @@ export class OfficeController {
     return this.office.createDataRequest(t, u, b);
   }
 
+  /** The copy of a family's data an access request is answered with (a zip of spreadsheets). */
+  @Get('privacy/requests/:id/export') @Require('privacy.manage')
+  async exportData(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Res({ passthrough: true }) reply: FastifyReply): Promise<Buffer> {
+    const r = await this.office.dataExport(t, u, id);
+    reply.header('content-type', 'application/zip').header('content-disposition', `attachment; filename="${r.name}"`);
+    return r.zip;
+  }
+
   @Post('privacy/requests/:id/decision') @HttpCode(200) @Require('privacy.manage')
   decideDataRequest(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(DataRequestDecision)) b: DataRequestDecision): Promise<DataRequestRow> {
     return this.office.decideDataRequest(t, u, id, b);

@@ -1397,6 +1397,7 @@
  "admin.privacy_page.declined_2": "Declined.{p0}",
  "admin.privacy_page.details_optional": "Details (optional)",
  "admin.privacy_page.done": "Done",
+ "admin.privacy_page.download_their_data": "Download their data",
  "admin.privacy_page.erasure": "Erasure",
  "admin.privacy_page.from_the_app": " · from the app",
  "admin.privacy_page.log_a_data_request": "Log a data request",

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { newId } from '@tangent/db';
+import { newId, toCsv, zip } from '@tangent/db';
 import { bestOf, roundPct, tx, fmtNumber, fmtMoney, fmtDate, addDays, dayMonth, schoolToday, latestSchoolDay, type DataRequestCreate, type DataRequestDecision, type DataRequestRow, type EventReply, type EventRow, type EventSave, type FeeStatus, type InvoiceListQuery, type InvoiceListRow, type InvoiceListSummary, type Paged, type ReceiptRow, type ReportData, type ReportInfo, type ReportQuery, type ThreadCreate, type ThreadDetail, type ThreadPatch, type ThreadReply, type ThreadRow } from '@tangent/contracts';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
@@ -362,6 +362,44 @@ export class OfficeService {
 
   private dsr(r: { id: string; kind: DataRequestRow['kind']; subject_name: string; requested_by: string; status: DataRequestRow['status']; note: string; answer: string; user_id: string | null; created_at: Date; resolved_at: Date | null }): DataRequestRow {
     return { id: r.id, kind: r.kind, subjectName: r.subject_name, requestedBy: r.requested_by, status: r.status, note: r.note, answer: r.answer, fromApp: !!r.user_id, createdAt: r.created_at.toISOString(), resolvedAt: r.resolved_at?.toISOString() ?? null };
+  }
+
+  /**
+   * Everything the school keeps about whoever asked from the app (a family: about each of their children too), as one
+   * spreadsheet a kind of record, zipped: the copy a data-access request is answered with. Requests logged at the office
+   * name a person in words only, so they are answered by hand.
+   */
+  async dataExport(t: TenantCtx, user: User, id: string): Promise<{ name: string; zip: Buffer }> {
+    const r = (await t.pool.query<{ user_id: string | null; subject_name: string }>('select user_id, subject_name from data_requests where id = $1', [id])).rows[0];
+    if (!r) throw notFound('That request');
+    if (!r.user_id) throw new ApiError('validation', tx('This request was logged at the office: gather the records by hand.'));
+    const uid = r.user_id;
+    const kids = (await t.pool.query<{ id: string }>(
+      `select s.id from students s where s.user_id = $1 union select sg.student_id from student_guardians sg join guardians g on g.id = sg.guardian_id where g.user_id = $1`, [uid])).rows.map((x) => x.id);
+    const sheets: [string, string][] = [
+      ['account', 'select name, kind, phone, email, status, consented_at, photo_consent, created_at, last_login_at from users where id = $1'],
+      ['students', "select admission_no, name, name_local, (select name from classes c where c.id = s.class_id) class, roll_no, dob, gender, blood_group, house, address, status, admitted_on, left_on, custom from students s where id = any($2)"],
+      ['guardians', 'select distinct g.name, g.relation, g.phone, g.email, g.language from guardians g join student_guardians sg on sg.guardian_id = g.id where sg.student_id = any($2) or g.user_id = $1'],
+      ['attendance', "select st.name student, x.date, x.part, m.status from attendance_marks m join attendance_sessions x on x.id = m.session_id join students st on st.id = m.student_id where m.student_id = any($2) order by x.date"],
+      ['marks', 'select st.name student, e.name exam, sub.name subject, m.score, m.grade, m.absent from exam_marks m join exams e on e.id = m.exam_id join subjects sub on sub.id = m.subject_id join students st on st.id = m.student_id where m.student_id = any($2)'],
+      ['fees', 'select st.name student, i.title, i.amount, i.waived_amount, i.due_on, (select coalesce(sum(p.amount - p.refunded), 0) from payments p where p.invoice_id = i.id) paid from fee_invoices i join students st on st.id = i.student_id where i.student_id = any($2) order by i.due_on'],
+      ['payments', 'select p.receipt_no, p.amount, p.refunded, p.method, p.paid_on from payments p join fee_invoices i on i.id = p.invoice_id where i.student_id = any($2) order by p.paid_on'],
+      ['library', 'select l.title, l.issued_on, l.due_on, l.returned_on, l.fine from library_loans l where l.student_id = any($2) or l.staff_user_id = $1'],
+      ['messages', "select th.subject, m.sender_name, m.body, m.created_at from thread_messages m join threads th on th.id = m.thread_id where th.guardian_id in (select id from guardians where user_id = $1) or th.student_user_id = $1 order by m.created_at"],
+      ['leave', "select a.title, a.subtitle, a.status, a.payload, a.created_at from approvals a where a.kind = 'leave' and (a.subject_ref = any($2) or a.requested_by = $1)"],
+      ['forms', 'select f.title, r.answers, r.created_at from form_responses r join forms f on f.id = r.form_id where r.user_id = $1'],
+    ];
+    const files: { name: string; content: string }[] = [];
+    for (const [name, sql] of sheets) {
+      // Each sheet reads the person, their children, or both: both are always given, so each names them both.
+      const res = await t.pool.query(`select * from (${sql}) q where $1::text is not null and cardinality($2::text[]) >= 0`, [uid, kids]);
+      if (!res.rows.length) continue;
+      const cols = Object.keys(res.rows[0]);
+      const cell = (v: unknown) => (v === null || v === undefined ? '' : v instanceof Date ? v.toISOString() : typeof v === 'object' ? JSON.stringify(v) : String(v));
+      files.push({ name: `${name}.csv`, content: `\uFEFF${toCsv([cols, ...res.rows.map((row) => cols.map((c) => cell(row[c])))])}` });
+    }
+    await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'privacy.exported', entity: 'data_request', entityId: id, detail: { files: files.length } });
+    return { name: `${r.subject_name || 'data'} - ${schoolToday()}.zip`.replace(/[^\w ,.-]+/g, ' '), zip: zip(files.length ? files : [{ name: 'nothing.txt', content: tx('The school keeps nothing else about this person.') }]) };
   }
 
   async dataRequests(t: TenantCtx): Promise<DataRequestRow[]> {

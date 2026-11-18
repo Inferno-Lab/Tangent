@@ -222,6 +222,7 @@ export function schoolApi(h: Http) {
       requests: () => h.get<DataRequestRow[]>('/v1/privacy/requests'),
       create: (b: DataRequestCreate) => h.post<DataRequestRow>('/v1/privacy/requests', b),
       decide: (id: string, b: DataRequestDecision) => h.post<DataRequestRow>(`/v1/privacy/requests/${id}/decision`, b),
+      exportData: (id: string) => h.blob(`/v1/privacy/requests/${id}/export`),
     },
     /** The school asks Tangent to change its setup. */
     changeRequests: {
