@@ -1,10 +1,11 @@
 import { Body, Controller, Delete, Get, HttpCode, Injectable, Param, Post, Put } from '@nestjs/common';
-import { SETUP_KINDS, SetupSave, importKind, type SetupSection } from '@tangent/contracts';
+import { SETUP_KINDS, SetupSave, importKind, schoolCountry, schoolToday, schoolZone, tx, type SetupSection } from '@tangent/contracts';
 import { commitImport, exportRows, newId, previewImport } from '@tangent/db';
 import { ApiError, ZodPipe, forbidden, notFound } from '@tangent/nest-kit';
 import { Core, CurrentUser, Require, RequireModule } from '../auth/guards.js';
 import { Tenant, type AuthedUser, type TenantCtx } from '../tenancy/tenant.js';
 import { AuditService, SettingsService } from './support.js';
+import { HubService } from './hub.service.js';
 
 const REMOVE: Record<string, { sql: string; inUse: string }> = {
   years: { sql: 'delete from academic_years where id = $1', inUse: 'Classes still belong to this year. Move them to another year first.' },
@@ -24,7 +25,28 @@ const LOCKED: Record<string, string> = {
 /** Classes and calendar: the school edits its own structure through the import engine, so a typed row gets the same checks (and undo) as a file. */
 @Injectable()
 export class SetupService {
-  constructor(private readonly audit: AuditService, private readonly settings: SettingsService) {}
+  constructor(private readonly audit: AuditService, private readonly settings: SettingsService, private readonly hubs: HubService) {}
+
+  /**
+   * The country's public holidays in the current school year (which may span two calendar years), from the Public holidays
+   * connection, each marked when the school already has a holiday that day. The school picks which to add (Year → Holidays).
+   */
+  async publicHolidays(t: TenantCtx): Promise<{ date: string; name: string; have: boolean }[]> {
+    const country = schoolCountry();
+    if (!country) throw new ApiError('validation', tx('Set the school’s country first (School profile).'));
+    const y = (await t.pool.query<{ s: string; e: string }>('select starts_on::text s, ends_on::text e from academic_years where current limit 1')).rows[0];
+    const today = schoolToday();
+    const [from, to] = y ? [y.s, y.e] : [`${today.slice(0, 4)}-01-01`, `${today.slice(0, 4)}-12-31`];
+    const r = await this.hubs.hub.resolve('holidays', t.info.id, t.info.slug).catch(() => null);
+    if (!r?.adapter.holidays) throw new ApiError('school_unavailable', tx('Public holidays are not connected for this school yet. Ask Tangent to connect them (Integrations → Public holidays).'));
+    const years = [...new Set([Number(from.slice(0, 4)), Number(to.slice(0, 4))])];
+    const found = (await Promise.all(years.map((n) => r.adapter.holidays!(r.ctx, country, n)))
+      .catch((e: Error) => { throw new ApiError('school_unavailable', tx('The public holidays could not be read: {message}', { message: e.message })); })).flat();
+    const have = new Set((await t.pool.query<{ d: string }>("select (starts_at at time zone $1)::date::text d from events where kind = 'holiday'", [schoolZone()])).rows.map((x) => x.d));
+    const seen = new Set<string>();
+    return found.filter((h) => h.date >= from && h.date <= to && !seen.has(`${h.date}|${h.name}`) && seen.add(`${h.date}|${h.name}`))
+      .sort((a, b) => a.date.localeCompare(b.date)).map((h) => ({ ...h, have: have.has(h.date) }));
+  }
 
   async sections(t: TenantCtx): Promise<SetupSection[]> {
     const modules = (await this.settings.effective(t)).modules;
@@ -98,6 +120,11 @@ export class SetupController {
   @Get() @Require('students.read')
   sections(@Tenant() t: TenantCtx): Promise<SetupSection[]> {
     return this.setup.sections(t);
+  }
+
+  @Get('holidays/public') @Require('setup.write')
+  publicHolidays(@Tenant() t: TenantCtx): Promise<{ date: string; name: string; have: boolean }[]> {
+    return this.setup.publicHolidays(t);
   }
 
   // Each kind belongs to a module (fee structures to fees); `open` checks it, since the kind is in the path.

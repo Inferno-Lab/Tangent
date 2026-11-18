@@ -8,7 +8,7 @@ import { localized, localizedLabels } from './i18n.js';
  */
 export const CAPABILITIES = [
   'sms', 'whatsapp', 'email', 'push', 'payments', 'storage', 'maps', 'tracking', 'scanning', 'webhook',
-  'alerts', 'builds', 'stores', 'databases', 'hosting', 'translation',
+  'alerts', 'builds', 'stores', 'databases', 'hosting', 'translation', 'holidays',
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
@@ -16,7 +16,7 @@ export const CAPABILITY_LABELS: Record<Capability, string> = localizedLabels({
   sms: 'Text messages', whatsapp: 'WhatsApp', email: 'Email', push: 'Phone notifications', payments: 'Payments', storage: 'File storage',
   maps: 'Maps', tracking: 'Bus trackers', scanning: 'Virus scanning', webhook: 'Events to other systems',
   alerts: 'Alerts to the Tangent team', builds: 'App builds', stores: 'App stores', databases: 'School databases', hosting: 'Hosting and domains',
-  translation: 'Translation drafts',
+  translation: 'Translation drafts', holidays: 'Public holidays',
 });
 
 /** Capabilities Tangent itself uses (never a school's own connection). */
@@ -196,6 +196,13 @@ export const INTEGRATION_PROVIDERS: ProviderDef[] = localized([
       f('country', 'The school’s country (two letters)', 'text', { placeholder: 'AE', pattern: '^[A-Z]{2}$', patternHint: 'Two capital letters, like AE.' }),
       f('environment', 'Environment', 'select', { options: [['sandbox', 'Test (sandbox)'], ['live', 'Live']] })],
     webhooks: { events: 'payment_captured, payment_declined, payment_capture_declined, payment_refunded', verifies: 'Cko-Signature with the webhook secret' } },
+  // Public holidays (Year → Holidays offers the country's to bring in)
+  { key: 'nager-date', name: 'Nager.Date', capabilities: ['holidays'], testAction: 'Lists the countries it has holidays for.', docs: 'https://date.nager.at/Api',
+    steps: ['Nothing to sign up for: Nager.Date is free and needs no key. It covers about a hundred countries (check yours at date.nager.at).', 'Save, Test, and route Public holidays to it.'],
+    fields: [] },
+  { key: 'calendarific', name: 'Calendarific', capabilities: ['holidays'], testAction: 'Asks for this year’s national holidays in the United States.', docs: 'https://calendarific.com/api-documentation',
+    steps: ['Sign up at calendarific.com (a free plan exists) and copy the API key from the account page. It covers more countries than Nager.Date, India among them.', 'Fill in the form, Test, and route Public holidays to it.'],
+    fields: [f('apiKey', 'API key', 'secret', { help: 'Calendarific → Account' })] },
   // File storage
   { key: 's3', name: 'S3-compatible storage', capabilities: ['storage'], testAction: 'Writes, reads and deletes a small file in the bucket.', docs: 'https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html',
     steps: ['Create a private bucket (AWS S3, Cloudflare R2, MinIO or DigitalOcean Spaces).', 'In its CORS rules allow PUT and GET from the admin’s and the app’s addresses (uploads go straight to the bucket).', 'Make an access key that can read and write only this bucket.', 'Fill in the form (endpoint blank for AWS) and Test. School backups are kept here too.'],

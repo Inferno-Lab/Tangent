@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { PromotionPreview, YearRow } from '@tangent/contracts';
 import { fmtMoney, schoolToday } from '@tangent/contracts';
-import { DateField, Dialog, EmptyCard, Field, Select, useShake, EmptyNote, t } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, EmptyCard, Field, Select, useShake, EmptyNote, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { StudentPick, dateLabel, problem, stamp } from '../../app/kit';
@@ -23,10 +23,52 @@ export function YearPage() { const { tab, tabs } = usePageTabs('/year');
   const chrome = useShellChrome();
   const { toast, say } = useToast();
   const setup = useSetupSections(KINDS[tab] ?? [], say);
+  const app = useApp();
+  const [bringing, setBringing] = useState(false);
+  const holidaysLocked = !!useQuery({ queryKey: ['setup'], queryFn: app.api.setup.sections }).data?.find((s) => s.kind === 'holidays')?.locked;
   if (tab === 'year-end') return <YearEnd tabs={tabs} />;
   // Bell times: the usual ones, and (with the timetable) days that keep their own.
   const timed = tab === 'bells' && !!chrome.shell?.modules.includes('timetable');
-  return <Page title={t('admin.year_page.academic_year')} sub={SUBS[tab] ?? ''} toast={toast} tabs={tabs} overlays={setup.overlay}>{setup.view}{timed && <BellDays say={say} />}</Page>;
+  const bring = tab === 'holidays' && app.user.permissions.includes('setup.write') && !holidaysLocked;
+  return <Page title={t('admin.year_page.academic_year')} sub={SUBS[tab] ?? ''} toast={toast} tabs={tabs}
+    actions={bring ? <button className="btn" onClick={() => setBringing(true)}>{t('admin.year_page.bring_in_public_holidays')}</button> : undefined}
+    overlays={<>{setup.overlay}{bringing && <PublicHolidays onClose={() => setBringing(false)} onDone={(m) => { setBringing(false); say(m); }} />}</>}>{setup.view}{timed && <BellDays say={say} />}</Page>;
+}
+
+/** The country's public holidays this school year, from Tangent's holidays connection: the school ticks the ones it closes for. */
+function PublicHolidays({ onClose, onDone }: { onClose: () => void; onDone: (m: string) => void }) { const app = useApp();
+  const qc = useQueryClient();
+  const list = useQuery({ queryKey: ['setup', 'publicHolidays'], queryFn: app.api.setup.publicHolidays, retry: false });
+  const [off, setOff] = useState<Set<string>>(new Set());
+  const [err, setErr] = useState('');
+  const key = (h: { date: string; name: string }) => `${h.date}|${h.name}`;
+  // Days the school already keeps as a holiday start unticked, so nothing is added twice.
+  const picked = (list.data ?? []).filter((h) => !h.have && !off.has(key(h)));
+  const add = useMutation({
+    mutationFn: async () => { for (const h of picked) await app.api.setup.save('holidays', { name: h.name, starts_on: h.date, ends_on: h.date }); return picked.length; },
+    onSuccess: (n) => { void qc.invalidateQueries({ predicate: (q) => ['setup', 'events', 'shell'].includes(String(q.queryKey[0])) }); onDone(t('admin.year_page.public_holidays_added', { n })); },
+    onError: (e) => { setErr((e as Error).message); void qc.invalidateQueries({ queryKey: ['setup'] }); },
+  });
+  return (
+    <Dialog title={t('admin.year_page.bring_in_public_holidays')} onClose={onClose} width={520}>
+      <div className="stack">
+        {list.isLoading ? <div className="skc" style={{ height: 200, borderRadius: 16 }} />
+          : list.isError ? <div className="emsg" role="alert">{(list.error as Error).message}</div>
+          : !list.data!.length ? <EmptyNote icon="calendar" title={t('admin.year_page.no_public_holidays_came_back')} body={t('admin.year_page.the_connection_has_none_for')} />
+          : <div className="lscroll" style={{ maxHeight: 360 }}>{list.data!.map((h) => (
+              <div key={key(h)} className="kv" style={{ alignItems: 'center' }}>
+                <Checkbox label={h.name} checked={!h.have && !off.has(key(h))} disabled={h.have} onChange={(on) => { const n = new Set(off); if (on) n.delete(key(h)); else n.add(key(h)); setOff(n); }} />
+                <b className="num">{h.have ? t('admin.year_page.already_a_holiday', { day: dateLabel(h.date) }) : dateLabel(h.date)}</b>
+              </div>
+            ))}</div>}
+        {err && <div className="emsg" role="alert">{err}</div>}
+        <div className="tgrow" style={{ justifyContent: 'flex-end' }}>
+          <button className="btn" onClick={onClose}>{t('admin.year_page.not_now')}</button>
+          <button className="btn pri" disabled={add.isPending || !picked.length} onClick={() => add.mutate()}>{add.isPending ? t('admin.year_page.adding') : t('admin.year_page.add_n_holidays', { n: picked.length })}</button>
+        </div>
+      </div>
+    </Dialog>
+  );
 }
 
 /** Drafting the next year, promoting students into it, and starting it. */

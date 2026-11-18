@@ -1,8 +1,8 @@
 import { createHmac } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { customHttp } from './providers/generic.js';
 import { razorpay } from './providers/payments.js';
-import { checkoutCom, gocardless, stripe, vonage } from './providers/regional.js';
+import { checkoutCom, gocardless, nagerDate, stripe, vonage } from './providers/regional.js';
 import { metaCloud } from './providers/whatsapp.js';
 import { readLink, signLink } from './token.js';
 import { e164, fill, segments, type Ctx } from './types.js';
@@ -100,5 +100,16 @@ describe('regional providers', () => {
   it('reads a Vonage delivery receipt', async () => {
     const r = await vonage.inbound!(ctx(), req('', {}, { messageId: 'm1', status: 'delivered', 'err-code': '0' }));
     expect(r.deliveries).toEqual([{ providerId: 'm1', status: 'delivered', error: undefined }]);
+  });
+});
+
+describe('public holidays', () => {
+  it('keeps the nationwide ones and treats an unknown country as none', async () => {
+    const reply = (body: unknown, status = 200) => vi.fn(async () => new Response(body === null ? '' : JSON.stringify(body), { status }));
+    vi.stubGlobal('fetch', reply([{ date: '2026-12-25', name: 'Christmas Day', global: true }, { date: '2026-03-17', name: 'Saint Patrick’s Day', global: false, counties: ['GB-NIR'] }]));
+    expect(await nagerDate.holidays!(ctx(), 'GB', 2026)).toEqual([{ date: '2026-12-25', name: 'Christmas Day' }]);
+    vi.stubGlobal('fetch', reply({ title: 'Not Found' }, 404));
+    expect(await nagerDate.holidays!(ctx(), 'ZZ', 2026)).toEqual([]);
+    vi.unstubAllGlobals();
   });
 });

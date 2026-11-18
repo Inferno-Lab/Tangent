@@ -187,6 +187,7 @@ export function schoolApi(h: Http) {
     },
     setup: {
       sections: () => h.get<SetupSection[]>('/v1/setup'),
+      publicHolidays: () => h.get<{ date: string; name: string; have: boolean }[]>('/v1/setup/holidays/public'),
       save: (kind: string, row: Record<string, string>) => h.put<SetupSection[]>(`/v1/setup/${kind}`, { row }),
       remove: (kind: string, id: string) => h.del<SetupSection[]>(`/v1/setup/${kind}/${encodeURIComponent(id)}`),
       applyFee: (id: string) => h.post<{ created: number }>(`/v1/setup/fee_structures/${id}/apply`),

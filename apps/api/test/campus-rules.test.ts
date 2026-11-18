@@ -183,3 +183,12 @@ describe('reporting periods', () => {
     expect((await call(parent, 'GET', '/v1/reports/periods')).status).toBe(403);
   });
 });
+
+describe('public holidays', () => {
+  it('says plainly when the school has no holidays connection, and is only for those who set the year up', async () => {
+    const r = await call(admin, 'GET', '/v1/setup/holidays/public');
+    expect(r.status).toBe(503);
+    expect(r.json.message).toMatch(/not connected/);
+    expect((await call(teacher, 'GET', '/v1/setup/holidays/public')).status).toBe(403);
+  });
+});

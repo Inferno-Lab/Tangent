@@ -119,6 +119,8 @@ export interface Adapter {
   tracking?: TrackingAdapter;
   /** Drafts of `texts` in another language, one per text in the same order ('' where it could not). */
   translate?(c: Ctx, t: TranslateInput): Promise<string[]>;
+  /** A country's (ISO 3166-1) nationwide public holidays in a calendar year, as dates (YYYY-MM-DD) and names. */
+  holidays?(c: Ctx, country: string, year: number): Promise<{ date: string; name: string }[]>;
   /** The provider's approved message templates, for importing (WhatsApp providers that can list them). */
   templates?(c: Ctx): Promise<ProviderTemplate[]>;
   test(c: Ctx, input: { to?: string }): Promise<{ ok: boolean; detail: string }>;

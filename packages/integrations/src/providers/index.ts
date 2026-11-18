@@ -7,7 +7,7 @@ import { cashfree, razorpay } from './payments.js';
 import { s3 } from './s3.js';
 import { sandbox } from './sandbox.js';
 import { gupshup, kaleyra, msg91, twilio } from './sms.js';
-import { checkoutCom, gocardless, mailgun, paypal, postmark, sendgrid, stripe, unifonic, vonage } from './regional.js';
+import { calendarific, checkoutCom, gocardless, mailgun, nagerDate, paypal, postmark, sendgrid, stripe, unifonic, vonage } from './regional.js';
 import { gupshupWa, interakt, metaCloud } from './whatsapp.js';
 import { anthropic, deepl, googleTranslate } from './translation.js';
 import { appStore, clamav, discord, emailAlerts, github, googlePlay, gpsHttp, neon, postgresServer, render, slack } from './platform.js';
@@ -18,5 +18,5 @@ export const ADAPTERS: Record<string, Adapter> = {
   'google-maps': googleMaps, mapbox, 'custom-http': customHttp, webhook,
   slack, discord, 'email-alerts': emailAlerts, clamav, github, 'google-play': googlePlay, 'app-store': appStore, 'postgres-server': postgresServer, neon, render, 'gps-http': gpsHttp,
   anthropic, deepl, 'google-translate': googleTranslate,
-  stripe, paypal, gocardless, 'checkout-com': checkoutCom, vonage, unifonic, sendgrid, mailgun, postmark,
+  stripe, paypal, gocardless, 'checkout-com': checkoutCom, vonage, unifonic, sendgrid, mailgun, postmark, 'nager-date': nagerDate, calendarific,
 };

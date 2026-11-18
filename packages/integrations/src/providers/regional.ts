@@ -279,6 +279,39 @@ export const unifonic: Adapter = {
   },
 };
 
+// ── Public holidays: Nager.Date, Calendarific ──────────────────────────────────
+
+/** Nager.Date: free, no key; only holidays kept across the whole country (not one state's or county's). */
+export const nagerDate: Adapter = {
+  async holidays(_c, country, year) {
+    const r = await call(`https://date.nager.at/api/v3/PublicHolidays/${year}/${encodeURIComponent(country)}`).catch((e: Error) => {
+      if (/^404:/.test(e.message)) return { json: [] };
+      throw e;
+    });
+    // An unknown country answers 404 or nothing: no holidays rather than an error.
+    return (Array.isArray(r.json) ? r.json : []).filter((h: any) => h.global !== false).map((h: any) => ({ date: String(h.date).slice(0, 10), name: String(h.name ?? h.localName) }));
+  },
+  async test() {
+    try {
+      const r = await call('https://date.nager.at/api/v3/AvailableCountries');
+      return { ok: true, detail: `Nager.Date has holidays for ${Array.isArray(r.json) ? r.json.length : 'many'} countries.` };
+    } catch (e) { return fail(e); }
+  },
+};
+
+export const calendarific: Adapter = {
+  async holidays(c, country, year) {
+    const r = await call(`https://calendarific.com/api/v2/holidays?${form({ api_key: c.secrets.apiKey, country, year: String(year), type: 'national' })}`);
+    return (r.json?.response?.holidays ?? []).map((h: any) => ({ date: String(h.date?.iso ?? '').slice(0, 10), name: String(h.name) })).filter((h: { date: string }) => /^\d{4}-\d{2}-\d{2}$/.test(h.date));
+  },
+  async test(c) {
+    try {
+      const list = await calendarific.holidays!(c, 'US', new Date().getUTCFullYear());
+      return { ok: true, detail: `Calendarific answered with ${list.length} national holidays.` };
+    } catch (e) { return fail(e); }
+  },
+};
+
 // ── Email: SendGrid, Mailgun, Postmark ─────────────────────────────────────────
 
 export const sendgrid: Adapter = {
