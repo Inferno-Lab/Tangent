@@ -676,7 +676,7 @@ await flow('admin: academic year adds a holiday, refuses a bad one, and fees bil
 await flow('admin: moving in sends a file to Tangent; Students → On the app invites a class and prints its letters', { storage: adminStore }, async (p) => {
   await p.goto(A('/moving-in'), { waitUntil: 'networkidle' });
   await expectVisible(p.getByRole('heading', { name: 'Send us your files' }), 'the files card');
-  await p.locator('input[type=file]').setInputFiles({ name: 'e2e-subjects.csv', mimeType: 'text/csv', buffer: Buffer.from('Subject,Periods a week\nE2E Robotics,2\nE2E Dance,x\n') });
+  await p.locator('input[type=file]:not([accept*="zip"])').setInputFiles({ name: 'e2e-subjects.csv', mimeType: 'text/csv', buffer: Buffer.from('Subject,Periods a week\nE2E Robotics,2\nE2E Dance,x\n') });
   await p.getByLabel('What is in it (optional)').fill('Two new subjects');
   await p.getByRole('button', { name: 'Send to Tangent' }).click();
   await expectVisible(p.getByText('Sent it to Tangent. The team will import it and tell you.'), 'the sent toast');
