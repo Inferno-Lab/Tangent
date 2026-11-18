@@ -218,7 +218,8 @@ abstract final class SchoolConfig {
     Map<String, dynamic>? json;
     if (AppConfig.live) {
       try {
-        json = Map<String, dynamic>.from(await Get.find<RemoteDataSource>().get('/v1/config') as Map);
+        // One quiet retry for a blip (a phone waking, a lift between floors) before saying anything.
+        json = await _fetch().catchError((Object _) => Future<Map<String, dynamic>>.delayed(const Duration(seconds: 3), _fetch));
         await Get.find<StorageService>().writeCache(_cacheKey, jsonEncode(json));
         stale.value = false;
       } on Object {
@@ -232,6 +233,8 @@ abstract final class SchoolConfig {
     if (json == null) return;
     await _apply(json);
   }
+
+  static Future<Map<String, dynamic>> _fetch() async => Map<String, dynamic>.from(await Get.find<RemoteDataSource>().get('/v1/config') as Map);
 
   static Future<void> _apply(Map<String, dynamic> json) async {
     _json = json;
