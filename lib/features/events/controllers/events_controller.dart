@@ -39,6 +39,12 @@ class EventsController extends GetxController with Loadable {
   RsvpStatus? mine(SchoolEvent e) =>
       pending[e.id] ?? e.rsvps.where((r) => r.userId == _me).map((r) => r.status).firstOrNull;
 
+  /// Replies are taken while the school asks for one, up to its last day and never after the event's day.
+  bool canReply(SchoolEvent e) {
+    final today = DateUtils.dateOnly(Clock.now());
+    return e.needsRsvp && !today.isAfter(e.date) && (e.rsvpBy == null || !today.isAfter(e.rsvpBy!));
+  }
+
   int going(SchoolEvent e) {
     final others = e.rsvps.where((r) => r.userId != _me && r.status == RsvpStatus.going).length;
     return others + (mine(e) == RsvpStatus.going ? 1 : 0);

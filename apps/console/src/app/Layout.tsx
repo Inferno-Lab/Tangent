@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from 'react';
-import { Shell } from '@tangent/web-ui';
+import { Shell, t } from '@tangent/web-ui';
 import { useChrome } from './useChrome';
 
 type ShellChrome = Omit<ReturnType<typeof useChrome>, 'aside' | 'overlays'>;
@@ -8,7 +8,7 @@ const Chrome = createContext<ShellChrome | null>(null);
 /** What a page may need from the shell around it: the search box, the theme, and the schools and approvals the menu counts. */
 export function useShellChrome(): ShellChrome {
   const c = useContext(Chrome);
-  if (!c) throw new Error('useShellChrome is only available inside the signed-in layout.');
+  if (!c) throw new Error(t('console.layout.useshellchrome_is_only_available_inside'));
   return c;
 }
 

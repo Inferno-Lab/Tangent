@@ -4,7 +4,9 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
+import { messageArgs } from '@tangent/contracts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -104,5 +106,77 @@ describe('the design system', { timeout: 30_000 }, () => {
   it('spaces things from the scale', () => {
     const space = /(?:(?<![\w-])(?:padding|margin)(?:-(?:top|right|bottom|left|inline|block))?\s*:\s*|(?<![\w-])(?:row-|column-)?gap\s*:\s*|\b(?:padding|margin)(?:Top|Right|Bottom|Left|Inline|Block)?\s*:\s*|\b(?:row|column)?[gG]ap\s*:\s*)['"`]?([^;}'"`,\n]+)/g;
     expect(hits(files, /padding|margin|gap/i, (l) => offScale(l, space, (n) => n > 56 || SPACE.includes(n))), `spacing up to 56 px is ${SPACE.join(', ')}`).toEqual([]);
+  });
+});
+
+// Any language (docs/one-shot-plan.md §3.5): every word a person reads comes from a catalogue (tools/i18n-extract.mjs moves new text).
+describe('every word in a language catalogue', () => {
+  const catalogues = ['apps/admin/src/i18n', 'apps/console/src/i18n', 'packages/web-ui/src/i18n'];
+  const en: Record<string, string> = Object.assign({}, ...catalogues.map((d) => JSON.parse(read(path.join(root, d, 'en.json'))) as Record<string, string>));
+  const code = [...apps, ...ui].filter((f) => /\.tsx?$/.test(f) && !/\.test\.|[\\/]i18n[\\/]/.test(f));
+
+  it('uses only keys that English has', () => {
+    const missing = code.flatMap((f) => [...read(f).matchAll(/\btr?\('([a-z]+\.[\w.]+)'/g)].filter((m) => !(m[1]! in en)).map((m) => `${rel(f)}  ${m[1]}`));
+    expect(missing, 'add the key to the area’s i18n/en.json (or run node tools/i18n-extract.mjs)').toEqual([]);
+  });
+
+  it('writes no text straight into a page', () => {
+    const shown = /^(label|title|sub|placeholder|hint|help|aria-label|alt|data-tip|note|empty|emptyTitle|emptyBody|desc|description|caption|heading)$/;
+    const found = code.filter((f) => f.endsWith('.tsx')).flatMap((f) => {
+      const src = ts.createSourceFile(f, read(f), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+      const out: string[] = [];
+      const at = (n: ts.Node, text: string) => out.push(`${rel(f)}:${src.getLineAndCharacterOfPosition(n.getStart(src)).line + 1}  ${text.trim().slice(0, 60)}`);
+      const visit = (n: ts.Node): void => {
+        // Entities (&nbsp;), and examples that are codes rather than words (greenfield, eu-west-2, #2F5BD3, ISBN), are not text.
+        const words = (x: string) => /[A-Za-z]{2,}/.test(x.replace(/&\w+;/g, '')) && !/^\s*([a-z0-9.-]+|[A-Z0-9]{2,6}|#.*)\s*$/.test(x);
+        if (ts.isJsxText(n) && words(n.text)) at(n, n.text);
+        else if (ts.isJsxAttribute(n) && n.initializer && ts.isStringLiteral(n.initializer) && shown.test(n.name.getText(src)) && words(n.initializer.text)) at(n, n.initializer.text);
+        ts.forEachChild(n, visit);
+      };
+      visit(src);
+      return out;
+    });
+    expect(found, 'put the words in the area’s i18n/en.json and show t(\'area.key\') (node tools/i18n-extract.mjs does it)').toEqual([]);
+  });
+
+  it('leaves no English chosen in code (photo/photos, " and ", "it"/"them")', async () => {
+    // @ts-expect-error a plain .mjs tool
+    const { englishInCode } = (await import('../../../tools/i18n-english.mjs')) as { englishInCode: () => string[] };
+    expect(englishInCode(), 'use one message with {n, plural, …} or select, and listOf() for lists (node tools/i18n-english.mjs)').toEqual([]);
+  });
+
+  it('names India only in the India pack and the files about India (docs/one-shot-plan.md §3.9.1)', async () => {
+    // @ts-expect-error a plain .mjs tool
+    const { indiaInCode } = (await import('../../../tools/guard-international.mjs')) as { indiaInCode: () => string[] };
+    expect(indiaInCode(), 'take it from the school’s settings or its country pack (node tools/guard-international.mjs); a line about India on purpose says india-pack: why').toEqual([]);
+  });
+
+  it('keeps code out of the catalogues (CSS, class names)', () => {
+    const code = catalogues.flatMap((d) => Object.entries(JSON.parse(read(path.join(root, d, 'en.json'))) as Record<string, string>)
+      .filter(([, v]) => /minmax\(|var\(--|\d(px|fr)\b|\bsp-\{|!important/.test(v)).map(([k]) => `${d}/en.json ${k}`));
+    expect(code, 'put the CSS back in the code: only words a person reads belong in a catalogue').toEqual([]);
+  });
+
+  it('keeps every other language to English’s keys and {values}', () => {
+    const problems = catalogues.flatMap((d) => readdirSync(path.join(root, d)).filter((f) => f.endsWith('.json') && f !== 'en.json').flatMap((f) => {
+      const own = JSON.parse(read(path.join(root, d, f))) as Record<string, string>;
+      const base = JSON.parse(read(path.join(root, d, 'en.json'))) as Record<string, string>;
+      const names = (s: string) => messageArgs(s).join(',');
+      return Object.entries(own).flatMap(([k, v]) => (!(k in base) ? [`${d}/${f} ${k}: not in English`] : names(v) !== names(base[k]!) ? [`${d}/${f} ${k}: values differ from English`] : []));
+    }));
+    expect(problems).toEqual([]);
+  });
+});
+
+// Right to left (docs/one-shot-plan.md §3.5.7): styles say start and end, so a page mirrors for Arabic (tools/rtl-logical.mjs).
+describe('reads right to left too', () => {
+  it('uses start and end, never left and right, in styles', () => {
+    // Allowed: centring (left: 50% with translateX(-50%)) and the segmented knob, which moves by its measured offsetLeft.
+    const allowed = (line: string) => line.replace(/\.seg \.kn\{[^}]*\}/g, '').replace(/(?<![-\w])(left|right)\s*:\s*50%/g, '');
+    const physical = /(margin|padding|border)-(left|right)\b|(?<![-\w])(left|right)\s*:|text-align\s*:\s*(left|right)|float\s*:\s*(left|right)|(top|bottom)-(left|right)-radius/;
+    const sheets = [...apps, ...ui].filter((f) => f.endsWith('.css'));
+    expect(hits(sheets, physical, (line) => !comment(line) && physical.test(allowed(line))), 'use margin-inline-start, inset-inline-end, text-align:start… (node tools/rtl-logical.mjs)').toEqual([]);
+    const inline = /\b(marginLeft|marginRight|paddingLeft|paddingRight|borderLeft|borderRight)\s*:|textAlign\s*:\s*'(left|right)'/;
+    expect(hits(allTsx, inline, (line) => !comment(line)), 'use marginInlineStart, paddingInlineEnd, textAlign: start…').toEqual([]);
   });
 });

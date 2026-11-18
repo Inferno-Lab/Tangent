@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Inject, Injectable, Param, Patch, Query } from '@nestjs/common';
 import { POOLS } from './tokens.js';
-import { activeModules, closeModules } from '@tangent/config-engine';
-import { SchoolDetailsPatch, type BuildRow, type DeployTarget, type FleetSummary, type SchoolDetail, type SchoolRow, type SchoolStatus } from '@tangent/contracts';
+import { PRICE_CURRENCY, activeModules, closeModules } from '@tangent/config-engine';
+import { SchoolDetailsPatch, isZone, tx, type BuildRow, type DeployTarget, type FleetSummary, type SchoolDetail, type SchoolRow, type SchoolStatus } from '@tangent/contracts';
 import { notFound, ApiError, ZodPipe } from '@tangent/nest-kit';
 import type { PoolManager } from '@tangent/tenancy';
 import { unseal } from '@tangent/security';
@@ -31,7 +31,7 @@ export class Schools {
   row(r: SchoolRecord): SchoolRow {
     return {
       id: r.id, slug: r.slug, name: r.name, shortName: r.shortName, color: r.color, logoText: r.logoText, status: r.status as SchoolStatus, plan: r.plan, cell: r.cell, target: r.target as DeployTarget,
-      region: r.region, versions: { api: r.apiVersion, admin: r.adminVersion, app: r.appVersion }, configVersion: r.configVersion, students: r.studentsCount, health: r.health as SchoolRow['health'],
+      region: r.region, country: r.country, versions: { api: r.apiVersion, admin: r.adminVersion, app: r.appVersion }, configVersion: r.configVersion, students: r.studentsCount, health: r.health as SchoolRow['health'],
       healthMs: r.healthMs, onboarding: { done: r.onboardingDone, total: r.onboardingTotal }, lastIncident: r.lastIncident, adminUrl: adminUrlFor(this.env, r.slug, r.addressing, r.customDomain), createdAt: r.createdAt.toISOString(), wentLiveAt: r.wentLiveAt?.toISOString() ?? null,
     };
   }
@@ -71,7 +71,7 @@ export class Schools {
     const ent = r.entitlement;
     return {
       ...this.row(r),
-      contact: r.contact, gstin: r.gstin, board: r.board, entitlement: {
+      contact: r.contact, gstin: r.gstin, board: r.board, contract: { currency: '', rate: null, perStudentYear: null, ...(r.contract as object) }, residency: r.residency, entitlement: {
         plan: r.plan, modules: closeModules(ent.modules), active: activeModules(ent), features: ent.features ?? {}, dates: ent.dates ?? {}, trialUntil: ent.trialUntil ?? null,
         limits: ent.limits, locks: ent.locks, version: ent.version,
       },
@@ -86,8 +86,14 @@ export class Schools {
 
   async setDetails(user: string, id: string, b: SchoolDetailsPatch): Promise<void> {
     const r = await this.raw(id);
-    await this.db.pool.query('update schools set contact = $2, gstin = $3, board = $4 where id = $1', [r.id, JSON.stringify(b.contact), b.gstin, b.board]);
-    await this.db.audit(user, 'school.details', 'school', r.id, { board: b.board });
+    // Another currency needs the rate it is billed at: the price list is in one currency.
+    if (b.contract.currency && b.contract.currency !== PRICE_CURRENCY && !b.contract.rate && b.contract.perStudentYear === null) {
+      throw new ApiError('validation', tx('Billing in {currency} needs the rate from {list}, or a price per student.', { currency: b.contract.currency, list: PRICE_CURRENCY }), { fields: { rate: tx('Give the rate.') } });
+    }
+    // The data stays where the contract says: the school must already run in that region.
+    if (b.residency && b.residency !== r.region) throw new ApiError('validation', tx('{name} runs in {region}. Move it to a cell in {residency} first.', { name: r.name, region: r.region, residency: b.residency }), { fields: { residency: tx('Move the school first.') } });
+    await this.db.pool.query('update schools set contact = $2, gstin = $3, board = $4, contract = $5, residency = $6 where id = $1', [r.id, JSON.stringify(b.contact), b.gstin, b.board, JSON.stringify(b.contract), b.residency]);
+    await this.db.audit(user, 'school.details', 'school', r.id, { board: b.board, contract: b.contract, residency: b.residency });
   }
 
   async setChecklist(user: string, id: string, key: string, state: string): Promise<void> {
@@ -100,14 +106,16 @@ export class Schools {
     await this.db.audit(user, 'checklist.changed', 'school', r.id, { key, state });
   }
 
-  async fleet(userId: string): Promise<FleetSummary> {
+  /** The fleet at a glance; requests per hour are counted on the reader's own clock (`tz`, their browser's zone). */
+  async fleet(userId: string, tz = 'UTC'): Promise<FleetSummary> {
+    const zone = isZone(tz) ? tz : 'UTC';
     const [schools, cells, series, p95, incident, seen] = await Promise.all([
       this.db.pool.query<{ status: string; health: string; cell: string; slug: string; name: string; id: string; created_at: Date }>('select id, slug, name, status, health, cell, created_at from schools where deleted_at is null'),
       this.db.pool.query<{ key: string; target: DeployTarget; region: string; max_schools: number }>('select key, target, region, max_schools from cells order by key'),
       this.db.pool.query<{ hour: number; day: string; per_min: number }>(
-        `select extract(hour from m.at at time zone 'Asia/Kolkata')::int as hour, case when (m.at at time zone 'Asia/Kolkata')::date = (now() at time zone 'Asia/Kolkata')::date then 'today' else 'previous' end as day,
+        `select extract(hour from m.at at time zone $1)::int as hour, case when (m.at at time zone $1)::date = (now() at time zone $1)::date then 'today' else 'previous' end as day,
            sum(m.requests)::float / 60 as per_min
-         from metrics_minute m where m.at >= (date_trunc('day', now() at time zone 'Asia/Kolkata') - interval '1 day') at time zone 'Asia/Kolkata' group by 1, 2`),
+         from metrics_minute m where m.at >= (date_trunc('day', now() at time zone $1) - interval '1 day') at time zone $1 group by 1, 2`, [zone]),
       this.db.pool.query<{ p95: number | null; at: Date | null }>("select max(p95_ms) p95, (select max(at) from metrics_minute) at from metrics_minute where at >= now() - interval '1 hour'"),
       this.db.pool.query<{ id: string; title: string; state: 'open' | 'resolved'; started_at: Date; school_id: string | null; school_name: string | null }>(
         `select i.id, i.title, i.state, i.started_at, i.school_id, s.name school_name from incidents i left join schools s on s.id = i.school_id

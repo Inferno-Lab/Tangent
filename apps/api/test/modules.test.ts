@@ -1,4 +1,5 @@
-import { addDays, istToday } from '@tangent/contracts';
+import { refreshTranslations } from '@tangent/tenancy';
+import { addDays, schoolToday } from '@tangent/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startHarness, type Harness } from './harness.js';
 
@@ -17,7 +18,7 @@ const send = (method: string, url: string, body?: unknown) => h.call(method, url
 
 describe('homework', () => {
   it('sets homework for a class, records hand-ins and checks marks against the maximum', async () => {
-    const due = addDays(istToday(), 3);
+    const due = addDays(schoolToday(), 3);
     const made = await send('POST', '/v1/homework', { classId: 'cls_8a', subjectId: 'sub_maths', title: 'Quadratic practice', dueOn: due, maxMarks: 10 });
     expect(made.status).toBe(201);
     expect(made.json.total).toBe(36);
@@ -32,7 +33,7 @@ describe('homework', () => {
     expect(tooHigh.status).toBe(400);
     const undo = await send('PUT', `/v1/homework/${made.json.id}/marks`, { marks: [{ studentId: first, handed: false }] });
     expect(undo.json.handedIn).toBe(0);
-    expect((await send('POST', '/v1/homework', { classId: 'cls_8a', subjectId: 'sub_maths', title: 'Late one', dueOn: addDays(istToday(), -1) })).status).toBe(400);
+    expect((await send('POST', '/v1/homework', { classId: 'cls_8a', subjectId: 'sub_maths', title: 'Late one', dueOn: addDays(schoolToday(), -1) })).status).toBe(400);
     expect((await get('/v1/homework?classId=cls_8a')).json.some((x: any) => x.id === made.json.id)).toBe(true);
     expect((await send('DELETE', `/v1/homework/${made.json.id}`)).status).toBe(204);
   });
@@ -45,7 +46,7 @@ describe('homework', () => {
 
 describe('exams', () => {
   it('goes from schedule to marks to published results with ranks', async () => {
-    const day = addDays(istToday(), -1);
+    const day = addDays(schoolToday(), -1);
     const made = await send('POST', '/v1/exams', { name: 'Class test', classId: 'cls_8a', startsOn: day, endsOn: day, subjects: [{ subjectId: 'sub_maths', onDate: day, maxMarks: 50 }, { subjectId: 'sub_english', maxMarks: 50 }] });
     expect(made.status).toBe(201);
     expect(made.json.expected).toBe(72);
@@ -78,7 +79,7 @@ describe('exams', () => {
     expect((await send('PUT', `/v1/exams/${id}/marks`, fix)).json.exam.status).toBe('marking');
   });
   it('rejects an exam that ends before it starts or names an unknown subject', async () => {
-    const d = istToday();
+    const d = schoolToday();
     expect((await send('POST', '/v1/exams', { name: 'Odd exam', classId: 'cls_8a', startsOn: d, endsOn: addDays(d, -2), subjects: [{ subjectId: 'sub_maths', maxMarks: 20 }] })).status).toBe(400);
     expect((await send('POST', '/v1/exams', { name: 'Odd exam', classId: 'cls_8a', startsOn: d, endsOn: d, subjects: [{ subjectId: 'sub_nope', maxMarks: 20 }] })).status).toBe(400);
   });
@@ -112,15 +113,14 @@ describe('staff and roles', () => {
     const off = await send('PATCH', `/v1/staff/${pooja.id}`, { status: 'inactive', designation: 'Maths teacher' });
     expect(off.json).toMatchObject({ status: 'inactive', designation: 'Maths teacher' });
   });
-  it('shows the roles Tangent made, and lets the school put staff in them only while the console allows it', async () => {
+  it('shows the school’s roles, and lets it put staff in them unless Tangent holds its roles', async () => {
     const roles = (await get('/v1/roles')).json;
     expect(roles.find((r: any) => r.key === 'principal')).toMatchObject({ locked: true });
-    expect((await send('POST', '/v1/roles', { name: 'Exam cell', permissions: [] })).status).toBe(404);
     const pooja = (await get('/v1/staff?query=Pooja')).json[0];
     expect((await send('PATCH', '/v1/staff/' + pooja.id, { roleId: 'role_office' })).status).toBe(200);
-    await h.setSettings({ 'staff.schoolAssignsRoles': false });
+    await h.setSettings({ 'roles.schoolEdits': false });
     expect((await send('PATCH', '/v1/staff/' + pooja.id, { roleId: 'role_teacher' })).status).toBe(403);
-    await h.setSettings({ 'staff.schoolAssignsRoles': true });
+    await h.setSettings({ 'roles.schoolEdits': true });
   }, 30_000);
   it('imports staff from a sheet, invites one who never signed in, edits their email, and exports everyone', async () => {
     const r = await send('POST', '/v1/staff/import', { csv: 'name,email,phone,designation,role\nSam Okafor,sam.okafor@greenfield.edu.in,+91 90000 55555,Teacher,Teacher' });
@@ -153,10 +153,13 @@ describe('admissions', () => {
     expect(made.status).toBe(201);
     expect(made.json.stage).toBe('enquiry');
     expect((await send('PATCH', `/v1/admissions/${made.json.id}`, { stage: 'test' })).status).toBe(400);
-    const test = await send('PATCH', `/v1/admissions/${made.json.id}`, { stage: 'test', testOn: addDays(istToday(), 4) });
-    expect(test.json).toMatchObject({ stage: 'test', testOn: addDays(istToday(), 4) });
+    const test = await send('PATCH', `/v1/admissions/${made.json.id}`, { stage: 'test', stageOn: addDays(schoolToday(), 4) });
+    expect(test.json).toMatchObject({ stage: 'test', stageOn: addDays(schoolToday(), 4) });
+    // Moving on clears the day of the stage it left.
+    expect((await send('PATCH', `/v1/admissions/${made.json.id}`, { score: '72%' })).json.scores).toEqual({ test: '72%' });
     const offer = await send('PATCH', `/v1/admissions/${made.json.id}`, { stage: 'offer' });
-    expect(offer.json.stage).toBe('offer');
+    expect(offer.json).toMatchObject({ stage: 'offer', stageOn: null, scores: { test: '72%' } });
+    expect((await send('PATCH', `/v1/admissions/${made.json.id}`, { score: 'A' })).status).toBe(400);
     expect((await send('PATCH', `/v1/admissions/${made.json.id}`, { stage: 'enrolled' })).status).toBe(400);
     const before = (await get('/v1/students/summary')).json.total;
     const enrolled = await send('POST', `/v1/admissions/${made.json.id}/enrol`, { classId: 'cls_4a', dob: '2016-05-12' });
@@ -178,6 +181,57 @@ describe('admissions', () => {
     expect((await send('PATCH', `/v1/admissions/${made.id}`, { stage: 'enquiry' })).json.stage).toBe('enquiry');
     await h.setSettings({ 'admissions.stages': ['applied', 'test', 'offer'] });
   }, 30_000);
+  it('follows the school’s own stages: a day, a score, documents, a stage taken away while cards are still in it', async () => {
+    await h.setSettings({ 'admissions.stages': [
+      { key: 'visit', name: 'School visit', needsDate: true },
+      { key: 'interview', name: 'Interview', scored: true, documents: ['Birth certificate', 'Last report'] },
+      { key: 'offer', name: 'Offer', tellFamily: true },
+    ] });
+    try {
+      const made = (await send('POST', '/v1/admissions', { childName: 'Noor Saleh', gradeSought: 2, guardianName: 'Huda Saleh', phone: '+971 50 123 4567' })).json;
+      expect((await send('PATCH', `/v1/admissions/${made.id}`, { stage: 'visit' })).status).toBe(400);
+      const visit = await send('PATCH', `/v1/admissions/${made.id}`, { stage: 'visit', stageOn: addDays(schoolToday(), 2) });
+      expect(visit.json).toMatchObject({ stage: 'visit', stageOn: addDays(schoolToday(), 2) });
+      const interview = await send('PATCH', `/v1/admissions/${made.id}`, { stage: 'interview', score: 'Strong', docs: { 'Birth certificate': true } });
+      expect(interview.json).toMatchObject({ stage: 'interview', stageOn: null, scores: { interview: 'Strong' } });
+      expect(interview.json.docs['Birth certificate']).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect((await send('PATCH', `/v1/admissions/${made.id}`, { docs: { Passport: true } })).status).toBe(400);
+      expect(Object.keys((await send('PATCH', `/v1/admissions/${made.id}`, { docs: { 'Birth certificate': false } })).json.docs)).toEqual([]);
+      // Taken away: the card stays where it is and moves on, but nobody moves a card into it.
+      await h.setSettings({ 'admissions.stages': [{ key: 'offer', name: 'Offer', tellFamily: true }] });
+      expect((await send('PATCH', `/v1/admissions/${made.id}`, { note: 'Called back' })).json.stage).toBe('interview');
+      expect((await send('PATCH', `/v1/admissions/${made.id}`, { stage: 'offer' })).json.stage).toBe('offer');
+      expect((await send('PATCH', `/v1/admissions/${made.id}`, { stage: 'interview' })).status).toBe(400);
+    } finally {
+      await h.setSettings({ 'admissions.stages': ['applied', 'test', 'offer'] });
+    }
+  }, 30_000);
+  it('takes an application from the school’s page only when the school says so, and keeps robots and repeats out', async () => {
+    const pub = (method: string, body?: unknown, ip = '203.0.113.7') => h.app.getHttpAdapter().getInstance().inject({ method, url: '/v1/apply', headers: { 'x-school': h.slug, 'content-type': 'application/json', 'x-forwarded-for': ip }, payload: body ? JSON.stringify(body) : undefined });
+    const form = { childName: 'Sami Haddad', gradeSought: 3, dob: '2018-02-03', guardianName: 'Rania Haddad', phone: '9822077123', email: '', note: '', consent: true };
+    expect(JSON.parse((await pub('GET')).body).open).toBe(false);
+    expect((await pub('POST', form)).statusCode).toBe(403);
+    await h.setSettings({ 'admissions.onlineForm': true });
+    try {
+      const info = JSON.parse((await pub('GET')).body);
+      expect(info.open).toBe(true);
+      expect(info.grades.length).toBeGreaterThan(5);
+      expect((await pub('POST', { ...form, consent: false })).statusCode).toBe(400);
+      expect((await pub('POST', { ...form, gradeSought: 13 })).statusCode).toBe(400);
+      expect((await pub('POST', form)).statusCode).toBe(200);
+      const row = (await get('/v1/admissions')).json.find((e: any) => e.childName === 'Sami Haddad');
+      expect(row).toMatchObject({ stage: 'applied', dob: '2018-02-03', gradeSought: 3 });
+      expect((await pub('POST', form)).statusCode).toBe(409);
+      // A robot fills the hidden field: it looks accepted and nothing is kept.
+      expect((await pub('POST', { ...form, childName: 'Bot Child', website: 'http://spam.example' })).statusCode).toBe(200);
+      expect((await get('/v1/admissions')).json.some((e: any) => e.childName === 'Bot Child')).toBe(false);
+      for (let i = 0; i < 4; i++) await pub('POST', { ...form, childName: `Child ${i}`, phone: `98220771${30 + i}` }, '198.51.100.9');
+      expect((await pub('POST', { ...form, childName: 'Child 5', phone: '9822077140' }, '198.51.100.9')).statusCode).toBe(200);
+      expect((await pub('POST', { ...form, childName: 'Child 6', phone: '9822077141' }, '198.51.100.9')).statusCode).toBe(429);
+    } finally {
+      await h.setSettings({ 'admissions.onlineForm': false });
+    }
+  }, 60_000);
   it('shows the number waiting on the menu', async () => {
     const shell = (await get('/v1/shell')).json;
     expect(shell.badges.admissions).toBeGreaterThan(0);
@@ -210,10 +264,10 @@ describe('money lists and reports', () => {
     const strength = (await get('/v1/reports/strength')).json;
     expect(strength.rows).toHaveLength(42);
     // Narrowed to a class and a period, and named after them.
-    const low = await get(`/v1/reports/attendance-class?classId=cls_8a&from=${addDays(istToday(), -10)}&to=${istToday()}`);
+    const low = await get(`/v1/reports/attendance-class?classId=cls_8a&from=${addDays(schoolToday(), -10)}&to=${schoolToday()}`);
     expect(low.json.rows).toHaveLength(1);
-    expect(low.json.scope).toMatch(/^Class 8 A, /);
-    expect((await get('/v1/reports/attendance-low/csv?classId=cls_8a')).headers['content-disposition']).toMatch(/Low attendance - Class 8 A/);
+    expect(low.json.scope).toMatch(/^8 A, /);
+    expect((await get('/v1/reports/attendance-low/csv?classId=cls_8a')).headers['content-disposition']).toMatch(/Low attendance - 8 A/);
     expect((await get('/v1/reports/nope')).status).toBe(404);
   });
 });
@@ -275,6 +329,19 @@ describe('privacy and templates', () => {
     const rows = (await h.registry.query("select channel, body from sandbox_messages where school_slug = 'greenfield' order by created_at desc limit 1")).rows;
     expect(rows[0]).toMatchObject({ channel: 'sms', body: 'Hello! Anika Rao has a fee waiting. Please pay soon. Greenfield' });
     expect(Number((await h.registry.query("select count(*) n from sandbox_messages where school_slug = 'greenfield'")).rows[0].n)).toBe(before + 1);
+    // A parent who reads Hindi (set on their record by the office) gets it in Hindi: the school's Hindi wording, else the usual one translated.
+    const to = (await h.registry.query("select to_addr from sandbox_messages where school_slug = 'greenfield' order by created_at desc limit 1")).rows[0].to_addr;
+    await h.schoolSql("update guardians set language = 'hi' where phone = $1", [to]);
+    const last = async () => (await h.registry.query("select body from sandbox_messages where school_slug = 'greenfield' order by created_at desc limit 1")).rows[0].body;
+    await h.setSettings({ 'templates.messages': { 'fees.reminder': { en: 'Hello! {student} has a fee waiting.', hi: 'नमस्ते! {student} की फ़ीस बाकी है। {school}' } } });
+    await send('POST', '/v1/fees/reminders', { ids: [stu.id] });
+    expect(await last()).toBe('नमस्ते! Anika Rao की फ़ीस बाकी है। Greenfield');
+    await h.registry.query(`insert into translations (lang, surface, key, text, updated_by) values ('hi', 'text', 'Reminder: fees for {student} are due. Pay in the Tangent app to get an instant receipt.', '{student} की फ़ीस देय है। तुरंत रसीद के लिए Tangent ऐप में भुगतान करें।', 'test')`);
+    await refreshTranslations(h.registry);
+    await h.setSettings({ 'templates.messages': {} });
+    await send('POST', '/v1/fees/reminders', { ids: [stu.id] });
+    expect(await last()).toBe('Anika Rao की फ़ीस देय है। तुरंत रसीद के लिए Tangent ऐप में भुगतान करें।');
+    await h.schoolSql('update guardians set language = null where phone = $1', [to]);
   });
   it('puts each role’s app layout and the console flags into the config the apps fetch', async () => {
     await h.setSettings({ 'app.layout': { parent: { dock: ['home', 'fees', 'nonsense', 'trips'], home: [], quick: ['payFees'] }, student: { dock: [], home: [], quick: [] }, teacher: { dock: ['home', 'classes'], home: [], quick: [] }, driver: { dock: [], home: [], quick: [] } } });

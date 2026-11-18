@@ -15,4 +15,14 @@ void main() {
     // A key without a singular keeps its one form.
     expect('teacher.n_absent'.trn(1), '1 absent');
   });
+
+  test('each language counts by its own rules: Arabic has a form for a few and for many', () {
+    Get
+      ..addTranslations({
+        'ar': {'homework.n_files': '@n ملف', 'homework.n_files_one': 'ملف واحد', 'homework.n_files_two': 'ملفان', 'homework.n_files_few': '@n ملفات'},
+      })
+      ..locale = const Locale('ar');
+    expect(['homework.n_files'.trn(1), 'homework.n_files'.trn(2), 'homework.n_files'.trn(3), 'homework.n_files'.trn(11)], ['ملف واحد', 'ملفان', '3 ملفات', '11 ملف']);
+    Get.locale = const Locale('en');
+  });
 }

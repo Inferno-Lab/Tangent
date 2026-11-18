@@ -22,8 +22,8 @@ describe('modules', () => {
     expect(activeModules(ent, '2026-12-01')).toEqual(['school', 'people', 'fees']);
   });
   it('built features are on unless taken away, planned ones never', () => {
-    expect(activeFeatures({}, ['fees'])).toEqual(['fees.onlinePayment', 'fees.reminders', 'fees.lateFines', 'fees.gstReceipts', 'fees.refunds']);
-    expect(activeFeatures({ features: { 'fees.onlinePayment': false, 'fees.concessions': true } }, ['fees'])).toEqual(['fees.reminders', 'fees.lateFines', 'fees.gstReceipts', 'fees.refunds']);
+    expect(activeFeatures({}, ['fees'])).toEqual(['fees.onlinePayment', 'fees.reminders', 'fees.lateFines', 'fees.taxReceipts', 'fees.refunds']);
+    expect(activeFeatures({ features: { 'fees.onlinePayment': false, 'fees.concessions': true } }, ['fees'])).toEqual(['fees.reminders', 'fees.lateFines', 'fees.taxReceipts', 'fees.refunds']);
   });
   it('every catalogue key is unique and every feature is named after its module', () => {
     const keys = [...MODULES.map((m) => m.key), ...MODULES.flatMap((m) => m.features.map((f) => f.key))];
@@ -42,7 +42,7 @@ describe('resolveConfig', () => {
   it('builds the whole menu in group order, tabs with their own addresses, Moving in only before go-live', () => {
     const all = resolveConfig({ settings, entitlement: entitlement(['fees', 'library']), live: false });
     expect(all.menu.map((g) => g.group)).toEqual(['Home', 'People', 'Money', 'Campus', 'School']);
-    expect(all.menu.find((g) => g.group === 'Money')!.pages[0]!.tabs.map((t) => t.href)).toEqual(['/fees/overview', '/fees/invoices', '/fees/receipts', '/fees/online', '/fees/structure']);
+    expect(all.menu.find((g) => g.group === 'Money')!.pages[0]!.tabs.map((t) => t.href)).toEqual(['/fees/overview', '/fees/invoices', '/fees/receipts', '/fees/online', '/fees/structure', '/fees/settings']);
     expect(all.menu.flatMap((g) => g.pages.map((p) => p.id))).toContain('move');
     expect(resolveConfig({ settings, entitlement: entitlement(['fees']) }).menu.flatMap((g) => g.pages.map((p) => p.id))).not.toContain('move');
   });
@@ -53,9 +53,10 @@ describe('resolveConfig', () => {
     expect(cfg.app.layout.parent).toEqual({ dock: ['home', 'fees'], home: [], quick: ['payFees'] });
     expect(cfg.app.layout.driver.dock).toEqual([]);
   });
-  it('words: plurals from the console, or the usual English ending', () => {
-    expect(resolveConfig({ settings: { ...settings, values: { ...settings.values, 'vocab.student': 'Child', 'vocab.students': 'Children' } }, entitlement: entitlement([]) }).vocabulary)
-      .toEqual({ student: 'Child', students: 'Children', class: 'Class', classes: 'Classes' });
+  it('words: the school’s own, with the usual English ending when only one is given', () => {
+    const cfg = resolveConfig({ settings: { ...settings, values: { ...settings.values, 'vocab.words': { en: { student: { one: 'Child', many: 'Children' }, class: { one: 'Form' } } } } }, entitlement: entitlement(['people']) });
+    expect(cfg.vocabulary).toMatchObject({ student: 'Child', students: 'Children', class: 'Form', classes: 'Forms', guardian: 'parent' });
+    expect(cfg.menu.flatMap((g) => g.pages.map((p) => p.label))).toContain('Children');
   });
   it('platform locks beat school values', () => {
     const cfg = resolveConfig({ settings, entitlement: entitlement(['fees'], ['brand.color'], { 'brand.color': '#ABCDEF' }) });

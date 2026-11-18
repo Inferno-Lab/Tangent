@@ -1,5 +1,7 @@
 import 'package:get/get.dart';
 import 'package:tangent/core/services/auth_service.dart';
+import 'package:tangent/core/services/school_config.dart';
+import 'package:tangent/core/utils/extensions.dart';
 import 'package:tangent/core/utils/formatters.dart';
 import 'package:tangent/core/utils/loadable.dart';
 import 'package:tangent/core/utils/schedule.dart';
@@ -11,7 +13,11 @@ import 'package:tangent/data/repositories/directory_repository.dart';
 import 'package:tangent/core/utils/clock.dart';
 
 class TimetableController extends GetxController with Loadable {
-  final dayIndex = (Clock.now().weekday - 1).clamp(0, 6).obs;
+  /// Opens on today's timetable day (the first one when the school has no lessons today).
+  final dayIndex = (() {
+    final i = SchoolConfig.timetableKeys.indexOf(weekdayKey(Clock.now()));
+    return i < 0 ? 0 : i;
+  })().obs;
   List<TimetableDay> days = [];
   SchoolClass? schoolClass;
   final teachers = <String, String>{}.obs;
@@ -19,7 +25,16 @@ class TimetableController extends GetxController with Loadable {
   /// Subjects with homework due by the next school day.
   Set<String> homeworkDue = {};
 
-  static const keys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  /// The school's timetable days (weekdays, A/B weekdays or the days of a cycle).
+  List<String> get keys => SchoolConfig.timetableKeys;
+
+  /// How a timetable day reads: Monday's short name, "Mon B", or "Day 3".
+  String dayLabel(int index) {
+    final key = keys[index];
+    if (key.startsWith('d') && int.tryParse(key.substring(1)) != null) return 'timetable.cycle_day'.trp({'n': key.substring(1)});
+    final parts = key.split('-');
+    return parts.length == 2 ? '${'day.${parts[0]}'.tr} ${parts[1].toUpperCase()}' : 'day.$key'.tr;
+  }
 
   TimetableDay? get selected {
     final key = keys[dayIndex.value];
@@ -31,11 +46,18 @@ class TimetableController extends GetxController with Loadable {
 
   bool get isToday => weekdayKey(Clock.now()) == keys[dayIndex.value];
 
-  /// The date of the selected weekday in the current week.
-  DateTime dateOf(int index) {
+  /// The date a timetable day falls on: this week's for a weekly timetable, else the next one from today (null when none is near).
+  DateTime? dateOf(int index) {
     final now = Clock.now();
-    final monday = DateTime(now.year, now.month, now.day - (now.weekday - 1));
-    return monday.add(Duration(days: index));
+    final today = DateTime(now.year, now.month, now.day);
+    final key = keys[index];
+    const week = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+    if (week.contains(key) && SchoolConfig.cycleKey(today) == null) return today.subtract(Duration(days: now.weekday - 1)).add(Duration(days: week.indexOf(key)));
+    for (var d = 0; d < 21; d++) {
+      final date = today.add(Duration(days: d));
+      if (weekdayKey(date) == key) return date;
+    }
+    return null;
   }
 
   @override

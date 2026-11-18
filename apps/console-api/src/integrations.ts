@@ -1,8 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Inject, Injectable, Param, Post, Put, Query, type OnModuleInit } from '@nestjs/common';
 import {
   ActivityQuery, CAPABILITY_LABELS, ConnectionInput, ConnectionPatch, MESSAGE_EVENTS, PLATFORM_CAPABILITIES, RouteInput, SYSTEM_MESSAGES, TemplateInput, fieldProblem, providerDef, type Capability, type ActionRow, type ActivityView, type ConnectionRow, type DeliveryRow, type HookEventRow,
-  type IntegrationsView, type RouteRow, type TemplateRow,
-} from '@tangent/contracts';
+  type IntegrationsView, type RouteRow, type TemplateRow, tx } from '@tangent/contracts';
 import { newId, scheduleJob } from '@tangent/db';
 import { Hub } from '@tangent/integrations';
 import { ApiError, ZodPipe, alert, notFound } from '@tangent/nest-kit';
@@ -135,7 +134,7 @@ export class Integrations implements OnModuleInit {
   async remove(me: ConsoleUser, id: string): Promise<void> {
     const c = await this.raw(id);
     const used = await this.db.pool.query('select capability from integration_routes where connection_id = $1 or fallback_id = $1', [id]);
-    if (used.rowCount) throw new ApiError('conflict', `${c.name} is routed for ${used.rows.map((r) => r.capability).join(', ')}. Change those routes first.`);
+    if (used.rowCount) throw new ApiError('conflict', tx('{name} is routed for {p1}. Change those routes first.', { name: c.name, p1: used.rows.map((r) => r.capability).join(', ') }));
     await this.db.pool.query('delete from integration_connections where id = $1', [id]);
     await this.db.audit(me.email, 'integration.deleted', 'integration', id, { provider: c.provider, name: c.name });
   }
@@ -149,12 +148,12 @@ export class Integrations implements OnModuleInit {
 
   async goLive(me: ConsoleUser, id: string): Promise<ActionRow> {
     const c = await this.raw(id);
-    if (c.state === 'live') throw new ApiError('conflict', `${c.name} is already live.`);
-    if (!c.health_ok) throw new ApiError('validation', `Run Test on ${c.name} first: only a connection that passed its test can go live.`);
+    if (c.state === 'live') throw new ApiError('conflict', tx('{name} is already live.', { name: c.name }));
+    if (!c.health_ok) throw new ApiError('validation', tx('Run Test on {name} first: only a connection that passed its test can go live.', { name: c.name }));
     const def = providerDef(c.provider);
     if (def?.capabilities.some((x) => x === 'sms' || x === 'whatsapp')) {
       const missing = await this.missingTemplates(id);
-      if (missing.length) throw new ApiError('validation', `${c.name} has no approved template for ${missing.length} ${missing.length === 1 ? 'message' : 'messages'} yet. Map them under Templates first.`);
+      if (missing.length) throw new ApiError('validation', tx('{name} has no approved template for {length} {p2} yet. Map them under Templates first.', { name: c.name, length: missing.length, p2: missing.length === 1 ? 'message' : 'messages' }));
     }
     return this.actions.request(me, { action: 'integration.live', schoolId: c.school_id ?? undefined, params: { connectionId: id, name: c.name }, dryRun: false });
   }
@@ -163,8 +162,10 @@ export class Integrations implements OnModuleInit {
     for (const [cid, role] of [[b.connectionId, 'connection'], [b.fallbackId, 'fallback']] as const) {
       if (!cid) continue;
       const c = await this.raw(cid);
-      if (!providerDef(c.provider)?.capabilities.includes(b.capability)) throw new ApiError('validation', `${c.name} cannot do ${b.capability}.`, { fields: { [`${role}Id`]: 'This connection cannot do that.' } });
-      if (c.scope === 'school' && c.school_id !== b.schoolId) throw new ApiError('validation', `${c.name} belongs to one school and can only be routed for it.`, { fields: { [`${role}Id`]: 'This connection belongs to another school.' } });
+      if (!providerDef(c.provider)?.capabilities.includes(b.capability)) throw new ApiError('validation', tx('{name} cannot do {capability}.', { name: c.name, capability: b.capability }), { fields: { [`${role}Id`]: 'This connection cannot do that.' } });
+      // A draft has not passed its checks: nothing is sent through it until it is set up and tested.
+      if (c.state === 'draft') throw new ApiError('validation', tx('Finish setting up {name} (fill in its form and Test it) before routing to it.', { name: c.name }), { fields: { [`${role}Id`]: tx('Not set up yet.') } });
+      if (c.scope === 'school' && c.school_id !== b.schoolId) throw new ApiError('validation', tx('{name} belongs to one school and can only be routed for it.', { name: c.name }), { fields: { [`${role}Id`]: 'This connection belongs to another school.' } });
     }
     if (b.fallbackId && b.fallbackId === b.connectionId) throw new ApiError('validation', 'The fallback must be a different connection.', { fields: { fallbackId: 'Choose a different connection.' } });
     await this.db.pool.query(
@@ -282,7 +283,7 @@ export class Integrations implements OnModuleInit {
       return { mode };
     }
     const gaps = await this.liveGaps();
-    if (gaps.length) throw new ApiError('validation', `Not ready for live messages: ${gaps.join(' ')}`);
+    if (gaps.length) throw new ApiError('validation', tx('Not ready for live messages: {p0}', { p0: gaps.join(' ') }));
     return { mode: await this.hub.mode(), action: await this.actions.request(me, { action: 'integration.mode', params: {}, dryRun: false }) };
   }
 

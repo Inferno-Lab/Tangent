@@ -2,7 +2,7 @@
 
 Written 2026-10-18 and updated 2026-10-19 for whoever continues this work (a person, or another Claude account with no memory of the earlier sessions). Read it top to bottom once, then use it as a reference. It says what was asked, what was built, **how and why it was built that way**, what is left, and **how to do each remaining part**.
 
-Related files: [`README.md`](../README.md) (overview and run commands), [`AGENTS.md`](../AGENTS.md) (rules for the Flutter app and agent workflow), [`docs/features-plan.md`](features-plan.md) (every feature, what is left and what is planned), [`docs/integrations.md`](integrations.md) (the Integrations Hub), [`docs/deploy-free-test.md`](deploy-free-test.md) (deploying), [`design/README.md`](../design/README.md) (the design boards). Section numbers like "section 12.5" in older notes and code comments refer to the first platform design, which is in git history (`docs/superpowers/specs/2026-10-14-tangent-platform-design.md`, removed 2026-11-10).
+Related files: [`README.md`](../README.md) (overview and run commands), [`AGENTS.md`](../AGENTS.md) (rules for the Flutter app and agent workflow), [`docs/one-shot-plan.md`](one-shot-plan.md) (the one plan: everything left, every new module, and what needs the owner), [`docs/integrations.md`](integrations.md) (the Integrations Hub), [`docs/deploy-free-test.md`](deploy-free-test.md) (deploying), [`design/README.md`](../design/README.md) (the design boards). Section numbers like "section 12.5" in older notes and code comments refer to the first platform design, which is in git history (`docs/superpowers/specs/2026-10-14-tangent-platform-design.md`, removed 2026-11-10).
 
 ---
 
@@ -155,7 +155,7 @@ Push or merge to `main`, or Render → service → Manual Deploy → Deploy late
 
 ## 9. What is left, why, and how to do it
 
-**This section was written on 2026-10-19.** Much of it has been done since (sections 14 to 17); what is left now is section 1 of `docs/features-plan.md`. Lines below that have changed are marked *(now: …)*.
+**This section was written on 2026-10-19.** Much of it has been done since (sections 14 to 17); what is left now is in `docs/one-shot-plan.md`. Lines below that have changed are marked *(now: …)*.
 
 Status against the plan's build order (section 24), as of 2026-10-19: **0** foundations — partial (monorepo, CI done; no Dart workspace/Melos, no `apps/mobile` move, no ADR folder, no OpenTofu/EKS/Argo; `docs/DESIGN.md` covers both surfaces). **1** platform core — done for the test track (tenancy, identity with code + password, permissions, config engine, audit, provisioning with three drivers); missing passkeys/TOTP, files/jobs/realtime/renderer, the 500-school synthetic fleet and tenancy property tests. **2** vertical slice attendance — done, including the app on the real API; no push. **3** people and academics — mostly (students, staff, admissions, timetable, homework, exams with marks and results, events calendar; no report-card designer, certificates, subjects/years UI). **4** finance — partly (invoices, payments, receipts, reminders, reports; no Razorpay, autopay, late fees, reconciliation, Tally). **5** communication — partly (notices with approvals, events with replies, family messages, templates and notification rules; no real SMS/WhatsApp/email/push providers, no realtime chat). **6** operations — partly (leave; transport route and library loans read-only; no live bus, catalogue or gallery). **7** admin experience — every menu page and settings tab exists; no setup checklist, year-end rollover, live app preview or guided tours. **8** console complete — done for the test track (cells, move-school bookkeeping, blueprints and parameters, compliance desk, status page, kill switches); missing catalog update offers and data-copying moves. **9** mobile distribution — Android workflow only. **10** production readiness — not started.
 
@@ -258,7 +258,7 @@ Traps from these sessions: Vite on this machine binds `localhost` (IPv6) unless 
 
 ## 14. Phase 1 and 2A (2026-11-04/05): what changed and what to know
 
-The plan at the time was the production plan, now replaced by `docs/features-plan.md`. The rules that now hold:
+The plan at the time was the production plan, since replaced (today: `docs/one-shot-plan.md`). The rules that now hold:
 
 - **Schools configure nothing.** The school API has no settings or role writes; `settings.write` and `roles.manage` are gone (migration `0006_roles_config_to_console`). The console API owns configuration (`apps/console-api/src/config.ts`): `GET/PATCH /console/v1/schools/:id/config` (stale version → 409; keys marked `risky` go through Approvals as `config.apply`), rollback, roles, staff roles, templates, preview and the requests schools send. **A new setting** goes into `SchoolSettingsSchema` and `SETTINGS_META` (`packages/contracts/src/settings-meta.ts`); the console's Configuration tab renders it with no new screen. Mark it `notUsedYet` until something acts on it.
 - **Accounts.** Family logins are made when a student is added, imported or enrolled (`students.service.ts` `create`); families sign in with `POST /v1/auth/code`; `POST /v1/auth/reset/start|finish` resets a password (codes carry a purpose, migration `0005`). Tokens carry `kind`; family tokens only reach `/v1/f`, `/v1/auth`, `/v1/me`, `/v1/config`, `/v1/brand`, `/v1/errors` (`guards.ts`). Console staff use an authenticator app unless `DEMO_CODE` is set (test track).
@@ -288,7 +288,7 @@ The plan at the time was the production plan, now replaced by `docs/features-pla
 
 ## 17. Finishing Phases 0 to 3 (2026-11-08): what changed and what to know
 
-Branch `feat/finish-phases-0-3`. The aim was to leave in Phases 0 to 3 only what needs the owner (accounts, vendors, decisions, design review) or belongs to a later phase; `docs/features-plan.md` section 1 lists each such item with its reason.
+Branch `feat/finish-phases-0-3`. The aim was to leave in Phases 0 to 3 only what needs the owner (accounts, vendors, decisions, design review) or belongs to a later phase; each such item is now in `docs/one-shot-plan.md` (section 10 for what needs the owner).
 
 - **Codes are capped per account** (`auth.service.ts`, `OTP_SENDS`): five sign-in or reset codes in fifteen minutes, outside demo mode, on top of the per-device rate limit. Families sign in only by code, so without the cap a phone number could be guessed against and, once SMS is real, run up the bill.
 - **Alerts** (`packages/nest-kit/src/alerts.ts`): `alert(text)` logs and sends through the console's Alerts connections (Slack, Discord, e-mail; `PlatformHub.alert`). A new error fingerprint alerts once (`recordError` returns whether the row is new); probes alert when a school stops and starts answering; backups, drills and start-up migrations alert on failure. Production logs are JSON (`ConsoleLogger({ json: true })`), and the exception filter logs school and request ID.
@@ -379,4 +379,8 @@ The owner's audit (`docs/product-map.md`) found pages in the wrong place, half-b
 - **Console.** Navigation is grouped (Schools, Product, Platform, Business, Console) and every tab is a route (`apps/console/src/app/nav.ts`; `tools/lib/pages.mjs` reads it for the audits). Plans are edited in the console, role templates live in Blueprints → Starting roles, team members join by link (`/join`), invoices are sent and marked paid, compliance items need the signed file. `schools.went_live_at` (registry 0015) ends the school's Moving in.
 - **Admin.** Families' and staff invites live on Students → On the app and Staff; Moving in holds only files and imports. Approvals have one page; decline needs a note.
 - **Not built (needs the owner):** push notifications on the phone (Firebase project files), real file pick and share in the app, the student demo card, and the "Which school?" picture and gallery empty art (waiting for the design system).
+
+## 23. After the one-pass (2026-11-12): the direction changed
+
+The owner set three standing rules after the one-pass: **the school never changes how it works to fit Tangent** (its steps, layouts, numbers, fields, lists, words and rules are its data or settings, with defaults from a starter pack so nothing has to be set up); **the school runs its own day from its admin** while Tangent keeps only what is paid for, risky or technical (this replaces "schools configure nothing"); and **Tangent is international, in any language**, with India as one country pack. The whole of the next pass (settings ownership, starter packs, locale and money, languages and right-to-left, the shared building blocks, every existing module rebuilt to the standard, the one-pass leftovers, and every new module except the rare ones) is planned in `docs/one-shot-plan.md`. It starts after the design system is merged.
 

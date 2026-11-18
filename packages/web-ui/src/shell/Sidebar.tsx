@@ -1,9 +1,10 @@
 import type { PageIcon } from '../Icon';
 import { Icon } from '../Icon';
-import { readableOn } from '@tangent/contracts';
+import { tx, readableOn } from '@tangent/contracts';
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
 import { Menu } from '../Menu';
 import { TangentIcon } from '../TangentIcon';
+import { t } from '../i18n';
 
 export interface NavItem {
   id: string;
@@ -60,14 +61,14 @@ export function Sidebar({ label, collapsed, groups, active, onNavigate, header, 
       {header}
       {groups.map((g) => (
         <div key={g.name} style={{ display: 'contents' }}>
-          <div className="sl fade">{g.name}</div>
+          <div className="sl fade">{tx(g.name)}</div>
           {g.items.map((n) => (
             <a
               key={n.id}
               className={`nv ${n.id === active ? 'on' : ''}`}
               href={n.href}
               aria-label={n.label}
-              data-tip={collapsed ? (n.count ? `${n.label}\n${n.count} waiting` : n.label) : undefined}
+              data-tip={collapsed ? (n.count ? t('ui.sidebar.waiting', { label: n.label, count: n.count }) : n.label) : undefined}
               data-tip-side="right"
               aria-current={n.id === active ? 'page' : undefined}
               onClick={(e) => {
@@ -87,7 +88,7 @@ export function Sidebar({ label, collapsed, groups, active, onNavigate, header, 
       <div className="me" style={{ ...(pushDown ? { marginTop: 'auto' } : {}), position: 'relative' }}>
         {/* Beside the button when the menu is collapsed, above it otherwise, so the narrow menu can never clip it. */}
         {meMenu && (
-          <Menu open={menu} anchor={meBtn} onClose={() => setMenu(false)} side={collapsed ? 'right' : 'auto'} label="Account">
+          <Menu open={menu} anchor={meBtn} onClose={() => setMenu(false)} side={collapsed ? 'right' : 'auto'} label={t('ui.sidebar.account')}>
             {meMenu.map((m) => <button key={m.label} role="menuitem" onClick={() => { setMenu(false); m.onPress(); }}>{m.label}</button>)}
           </Menu>
         )}
@@ -113,7 +114,7 @@ export function SchoolHeader({ logo, logoUrl, name, place, color, onToggle, coll
     <div className="ws">
       <span className="lg" style={logoUrl ? undefined : markStyle(color)}>{logoUrl ? <img className="lgi" src={logoUrl} alt="" /> : logo}</span>
       <div className="fade"><b>{name}</b><small>{place}</small></div>
-      <button className="colb" onClick={onToggle} aria-label={collapsed ? 'Expand the menu' : 'Collapse the menu'}>
+      <button className="colb" onClick={onToggle} aria-label={collapsed ? t('ui.sidebar.expand_the_menu') : t('ui.sidebar.collapse_the_menu')}>
         <Icon name="sidebar" size={20} />
       </button>
     </div>
@@ -132,8 +133,8 @@ export function WorkspaceHeader({ env, onToggle, collapsed, envClass }: { env: s
   return (
     <div className="wsw">
       <span className="lg" style={{ background: 'none' }}><TangentIcon /></span>
-      <div className="fade"><b>Tangent</b><small><span className={`pdot ${envClass ?? ''}`}></span>{env}</small></div>
-      <button className="colb" onClick={onToggle} aria-label={collapsed ? 'Expand the menu' : 'Collapse the menu'}>
+      <div className="fade"><b>{t('ui.sidebar.tangent')}</b><small><span className={`pdot ${envClass ?? ''}`}></span>{env}</small></div>
+      <button className="colb" onClick={onToggle} aria-label={collapsed ? t('ui.sidebar.expand_the_menu') : t('ui.sidebar.collapse_the_menu')}>
         <Icon name="sidebar" size={20} />
       </button>
     </div>

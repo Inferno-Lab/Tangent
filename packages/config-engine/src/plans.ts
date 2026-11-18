@@ -20,7 +20,7 @@ export const DEFAULT_PLANS: PlanRow[] = [
     key: 'premium',
     name: 'Premium',
     perStudentYear: 650,
-    modules: ['people', 'attendance', 'fees', 'notices', 'timetable', 'homework', 'events', 'exams', 'chat', 'transport', 'library', 'gallery'],
+    modules: ['people', 'attendance', 'fees', 'notices', 'timetable', 'homework', 'events', 'exams', 'chat', 'transport', 'library', 'gallery', 'staffAttendance', 'diary', 'ptm', 'visitors', 'certificates'],
     limits: { students: 5000, storageGb: 100, smsPerMonth: 20000 },
   },
 ];

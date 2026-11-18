@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { basic, call } from '../http.js';
 import type { Adapter, Ctx, InboundRequest, PaymentEvent } from '../types.js';
+import { currencyDigits } from '@tangent/contracts';
 
 const s = (c: Ctx, k: string) => String(c.route[k] ?? c.settings[k] ?? '');
 const header = (r: InboundRequest, k: string) => { const v = r.headers[k]; return Array.isArray(v) ? v[0] : v; };
@@ -15,25 +16,25 @@ export const razorpay: Adapter = {
     async createLink(c, i) {
       const r = await call('https://api.razorpay.com/v1/payment_links', {
         method: 'POST', headers: { authorization: rzpAuth(c), 'content-type': 'application/json' },
-        body: JSON.stringify({ amount: i.amountPaise, currency: 'INR', reference_id: i.reference, description: i.description.slice(0, 2048),
+        body: JSON.stringify({ amount: i.amountMinor, currency: i.currency, reference_id: i.reference, description: i.description.slice(0, 2048),
           customer: { name: i.customer.name, contact: i.customer.phone, email: i.customer.email }, notify: { sms: false, email: false }, reminder_enable: false,
           callback_url: i.callbackUrl, callback_method: 'get', ...(i.expiresAt ? { expire_by: Math.floor(i.expiresAt.getTime() / 1000) } : {}) }),
       });
       return { linkId: r.json.id, url: r.json.short_url };
     },
-    async refund(c, paymentId, amountPaise, note) {
+    async refund(c, paymentId, amountMinor, note) {
       const r = await call(`https://api.razorpay.com/v1/payments/${paymentId}/refund`, {
-        method: 'POST', headers: { authorization: rzpAuth(c), 'content-type': 'application/json' }, body: JSON.stringify({ amount: amountPaise, notes: { reason: note.slice(0, 250) } }),
+        method: 'POST', headers: { authorization: rzpAuth(c), 'content-type': 'application/json' }, body: JSON.stringify({ amount: amountMinor, notes: { reason: note.slice(0, 250) } }),
       });
       return { refundId: r.json.id };
     },
     async settlements(c, from, to) {
-      const out: { providerPaymentId: string; amountPaise: number }[] = [];
+      const out: { providerPaymentId: string; amountMinor: number }[] = [];
       for (let skip = 0; ; skip += 100) {
         const q = new URLSearchParams({ from: String(Math.floor(from.getTime() / 1000)), to: String(Math.floor(to.getTime() / 1000)), count: '100', skip: String(skip) });
         const r = await call(`https://api.razorpay.com/v1/payments?${q}`, { headers: { authorization: rzpAuth(c) } });
         const items: any[] = r.json?.items ?? [];
-        for (const p of items) if (p.status === 'captured') out.push({ providerPaymentId: p.id, amountPaise: Number(p.amount) });
+        for (const p of items) if (p.status === 'captured') out.push({ providerPaymentId: p.id, amountMinor: Number(p.amount) });
         if (items.length < 100) return out;
       }
     },
@@ -56,9 +57,9 @@ export const razorpay: Adapter = {
     const link = b?.payload?.payment_link?.entity;
     const refund = b?.payload?.refund?.entity;
     const payments: PaymentEvent[] = [];
-    if (b?.event === 'payment_link.paid' && link && pay) payments.push({ kind: 'paid', reference: link.reference_id, providerPaymentId: pay.id, amountPaise: Number(pay.amount), method: pay.method });
-    if (b?.event === 'payment.failed' && pay?.notes?.reference) payments.push({ kind: 'failed', reference: pay.notes.reference, providerPaymentId: pay.id, amountPaise: Number(pay.amount), method: pay.method });
-    if (b?.event === 'refund.processed' && refund) payments.push({ kind: 'refunded', reference: '', providerPaymentId: refund.payment_id, amountPaise: Number(refund.amount), refundId: refund.id });
+    if (b?.event === 'payment_link.paid' && link && pay) payments.push({ kind: 'paid', reference: link.reference_id, providerPaymentId: pay.id, amountMinor: Number(pay.amount), method: pay.method });
+    if (b?.event === 'payment.failed' && pay?.notes?.reference) payments.push({ kind: 'failed', reference: pay.notes.reference, providerPaymentId: pay.id, amountMinor: Number(pay.amount), method: pay.method });
+    if (b?.event === 'refund.processed' && refund) payments.push({ kind: 'refunded', reference: '', providerPaymentId: refund.payment_id, amountMinor: Number(refund.amount), refundId: refund.id });
     return { ok: true, summary: `${b?.event ?? 'event'}${payments[0] ? ` ${payments[0].providerPaymentId}` : ''}`, payments };
   },
 };
@@ -71,17 +72,17 @@ export const cashfree: Adapter = {
   payments: {
     async createLink(c, i) {
       const r = await call(`${cfBase(c)}/links`, { method: 'POST', headers: cfHeaders(c),
-        body: JSON.stringify({ link_id: i.reference.replace(/[^\w-]/g, '_').slice(0, 50), link_amount: i.amountPaise / 100, link_currency: 'INR', link_purpose: i.description.slice(0, 500),
+        body: JSON.stringify({ link_id: i.reference.replace(/[^\w-]/g, '_').slice(0, 50), link_amount: i.amountMinor / 10 ** currencyDigits(i.currency), link_currency: i.currency, link_purpose: i.description.slice(0, 500),
           customer_details: { customer_name: i.customer.name, customer_phone: (i.customer.phone ?? '').replace(/\D/g, '').slice(-10) || '9999999999', customer_email: i.customer.email },
           link_meta: { return_url: i.callbackUrl }, link_notify: { send_sms: false, send_email: false }, link_notes: { reference: i.reference },
           ...(i.expiresAt ? { link_expiry_time: i.expiresAt.toISOString() } : {}) }) });
       return { linkId: r.json.link_id, url: r.json.link_url };
     },
-    async refund(c, paymentId, amountPaise, note) {
+    async refund(c, paymentId, amountMinor, note, currency) {
       // Cashfree refunds by order: the payment ID we keep is "<order>:<payment>".
       const [order] = paymentId.split(':');
       const refundId = `rf_${Date.now()}`;
-      await call(`${cfBase(c)}/orders/${order}/refunds`, { method: 'POST', headers: cfHeaders(c), body: JSON.stringify({ refund_amount: amountPaise / 100, refund_id: refundId, refund_note: note.slice(0, 100) }) });
+      await call(`${cfBase(c)}/orders/${order}/refunds`, { method: 'POST', headers: cfHeaders(c), body: JSON.stringify({ refund_amount: amountMinor / 10 ** currencyDigits(currency), refund_id: refundId, refund_note: note.slice(0, 100) }) });
       return { refundId };
     },
   },
@@ -105,10 +106,10 @@ export const cashfree: Adapter = {
     const payments: PaymentEvent[] = [];
     if (b?.type === 'PAYMENT_LINK_EVENT' && d.link_status === 'PAID') {
       const order = d.order ?? {};
-      payments.push({ kind: 'paid', reference: d.link_notes?.reference ?? d.link_id, providerPaymentId: `${order.order_id ?? ''}:${order.transaction_id ?? ''}`, amountPaise: Math.round(Number(d.link_amount_paid ?? order.order_amount ?? 0) * 100) });
+      payments.push({ kind: 'paid', reference: d.link_notes?.reference ?? d.link_id, providerPaymentId: `${order.order_id ?? ''}:${order.transaction_id ?? ''}`, amountMinor: Math.round(Number(d.link_amount_paid ?? order.order_amount ?? 0) * 100) });
     }
     if (b?.type === 'REFUND_STATUS_WEBHOOK' && d.refund?.refund_status === 'SUCCESS') {
-      payments.push({ kind: 'refunded', reference: '', providerPaymentId: `${d.refund.order_id}:${d.refund.cf_payment_id ?? ''}`, amountPaise: Math.round(Number(d.refund.refund_amount) * 100), refundId: d.refund.refund_id });
+      payments.push({ kind: 'refunded', reference: '', providerPaymentId: `${d.refund.order_id}:${d.refund.cf_payment_id ?? ''}`, amountMinor: Math.round(Number(d.refund.refund_amount) * 100), refundId: d.refund.refund_id });
     }
     return { ok: true, summary: `${b?.type ?? 'event'}`, payments };
   },

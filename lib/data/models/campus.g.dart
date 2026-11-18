@@ -9,7 +9,7 @@ part of 'campus.dart';
 Installment _$InstallmentFromJson(Map<String, dynamic> json) => Installment(
   id: json['id'] as String,
   title: json['title'] as String,
-  amount: (json['amount'] as num).toInt(),
+  amount: json['amount'] as num,
   dueDate: DateTime.parse(json['dueDate'] as String),
   paid: json['paid'] as bool,
   paidOn: json['paidOn'] == null
@@ -35,10 +35,11 @@ Receipt _$ReceiptFromJson(Map<String, dynamic> json) => Receipt(
   id: json['id'] as String,
   installmentId: json['installmentId'] as String,
   title: json['title'] as String,
-  amount: (json['amount'] as num).toInt(),
+  amount: json['amount'] as num,
   paidOn: DateTime.parse(json['paidOn'] as String),
   method: json['method'] as String,
   reference: json['reference'] as String,
+  number: json['number'] as String? ?? '',
 );
 
 Map<String, dynamic> _$ReceiptToJson(Receipt instance) => <String, dynamic>{
@@ -49,6 +50,7 @@ Map<String, dynamic> _$ReceiptToJson(Receipt instance) => <String, dynamic>{
   'paidOn': instance.paidOn.toIso8601String(),
   'method': instance.method,
   'reference': instance.reference,
+  'number': instance.number,
 };
 
 FeeAccount _$FeeAccountFromJson(Map<String, dynamic> json) => FeeAccount(
@@ -82,6 +84,11 @@ Notice _$NoticeFromJson(Map<String, dynamic> json) => Notice(
   attachments: (json['attachments'] as List<dynamic>)
       .map((e) => e as String)
       .toList(),
+  files:
+      (json['files'] as List<dynamic>?)
+          ?.map((e) => Map<String, dynamic>.from(e as Map))
+          .toList() ??
+      [],
   needsAck: json['needsAck'] as bool? ?? false,
   acked: json['acked'] as bool? ?? false,
 );
@@ -96,6 +103,7 @@ Map<String, dynamic> _$NoticeToJson(Notice instance) => <String, dynamic>{
   'date': instance.date.toIso8601String(),
   'author': instance.author,
   'attachments': instance.attachments,
+  'files': instance.files,
   'needsAck': instance.needsAck,
   'acked': instance.acked,
 };
@@ -128,6 +136,8 @@ SchoolEvent _$SchoolEventFromJson(Map<String, dynamic> json) => SchoolEvent(
   rsvps: (json['rsvps'] as List<dynamic>)
       .map((e) => Rsvp.fromJson(e as Map<String, dynamic>))
       .toList(),
+  needsRsvp: json['needsRsvp'] as bool? ?? true,
+  rsvpBy: json['rsvpBy'] == null ? null : DateTime.parse(json['rsvpBy'] as String),
 );
 
 Map<String, dynamic> _$SchoolEventToJson(SchoolEvent instance) =>
@@ -171,6 +181,7 @@ ChatMessage _$ChatMessageFromJson(Map<String, dynamic> json) => ChatMessage(
   text: json['text'] as String,
   sentAt: DateTime.parse(json['sentAt'] as String),
   read: json['read'] as bool,
+  files: (json['files'] as List<dynamic>?)?.map((e) => '$e').toList() ?? const [],
 );
 
 Map<String, dynamic> _$ChatMessageToJson(ChatMessage instance) =>
@@ -317,6 +328,7 @@ GalleryPhoto _$GalleryPhotoFromJson(Map<String, dynamic> json) => GalleryPhoto(
   tagged:
       (json['tagged'] as List<dynamic>?)?.map((e) => e as String).toList() ??
       [],
+  thumbUrl: json['thumbUrl'] as String? ?? '',
 );
 
 Map<String, dynamic> _$GalleryPhotoToJson(GalleryPhoto instance) =>
@@ -335,6 +347,7 @@ GalleryAlbum _$GalleryAlbumFromJson(Map<String, dynamic> json) => GalleryAlbum(
   photos: (json['photos'] as List<dynamic>)
       .map((e) => GalleryPhoto.fromJson(e as Map<String, dynamic>))
       .toList(),
+  yearLabel: json['yearLabel'] as String? ?? '',
 );
 
 Map<String, dynamic> _$GalleryAlbumToJson(GalleryAlbum instance) =>
@@ -344,6 +357,7 @@ Map<String, dynamic> _$GalleryAlbumToJson(GalleryAlbum instance) =>
       'date': instance.date.toIso8601String(),
       'blurb': instance.blurb,
       'photos': instance.photos.map((e) => e.toJson()).toList(),
+      'yearLabel': instance.yearLabel,
     };
 
 AppNotification _$AppNotificationFromJson(Map<String, dynamic> json) =>

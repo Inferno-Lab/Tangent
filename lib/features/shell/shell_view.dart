@@ -5,6 +5,8 @@ import 'package:get/get.dart';
 import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/utils/extensions.dart';
 import 'package:tangent/core/widgets/dock.dart';
+import 'package:tangent/core/widgets/glass.dart';
+import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/core/widgets/lazy_stack.dart';
 import 'package:tangent/features/auth/views/welcome_overlay.dart';
 import 'package:tangent/features/chat/controllers/chat_controller.dart';
@@ -19,6 +21,7 @@ import 'package:tangent/features/homework/views/homework_view.dart';
 import 'package:tangent/features/library/views/library_view.dart';
 import 'package:tangent/features/notices/views/notices_view.dart';
 import 'package:tangent/features/profile/views/profile_view.dart';
+import 'package:tangent/features/school_life/views/diary_view.dart';
 import 'package:tangent/features/shell/shell_controller.dart';
 import 'package:tangent/features/teacher_tools/views/teacher_home_view.dart';
 import 'package:tangent/features/timetable/views/timetable_view.dart';
@@ -90,6 +93,33 @@ class _ShellViewState extends State<ShellView> {
                     ),
                   ),
               ],
+              // The school could not be reached: the saved setup shows, and a plain line says so with a way to try again.
+              if (!_welcome)
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  bottom: 92 + MediaQuery.paddingOf(context).bottom,
+                  child: Obx(
+                    () => !SchoolConfig.stale.value
+                        ? const SizedBox.shrink()
+                        : Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 460),
+                              child: Glass(
+                                radius: 999,
+                                padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+                                child: Row(
+                                  children: [
+                                    Expanded(child: Text('common.config_stale'.tr, style: context.type.cap, maxLines: 2, overflow: TextOverflow.ellipsis)),
+                                    const SizedBox(width: 8),
+                                    Btn('common.retry', kind: BtnKind.quiet, onPressed: () => unawaited(SchoolConfig.load())),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                  ),
+                ),
               if (_welcome)
                 Positioned.fill(
                   child: WelcomeOverlay(
@@ -130,5 +160,6 @@ Map<String, (DockItem, Widget)> _tabsFor(bool teacher, {bool driver = false}) =>
   'transport': (const DockItem(icon: PhosphorIconsRegular.bus, activeIcon: PhosphorIconsBold.bus, label: 'nav.transport'), const TransportView()),
   'library': (const DockItem(icon: PhosphorIconsRegular.books, activeIcon: PhosphorIconsBold.books, label: 'nav.library'), const LibraryView()),
   'gallery': (const DockItem(icon: PhosphorIconsRegular.images, activeIcon: PhosphorIconsBold.images, label: 'nav.gallery'), const GalleryView()),
+  'diary': (const DockItem(icon: PhosphorIconsRegular.notePencil, activeIcon: PhosphorIconsBold.notePencil, label: 'nav.diary'), const DiaryView()),
   'profile': (const DockItem(icon: PhosphorIconsRegular.user, activeIcon: PhosphorIconsBold.user, label: 'nav.profile'), const ProfileView()),
 };

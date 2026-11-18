@@ -2,17 +2,22 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/features/auth/views/account_sheets.dart';
+import 'package:tangent/features/auth/views/password_sheets.dart';
 import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/services/auth_service.dart';
+import 'package:tangent/data/models/user.dart';
 import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/services/theme_service.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_theme.dart';
 import 'package:tangent/core/theme/app_typography.dart';
 import 'package:tangent/core/theme/tokens.dart';
+import 'package:tangent/core/translations/languages.dart';
 import 'package:tangent/core/utils/extensions.dart';
 import 'package:tangent/core/utils/haptics.dart';
+import 'package:tangent/core/widgets/app_icons.dart';
 import 'package:tangent/core/widgets/glass_controls.dart';
 import 'package:tangent/core/widgets/page.dart';
 import 'package:tangent/core/widgets/sheets.dart';
@@ -25,8 +30,6 @@ import 'package:tangent/features/settings/views/privacy_sheet.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-const _locales = [Locale('en'), Locale('hi'), Locale('mr')];
-const _localeNames = ['English', 'हिंदी', 'मराठी'];
 
 /// Text size slider runs 85% to 125%.
 double _scaleOf(double t) => .85 + t * .40;
@@ -61,9 +64,9 @@ class SettingsView extends StatelessWidget {
     final c = context.app;
     return Obx(() {
       final mode = theme.mode.value;
-      // Only the languages the school offers (console: The app → Languages offered).
-      final offered = [for (final (i, l) in _locales.indexed) if (SchoolConfig.languages.contains(l.languageCode)) i];
-      final lang = offered.indexWhere((i) => _locales[i].languageCode == theme.locale.value.languageCode);
+      // Only the languages the school offers (admin: Profile → The app → Languages offered), each by its own name.
+      final offered = [for (final code in SchoolConfig.languages) if (kLanguageNames.containsKey(code)) code];
+      final lang = offered.indexOf(theme.locale.value.languageCode);
       final toggles = <(String, String, bool, ValueChanged<bool>)>[
         ('settings.motion', 'settings.motion_hint', theme.reduceMotion.value, (v) => theme.setReduceMotion(value: v)),
         (
@@ -140,15 +143,47 @@ class SettingsView extends StatelessWidget {
           ),
           if (offered.length > 1) ...[
             SectionLabel('settings.language'.tr, top: 16),
-            GlassSegmented(
-              labels: [for (final i in offered) _localeNames[i]],
-              index: lang < 0 ? 0 : lang,
-              height: 48,
-              droplet: c.ink,
-              dropletText: c.chalk,
-              semanticLabel: 'settings.language'.tr,
-              onChanged: (i) => theme.setLocale(_locales[offered[i]]),
-            ),
+            // A few languages fit side by side; more are a list.
+            if (offered.length <= 3)
+              GlassSegmented(
+                labels: [for (final code in offered) kLanguageNames[code]!],
+                index: lang < 0 ? 0 : lang,
+                height: 48,
+                droplet: c.ink,
+                dropletText: c.chalk,
+                semanticLabel: 'settings.language'.tr,
+                onChanged: (i) => theme.setLocale(Locale(offered[i])),
+              )
+            else
+              EduCard(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final code in offered)
+                      Semantics(
+                        button: true,
+                        selected: code == theme.locale.value.languageCode,
+                        child: Pressable(
+                          label: kLanguageNames[code],
+                          onTap: () {
+                            Haptics.selection();
+                            unawaited(theme.setLocale(Locale(code)));
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            child: Row(
+                              children: [
+                                Expanded(child: Text(kLanguageNames[code]!, style: context.type.b)),
+                                if (code == theme.locale.value.languageCode) Icon(AppIcons.check, size: 18, color: c.brand),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
           ],
           SectionLabel('settings.comfort'.tr, top: 16),
           EduCard(
@@ -195,6 +230,17 @@ class SettingsView extends StatelessWidget {
                 ),
                 const Hr(indent: 46),
                 _LinkRow(icon: PhosphorIconsRegular.shieldCheck, label: 'privacy.title', onTap: () => unawaited(showPrivacy())),
+                const Hr(indent: 46),
+                // Staff sign in with a password; families sign in with a code and have none to change.
+                if (Get.find<AuthService>().role == UserRole.teacher) ...[
+                  _LinkRow(icon: PhosphorIconsRegular.password, label: 'auth.change_password', onTap: () => unawaited(showChangePassword())),
+                  const Hr(indent: 46),
+                ],
+                _LinkRow(icon: PhosphorIconsRegular.at, label: 'account.phone_email', onTap: () => unawaited(showContactChange())),
+                const Hr(indent: 46),
+                _LinkRow(icon: PhosphorIconsRegular.devices, label: 'account.devices', onTap: () => unawaited(showDevices())),
+                const Hr(indent: 46),
+                _LinkRow(icon: PhosphorIconsRegular.signOut, label: 'auth.sign_out_everywhere', onTap: () => unawaited(signOutEverywhere())),
                 const Hr(indent: 46),
                 _LinkRow(
                   icon: PhosphorIconsRegular.signOut,

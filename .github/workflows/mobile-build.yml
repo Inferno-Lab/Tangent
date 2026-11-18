@@ -150,6 +150,17 @@ jobs:
           xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Runner.xcarchive" -exportOptionsPlist "$RUNNER_TEMP/export.plist" -exportPath "$RUNNER_TEMP/out" \
             -allowProvisioningUpdates -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_${KEY_ID}.p8" -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID"
 
+      - name: The store kit (privacy answers and review notes)
+        # Apple's App Privacy and Google's Data safety answers from what the app collects, and the reviewers' notes.
+        if: success()
+        run: node tools/store-kit.mjs --school "${APP_NAME}" --out "$RUNNER_TEMP/store" --demo-user "$(jq -r '.reviewer.user // empty' "$RUNNER_TEMP/kit.json")" --demo-code "$(jq -r '.reviewer.code // empty' "$RUNNER_TEMP/kit.json")"
+      - name: Keep the store kit with the build
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-kit-${{ inputs.platform }}
+          path: ${{ runner.temp }}/store
+
       - name: Tell the console
         if: always()
         run: |

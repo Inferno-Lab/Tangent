@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, Inject, Injectable, Param, Post, Put, Query } from '@nestjs/common';
 import { CORE_MODULES, DEFAULT_PLANS, closeModules, moduleByKey } from '@tangent/config-engine';
-import { BlueprintInput, PlanSave, STEP_LABELS, WIZARD_STEPS, WizardPayload, type BlueprintRow, type PlanRow, type ProvisionRunRow, type WizardDraftRow, type WizardReview } from '@tangent/contracts';
+import { fmtNumber, BlueprintInput, PlanSave, STEP_LABELS, WIZARD_STEPS, WizardPayload, type BlueprintRow, type PlanRow, type ProvisionRunRow, type WizardDraftRow, type WizardReview, tx } from '@tangent/contracts';
 import { newId } from '@tangent/db';
 import { ApiError, ZodPipe, notFound } from '@tangent/nest-kit';
 import { Db, Me, Needs, type ConsoleUser, type reg } from './core.js';
@@ -31,7 +31,7 @@ export class Wizard {
    */
   async savePlan(me: ConsoleUser, key: string | null, body: PlanSave): Promise<PlanRow[]> {
     const unknown = body.modules.filter((m) => !moduleByKey(m));
-    if (unknown.length) throw new ApiError('validation', `There is no module called ${unknown.join(', ')}.`);
+    if (unknown.length) throw new ApiError('validation', tx('There is no module called {p0}.', { p0: unknown.join(', ') }));
     const modules = closeModules(body.modules).filter((m) => !CORE_MODULES.includes(m) || body.modules.includes(m));
     const was = key ? (await this.db.pool.query('select 1 from plans where key = $1', [key])).rowCount : 0;
     if (key && !was) throw notFound('That plan');
@@ -49,7 +49,7 @@ export class Wizard {
   async removePlan(me: ConsoleUser, key: string): Promise<PlanRow[]> {
     const p = (await this.plans()).find((x) => x.key === key);
     if (!p) throw notFound('That plan');
-    if (p.schools) throw new ApiError('conflict', `${p.schools} ${p.schools === 1 ? 'school is' : 'schools are'} on ${p.name}. Move them to another plan first.`);
+    if (p.schools) throw new ApiError('conflict', tx('{schools} {p1} on {name}. Move them to another plan first.', { schools: p.schools, p1: p.schools === 1 ? 'school is' : 'schools are', name: p.name }));
     await this.db.pool.query('delete from plans where key = $1', [key]);
     await this.db.audit(me.email, 'plan.removed', 'plan', key, { name: p.name });
     return this.plans();
@@ -135,7 +135,7 @@ export class Wizard {
     return {
       summary: [
         { label: 'School', detail: `${payload.basics.name} · ${payload.basics.slug}` },
-        { label: 'Plan', detail: `${plan?.name ?? payload.plan.plan} · ${closeModules(payload.plan.modules).length} modules · up to ${payload.plan.students.toLocaleString('en-IN')} students` },
+        { label: 'Plan', detail: `${plan?.name ?? payload.plan.plan} · ${closeModules(payload.plan.modules).length} modules · up to ${fmtNumber(payload.plan.students)} students` },
         { label: 'Where', detail: `${payload.placement.target} · cell ${payload.placement.cell} · ${payload.placement.addressing === 'path' ? 'a path on the test site' : 'its own subdomain'}${payload.placement.customDomain ? ` and ${payload.placement.customDomain}` : ''}` },
         { label: 'First admin', detail: `${payload.admin.name} · ${payload.admin.email}` },
         { label: 'Starting data', detail: payload.data.start === 'demo' ? 'The demo school with sample students' : payload.data.start === 'import' ? 'Empty, ready for an import' : 'Empty' },
@@ -158,11 +158,11 @@ export class Wizard {
     const id = newId('sch');
     const entitlement = { modules: closeModules(payload.plan.modules), features: plan.features ?? {}, limits: plan.limits, locks: payload.plan.locks, overrides: {}, version: 1 };
     const school = (await this.db.query<typeof reg.schools.$inferSelect>(
-      `insert into schools (id, slug, name, short_name, color, logo_text, status, plan, cell, target, region, entitlement, contact, gstin, board, address, addressing, custom_domain, app_name, created_by, ring, api_version, admin_version, demo)
-       values ($1,$2,$3,$4,$5,$6,'onboarding',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'rest',$20,$20,$21) returning *`,
+      `insert into schools (id, slug, name, short_name, color, logo_text, status, plan, cell, target, region, entitlement, contact, gstin, board, address, addressing, custom_domain, app_name, created_by, ring, api_version, admin_version, demo, country, timezone, locale, currency)
+       values ($1,$2,$3,$4,$5,$6,'onboarding',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'rest',$20,$20,$21,$22,$23,$24,$25) returning *`,
       [id, payload.basics.slug, payload.basics.name, payload.basics.shortName, payload.branding.color, payload.branding.logoText, payload.plan.plan, payload.placement.cell, payload.placement.target, cell.region,
         JSON.stringify(entitlement), JSON.stringify({ name: payload.basics.contactName, phone: payload.basics.contactPhone, email: payload.basics.contactEmail }), payload.basics.gstin, payload.basics.board,
-        [payload.basics.address, payload.basics.city].filter(Boolean).join(', '), payload.placement.addressing, payload.placement.customDomain, payload.branding.appName, user.email, this.env.APP_VERSION, payload.data.start === 'demo'])).rows[0]!;
+        [payload.basics.address, payload.basics.city].filter(Boolean).join(', '), payload.placement.addressing, payload.placement.customDomain, payload.branding.appName, user.email, this.env.APP_VERSION, payload.data.start === 'demo', payload.basics.country, payload.basics.timezone, payload.basics.locale, payload.basics.currency])).rows[0]!;
     if (opts.dryRun) {
       // A dry run needs a school record to read from; it is removed as soon as the run has finished.
       try {

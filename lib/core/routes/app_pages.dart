@@ -9,7 +9,6 @@ import 'package:tangent/features/attendance/views/attendance_view.dart';
 import 'package:tangent/features/auth/controllers/login_controller.dart';
 import 'package:tangent/features/auth/controllers/splash_controller.dart';
 import 'package:tangent/features/auth/views/login_view.dart';
-import 'package:tangent/features/auth/views/onboarding_view.dart';
 import 'package:tangent/features/auth/views/splash_view.dart';
 import 'package:tangent/features/chat/controllers/chat_controller.dart';
 import 'package:tangent/features/chat/views/chat_list_view.dart';
@@ -20,6 +19,19 @@ import 'package:tangent/features/driver/controllers/driver_controller.dart';
 import 'package:tangent/features/events/views/events_view.dart';
 import 'package:tangent/features/exams_results/controllers/results_controller.dart';
 import 'package:tangent/features/exams_results/views/results_view.dart';
+import 'package:tangent/features/exams_results/controllers/exam_timetable_controller.dart';
+import 'package:tangent/features/forms/controllers/forms_controller.dart';
+import 'package:tangent/features/forms/views/forms_view.dart';
+import 'package:tangent/features/school_life/controllers/school_life_controllers.dart';
+import 'package:tangent/features/school_life/views/certificates_view.dart';
+import 'package:tangent/features/school_life/views/diary_view.dart';
+import 'package:tangent/features/school_life/views/gate_pass_view.dart';
+import 'package:tangent/features/school_life/views/invite_view.dart';
+import 'package:tangent/features/school_life/views/meetings_view.dart';
+import 'package:tangent/features/school_life/views/staff_time_view.dart';
+import 'package:tangent/features/exams_results/views/exam_timetable_view.dart';
+import 'package:tangent/features/teacher_tools/controllers/roster_controller.dart';
+import 'package:tangent/features/teacher_tools/views/roster_view.dart';
 import 'package:tangent/features/fees/controllers/fees_controller.dart';
 import 'package:tangent/features/fees/views/fees_view.dart';
 import 'package:tangent/features/gallery/controllers/gallery_controller.dart';
@@ -67,6 +79,8 @@ class ShellBinding extends Bindings {
       ..lazyPut(LibraryController.new, fenix: true)
       ..lazyPut(TransportController.new, fenix: true)
       ..lazyPut(GalleryController.new, fenix: true)
+      ..lazyPut(DiaryController.new, fenix: true)
+      ..lazyPut(StaffTimeController.new, fenix: true)
       ..lazyPut(DriverController.new, fenix: true);
   }
 }
@@ -83,7 +97,6 @@ class AppPages {
       }),
       transition: Transition.fadeIn,
     ),
-    GetPage(name: AppRoutes.onboarding, page: () => const OnboardingView(), binding: BindingsBuilder<void>(() => Get.lazyPut(OnboardingController.new, fenix: true)), transition: Transition.fadeIn),
     GetPage(name: AppRoutes.login, page: () => const LoginView(), binding: BindingsBuilder<void>(() => Get.lazyPut(LoginController.new, fenix: true)), transition: Transition.fadeIn),
     GetPage(name: AppRoutes.shell, page: () => const ShellView(), binding: ShellBinding(), middlewares: [AuthMiddleware()], transition: Transition.fadeIn, transitionDuration: AppMotion.t3),
     _page(AppRoutes.attendance, const AttendanceView(), AttendanceController.new),
@@ -103,6 +116,17 @@ class AppPages {
     GetPage(name: AppRoutes.homeworkScan, page: () => const HomeworkScanView(), middlewares: [AuthMiddleware()], transition: Transition.downToUp),
     _page(AppRoutes.timetable, const TimetableView(), TimetableController.new),
     _page(AppRoutes.results, const ResultsView(), ResultsController.new),
+    _page(AppRoutes.examTimetable, const ExamTimetableView(), ExamTimetableController.new),
+    _page(AppRoutes.forms, const FormsView(), FormsController.new),
+    _page(AppRoutes.staffMe, const StaffTimeView(), StaffTimeController.new),
+    _page(AppRoutes.diary, const DiaryView(), DiaryController.new),
+    _page(AppRoutes.teacherDiary, const TeacherDiaryView(), TeacherDiaryController.new),
+    _page(AppRoutes.meetings, const MeetingsView(), MeetingsController.new),
+    _page(AppRoutes.teacherMeetings, const TeacherMeetingsView(), TeacherMeetingsController.new),
+    _page(AppRoutes.gatePass, const GatePassScreen(), GatePassController.new),
+    _page(AppRoutes.inviteVisitor, const InviteView(), InviteController.new),
+    _page(AppRoutes.certificates, const CertificatesView(), CertificatesController.new),
+    _page(AppRoutes.teacherRoster, const RosterView(), RosterController.new),
     _page(AppRoutes.fees, const FeesView(), FeesController.new),
     GetPage(name: AppRoutes.receipt, page: () => const ReceiptView(), middlewares: [AuthMiddleware()], transition: Transition.fadeIn),
     _page(AppRoutes.notices, const NoticesView(), NoticesController.new),

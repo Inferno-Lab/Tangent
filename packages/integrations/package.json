@@ -17,9 +17,11 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
     "@tangent/contracts": "workspace:*",
     "@tangent/security": "workspace:*",
-    "pg": "^8.16.0"
+    "pg": "^8.16.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

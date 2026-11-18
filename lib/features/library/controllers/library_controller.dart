@@ -12,8 +12,8 @@ import 'package:tangent/data/repositories/campus_repository.dart';
 import 'package:tangent/core/utils/clock.dart';
 
 class LibraryController extends GetxController with Loadable {
-  /// Books a student may hold at once.
-  static const limit = 3;
+  /// Books a student may hold at once (the school's library rule).
+  static int get limit => SchoolConfig.libraryMaxLoans;
 
   final query = ''.obs;
   List<LibraryBook> books = [];

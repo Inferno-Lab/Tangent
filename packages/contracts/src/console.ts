@@ -1,11 +1,13 @@
 import { z } from 'zod';
+import { COUNTRIES, isCurrency, isLocale, isZone } from './locale.js';
 import { RESERVED_SLUGS, SLUG_RE } from './common.js';
 import type { Limits, ModuleDates } from './config.js';
+import { localized, localizedLabels } from './i18n.js';
 
 export const CONSOLE_ROLES = ['super_admin', 'implementation', 'support', 'release_manager', 'finance', 'compliance', 'auditor'] as const;
 export const ConsoleRole = z.enum(CONSOLE_ROLES);
 /** What each console role is called and what it is for, kept with the roles so every page says the same. */
-export const CONSOLE_ROLE_INFO: Record<(typeof CONSOLE_ROLES)[number], { label: string; help: string }> = {
+export const CONSOLE_ROLE_INFO: Record<(typeof CONSOLE_ROLES)[number], { label: string; help: string }> = localized({
   super_admin: { label: 'Super admin', help: 'Everything, including the team and the rules for risky changes' },
   implementation: { label: 'Implementation', help: 'Set schools up: configuration, roles, imports and requests' },
   support: { label: 'Support', help: 'Look inside schools, read-only, in support sessions' },
@@ -13,7 +15,7 @@ export const CONSOLE_ROLE_INFO: Record<(typeof CONSOLE_ROLES)[number], { label: 
   finance: { label: 'Finance', help: 'Plans, prices, billing and invoices' },
   compliance: { label: 'Compliance', help: 'Agreements, breaches, erasure and data requests' },
   auditor: { label: 'Auditor', help: 'Read everything, change nothing' },
-};
+});
 export type ConsoleRole = z.infer<typeof ConsoleRole>;
 
 export const SchoolStatus = z.enum(['onboarding', 'live', 'suspended', 'moving', 'offboarding', 'archived']);
@@ -36,7 +38,7 @@ export const STEP_KEYS = ['database', 'keys-storage', 'migrate-seed', 'domain', 
 export const StepKey = z.enum(STEP_KEYS);
 
 /** What each setup step is called on screen. */
-export const STEP_LABELS: Record<(typeof STEP_KEYS)[number], string> = {
+export const STEP_LABELS: Record<(typeof STEP_KEYS)[number], string> = localizedLabels({
   database: 'Database',
   'keys-storage': 'Keys and storage',
   'migrate-seed': 'Migrations and defaults',
@@ -44,7 +46,7 @@ export const STEP_LABELS: Record<(typeof STEP_KEYS)[number], string> = {
   admin: 'First admin',
   'build-profile': 'App build profile',
   'store-checklist': 'Store checklist',
-};
+});
 export type StepKey = z.infer<typeof StepKey>;
 
 export const BlueprintStep = z.object({
@@ -119,13 +121,29 @@ export const PlanSave = z.object({
 export type PlanSave = z.infer<typeof PlanSave>;
 
 /** The boards a school can follow: the one list the wizard and a school's details offer. */
-export const SCHOOL_BOARDS = ['CBSE', 'ICSE', 'State', 'IB', 'International', 'Other'] as const;
+/** The curricula a school can start from (packs.ts sets each one's grading); kept as the registry's `board`. */
+// india-pack: the curricula the onboarding offers, India's among them (their grading is in packs.ts).
+export const SCHOOL_BOARDS = ['CBSE', 'ICSE', 'State', 'British', 'Cambridge', 'IB', 'American', 'International', 'Other'] as const;
 
 /** What Tangent keeps about a school beside its own settings: the contact for Tangent, tax number and board. */
+/**
+ * What a school is billed under (D13): its currency (empty: Tangent's price list's), how many of it one unit of the price
+ * list is worth (fixed in the contract; needed for another currency), and an agreed price per student a year in it.
+ */
+export const SchoolContract = z.object({
+  currency: z.string().trim().toUpperCase().refine((c) => c === '' || isCurrency(c), 'Write a currency code like USD').default(''),
+  rate: z.number().positive().max(1_000_000).nullable().default(null),
+  perStudentYear: z.number().min(0).max(10_000_000).nullable().default(null),
+});
+export type SchoolContract = z.infer<typeof SchoolContract>;
+
 export const SchoolDetailsPatch = z.object({
   contact: z.object({ name: z.string().trim().min(2, 'Enter the contact’s name').max(80), phone: z.string().trim().min(8, 'Enter a phone number').max(24), email: z.string().trim().email('Enter a valid email') }),
   gstin: z.string().trim().max(20).default(''),
   board: z.enum(SCHOOL_BOARDS),
+  contract: SchoolContract.default({ currency: '', rate: null, perStudentYear: null }),
+  /** The region (a cell's region) the school's data must stay in; empty: anywhere. */
+  residency: z.string().trim().max(40).default(''),
 });
 export type SchoolDetailsPatch = z.infer<typeof SchoolDetailsPatch>;
 
@@ -133,7 +151,7 @@ export const WizardBasics = z.object({
   name: z.string().trim().min(3, 'Enter the school’s full name').max(80),
   shortName: z.string().trim().min(2, 'Enter a short name').max(20),
   slug: Slug,
-  board: z.enum(SCHOOL_BOARDS).default('CBSE'),
+  board: z.enum(SCHOOL_BOARDS).default('Other'),
   address: z.string().trim().max(240).default(''),
   city: z.string().trim().max(60).default(''),
   contactName: z.string().trim().min(2).max(80),
@@ -141,6 +159,11 @@ export const WizardBasics = z.object({
   contactEmail: z.string().trim().email('Enter a valid email'),
   gstin: z.string().trim().max(20).default(''),
   language: z.enum(['en', 'hi', 'mr']).default('en'),
+  // Where the school is (locale.ts): its rules, its clock, its way of writing numbers and its currency.
+  country: z.string().refine((c) => COUNTRIES.includes(c), 'Choose the school’s country'),
+  timezone: z.string().refine(isZone, 'Choose a time zone'),
+  locale: z.string().refine(isLocale, 'Choose how dates and numbers are written'),
+  currency: z.string().trim().toUpperCase().refine(isCurrency, 'Write a currency code like USD'),
 });
 
 export const WizardPlan = z.object({
@@ -251,6 +274,8 @@ export interface SchoolRow {
   cell: string;
   target: DeployTarget;
   region: string;
+  /** The school's country (ISO 3166-1), copied from its settings. */
+  country: string;
   versions: { api: string; admin: string; app: string };
   configVersion: number;
   students: number;
@@ -268,6 +293,8 @@ export interface SchoolDetail extends SchoolRow {
   contact: { name: string; phone: string; email: string };
   gstin: string;
   board: string;
+  contract: SchoolContract;
+  residency: string;
   entitlement: {
     plan: string;
     /** As granted (with what they need), before dates are applied. */
@@ -298,16 +325,26 @@ export interface BuildRow {
   createdAt: string;
 }
 
-export const ACTIONS = ['school.golive', 'school.suspend', 'school.resume', 'school.erase', 'entitlements.push', 'migration.run', 'domain.set', 'build.app', 'backup.take', 'backup.restore', 'school.move', 'config.apply', 'integration.live', 'integration.mode', 'retention.erase'] as const;
+export const ACTIONS = ['school.golive', 'school.suspend', 'school.resume', 'school.erase', 'entitlements.push', 'migration.run', 'domain.set', 'build.app', 'backup.take', 'backup.restore', 'school.move', 'config.apply', 'integration.live', 'integration.mode', 'pack.apply', 'retention.erase'] as const;
 /** What each action is called on every console page (approvals, rules for risky changes, history). */
-export const ACTION_LABELS: Record<(typeof ACTIONS)[number], string> = {
+export const ACTION_LABELS: Record<(typeof ACTIONS)[number], string> = localizedLabels({
   'school.golive': 'Take a school live', 'school.suspend': 'Pause a school', 'school.resume': 'Bring a school back', 'school.erase': 'Erase a school',
   'entitlements.push': 'Change a school’s plan and modules', 'migration.run': 'Run database changes', 'domain.set': 'Change a school’s address',
   'build.app': 'Build a school’s app', 'backup.take': 'Take a backup', 'backup.restore': 'Restore a backup', 'school.move': 'Move a school to another cell',
-  'config.apply': 'Change a risky setting', 'integration.live': 'Take a connection live', 'integration.mode': 'Switch the platform to live messages',
+  'config.apply': 'Change a risky setting', 'pack.apply': 'Re-apply part of a starter pack', 'integration.live': 'Take a connection live', 'integration.mode': 'Switch the platform to live messages',
   'retention.erase': 'Erase leavers past retention',
-};
+});
 export const ActionKey = z.enum(ACTIONS);
+
+/** One part (a module's or a school-wide group's settings) of a starter pack, and what re-applying it would change. */
+export interface PackPart { group: string; label: string; changes: { key: string; label: string; before: unknown; after: unknown }[] }
+export const PackApply = z.object({
+  country: z.string().regex(/^[A-Z]{2}$/),
+  curriculum: z.string().max(40).default(''),
+  groups: z.array(z.string().min(1).max(40)).min(1, 'Choose a part to re-apply').max(40),
+  note: z.string().trim().max(300).default(''),
+});
+export type PackApply = z.infer<typeof PackApply>;
 export type ActionKey = z.infer<typeof ActionKey>;
 
 export const ActionRequest = z.object({
@@ -464,6 +501,8 @@ export interface InvoiceRowC {
   schoolName: string;
   period: string;
   amount: number;
+  /** The currency it was made in (the school's contract's). */
+  currency: string;
   /** How the amount was worked out: the plan, then each module added on top of it. */
   lines: { label: string; amount: number }[];
   /** Overdue is worked out: sent and not paid by the due date. */
@@ -487,12 +526,14 @@ export const CONSOLE_PERMISSIONS = [
   'schools.configure',
   // Third parties: connections, routes, templates and the delivery log.
   'integrations.read', 'integrations.write',
+  // Languages: translate, correct and approve the words of every surface (machine drafts included).
+  'languages.write',
 ] as const;
 export type ConsolePermission = (typeof CONSOLE_PERMISSIONS)[number];
 
 export const CONSOLE_ROLE_PERMISSIONS: Record<ConsoleRole, readonly ConsolePermission[]> = {
   super_admin: CONSOLE_PERMISSIONS,
-  implementation: ['schools.read', 'schools.configure', 'sandbox.read', 'audit.read', 'integrations.read', 'integrations.write'],
+  implementation: ['schools.read', 'schools.configure', 'sandbox.read', 'audit.read', 'integrations.read', 'integrations.write', 'languages.write'],
   support: ['schools.read', 'support.access', 'sandbox.read', 'audit.read', 'integrations.read'],
   release_manager: ['schools.read', 'releases.write', 'builds.write', 'flags.write', 'sandbox.read'],
   finance: ['schools.read', 'billing.read', 'billing.write'],
@@ -671,7 +712,18 @@ export interface SchoolConfig {
   feeHeads: { key: string; name: string }[];
   staff: { id: string; name: string; designation: string; roleId: string | null }[];
   versions: ConfigVersionRow[];
+  /** Settings Tangent locked for this school, with the locked value and why. */
+  locks: { key: string; value: unknown; note: string }[];
 }
+
+/** Locks a setting for one school at a value (a floor for a tightened one), or lifts the lock. */
+export const SettingLockPut = z.object({
+  key: z.string().min(1).max(60),
+  locked: z.boolean(),
+  value: z.unknown().optional(),
+  note: z.string().trim().max(200).default(''),
+});
+export type SettingLockPut = z.infer<typeof SettingLockPut>;
 
 export interface RoleDef { id: string; key: string; name: string; description: string; permissions: string[]; locked: boolean; people: number }
 
@@ -716,7 +768,7 @@ const AUDIT_WORDS: Record<string, string> = {
   'blueprint.activated': 'Switched a blueprint on', 'blueprint.saved': 'Saved a blueprint', 'build.requested': 'Asked for an app build', 'cell.changed': 'Changed a cell',
   'cell.created': 'Added a cell', 'cell.removed': 'Removed a cell', 'checklist.changed': 'Changed an app store step', 'config.changed': 'Changed settings', 'flag.removed': 'Removed a flag',
   'flag.set': 'Switched a flag', 'import.committed': 'Imported records', 'import.file_set_aside': 'Set a school’s file aside', 'import.sample_loaded': 'Loaded a test school',
-  'import.undone': 'Undid an import', 'integration.allowlist': 'Changed who gets real messages in test', 'integration.changed': 'Changed a connection',
+  'import.undone': 'Undid an import', 'language.text': 'Translated or approved a text', 'language.draft': 'Drafted translations by machine', 'language.import': 'Brought in a translator’s sheet', 'integration.allowlist': 'Changed who gets real messages in test', 'integration.changed': 'Changed a connection',
   'integration.created': 'Added a connection', 'integration.deleted': 'Deleted a connection', 'integration.mode': 'Switched messages to live or test',
   'integration.retried': 'Sent a failed message again', 'integration.routed': 'Chose a school’s connection', 'integration.template': 'Saved an approved template',
   'integration.template.deleted': 'Deleted an approved template', 'integration.tested': 'Tested a connection', 'integration.unrouted': 'Put a school back on Tangent’s connection',
@@ -739,3 +791,65 @@ export function auditLabel(action: string): string {
   if (c) return `${c[1] === 'breach' ? 'Breach' : c[1] === 'agreement' ? 'Agreement' : 'Compliance item'} ${c[2]!.replace(/_/g, ' ')}`;
   return action.replace(/[._]/g, ' ').replace(/^./, (x) => x.toUpperCase());
 }
+
+/**
+ * A school's settings as its own admin edits them: the values in force, which ones Tangent locked (with the value and why),
+ * and the school's lists the editors pick from. Only the school's own settings can be changed from here (settingOwner).
+ */
+export interface SchoolSettingsView {
+  version: number;
+  /** Every setting as it applies now: defaults, the school's choices and Tangent's locks together. */
+  values: Record<string, unknown>;
+  locks: { key: string; value: unknown; note: string }[];
+  entitled: string[];
+  features: string[];
+  classes: { id: string; name: string }[];
+  feeHeads: { key: string; name: string }[];
+  /** Who a step of a request can name (§3.6.1): the school's roles and its staff. */
+  roles: { key: string; name: string }[];
+  staff: { id: string; name: string }[];
+  subjects: { id: string; name: string }[];
+}
+
+/** A change the school makes to its own settings; a risky one waits for a second person in Approvals. */
+export const SchoolSettingsPatch = z.object({
+  expectedVersion: z.number().int(),
+  changes: z.record(z.string(), z.unknown()),
+  note: z.string().trim().max(200).default(''),
+});
+export type SchoolSettingsPatch = z.infer<typeof SchoolSettingsPatch>;
+
+// ── Languages (docs/one-shot-plan.md §3.5.9) ───────────────────────────────
+
+/** The surfaces whose words are translated: the admin, the console, the shared web parts, shared text (labels, errors) and the app. */
+export const I18N_SURFACES = ['admin', 'console', 'ui', 'text', 'app'] as const;
+export type I18nSurface = (typeof I18N_SURFACES)[number];
+export const I18N_SURFACE_LABELS: Record<I18nSurface, string> = localizedLabels({
+  admin: 'School admin', console: 'Console', ui: 'Shared pieces', text: 'Labels, errors and messages', app: 'The app',
+});
+
+/** One language's progress: per surface, how many texts English has, how many are translated and how many a person approved. */
+export interface LanguageSummary {
+  code: string;
+  surfaces: Record<I18nSurface, { total: number; translated: number; reviewed: number }>;
+}
+
+/** One text of a surface in a language. */
+export interface TranslationRow {
+  key: string;
+  english: string;
+  text: string;
+  /** Approved by a person; a machine draft or a shipped file's text is shown until then but marked. */
+  reviewed: boolean;
+  /** Where the text came from: the repository's file, a machine draft or a person. */
+  source: 'file' | 'machine' | 'person' | 'missing';
+  updatedBy: string | null;
+}
+
+export const TranslationPut = z.object({ key: z.string().min(1).max(4000), text: z.string().max(4000), reviewed: z.boolean() });
+export type TranslationPut = z.infer<typeof TranslationPut>;
+
+/** Machine drafts for the texts a language is missing, a batch at a time (the Hub's translation connection). */
+export const DraftRequest = z.object({ surface: z.enum(I18N_SURFACES), limit: z.number().int().min(1).max(400).default(200) });
+export type DraftRequest = z.infer<typeof DraftRequest>;
+export interface DraftResult { drafted: number; skipped: number; left: number }

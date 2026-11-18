@@ -42,7 +42,8 @@ class Installment {
 
   final String id;
   final String title;
-  final int amount;
+  /// In the school's currency, with its decimals (cents, fils).
+  final num amount;
   final DateTime dueDate;
   final bool paid;
   final DateTime? paidOn;
@@ -80,6 +81,7 @@ class Receipt {
     required this.paidOn,
     required this.method,
     required this.reference,
+    this.number = '',
   });
 
   factory Receipt.fromJson(Map<String, dynamic> json) => _$ReceiptFromJson(json);
@@ -87,10 +89,14 @@ class Receipt {
   final String id;
   final String installmentId;
   final String title;
-  final int amount;
+  final num amount;
   final DateTime paidOn;
   final String method;
   final String reference;
+
+  /// The receipt's number in the school's series; empty in sample data.
+  @JsonKey(defaultValue: '')
+  final String number;
 
   Map<String, dynamic> toJson() => _$ReceiptToJson(this);
 }
@@ -139,6 +145,7 @@ class Notice {
     required this.date,
     required this.author,
     required this.attachments,
+    this.files = const [],
     this.needsAck = false,
     this.acked = false,
   });
@@ -154,6 +161,13 @@ class Notice {
   final DateTime date;
   final String author;
   final List<String> attachments;
+
+  /// The attached files with their ids (to open them); empty in sample data, which has names only.
+  @JsonKey(defaultValue: <Map<String, dynamic>>[])
+  final List<Map<String, dynamic>> files;
+
+  /// The id of the attached file called [name], when the school's server sent it.
+  String? fileId(String name) => files.where((f) => f['name'] == name).map((f) => '${f['id']}').firstOrNull;
 
   /// The school asks families to say they have read it; [acked] once they have.
   @JsonKey(defaultValue: false)
@@ -188,6 +202,8 @@ class SchoolEvent {
     required this.category,
     required this.imageUrl,
     required this.rsvps,
+    this.needsRsvp = true,
+    this.rsvpBy,
   });
 
   factory SchoolEvent.fromJson(Map<String, dynamic> json) =>
@@ -203,6 +219,10 @@ class SchoolEvent {
   final String imageUrl;
   final List<Rsvp> rsvps;
 
+  /// Whether the school asks for a reply, and the last day it takes one (none: until the event).
+  final bool needsRsvp;
+  final DateTime? rsvpBy;
+
   SchoolEvent copyWith({List<Rsvp>? rsvps}) => SchoolEvent(
     id: id,
     title: title,
@@ -213,6 +233,8 @@ class SchoolEvent {
     category: category,
     imageUrl: imageUrl,
     rsvps: rsvps ?? this.rsvps,
+    needsRsvp: needsRsvp,
+    rsvpBy: rsvpBy,
   );
 
   Map<String, dynamic> toJson() => _$SchoolEventToJson(this);
@@ -251,6 +273,7 @@ class ChatMessage {
     required this.text,
     required this.sentAt,
     required this.read,
+    this.files = const [],
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) =>
@@ -262,6 +285,9 @@ class ChatMessage {
   final String text;
   final DateTime sentAt;
   final bool read;
+
+  /// Files sent with it (their ids, opened from the server).
+  final List<String> files;
 
   Map<String, dynamic> toJson() => _$ChatMessageToJson(this);
 }
@@ -458,6 +484,7 @@ class GalleryPhoto {
     required this.url,
     required this.caption,
     this.tagged = const [],
+    this.thumbUrl = '',
   });
 
   factory GalleryPhoto.fromJson(Map<String, dynamic> json) =>
@@ -466,6 +493,12 @@ class GalleryPhoto {
   final String id;
   final String url;
   final String caption;
+
+  /// Its small copy, for covers and strips ('' until the school's upload made one).
+  final String thumbUrl;
+
+  /// What a list shows: the small copy when there is one.
+  String get small => thumbUrl.isNotEmpty ? thumbUrl : url;
 
   /// Students who appear in the photo.
   @JsonKey(defaultValue: <String>[])
@@ -482,6 +515,7 @@ class GalleryAlbum {
     required this.date,
     required this.blurb,
     required this.photos,
+    this.yearLabel = '',
   });
 
   factory GalleryAlbum.fromJson(Map<String, dynamic> json) =>
@@ -492,6 +526,10 @@ class GalleryAlbum {
   final DateTime date;
   final String blurb;
   final List<GalleryPhoto> photos;
+
+  /// The school's academic year it belongs to ('2026–27'); empty in sample data.
+  @JsonKey(defaultValue: '')
+  final String yearLabel;
 
   Map<String, dynamic> toJson() => _$GalleryAlbumToJson(this);
 }

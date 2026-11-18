@@ -412,7 +412,7 @@ class _DayCell extends StatelessWidget {
     final off = isWeeklyOff(date);
     final status = record?.status ?? (off ? AttendanceStatus.holiday : null);
     final label =
-        '${DateFormat('d MMMM').format(date)}, ${switch (status) {
+        '${DateFormat('d MMMM').format(date)}, ${record?.label?.isNotEmpty ?? false ? record!.label : switch (status) {
           AttendanceStatus.present => 'attendance.present'.tr,
           AttendanceStatus.absent => 'attendance.absent'.tr,
           AttendanceStatus.lateArrival => 'attendance.late'.tr,

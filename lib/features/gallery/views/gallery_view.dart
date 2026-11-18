@@ -19,6 +19,14 @@ import 'package:tangent/data/models/campus.dart';
 import 'package:tangent/features/gallery/controllers/gallery_controller.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+/// Opens a photo at full size outside the app; sample photos (no web address) say there is nothing to save.
+Future<void> _openFull(GalleryPhoto photo) async {
+  final uri = Uri.tryParse(photo.url);
+  final ok = uri != null && uri.hasScheme && uri.scheme.startsWith('http') && await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (!ok) ToastHelper.show('gallery.save_unavailable', kind: ToastKind.error);
+}
 
 /// Placeholder pigments while a photo loads or when it cannot.
 List<Color> get _wash => [
@@ -121,7 +129,7 @@ class GalleryView extends GetView<GalleryController> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (rest.isNotEmpty) ...[
-                    Rise(child: Overline('gallery.albums'.trp({'year': _year(hero.date)}))),
+                    Rise(child: Overline('gallery.albums'.trp({'year': _year(hero)}))),
                     const SizedBox(height: 12),
                     Rise(index: 1, child: _AlbumGrid(albums: rest)),
                   ],
@@ -134,11 +142,8 @@ class GalleryView extends GetView<GalleryController> {
     });
   }
 
-  /// Academic year runs June to May.
-  static String _year(DateTime d) {
-    final start = d.month >= 6 ? d.year : d.year - 1;
-    return '$start–${(start + 1) % 100}';
-  }
+  /// The school's own academic year the album belongs to (it may start in any month); the calendar year without one.
+  static String _year(GalleryAlbum a) => a.yearLabel.isNotEmpty ? a.yearLabel : '${a.date.year}';
 }
 
 void _open(GalleryAlbum album, [int index = 0]) => unawaited(
@@ -172,7 +177,7 @@ class _Hero extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 if (album.photos.isNotEmpty)
-                  _Photo(url: album.photos.first.url, wash: _wash[0])
+                  _Photo(url: album.photos.first.small, wash: _wash[0])
                 else
                   ColoredBox(color: _wash[0]),
                 DecoratedBox(
@@ -264,7 +269,7 @@ class _AlbumTile extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (album.photos.isNotEmpty) _Photo(url: album.photos.first.url, wash: wash) else ColoredBox(color: wash),
+              if (album.photos.isNotEmpty) _Photo(url: album.photos.first.small, wash: wash) else ColoredBox(color: wash),
               DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -518,7 +523,7 @@ class _GalleryViewerState extends State<GalleryViewer> with SingleTickerProvider
                             : null,
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(10),
-                          child: _Photo(url: photos[i].url, wash: _wash[0]),
+                          child: _Photo(url: photos[i].small, wash: _wash[0]),
                         ),
                       ),
                     ),),
@@ -536,35 +541,22 @@ class _GalleryViewerState extends State<GalleryViewer> with SingleTickerProvider
                     height: 60,
                     radius: 999,
                     onPigment: true,
-                    child: Obx(() {
-                      final fav = _gallery.favourites.contains(photo.id);
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _BarButton(
-                            icon: PhosphorIconsRegular.export,
-                            label: 'gallery.share',
-                            onTap: () => ToastHelper.show('gallery.shared', kind: ToastKind.success),
-                          ),
-                          _BarButton(
-                            icon: PhosphorIconsRegular.downloadSimple,
-                            label: 'gallery.save',
-                            onTap: () => ToastHelper.show('gallery.saved', kind: ToastKind.success),
-                          ),
-                          _BarButton(
-                            icon: fav ? PhosphorIconsFill.heart : PhosphorIconsRegular.heart,
-                            label: fav ? 'gallery.unfavourite' : 'gallery.favourite',
-                            color: fav ? AppColors.blackboard.badText : null,
-                            onTap: () => fav ? _gallery.favourites.remove(photo.id) : _gallery.favourites.add(photo.id),
-                          ),
-                          _BarButton(
-                            icon: PhosphorIconsRegular.flag,
-                            label: 'gallery.report_label',
-                            onTap: () => unawaited(_report(photo)),
-                          ),
-                        ],
-                      );
-                    }),
+                    // The full photo opens outside the app, where the phone saves or shares it as it does any picture.
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _BarButton(
+                          icon: PhosphorIconsRegular.downloadSimple,
+                          label: 'gallery.save',
+                          onTap: () => unawaited(_openFull(photo)),
+                        ),
+                        _BarButton(
+                          icon: PhosphorIconsRegular.flag,
+                          label: 'gallery.report_label',
+                          onTap: () => unawaited(_report(photo)),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -577,12 +569,11 @@ class _GalleryViewerState extends State<GalleryViewer> with SingleTickerProvider
 }
 
 class _BarButton extends StatelessWidget {
-  const _BarButton({required this.icon, required this.label, required this.onTap, this.color});
+  const _BarButton({required this.icon, required this.label, required this.onTap});
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  final Color? color;
 
   @override
   Widget build(BuildContext context) => Semantics(
@@ -591,7 +582,7 @@ class _BarButton extends StatelessWidget {
     excludeSemantics: true,
     child: GlassPress(
       onTap: onTap,
-      child: SizedBox(width: 44, height: 44, child: Icon(icon, color: color ?? AppColors.white, size: 24)),
+      child: SizedBox(width: 44, height: 44, child: Icon(icon, color: AppColors.white, size: 24)),
     ),
   );
 }

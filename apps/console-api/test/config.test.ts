@@ -8,8 +8,8 @@ let second: string;
 let id: string;
 let school: string;
 
-async function launch(slug: string) {
-  const r = await h.c('POST', '/console/v1/wizard/launch', { token: t, body: { payload: wizardPayload(slug, { data: { start: 'demo' } }) } });
+async function launch(slug: string, payload: object = wizardPayload(slug, { data: { start: 'demo' } })) {
+  const r = await h.c('POST', '/console/v1/wizard/launch', { token: t, body: { payload } });
   for (let i = 0; i < 400; i++) {
     const run = (await h.c('GET', `/console/v1/runs/${r.json.id}`, { token: t })).json;
     if (run.status === 'succeeded' || run.status === 'failed') return run;
@@ -117,7 +117,9 @@ describe('configuration from the console', () => {
     await h.invite(t, { name: 'Ira Implement', email: 'ira@tangent.app', roles: ['implementation'] }, 'long-enough-pass');
     const ira = await h.signIn('ira@tangent.app', 'long-enough-pass');
     expect((await patch({ expectedVersion: (await cfg()).json.version, changes: { 'school.tagline': 'Set by implementation' } }, ira)).status).toBe(200);
-    expect((await h.s('PATCH', '/v1/settings', { school: 'cfgschool', token: school, body: { changes: { 'school.tagline': 'x' } } })).status).toBe(404);
+    // The school changes its own settings now, never Tangent's (the app's look stays with Tangent).
+    const own = await h.s('GET', '/v1/settings/edit', { school: 'cfgschool', token: school });
+    expect((await h.s('PATCH', '/v1/settings', { school: 'cfgschool', token: school, body: { expectedVersion: own.json.version, changes: { 'brand.color': '#123456' } } })).status).toBe(400);
   });
 });
 
@@ -162,4 +164,50 @@ describe('modules per school', () => {
     const none = (await h.c('GET', '/console/v1/billing/invoices', { token: t })).json.filter((i: { schoolId: string; period: string }) => i.schoolId === id && i.period === '2031-06');
     expect(none).toEqual([]);
   }, 60_000);
+
+  it('re-applies part of a starter pack only after a second person approves, and only what differs', async () => {
+    const parts = (await h.c('GET', `/console/v1/schools/${id}/packs/preview?country=GB&curriculum=IB`, { token: t })).json;
+    const exams = parts.find((p: { group: string }) => p.group === 'exams');
+    expect(exams.changes.some((c: { key: string }) => c.key === 'grading.scale')).toBe(true);
+    expect((await h.c('POST', `/console/v1/schools/${id}/packs/apply`, { token: t, body: { country: 'GB', curriculum: 'IB', groups: [] } })).status).toBe(400);
+    const asked = await h.c('POST', `/console/v1/schools/${id}/packs/apply`, { token: t, body: { country: 'GB', curriculum: 'IB', groups: ['exams'], note: 'Moving to IB grading' } });
+    expect(asked.json.status).toBe('pending_approval');
+    // Nothing changes until someone else approves.
+    expect((await h.c('GET', `/console/v1/schools/${id}/packs/preview?country=GB&curriculum=IB`, { token: t })).json.some((p: { group: string }) => p.group === 'exams')).toBe(true);
+    const done = await h.c('POST', `/console/v1/actions/${asked.json.actionId}/approve`, { token: second });
+    expect(done.json.status, JSON.stringify(done.json)).toBe('done');
+    const after = (await h.c('GET', `/console/v1/schools/${id}/packs/preview?country=GB&curriculum=IB`, { token: t })).json;
+    expect(after.some((p: { group: string }) => p.group === 'exams')).toBe(false);
+    // The other parts were left as they were.
+    expect(after.length).toBe(parts.length - 1);
+  }, 60_000);
+  it('bills in the contract’s currency at its rate, never mixing currencies, and keeps the data in its region', async () => {
+    await push({ trialUntil: null });
+    const d = (await h.c('GET', `/console/v1/schools/${id}`, { token: t })).json;
+    const details = (b: Record<string, unknown>) => h.c('PATCH', `/console/v1/schools/${id}/details`, { token: t,
+      body: { contact: { name: d.contact.name || 'Office', phone: d.contact.phone || '+14155550100', email: d.contact.email || 'office@example.org' }, gstin: d.gstin, board: d.board, ...b } });
+    expect((await details({ contract: { currency: 'USD', rate: null, perStudentYear: null } })).status).toBe(400);
+    expect((await details({ residency: 'somewhere-else' })).status).toBe(400);
+    const ok = await details({ contract: { currency: 'USD', rate: 0.012, perStudentYear: null }, residency: d.region });
+    expect(ok.status, JSON.stringify(ok.json)).toBe(200);
+    await h.c('POST', '/console/v1/billing/generate', { token: t, body: { period: '2032-01' } });
+    const inv = (await h.c('GET', '/console/v1/billing/invoices', { token: t })).json.find((i: { schoolId: string; period: string }) => i.schoolId === id && i.period === '2032-01');
+    expect(inv.currency).toBe('USD');
+    expect(inv.amount).toBeCloseTo(inv.lines.reduce((a: number, l: { amount: number }) => a + l.amount, 0), 2);
+    await details({ contract: { currency: '', rate: null, perStudentYear: null }, residency: '' });
+  }, 60_000);
+
+  it('starts a school in another country with its own ways, and nothing of India', async () => {
+    const base = wizardPayload('ukschool');
+    const run = await launch('ukschool', { ...base, basics: { ...base.basics, country: 'GB', timezone: 'Europe/London', locale: 'en-GB', currency: 'GBP', board: 'British', contactPhone: '+44 20 7946 0000' } });
+    expect(run.status).toBe('succeeded');
+    const uk = (await h.c('GET', '/console/v1/schools', { token: t })).json.find((x: any) => x.slug === 'ukschool');
+    const v = (await h.c('GET', `/console/v1/schools/${uk.id}/config`, { token: t })).json.values;
+    expect(v['school.timezone']).toBe('Europe/London');
+    expect(v['school.currency']).toBe('GBP');
+    expect(v['grading.scale'][0].grade).toBe('9');
+    expect(v['fees.paymentMethods'].map((m: any) => m.key)).not.toContain('upi');
+    expect(v['calendar.weeklyOff']).toEqual(['sat', 'sun']);
+    expect((await h.registry.query('select timezone, currency from schools where slug = $1', ['ukschool'])).rows[0]).toEqual({ timezone: 'Europe/London', currency: 'GBP' });
+  });
 });

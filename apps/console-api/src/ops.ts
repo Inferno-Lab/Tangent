@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Header, HttpCode, Inject, Injectable, Logger, Param, Post, Put, Query, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
 import { POOLS } from './tokens.js';
-import { MODULES, activeModules, closeModules, moduleByKey } from '@tangent/config-engine';
-import { CellCreate, CellPatch, CONSOLE_PERMISSIONS, DEPLOY_TARGET_LABELS, InvoicePaid, auditLabel, CONSOLE_ROLES, WizardPayload, type AuditRow, type DeployTarget, type ConsoleRole, type FleetSummary, type ConsoleUserRow, type FlagRow, type EntitlementDoc, type EntitlementRow, type InvoiceRowC, type SupportSessionRow, type SupportToken } from '@tangent/contracts';
+import { MODULES, PRICE_CURRENCY, activeModules, closeModules, moduleByKey } from '@tangent/config-engine';
+import { fmtMoney, roundToCurrency, type SchoolContract, CellCreate, CellPatch, CONSOLE_PERMISSIONS, DEPLOY_TARGET_LABELS, InvoicePaid, auditLabel, CONSOLE_ROLES, WizardPayload, type AuditRow, type DeployTarget, type ConsoleRole, type FleetSummary, type ConsoleUserRow, type FlagRow, type EntitlementDoc, type EntitlementRow, type InvoiceRowC, type SupportSessionRow, type SupportToken, tx } from '@tangent/contracts';
 import { migrate, newId, pg, scheduleJob } from '@tangent/db';
 import { topUpDemo } from '@tangent/db/seed';
 import { ApiError, ZodPipe, alert, notFound } from '@tangent/nest-kit';
@@ -144,13 +144,13 @@ export class Admin {
   }
 
   async invoices(): Promise<InvoiceRowC[]> {
-    const { rows } = await this.db.pool.query<{ id: string; school_id: string; school_name: string; period: string; amount: number; status: InvoiceRowC['status']; lines: InvoiceRowC['lines']; sent_at: Date | null; sent_to: string | null; paid_on: string | null; paid_ref: string | null }>(
-      'select id, school_id, school_name, period, amount, status, lines, sent_at, sent_to, paid_on::text, paid_ref from invoices order by period desc, school_name limit 1000');
+    const { rows } = await this.db.pool.query<{ id: string; school_id: string; school_name: string; period: string; amount: number; status: InvoiceRowC['status']; lines: InvoiceRowC['lines']; sent_at: Date | null; sent_to: string | null; paid_on: string | null; paid_ref: string | null; currency: string }>(
+      'select id, school_id, school_name, period, amount, currency, status, lines, sent_at, sent_to, paid_on::text, paid_ref from invoices order by period desc, school_name limit 1000');
     const today = new Date().toISOString().slice(0, 10);
     return rows.map((r) => {
       const dueOn = dueFor(r.period);
       return {
-        id: r.id, schoolId: r.school_id, schoolName: r.school_name, period: r.period, amount: r.amount, lines: r.lines ?? [], dueOn,
+        id: r.id, schoolId: r.school_id, schoolName: r.school_name, period: r.period, amount: Number(r.amount), currency: r.currency, lines: r.lines ?? [], dueOn,
         status: r.status === 'sent' && dueOn < today ? 'overdue' : r.status, sentAt: r.sent_at?.toISOString() ?? null, sentTo: r.sent_to, paidOn: r.paid_on, paidRef: r.paid_ref,
       };
     });
@@ -158,13 +158,14 @@ export class Admin {
 
   /** Emails the invoice to the school's contact through Tangent's email connection, and says when and to whom. */
   async sendInvoice(user: string, id: string, hub: PlatformHub['hub']): Promise<string> {
-    const r = (await this.db.pool.query<{ school_id: string; period: string; amount: number; lines: InvoiceRowC['lines']; status: string }>('select school_id, period, amount, lines, status from invoices where id = $1', [id])).rows[0];
+    const r = (await this.db.pool.query<{ school_id: string; period: string; amount: number; lines: InvoiceRowC['lines']; status: string; currency: string }>('select school_id, period, amount, lines, status, currency from invoices where id = $1', [id])).rows[0];
     if (!r) throw notFound('That invoice');
     if (r.status === 'paid') throw new ApiError('conflict', 'That invoice is paid already.');
     const s = (await this.db.pool.query<{ name: string; contact: { name: string; email: string }; gstin: string }>('select name, contact, gstin from schools where id = $1', [r.school_id])).rows[0]!;
-    if (!s.contact?.email) throw new ApiError('validation', `${s.name} has no contact email. Add one under its details first.`);
-    const inr = (n: number) => `₹${n.toLocaleString('en-IN')}`;
-    const body = [`Dear ${s.contact.name},`, '', `Tangent invoice for ${s.name}, ${r.period}${s.gstin ? ` (GSTIN ${s.gstin})` : ''}:`, ...r.lines.map((l) => `  ${l.label}: ${inr(l.amount)}`), `Total: ${inr(r.amount)}`, `Due by ${dueFor(r.period)}.`, '', 'Thank you.'].join('\n');
+    if (!s.contact?.email) throw new ApiError('validation', tx('{name} has no contact email. Add one under its details first.', { name: s.name }));
+    // In the currency the invoice was made in: the school's contract's (D13).
+    const inr = (n: number) => fmtMoney(n, r.currency);
+    const body = [`Dear ${s.contact.name},`, '', `Tangent invoice for ${s.name}, ${r.period}${s.gstin ? ` (tax number ${s.gstin})` : ''}:`, ...r.lines.map((l) => `  ${l.label}: ${inr(l.amount)}`), `Total: ${inr(r.amount)}`, `Due by ${dueFor(r.period)}.`, '', 'Thank you.'].join('\n');
     await hub.send({ schoolId: null, schoolSlug: 'console', channel: 'email', to: s.contact.email, subject: `Tangent invoice ${r.period} · ${s.name}`, body, now: true });
     await this.db.pool.query("update invoices set status = 'sent', sent_at = now(), sent_to = $2 where id = $1", [id, s.contact.email]);
     await this.db.audit(user, 'invoice.sent', 'invoice', id, { to: s.contact.email });
@@ -182,31 +183,38 @@ export class Admin {
   /**
    * One invoice per live school for the month, from exactly what it has on the month's last day: students times the plan's yearly
    * price, plus each module added on top of the plan at its add-on price, divided by twelve. A school in its trial pays nothing.
+   * Each is in the school's contract currency: the price list at the contract's rate, or its agreed price per student. A school
+   * billed in another currency with neither is left out (and named in the audit) rather than billed in the wrong money.
    * Safe to run twice.
    */
   async billMonth(user: string, period: string): Promise<number> {
     if (!/^\d{4}-\d{2}$/.test(period)) throw new ApiError('validation', 'Use a month like 2026-10.');
     const [y, mo] = period.split('-').map(Number) as [number, number];
     const lastDay = new Date(Date.UTC(y, mo, 0)).toISOString().slice(0, 10);
-    const { rows } = await this.db.pool.query<{ id: string; name: string; students_count: number; per: number; plan_name: string; plan_modules: string[]; entitlement: EntitlementDoc }>(
-      "select s.id, s.name, s.students_count, s.entitlement, p.per_student_year per, p.name plan_name, p.modules plan_modules from schools s join plans p on p.key = s.plan where s.status = 'live' and s.deleted_at is null");
+    const { rows } = await this.db.pool.query<{ id: string; name: string; students_count: number; per: number; plan_name: string; plan_modules: string[]; entitlement: EntitlementDoc; contract: Partial<SchoolContract> }>(
+      "select s.id, s.name, s.students_count, s.entitlement, s.contract, p.per_student_year per, p.name plan_name, p.modules plan_modules from schools s join plans p on p.key = s.plan where s.status = 'live' and s.deleted_at is null");
     let made = 0;
+    const unpriced: string[] = [];
     for (const s of rows) {
       if (s.entitlement.trialUntil && s.entitlement.trialUntil >= lastDay) continue;
       const exists = await this.db.pool.query('select 1 from invoices where school_id = $1 and period = $2', [s.id, period]);
       if (exists.rowCount) continue;
-      const month = (perYear: number) => Math.round((s.students_count * perYear) / 12);
+      const currency = s.contract?.currency || PRICE_CURRENCY;
+      const rate = currency === PRICE_CURRENCY ? 1 : s.contract?.rate ?? null;
       const inPlan = closeModules(s.plan_modules);
+      const added = activeModules(s.entitlement, lastDay).filter((k) => !inPlan.includes(k)).map((k) => moduleByKey(k)!).filter((m) => m.addOnPerStudentYear > 0);
+      // Without a rate, only an agreed price per student and no add-ons can be billed in another currency.
+      if (rate === null && (s.contract?.perStudentYear == null || added.length)) { unpriced.push(s.name); continue; }
+      const month = (perYear: number) => roundToCurrency((s.students_count * perYear) / 12, currency);
       const lines = [
-        { label: `${s.plan_name} plan, ${s.students_count} students`, amount: month(s.per) },
-        ...activeModules(s.entitlement, lastDay).filter((k) => !inPlan.includes(k)).map((k) => moduleByKey(k)!).filter((m) => m.addOnPerStudentYear > 0)
-          .map((m) => ({ label: `${m.name} (added)`, amount: month(m.addOnPerStudentYear) })),
+        { label: `${s.plan_name} plan, ${s.students_count} students`, amount: month(s.contract?.perStudentYear ?? s.per * rate!) },
+        ...added.map((m) => ({ label: `${m.name} (added)`, amount: month(m.addOnPerStudentYear * rate!) })),
       ];
-      await this.db.pool.query("insert into invoices (id, school_id, school_name, period, amount, status, lines) values ($1,$2,$3,$4,$5,'draft',$6)",
-        [newId('inv'), s.id, s.name, period, lines.reduce((a, l) => a + l.amount, 0), JSON.stringify(lines)]);
+      await this.db.pool.query("insert into invoices (id, school_id, school_name, period, amount, status, lines, currency) values ($1,$2,$3,$4,$5,'draft',$6,$7)",
+        [newId('inv'), s.id, s.name, period, roundToCurrency(lines.reduce((a, l) => a + l.amount, 0), currency), JSON.stringify(lines), currency]);
       made++;
     }
-    await this.db.audit(user, 'billing.generated', 'invoice', period, { made });
+    await this.db.audit(user, 'billing.generated', 'invoice', period, { made, unpriced });
     return made;
   }
 
@@ -234,7 +242,7 @@ export class Admin {
   async invite(id: string, hub: PlatformHub['hub'], consoleUrl: string): Promise<{ link: string }> {
     const m = (await this.db.pool.query<{ name: string; email: string; status: string }>('select name, email, status from console_users where id = $1', [id])).rows[0];
     if (!m) throw notFound('That person');
-    if (m.status !== 'invited') throw new ApiError('conflict', `${m.name} has an account already. Change their password or authenticator instead.`);
+    if (m.status !== 'invited') throw new ApiError('conflict', tx('{name} has an account already. Change their password or authenticator instead.', { name: m.name }));
     const token = randomToken(24);
     await this.db.pool.query("update console_users set invite_hash = $2, invite_expires = now() + interval '7 days' where id = $1", [id, sha256(token)]);
     const link = `${consoleUrl.replace(/\/$/, '')}/join?token=${token}`;
@@ -373,8 +381,8 @@ export class Bootstrap implements OnApplicationBootstrap {
     const cell = (await this.db.pool.query<{ key: string; target: DeployTarget }>('select key, target from cells order by key limit 1')).rows[0];
     if (!cell) return;
     const payload = WizardPayload.parse({
-      basics: { name: 'Greenfield International School', shortName: 'Greenfield', slug: 'greenfield', board: 'International', address: '42, Baner Road, Baner', city: 'Pune', contactName: 'Neha Menon', contactPhone: '+91 98220 41200', contactEmail: 'neha.menon@greenfield.edu.in', language: 'en' },
-      plan: { plan: 'premium', modules: ['people', 'attendance', 'fees', 'notices', 'timetable', 'homework', 'events', 'exams', 'chat', 'transport', 'library', 'gallery'], students: 1500 },
+      basics: { name: 'Greenfield International School', shortName: 'Greenfield', slug: 'greenfield', board: 'CBSE', address: '42, Baner Road, Baner', city: 'Pune', contactName: 'Neha Menon', contactPhone: '+91 98220 41200', contactEmail: 'neha.menon@greenfield.edu.in', language: 'en', country: 'IN', timezone: 'Asia/Kolkata', locale: 'en-IN', currency: 'INR' },
+      plan: { plan: 'premium', modules: ['people', 'attendance', 'fees', 'notices', 'timetable', 'homework', 'events', 'exams', 'chat', 'transport', 'library', 'gallery', 'staffAttendance', 'diary', 'ptm', 'visitors', 'certificates'], students: 1500 },
       branding: { color: '#6A4CF5', logoText: 'G', appName: 'Greenfield', tagline: 'Curiosity first. Kindness always.' },
       placement: { target: cell.target, cell: cell.key, addressing: 'path' },
       admin: { name: 'Neha Menon', email: 'neha.menon@greenfield.edu.in', phone: '+91 98220 41200', invite: 'both', roles: ['principal'] },
@@ -400,8 +408,8 @@ export class OpsController {
   ) {}
 
   @Get('fleet') @Needs('schools.read')
-  async fleet(@Me() me: ConsoleUser): Promise<FleetSummary> {
-    return { ...(await this.schools.fleet(me.id)), release: await this.releases.latest() };
+  async fleet(@Me() me: ConsoleUser, @Query('tz') tz?: string): Promise<FleetSummary> {
+    return { ...(await this.schools.fleet(me.id, tz)), release: await this.releases.latest() };
   }
 
   @Post('fleet/incident/:id/dismiss') @HttpCode(204) @Needs('schools.read')
@@ -430,7 +438,7 @@ export class OpsController {
   @Delete('cells/:key') @HttpCode(204) @Needs('policy.write')
   async removeCell(@Me() me: ConsoleUser, @Param('key') key: string): Promise<void> {
     const n = (await this.db.pool.query<{ n: string }>('select count(*) n from schools where cell = $1', [key])).rows[0]!.n;
-    if (Number(n)) throw new ApiError('conflict', `${n} ${n === '1' ? 'school is' : 'schools are'} on this cell (archived ones too). Move them first.`);
+    if (Number(n)) throw new ApiError('conflict', tx('{n} {p1} on this cell (archived ones too). Move them first.', { n, p1: n === '1' ? 'school is' : 'schools are' }));
     const r = await this.db.pool.query('delete from cells where key = $1', [key]);
     if (!r.rowCount) throw notFound('That cell');
     await this.db.audit(me.email, 'cell.removed', 'cell', key);
@@ -457,10 +465,10 @@ export class OpsController {
   async patchCell(@Me() me: ConsoleUser, @Param('key') key: string, @Body(new ZodPipe(CellPatch)) body: CellPatch): Promise<{ ok: true }> {
     const cur = (await this.db.pool.query<{ n: string }>('select (select count(*) from schools s where s.cell = c.key and s.deleted_at is null) n from cells c where c.key = $1', [key])).rows[0];
     if (!cur) throw notFound('That cell');
-    if (body.maxSchools !== undefined && body.maxSchools < Number(cur.n)) throw new ApiError('validation', `${cur.n} schools already run here, so the limit cannot go below that.`, { fields: { maxSchools: `At least ${cur.n}.` } });
+    if (body.maxSchools !== undefined && body.maxSchools < Number(cur.n)) throw new ApiError('validation', tx('{n} schools already run here, so the limit cannot go below that.', { n: cur.n }), { fields: { maxSchools: tx('At least {n}.', { n: cur.n }) } });
     if (body.connectionId !== undefined) {
       await this.databasesConnection(body.connectionId);
-      if (Number(cur.n) > 0) throw new ApiError('conflict', `${cur.n} schools already run on this cell’s server, so its database connection stays. Move them to another cell first.`);
+      if (Number(cur.n) > 0) throw new ApiError('conflict', tx('{n} schools already run on this cell’s server, so its database connection stays. Move them to another cell first.', { n: cur.n }));
       await this.db.pool.query('update cells set connection_id = $2 where key = $1', [key, body.connectionId]);
     }
     await this.db.pool.query('update cells set region = coalesce($2, region), max_schools = coalesce($3, max_schools), accepting = coalesce($4, accepting) where key = $1', [key, body.region ?? null, body.maxSchools ?? null, body.accepting ?? null]);

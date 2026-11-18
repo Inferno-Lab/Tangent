@@ -1,11 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
-import { initials, type AppRoleKey, type ClientKind, type LoginChallenge, type LoginRequest, type LoginResponse, type Permission, type SessionUser, type TokenPair } from '@tangent/contracts';
+import { toE164, initials, type AppRoleKey, type ClientKind, type LoginChallenge, type LoginRequest, type LoginResponse, type Permission, type SessionUser, type TokenPair, tx, type ContactFinish, type ContactStart, type SessionRow } from '@tangent/contracts';
 import { hashPassword, maskEmail, maskPhone, passwordNeedsRehash, randomCode, randomToken, sha256, signJwt, verifyPassword, constantTimeEqual } from '@tangent/security';
 import { ENV, type Env } from '../env.js';
 import { ApiError } from '@tangent/nest-kit';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { AuditService, Messenger, SettingsService } from '../school/support.js';
+import { BUS_CREW_SQL } from '../school/transport.service.js';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { checkCookieCsrf, clearSchoolRefreshCookie, schoolCookieToken, setSchoolRefreshCookie } from './session-cookies.js';
 
@@ -44,6 +45,14 @@ function sessionExpiry(created: Date, life: Life): Date {
   return new Date(Math.min(Date.now() + life.idleDays * 86_400_000, created.getTime() + life.maxDays * 86_400_000));
 }
 
+/** A device in plain words from its user agent: the app on a phone, or a browser on a computer. */
+export function deviceOf(ua: string | null): string {
+  const a = ua ?? '';
+  const os = /Android/i.test(a) ? 'Android' : /iPhone|iPad|iOS/i.test(a) ? 'iPhone or iPad' : /Windows/i.test(a) ? 'Windows' : /Mac OS|Macintosh/i.test(a) ? 'Mac' : /Linux/i.test(a) ? 'Linux' : '';
+  const app = /Dart|okhttp|Tangent/i.test(a) ? 'Tangent app' : /Edg\//.test(a) ? 'Edge' : /Chrome\//.test(a) ? 'Chrome' : /Firefox\//.test(a) ? 'Firefox' : /Safari\//.test(a) ? 'Safari' : '';
+  return [app, os].filter(Boolean).join(', ') || 'Unknown device';
+}
+
 @Injectable()
 export class AuthService {
   private readonly live = new Map<string, { at: number; ok: boolean }>();
@@ -72,7 +81,7 @@ export class AuthService {
     const user = await this.findUser(t, body.identifier);
     if (user?.locked_until && user.locked_until > new Date()) {
       const retryAfter = Math.ceil((user.locked_until.getTime() - Date.now()) / 1000);
-      throw new ApiError('locked', `Too many wrong attempts. Try again in ${Math.ceil(retryAfter / 60)} minutes, or reset your password by SMS.`, { retryAfter });
+      throw new ApiError('locked', tx('Too many wrong attempts. Try again in {p0} minutes, or reset your password by SMS.', { p0: Math.ceil(retryAfter / 60) }), { retryAfter });
     }
     if (user && !user.password_hash) throw new ApiError('validation', 'This account has no password. Sign in with a code sent to your phone instead.', { fields: { password: 'Sign in with a code instead.' } });
     dummyHash ??= hashPassword('not-a-real-password');
@@ -82,7 +91,7 @@ export class AuthService {
         const failed = user.failed_logins + 1;
         const lock = failed >= MAX_PASSWORD_TRIES;
         await t.pool.query('update users set failed_logins = $2, locked_until = $3 where id = $1', [user.id, lock ? 0 : failed, lock ? new Date(Date.now() + LOCK_MINUTES * 60_000) : null]);
-        if (lock) throw new ApiError('locked', `Too many wrong attempts. Try again in ${LOCK_MINUTES} minutes, or reset your password by SMS.`, { retryAfter: LOCK_MINUTES * 60 });
+        if (lock) throw new ApiError('locked', tx('Too many wrong attempts. Try again in {LOCK_MINUTES} minutes, or reset your password by SMS.', { LOCK_MINUTES }), { retryAfter: LOCK_MINUTES * 60 });
         throw new ApiError('unauthenticated', 'That password isn’t right. Check it, or reset it by SMS.', { attemptsLeft: MAX_PASSWORD_TRIES - failed, fields: { password: 'That password isn’t right.' } });
       }
       throw new ApiError('unauthenticated', 'We couldn’t find an account with those details.', { fields: { identifier: 'We couldn’t find an account with those details.' } });
@@ -113,7 +122,7 @@ export class AuthService {
   async appRole(t: TenantCtx, user: { id: string; kind: string }): Promise<AppRoleKey> {
     if (user.kind === 'guardian') return 'parent';
     if (user.kind === 'student') return 'student';
-    const { rowCount } = await t.pool.query('select 1 from transport_routes where driver_user_id = $1 limit 1', [user.id]);
+    const { rowCount } = await t.pool.query(BUS_CREW_SQL, [user.id]);
     return rowCount ? 'driver' : 'teacher';
   }
 
@@ -139,7 +148,7 @@ export class AuthService {
     const u = (await t.pool.query<{ password_hash: string | null }>('select password_hash from users where id = $1', [user.id])).rows[0];
     if (!u?.password_hash || !(await verifyPassword(current, u.password_hash))) throw new ApiError('validation', 'That is not your current password.', { fields: { current: 'Not your current password.' } });
     const min = Number((await this.settings.doc(t)).values['security.passwordMinLength'] ?? 8);
-    if (next.length < min) throw new ApiError('validation', `Use at least ${min} characters.`, { fields: { next: `At least ${min} characters.` } });
+    if (next.length < min) throw new ApiError('validation', tx('Use at least {min} characters.', { min }), { fields: { next: tx('At least {min} characters.', { min }) } });
     if (next === current) throw new ApiError('validation', 'Choose a password you have not used here.', { fields: { next: 'The same as now.' } });
     await t.pool.query('update users set password_hash = $2 where id = $1', [user.id, await hashPassword(next)]);
     await t.pool.query('update sessions set revoked_at = now() where user_id = $1 and id <> $2 and revoked_at is null', [user.id, user.sid]);
@@ -148,7 +157,7 @@ export class AuthService {
 
   async resetFinish(t: TenantCtx, challengeId: string, code: string, password: string): Promise<void> {
     const min = Number((await this.settings.doc(t)).values['security.passwordMinLength'] ?? 8);
-    if (password.length < min) throw new ApiError('validation', `Use at least ${min} characters.`, { fields: { password: `At least ${min} characters.` } });
+    if (password.length < min) throw new ApiError('validation', tx('Use at least {min} characters.', { min }), { fields: { password: tx('At least {min} characters.', { min }) } });
     const userId = await this.useCode(t, challengeId, code, 'reset');
     await t.pool.query('update users set password_hash = $2, failed_logins = 0, locked_until = null where id = $1', [userId, await hashPassword(password)]);
     // A new password ends every session, on every device.
@@ -169,45 +178,91 @@ export class AuthService {
     const { rows } = await t.pool.query<UserRow & { kind: string }>(
       byEmail
         ? 'select id, name, email, phone, password_hash, status, failed_logins, locked_until, token_version, kind from users where lower(email) = $1 limit 1'
-        : "select id, name, email, phone, password_hash, status, failed_logins, locked_until, token_version, kind from users where right(regexp_replace(coalesce(phone,''), '\\D', '', 'g'), 10) = right($1, 10) limit 1",
-      [byEmail ? ident.toLowerCase() : digits],
+        : 'select id, name, email, phone, password_hash, status, failed_logins, locked_until, token_version, kind from users where phone = $1 limit 1',
+      // A number typed locally takes the school's country; one with + or 00 is taken as it is.
+      [byEmail ? ident.toLowerCase() : toE164(ident, t.info.country) ?? `+${digits}`],
     );
     return rows[0];
   }
 
-  private async sendCode(t: TenantCtx, user: { id: string; phone: string | null; email: string | null }, purpose: 'sign_in' | 'reset'): Promise<LoginChallenge> {
+  private async sendCode(t: TenantCtx, user: { id: string; phone: string | null; email: string | null }, purpose: 'sign_in' | 'reset' | 'contact', target?: { channel: 'sms' | 'email'; to: string }): Promise<LoginChallenge> {
     const demo = t.info.demo;
+    let sends = 0;
     if (!demo) {
       const { rows: [r] } = await t.pool.query<{ n: string; first: Date | null }>(
         `select count(*) n, min(created_at) first from otp_challenges where user_id = $1 and created_at > now() - interval '${OTP_WINDOW_MINUTES} minutes'`, [user.id]);
       if (Number(r!.n) >= OTP_SENDS) {
         const retryAfter = Math.max(60, Math.ceil((r!.first!.getTime() + OTP_WINDOW_MINUTES * 60_000 - Date.now()) / 1000));
-        throw new ApiError('rate_limited', `Too many codes sent. Try again in ${Math.ceil(retryAfter / 60)} minutes.`, { retryAfter });
+        throw new ApiError('rate_limited', tx('Too many codes sent. Try again in {p0} minutes.', { p0: Math.ceil(retryAfter / 60) }), { retryAfter });
       }
+      sends = Number(r!.n) + 1;
     }
     const code = demo ? DEMO_CODE : randomCode(6);
     const id = newId('otp');
-    const channel: 'sms' | 'email' = user.phone ? 'sms' : 'email';
-    await t.pool.query('insert into otp_challenges (id, user_id, code_hash, channel, purpose, expires_at) values ($1,$2,$3,$4,$5,$6)', [id, user.id, sha256(`${id}:${code}`), channel, purpose, new Date(Date.now() + OTP_MINUTES * 60_000)]);
-    const what = purpose === 'reset' ? 'code to set a new password' : 'sign-in code';
+    const channel: 'sms' | 'email' = target?.channel ?? (user.phone ? 'sms' : 'email');
+    const to = target?.to ?? (channel === 'sms' ? user.phone : user.email) ?? '';
+    await t.pool.query('insert into otp_challenges (id, user_id, code_hash, channel, purpose, expires_at, target) values ($1,$2,$3,$4,$5,$6,$7)', [id, user.id, sha256(`${id}:${code}`), channel, purpose, new Date(Date.now() + OTP_MINUTES * 60_000), target?.to ?? null]);
+    const what = purpose === 'reset' ? 'code to set a new password' : purpose === 'contact' ? 'code to confirm this address' : 'sign-in code';
     try {
       // Sent now (never queued or held): the person is waiting on the sign-in screen.
       await this.messenger.send(t, {
-        channel, to: (channel === 'sms' ? user.phone : user.email) ?? '', subject: channel === 'email' ? `Your Tangent ${what}` : undefined,
+        channel, to, subject: channel === 'email' ? `Your Tangent ${what}` : undefined,
         body: `Your Tangent ${what} for ${t.info.shortName} is ${code}. It expires in ${OTP_MINUTES} minutes.`,
         key: purpose === 'reset' ? 'auth.reset' : 'auth.code', vars: { code, school: t.info.shortName, minutes: String(OTP_MINUTES) }, now: true,
       });
     } catch {
       throw new ApiError('school_unavailable', 'We could not send the code just now. Try again in a minute.');
     }
+    // Another code after a short wait; the last one allowed in the window waits for the window to end.
+    const resendInSeconds = sends >= OTP_SENDS ? OTP_WINDOW_MINUTES * 60 : 30 * Math.max(1, sends);
     return {
-      challengeId: id, channel, maskedTo: channel === 'sms' ? maskPhone(user.phone!) : maskEmail(user.email!),
-      expiresInSeconds: OTP_MINUTES * 60, ...(demo ? { demoCode: DEMO_CODE } : {}),
+      challengeId: id, channel, maskedTo: channel === 'sms' ? maskPhone(to) : maskEmail(to),
+      expiresInSeconds: OTP_MINUTES * 60, resendInSeconds, ...(demo ? { demoCode: DEMO_CODE } : {}),
     };
   }
 
+  /** A new phone number or email for one's own account: free (no one else has it), then confirmed by a code sent to it. */
+  async startContact(t: TenantCtx, userId: string, b: ContactStart): Promise<LoginChallenge> {
+    const u = (await t.pool.query<{ id: string; phone: string | null; email: string | null }>("select id, phone, email from users where id = $1 and status = 'active'", [userId])).rows[0];
+    if (!u) throw new ApiError('unauthenticated', 'Your session has ended. Sign in again.');
+    const to = b.phone ? this.settings.phone(t, b.phone, 'phone') : b.email!.toLowerCase();
+    if (to === (b.phone ? u.phone : u.email?.toLowerCase())) throw new ApiError('validation', tx('That is already yours.'), { fields: { [b.phone ? 'phone' : 'email']: tx('That is already yours.') } });
+    const taken = await t.pool.query(b.phone ? 'select 1 from users where phone = $1 and id <> $2' : 'select 1 from users where lower(email) = $1 and id <> $2', [to, userId]);
+    if (taken.rowCount) throw new ApiError('conflict', tx('Another account at the school has it. Ask the school office.'), { fields: { [b.phone ? 'phone' : 'email']: tx('Already in use.') } });
+    return this.sendCode(t, u, 'contact', { channel: b.phone ? 'sms' : 'email', to });
+  }
+
+  /** The code from the new address: the account (and, for a parent, the family's record the school messages) takes it. */
+  async finishContact(t: TenantCtx, userId: string, b: ContactFinish): Promise<void> {
+    const who = await this.useCode(t, b.challengeId, b.code, 'contact');
+    if (who !== userId) throw new ApiError('unauthenticated', 'That code has expired. Go back and ask for a new one.', { fields: { code: 'That code has expired.' } });
+    const c = (await t.pool.query<{ channel: 'sms' | 'email'; target: string }>('select channel, target from otp_challenges where id = $1', [b.challengeId])).rows[0]!;
+    const col = c.channel === 'sms' ? 'phone' : 'email';
+    // Checked again: someone may have taken it while the code was on its way.
+    if ((await t.pool.query(`select 1 from users where ${col === 'phone' ? 'phone = $1' : 'lower(email) = $1'} and id <> $2`, [c.target, userId])).rowCount) {
+      throw new ApiError('conflict', tx('Another account at the school has it. Ask the school office.'));
+    }
+    await t.pool.query(`update users set ${col} = $2 where id = $1`, [userId, c.target]);
+    await t.pool.query(`update guardians set ${col} = $2 where user_id = $1`, [userId, c.target]);
+    await this.audit.record(t, { actorId: userId, actorName: 'self', action: `account.${col}`, entity: 'user', entityId: userId });
+  }
+
+  /** Where this person is signed in, newest first; the one asking is marked. */
+  async sessions(t: TenantCtx, userId: string, current: string | undefined): Promise<SessionRow[]> {
+    const { rows } = await t.pool.query<{ id: string; client: string | null; user_agent: string | null; created_at: Date }>(
+      'select id, client, user_agent, created_at from sessions where user_id = $1 and revoked_at is null and expires_at > now() order by created_at desc limit 50', [userId]);
+    return rows.map((r) => ({ id: r.id, client: r.client ?? 'web', device: deviceOf(r.user_agent), since: r.created_at.toISOString(), current: r.id === current }));
+  }
+
+  /** Signs one of them out (not the one asking: that is sign out). */
+  async endSession(t: TenantCtx, userId: string, id: string, current: string | undefined): Promise<void> {
+    if (id === current) throw new ApiError('validation', tx('This is the device you are on: sign out instead.'));
+    const r = await t.pool.query('update sessions set revoked_at = now() where id = $1 and user_id = $2 and revoked_at is null', [id, userId]);
+    if (!r.rowCount) throw new ApiError('not_found', tx('That device is already signed out.'));
+  }
+
   /** Checks a code for one purpose and spends it. Returns the user it belongs to. */
-  private async useCode(t: TenantCtx, challengeId: string, code: string, purpose: 'sign_in' | 'reset'): Promise<string> {
+  private async useCode(t: TenantCtx, challengeId: string, code: string, purpose: 'sign_in' | 'reset' | 'contact'): Promise<string> {
     const { rows } = await t.pool.query<{ id: string; user_id: string; code_hash: string; attempts: number; expires_at: Date; used_at: Date | null; purpose: string }>(
       'select id, user_id, code_hash, attempts, expires_at, used_at, purpose from otp_challenges where id = $1', [challengeId]);
     const row = rows[0];

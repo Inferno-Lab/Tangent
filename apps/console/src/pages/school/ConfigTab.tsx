@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
-import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, MODULES, hasKey, type AppRole } from '@tangent/config-engine';
-import { CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MESSAGE_EVENTS, SETTING_GROUPS, SETTINGS_META, SchoolSettingsSchema, type AppLayout, type Category, type SchoolConfig, type SettingKey, type SettingMeta, hueContrast, hueOf, hueTokens } from '@tangent/contracts';
-import { Checkbox, ColourField, DateField, Dialog, EmptyCard, ErrorLine, Field, FilePick, NumberField, Select, SelectField, TimeField, useShake, Icon, EmptyNote } from '@tangent/web-ui';
+import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, MODULES } from '@tangent/config-engine';
+import { COUNTRY_PACKS, curriculaFor, tx, DEFAULT_BRAND, SETTING_GROUPS, SETTINGS_META, SchoolSettingsSchema, TIGHTEN, settingOwner, type SchoolConfig, type SettingKey, hueContrast, hueOf, hueTokens } from '@tangent/contracts';
+import { Checkbox, Dialog, EmptyCard, ErrorLine, Field, SelectField, SettingRow, useShake, Icon, EmptyNote, t as tr } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { ago } from '../../app/format';
 
@@ -12,19 +12,15 @@ const KEYS = Object.keys(SETTINGS_META) as SettingKey[];
 const shape = SchoolSettingsSchema.shape as Record<string, { safeParse: (v: unknown) => { data?: unknown } }>;
 const dflt = (k: string): unknown => shape[k]?.safeParse(undefined).data;
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
-/** The channels a message can go through, as the Hub sends them. */
-const CHANNELS = [['push', 'App'], ['sms', 'SMS'], ['whatsapp', 'WhatsApp'], ['email', 'Email']] as const;
-const ta = { width: '100%', minHeight: 90, resize: 'vertical', border: 0, outline: 0, background: 'none', font: '400 14px/1.5 var(--fb)', color: 'var(--ink)', padding: '10px 0' } as const;
 
 /** The groups a school's settings sit in: the six school-wide ones, then one per module it has. */
-const groupLabel = (g: string) => (MODULES.find((m) => m.key === g) ? (g === 'school' ? 'Academic year' : MODULES.find((m) => m.key === g)!.name) : g);
+const groupLabel = (g: string) => (MODULES.find((m) => m.key === g) ? (g === 'school' ? tr('console.config_tab.academic_year') : MODULES.find((m) => m.key === g)!.name) : tx(g));
 
 /**
  * Everything Tangent sets for one school, built from SETTINGS_META: a new setting appears here without a new screen. Groups sit
  * in a side list with their own address (?group=…), a search finds any setting, and changes in several groups go in one save.
  */
-export function ConfigTab({ schoolId, say }: { schoolId: string; say: Say }) {
-  const app = useApp();
+export function ConfigTab({ schoolId, say }: { schoolId: string; say: Say }) { const app = useApp();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['config', schoolId], queryFn: () => app.api.config.get(schoolId) });
   const [edits, setEdits] = useState<Record<string, unknown>>({});
@@ -37,8 +33,7 @@ export function ConfigTab({ schoolId, say }: { schoolId: string; say: Say }) {
   const shake = useShake();
   const can = app.can('schools.configure');
   const cfg = q.data;
-  const setGroup = (g: string) => {
-    setGroupState(g);
+  const setGroup = (g: string) => { setGroupState(g);
     setFind('');
     const u = new URL(window.location.href);
     u.searchParams.set('group', g);
@@ -47,29 +42,23 @@ export function ConfigTab({ schoolId, say }: { schoolId: string; say: Say }) {
   const value = (k: string): unknown => (k in edits ? edits[k] : cfg && k in cfg.values ? cfg.values[k] : dflt(k));
   const changed = cfg ? Object.keys(edits).filter((k) => !same(edits[k], k in cfg.values ? cfg.values[k] : dflt(k))) : [];
   const refresh = () => void qc.invalidateQueries({ queryKey: ['config', schoolId] });
-  const save = useMutation({
-    mutationFn: async () => {
-      // The logo is a file: it goes up first, then the rest of the change, so both are one save with one note.
-      if (logo) {
-        const data = await new Promise<string>((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] ?? ''); r.onerror = () => no(new Error('That file could not be read.')); r.readAsDataURL(logo); });
+  const save = useMutation({ mutationFn: async () => { // The logo is a file: it goes up first, then the rest of the change, so both are one save with one note.
+      if (logo) { const data = await new Promise<string>((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] ?? ''); r.onerror = () => no(new Error(tr('console.config_tab.that_file_could_not_be'))); r.readAsDataURL(logo); });
         await app.api.logo(schoolId, { name: logo.name, mime: logo.type as 'image/png', data });
       }
       if (!changed.length) return { saved: true } as const;
       return app.api.config.patch(schoolId, { expectedVersion: cfg!.version, changes: Object.fromEntries(changed.map((k) => [k, edits[k]])), note: note.trim() });
     },
-    onSuccess: (r) => {
-      setEdits({}); setLogo(null); setNote(''); setErr({}); refresh();
-      say('pending' in r ? 'A risky setting is in there, so the change waits for a second person under Approvals.' : 'Saved. The school’s admin and app follow within a minute.');
+    onSuccess: (r) => { setEdits({}); setLogo(null); setNote(''); setErr({}); refresh();
+      say('pending' in r ? tr('console.config_tab.a_risky_setting_is_in') : tr('console.config_tab.saved_the_school_s_admin'));
     },
-    onError: (e) => {
-      setErr(e instanceof HttpError && Object.keys(e.fields).length ? e.fields : { _: (e as Error).message });
+    onError: (e) => { setErr(e instanceof HttpError && Object.keys(e.fields).length ? e.fields : { _: (e as Error).message });
       if (e instanceof HttpError && e.code === 'conflict') refresh();
       shake.hit();
-    },
-  });
+    } });
 
   if (q.isLoading) return <div className="skc" style={{ height: 420, borderRadius: 24 }} />;
-  if (q.isError || !cfg) return <EmptyCard error title="Configuration" chip={{ text: 'Couldn’t load', tone: 'c' }} icon="warning" heading="The school’s configuration didn’t load" body={(q.error as Error)?.message ?? ''} actions={<button className="btn pri" onClick={() => void q.refetch()}>Try again</button>} />;
+  if (q.isError || !cfg) return <EmptyCard error title={tr('console.config_tab.configuration')} chip={{ text: tr('console.config_tab.couldn_t_load'), tone: 'c' }} icon="warning" heading={tr('console.config_tab.the_school_s_configuration_didn')} body={(q.error as Error)?.message ?? ''} actions={<button className="btn pri" onClick={() => void q.refetch()}>{tr('console.config_tab.try_again')}</button>} />;
 
   const shown = (k: SettingKey) => unused || !SETTINGS_META[k].notUsedYet;
   const groups = [...SETTING_GROUPS as readonly string[], ...MODULES.filter((m) => m.settings.length && cfg.entitled.includes(m.key)).map((m) => m.key)];
@@ -86,37 +75,37 @@ export function ConfigTab({ schoolId, say }: { schoolId: string; say: Say }) {
     <section className="grid">
       <div className="card s12 rise">
         <div className="ch" style={{ flexWrap: 'wrap', gap: 10 }}>
-          <h2>Configuration</h2><span className="chip">Version {cfg.version}</span><span className="grow"></span>
-          <div className="srch" style={{ minWidth: 220, height: 38 }}><Icon name="search" /><input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Find a setting" aria-label="Find a setting" style={{ border: 0, outline: 0, background: 'none', font: '600 13px var(--fb)', color: 'var(--ink)', flex: 1, minWidth: 0 }} /></div>
+          <h2>{tr('console.config_tab.configuration')}</h2><span className="chip">{tr('console.config_tab.version')}{' '}{cfg.version}</span><span className="grow"></span>
+          <div className="srch" style={{ minWidth: 220, height: 38 }}><Icon name="search" /><input value={find} onChange={(e) => setFind(e.target.value)} placeholder={tr('console.config_tab.find_a_setting')} aria-label={tr('console.config_tab.find_a_setting')} style={{ border: 0, outline: 0, background: 'none', font: '600 13px var(--fb)', color: 'var(--ink)', flex: 1, minWidth: 0 }} /></div>
         </div>
-        <div className="help">Only Tangent changes a school’s setup. The school sees it, read-only, under School profile, and can ask for changes (Requests).{off.length ? ` Not in its plan, so not shown: ${off.map((m) => m.name).join(', ')}.` : ''}</div>
+        <div className="help">{tr('console.config_tab.the_school_changes_its_own')}{off.length ? tr('console.config_tab.not_in_its_plan_so', { p0: off.map((m) => m.name).join(', ') }) : ''}</div>
         {dirtyGroups.length > 0 && (
           <div className="tgrow" style={{ marginTop: 10, alignItems: 'center' }}>
-            <span className="chip a">{dirtyGroups.length === 1 ? '1 group has' : `${dirtyGroups.length} groups have`} unsaved changes</span>
+            <span className="chip a">{tr('console.config_tab.unsaved_changes', { n: dirtyGroups.length })}</span>
             {dirtyGroups.map((g) => <button key={g} className="btn sm" onClick={() => setGroup(g)}>{groupLabel(g)}</button>)}
           </div>
         )}
       </div>
 
-      <nav className="card s3 rise" aria-label="Setting groups" style={{ padding: 12, alignSelf: 'start' }}>
-        {groups.map((g) => {
-          const n = changed.filter((k) => SETTINGS_META[k as SettingKey]?.group === g).length;
+      <nav className="card s3 rise" aria-label={tr('console.config_tab.setting_groups')} style={{ padding: 12, alignSelf: 'start' }}>
+        {groups.map((g) => { const n = changed.filter((k) => SETTINGS_META[k as SettingKey]?.group === g).length;
           return (
             <button key={g} className={`rpb ${!needle && g === group ? 'on' : ''}`} aria-current={!needle && g === group} onClick={() => setGroup(g)} style={{ width: '100%' }}>
-              <b>{groupLabel(g)}{n ? ` · ${n} changed` : ''}</b><small>{KEYS.filter((k) => SETTINGS_META[k].group === g && shown(k)).length} settings</small>
+              <b>{groupLabel(g)}{n ? tr('console.config_tab.changed', { n }) : ''}</b><small>{KEYS.filter((k) => SETTINGS_META[k].group === g && shown(k)).length} {tr('console.config_tab.settings')}</small>
             </button>
           );
         })}
-        {hiddenCount > 0 && <div style={{ padding: '10px 8px 0' }}><Checkbox checked={unused} onChange={setUnused} label={`Show ${hiddenCount} not in use yet`} /></div>}
+        {hiddenCount > 0 && <div style={{ padding: '10px 8px 0' }}><Checkbox checked={unused} onChange={setUnused} label={tr('console.config_tab.show_not_in_use_yet', { hiddenCount })} /></div>}
       </nav>
 
       <div className={`card s9 rise ${shake.cls}`}>
-        <div className="ch"><h2>{needle ? `Settings matching “${find.trim()}”` : groupLabel(group)}</h2></div>
-        {keys.length === 0 && <div style={{ marginTop: 12 }}><EmptyNote icon={needle ? 'search' : 'setup'} title={needle ? `No setting matches “${find.trim()}”` : 'No settings here'} body={needle ? 'Search by what the setting does, like “late fee” or “holidays”.' : 'This group has nothing to set for this school.'} /></div>}
+        <div className="ch"><h2>{needle ? tr('console.config_tab.settings_matching', { p0: find.trim() }) : groupLabel(group)}</h2></div>
+        {keys.length === 0 && <div style={{ marginTop: 12 }}><EmptyNote icon={needle ? 'search' : 'setup'} title={needle ? tr('console.config_tab.no_setting_matches', { p0: find.trim() }) : tr('console.config_tab.no_settings_here')} body={needle ? tr('console.config_tab.search_by_what_the_setting') : tr('console.config_tab.this_group_has_nothing_to')} /></div>}
         {keys.map((k) => (
           <div key={k}>
             {needle && <div className="lbl" style={{ marginTop: 12 }}>{groupLabel(SETTINGS_META[k].group)}</div>}
-            <SettingRow meta={SETTINGS_META[k]} value={value(k)} error={err[k]} disabled={!can} cfg={cfg} logo={logo} onLogo={setLogo}
+            <LockLine k={k} cfg={cfg} schoolId={schoolId} can={can} current={value(k)} say={say} />
+            <SettingRow meta={SETTINGS_META[k]} value={value(k)} error={err[k]} disabled={!can} ctx={cfg} logo={logo} onLogo={setLogo} after={k === 'brand.color' ? <HueSwatches colour={String(value(k) || DEFAULT_BRAND)} /> : undefined}
               onChange={(v) => { setEdits((x) => ({ ...x, [k]: v })); setErr({}); }} />
           </div>
         ))}
@@ -124,181 +113,118 @@ export function ConfigTab({ schoolId, say }: { schoolId: string; say: Say }) {
           <div style={{ marginTop: 16 }}>
             {err._ && <ErrorLine>{err._}</ErrorLine>}
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: 220 }}><Field label="Why (kept in the history)" value={note} onChange={setNote} maxLength={200} placeholder="For example: the principal asked for Fees in the tabs" /></div>
-              <button className="btn" disabled={!total || save.isPending} onClick={() => { setEdits({}); setLogo(null); setErr({}); }}>Discard all</button>
-              <button className="btn pri" disabled={!total || save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Saving…' : total ? `Save ${total} ${total === 1 ? 'change' : 'changes'}` : 'Save'}</button>
+              <div style={{ flex: 1, minWidth: 220 }}><Field label={tr('console.config_tab.why_kept_in_the_history')} value={note} onChange={setNote} maxLength={200} placeholder={tr('console.config_tab.for_example_the_principal_asked')} /></div>
+              <button className="btn" disabled={!total || save.isPending} onClick={() => { setEdits({}); setLogo(null); setErr({}); }}>{tr('console.config_tab.discard_all')}</button>
+              <button className="btn pri" disabled={!total || save.isPending} onClick={() => save.mutate()}>{save.isPending ? tr('console.config_tab.saving') : total ? tr('console.config_tab.save', { total }) : tr('console.config_tab.save_2')}</button>
             </div>
           </div>
         )}
       </div>
 
       <History cfg={cfg} schoolId={schoolId} can={can} say={say} />
+      <Packs cfg={cfg} schoolId={schoolId} can={can} say={say} />
       <Templates schoolId={schoolId} can={can} say={say} />
       <Preview cfg={cfg} schoolId={schoolId} />
     </section>
   );
 }
 
-function SettingRow({ meta, value, error, disabled, cfg, logo, onLogo, onChange }: { meta: SettingMeta; value: unknown; error?: string; disabled: boolean; cfg: SchoolConfig; logo: File | null; onLogo: (f: File | null) => void; onChange: (v: unknown) => void }) {
-  const label = <>{meta.label}{meta.risky && <span className="chip a" style={{ marginLeft: 8 }}>Needs a second person</span>}</>;
-  const help = meta.help;
-  const str = typeof value === 'string' ? value : '';
-  const list = Array.isArray(value) ? (value as string[]) : [];
-  const toggle = (key: string, max?: number) => onChange(list.includes(key) ? list.filter((x) => x !== key) : max && list.length >= max ? list : [...list, key]);
-  const box = (body: React.ReactNode) => (
-    <div className="fld" style={{ marginTop: 12 }}>
-      <label>{label}</label>
-      {body}
-      {error ? <ErrorLine>{error}</ErrorLine> : help ? <div className="help">{help}</div> : null}
-    </div>
-  );
-  const pick = (options: { key: string; label: string }[], max?: number) => box(
-    <div className="tgrow">{options.map((o) => {
-      const at = list.indexOf(o.key);
-      return <button key={o.key} type="button" className={`chip ${at >= 0 ? 'v' : ''}`} aria-pressed={at >= 0} disabled={disabled} onClick={() => toggle(o.key, max)} style={{ cursor: disabled ? 'default' : 'pointer' }}>{at >= 0 && meta.kind !== 'classes' && meta.kind !== 'multi' && meta.kind !== 'appRoles' ? `${at + 1}. ` : ''}{o.label}</button>;
-    })}{max && <span className="help">{list.length} of {max}</span>}</div>,
-  );
-  switch (meta.kind) {
-    case 'bool':
-      return box(<div style={{ display: 'flex', gap: 10, alignItems: 'center' }}><button type="button" className={`sw ${value === true ? 'on' : ''}`} role="switch" aria-checked={value === true} aria-label={meta.label} disabled={disabled} onClick={() => onChange(value !== true)} /><span className="help" style={{ margin: 0 }}>{value === true ? 'On' : 'Off'}</span></div>);
-    case 'enum': case 'language':
-      return box(<Select value={str} onChange={onChange} disabled={disabled} aria-label={meta.label} options={(meta.options ?? []).map(([v, l]) => ({ value: v, label: l }))} />);
-    case 'number':
-      return <div style={{ marginTop: 12 }}><NumberField label={meta.label} min={meta.min} max={meta.max} value={value == null ? '' : String(value)} onChange={(v) => onChange(v === '' ? null : Number(v))} disabled={disabled} error={error} hint={help || undefined} /></div>;
-    case 'color':
-      return box(<><ColourField label={meta.label} value={str || DEFAULT_BRAND} onChange={onChange} disabled={disabled} /><HueSwatches colour={str || DEFAULT_BRAND} /></>);
-    case 'time': case 'date':
-      return <div style={{ marginTop: 12 }}>{meta.kind === 'date' ? <DateField label={meta.label} value={str} onChange={(v) => onChange(v || null)} disabled={disabled} error={error} hint={help || undefined} /> : <TimeField label={meta.label} value={str} onChange={(v) => onChange(v || null)} disabled={disabled} error={error} hint={help || undefined} />}</div>;
-    case 'textarea':
-      return box(<div className={`inp ${error ? 'err' : ''}`} style={{ height: 'auto' }}><textarea value={str} onChange={(e) => onChange(e.target.value)} disabled={disabled} aria-label={meta.label} style={ta} /></div>);
-    case 'logo':
-      return box(<LogoPick has={!!str} picked={logo} disabled={disabled} onPick={onLogo} />);
-    case 'multi':
-      // `fees.gstHeads` names the school's own fee heads; every other list names its options.
-      return pick(meta.options ? meta.options.map(([key, l]) => ({ key, label: l })) : cfg.feeHeads.map((h) => ({ key: h.key, label: h.name })));
-    case 'appRoles': return pick(APP_ROLES.map((r) => ({ key: r, label: APP_ROLE_LABELS[r] })));
-    case 'appLayout':
-      return box(<AppLayoutEditor value={(value ?? {}) as Record<AppRole, AppLayout>} has={{ modules: cfg.entitled, features: cfg.features }} disabled={disabled} onChange={onChange} />);
-    case 'classes': return pick(cfg.classes.map((c) => ({ key: c.id, label: c.name })), meta.max);
-    case 'strings':
-      return box(<ListEditor items={list} max={meta.max ?? 12} disabled={disabled} placeholder="Add one" onChange={onChange} />);
-    case 'houses':
-      return box(<HousesEditor value={(Array.isArray(value) ? value : []) as { key: string; name: string; color: string }[]} max={meta.max ?? 12} disabled={disabled} onChange={onChange} />);
-    case 'categories':
-      return box(<CategoriesEditor value={(Array.isArray(value) ? value : []) as Category[]} max={meta.max ?? 16} disabled={disabled} onChange={onChange} />);
-    case 'gradingScale':
-      return box(<GradingEditor value={(Array.isArray(value) ? value : []) as { grade: string; minPct: number }[]} max={meta.max ?? 12} disabled={disabled} onChange={onChange} />);
-    case 'notifyRules': {
-      const rules = (value ?? {}) as Record<string, { push: boolean; sms: boolean; email: boolean; whatsapp?: boolean }>;
-      const set = (ev: string, ch: (typeof CHANNELS)[number][0], on: boolean) => {
-        const base = rules[ev] ?? MESSAGE_EVENTS.find((e) => e.key === ev)!.defaults;
-        onChange({ ...rules, [ev]: { ...base, [ch]: on } });
-      };
-      return box(<div>{MESSAGE_EVENTS.map((e) => {
-        const r = rules[e.key] ?? e.defaults;
-        return (
-          <div key={e.key} className="kv" style={{ flexWrap: 'wrap', gap: 8 }}>{e.label}{e.urgent ? ' · sent in quiet hours' : ''}
-            <b style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>{CHANNELS.map(([ch, label]) => (
-              <Checkbox key={ch} checked={!!(r as Record<string, boolean | undefined>)[ch]} disabled={disabled} onChange={(c) => set(e.key, ch, c)} label={label} />
-            ))}</b>
-          </div>
-        );
-      })}</div>);
-    }
-    case 'templates': {
-      const words = (value ?? {}) as Record<string, string>;
-      return box(<div>{MESSAGE_EVENTS.map((e) => (
-        <div key={e.key} style={{ marginTop: 10 }}>
-          <div className="help" style={{ margin: '0 0 4px' }}><b>{e.label}</b> · placeholders: {e.vars.map((v) => `{${v}}`).join(' ')}</div>
-          <div className="inp" style={{ height: 'auto' }}><textarea value={words[e.key] ?? ''} placeholder={e.text} maxLength={320} disabled={disabled} aria-label={`Wording: ${e.label}`} style={{ ...ta, minHeight: 56 }}
-            onChange={(x) => { const next = { ...words, [e.key]: x.target.value }; if (!x.target.value.trim()) delete next[e.key]; onChange(next); }} /></div>
-        </div>
-      ))}</div>);
-    }
-    default:
-      return <div style={{ marginTop: 12 }}><Field label={meta.label} value={str} onChange={onChange} disabled={disabled} error={error} hint={help || undefined} /></div>;
-  }
-}
-
-/** The logo is a file: picked here, sent with the rest of the change when it is saved. */
-function LogoPick({ has, picked, disabled, onPick }: { has: boolean; picked: File | null; disabled: boolean; onPick: (f: File | null) => void }) {
-  const [err, setErr] = useState('');
-  return (
-    <div>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-        <span className={`chip ${picked ? 'a' : has ? 'g' : ''}`}>{picked ? `${picked.name}: not saved yet` : has ? 'Logo set' : 'Letters only'}</span>
-        <FilePick accept="image/png,image/jpeg" disabled={disabled} className="btn sm" onPick={(f) => {
-          if (!['image/png', 'image/jpeg'].includes(f.type)) return setErr('Choose a PNG or JPEG image.');
-          if (f.size > 2 * 1024 * 1024) return setErr('The logo must be 2 MB or smaller.');
-          setErr(''); onPick(f);
-        }}>{has || picked ? 'Choose another' : 'Choose a logo'}</FilePick>
-        {picked && <button className="btn sm" onClick={() => onPick(null)}>Keep the old one</button>}
-      </div>
-      {err && <ErrorLine>{err}</ErrorLine>}
-    </div>
-  );
-}
-
-function History({ cfg, schoolId, can, say }: { cfg: SchoolConfig; schoolId: string; can: boolean; say: Say }) {
-  const app = useApp();
+function History({ cfg, schoolId, can, say }: { cfg: SchoolConfig; schoolId: string; can: boolean; say: Say }) { const app = useApp();
   const qc = useQueryClient();
   const [sure, setSure] = useState<string | null>(null);
-  const back = useMutation({
-    mutationFn: (versionId: string) => app.api.config.rollback(schoolId, versionId),
-    onSuccess: (r) => { setSure(null); void qc.invalidateQueries({ queryKey: ['config', schoolId] }); say(`Rolled back. The configuration is now version ${r.version}.`); },
-    onError: (e) => say((e as Error).message, 'bad'),
-  });
+  const back = useMutation({ mutationFn: (versionId: string) => app.api.config.rollback(schoolId, versionId),
+    onSuccess: (r) => { setSure(null); void qc.invalidateQueries({ queryKey: ['config', schoolId] }); say(tr('console.config_tab.rolled_back_the_configuration_is', { version: r.version })); },
+    onError: (e) => say((e as Error).message, 'bad') });
   return (
     <div className="card s12 rise">
-      <div className="ch"><h2>History</h2><span className="chip">{cfg.versions.length} changes</span></div>
-      {!cfg.versions.length && <div className="help">Every change made here is listed with who made it and why, and can be rolled back.</div>}
+      <div className="ch"><h2>{tr('console.config_tab.history')}</h2><span className="chip">{cfg.versions.length} {tr('console.config_tab.changes')}</span></div>
+      {!cfg.versions.length && <div className="help">{tr('console.config_tab.every_change_made_here_is')}</div>}
       {cfg.versions.map((v) => (
         <div key={v.id} className="rw" style={{ height: 'auto', padding: '10px 0', display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <span className="chip v">v{v.version}</span>
           <span style={{ flex: 1, minWidth: 200 }}>
-            <b style={{ font: '700 13px var(--fb)' }}>{v.changes.map((c) => SETTINGS_META[c.key as SettingKey]?.label ?? c.key).join(', ') || 'No change'}</b>
+            <b style={{ font: '700 13px var(--fb)' }}>{v.changes.map((c) => SETTINGS_META[c.key as SettingKey]?.label ?? c.key).join(', ') || tr('console.config_tab.no_change')}</b>
             <small style={{ display: 'block', color: 'var(--ink3)' }}>{v.by} · {ago(v.at)}{v.note ? ` · ${v.note}` : ''}</small>
           </span>
           {can && v.id !== cfg.versions[0]?.id && (sure === v.id
-            ? <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><button className="btn sm dng" disabled={back.isPending} onClick={() => back.mutate(v.id)}>Roll back to v{v.version}</button><button className="btn sm" onClick={() => setSure(null)}>Keep</button></span>
-            : <button className="btn sm" onClick={() => setSure(v.id)}>Roll back…</button>)}
+            ? <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><button className="btn sm dng" disabled={back.isPending} onClick={() => back.mutate(v.id)}>{tr('console.config_tab.roll_back_to_v')}{v.version}</button><button className="btn sm" onClick={() => setSure(null)}>{tr('console.config_tab.keep')}</button></span>
+            : <button className="btn sm" onClick={() => setSure(v.id)}>{tr('console.config_tab.roll_back')}</button>)}
         </div>
       ))}
     </div>
   );
 }
 
-function Templates({ schoolId, can, say }: { schoolId: string; can: boolean; say: Say }) {
-  const app = useApp();
+/** A value as one short line: words as they are, anything else as its JSON, cut short. */
+const brief = (v: unknown) => { const s = typeof v === 'string' ? v : JSON.stringify(v); return s.length > 80 ? `${s.slice(0, 77)}…` : s; };
+
+/**
+ * Re-applies part of a starter pack to a live school (one-shot plan 3.2): what each part would change is shown first, and a
+ * second person approves before anything changes. Only what differs is written, worked out again when it is approved.
+ */
+function Packs({ cfg, schoolId, can, say }: { cfg: SchoolConfig; schoolId: string; can: boolean; say: Say }) { const app = useApp();
+  const [country, setCountry] = useState(String(cfg.values['school.country'] ?? '') || Object.keys(COUNTRY_PACKS)[0]!);
+  const [curriculum, setCurriculum] = useState('');
+  const [groups, setGroups] = useState<string[]>([]);
+  const [note, setNote] = useState('');
+  const parts = useQuery({ queryKey: ['packs', schoolId, country, curriculum], queryFn: () => app.api.packPreview(schoolId, country, curriculum) });
+  const ask = useMutation({ mutationFn: () => app.api.packApply(schoolId, { country, curriculum, groups, note: note.trim() }),
+    onSuccess: (r) => { setGroups([]); setNote(''); say(r.status === 'pending_approval' ? tr('console.config_tab.pack_waits') : tr('console.config_tab.pack_applied')); },
+    onError: (e) => say((e as Error).message, 'bad') });
+  return (
+    <div className="card s12 rise">
+      <div className="ch"><h2>{tr('console.config_tab.starter_packs')}</h2></div>
+      <div className="help">{tr('console.config_tab.starter_packs_help')}</div>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 10 }}>
+        <div style={{ width: 200 }}><SelectField label={tr('console.config_tab.country_pack')} value={country} onChange={(v) => { setCountry(v); setGroups([]); }} options={Object.keys(COUNTRY_PACKS).map((c) => ({ value: c, label: c }))} /></div>
+        <div style={{ width: 260 }}><SelectField label={tr('console.config_tab.curriculum_pack')} value={curriculum} onChange={(v) => { setCurriculum(v); setGroups([]); }}
+          options={[{ value: '', label: tr('console.config_tab.none') }, ...curriculaFor(country).map((c) => ({ value: c.key, label: c.name }))]} /></div>
+      </div>
+      {parts.isLoading ? <div className="skc" style={{ height: 120, borderRadius: 16, marginTop: 12 }} />
+        : !(parts.data ?? []).length ? <EmptyNote icon="checkCircle" title={tr('console.config_tab.pack_nothing_differs')} body={tr('console.config_tab.pack_nothing_differs_body')} />
+        : (parts.data ?? []).map((p) => (
+          <div key={p.group} style={{ marginTop: 12 }}>
+            <Checkbox label={`${groupLabel(p.group)} (${p.changes.length})`} checked={groups.includes(p.group)} disabled={!can} onChange={(on) => setGroups(on ? [...groups, p.group] : groups.filter((g) => g !== p.group))} />
+            {p.changes.map((c) => <div key={c.key} className="kv" style={{ alignItems: 'flex-start' }}><span>{c.label}</span><b style={{ minWidth: 0, textAlign: 'end' }}><s style={{ color: 'var(--ink3)' }}>{brief(c.before)}</s> → {brief(c.after)}</b></div>)}
+          </div>
+        ))}
+      {can && groups.length > 0 && (
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 12 }}>
+          <div style={{ flex: 1, minWidth: 220 }}><Field label={tr('console.config_tab.why_kept_in_the_history')} value={note} onChange={setNote} maxLength={300} /></div>
+          <button className="btn pri" disabled={ask.isPending} onClick={() => ask.mutate()}>{tr('console.config_tab.ask_to_reapply')}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Templates({ schoolId, can, say }: { schoolId: string; can: boolean; say: Say }) { const app = useApp();
   const qc = useQueryClient();
   const list = useQuery({ queryKey: ['config-templates'], queryFn: app.api.config.templates });
   const [name, setName] = useState('');
   const [applying, setApplying] = useState(false);
-  const save = useMutation({
-    mutationFn: () => app.api.config.saveTemplate(schoolId, name.trim()),
-    onSuccess: () => { setName(''); void qc.invalidateQueries({ queryKey: ['config-templates'] }); say('Saved as a template. Its settings and roles can now be applied to other schools.'); },
-    onError: (e) => say((e as Error).message, 'bad'),
-  });
+  const save = useMutation({ mutationFn: () => app.api.config.saveTemplate(schoolId, name.trim()),
+    onSuccess: () => { setName(''); void qc.invalidateQueries({ queryKey: ['config-templates'] }); say(tr('console.config_tab.saved_as_a_template_its')); },
+    onError: (e) => say((e as Error).message, 'bad') });
   return (
     <div className="card s12 rise">
-      <div className="ch"><h2>Templates</h2><span className="chip">{(list.data ?? []).length}</span></div>
-      <div className="help">A template carries settings and roles, never who the school is (name, contacts, logo letters). Applying one to many schools at once is on Blueprints.</div>
-      {(list.data ?? []).map((t) => <div key={t.id} className="kv">{t.name}<b>{t.keys} settings · {t.roles} roles · {ago(t.createdAt)}</b></div>)}
+      <div className="ch"><h2>{tr('console.config_tab.templates')}</h2><span className="chip">{(list.data ?? []).length}</span></div>
+      <div className="help">{tr('console.config_tab.a_template_carries_settings_and')}</div>
+      {(list.data ?? []).map((t) => <div key={t.id} className="kv">{t.name}<b>{t.keys} {tr('console.config_tab.settings_2')}{' '}{t.roles} {tr('console.config_tab.roles')}{' '}{ago(t.createdAt)}</b></div>)}
       {can && (
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 12 }}>
-          <div style={{ flex: 1, minWidth: 200 }}><Field label="Save this school’s setup as" value={name} onChange={setName} maxLength={60} placeholder="For example: CBSE day school" /></div>
-          <button className="btn" disabled={name.trim().length < 2 || save.isPending} onClick={() => save.mutate()}>Save template</button>
-          <button className="btn pri" disabled={!(list.data ?? []).length} onClick={() => setApplying(true)}>Start from a template…</button>
+          <div style={{ flex: 1, minWidth: 200 }}><Field label={tr('console.config_tab.save_this_school_s_setup')} value={name} onChange={setName} maxLength={60} placeholder={tr('console.config_tab.for_example_cbse_day_school')} /></div>
+          <button className="btn" disabled={name.trim().length < 2 || save.isPending} onClick={() => save.mutate()}>{tr('console.config_tab.save_template')}</button>
+          <button className="btn pri" disabled={!(list.data ?? []).length} onClick={() => setApplying(true)}>{tr('console.config_tab.start_from_a_template')}</button>
         </div>
       )}
-      {applying && <ApplyDialog only={schoolId} onClose={() => setApplying(false)} onDone={(n) => { setApplying(false); void qc.invalidateQueries({ queryKey: ['config'] }); say(`Applied to ${n} ${n === 1 ? 'school' : 'schools'}.`); }} />}
+      {applying && <ApplyDialog only={schoolId} onClose={() => setApplying(false)} onDone={(n) => { setApplying(false); void qc.invalidateQueries({ queryKey: ['config'] }); say(tr('console.config_tab.applied_to', { n })); }} />}
     </div>
   );
 }
 
 /** Applies a saved setup: to this school only (its Configuration), or to the schools chosen (Blueprints → Setup templates). */
-export function ApplyDialog({ only, onClose, onDone }: { only?: string; onClose: () => void; onDone: (n: number) => void }) {
-  const app = useApp();
+export function ApplyDialog({ only, onClose, onDone }: { only?: string; onClose: () => void; onDone: (n: number) => void }) { const app = useApp();
   const list = useQuery({ queryKey: ['config-templates'], queryFn: app.api.config.templates });
   const schools = useQuery({ queryKey: ['schools'], queryFn: () => app.api.schools() });
   const [tpl, setTpl] = useState('');
@@ -307,10 +233,10 @@ export function ApplyDialog({ only, onClose, onDone }: { only?: string; onClose:
   const go = useMutation({ mutationFn: () => app.api.config.applyTemplate(tpl, [...picked]), onSuccess: (r) => onDone(r.applied), onError: (e) => setErr((e as Error).message) });
   const rows = (schools.data ?? []).filter((s) => s.status !== 'archived' && s.status !== 'onboarding');
   return (
-    <Dialog title="Apply a template" onClose={onClose} width={560}>
-      <SelectField label="Template" value={tpl} onChange={setTpl} options={[{ value: '', label: 'Choose a template' }, ...(list.data ?? []).map((t) => ({ value: t.id, label: t.name }))]} />
+    <Dialog title={tr('console.config_tab.apply_a_template')} onClose={onClose} width={560}>
+      <SelectField label={tr('console.config_tab.template')} value={tpl} onChange={setTpl} options={[{ value: '', label: tr('console.config_tab.choose_a_template') }, ...(list.data ?? []).map((t) => ({ value: t.id, label: t.name }))]} />
       {!only && <>
-        <div className="lbl" style={{ margin: '12px 0 6px' }}>Schools</div>
+        <div className="lbl" style={{ margin: '12px 0 6px' }}>{tr('console.config_tab.schools')}</div>
         <div style={{ maxHeight: 260, overflow: 'auto' }}>
           {rows.map((s) => (
             <label key={s.id} className="hwc" style={{ display: 'flex', padding: '6px 0' }}>
@@ -320,33 +246,32 @@ export function ApplyDialog({ only, onClose, onDone }: { only?: string; onClose:
         </div>
       </>}
       {err && <ErrorLine>{err}</ErrorLine>}
-      <div className="help" style={{ marginTop: 10 }}>Each school gets a new configuration version, which can be rolled back. Modules outside a school’s plan are left off.</div>
+      <div className="help" style={{ marginTop: 10 }}>{tr('console.config_tab.each_school_gets_a_new')}</div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-        <button className="btn" onClick={onClose}>Cancel</button>
-        <button className="btn pri" disabled={!tpl || !picked.size || go.isPending} onClick={() => go.mutate()}>Apply to {picked.size} {picked.size === 1 ? 'school' : 'schools'}</button>
+        <button className="btn" onClick={onClose}>{tr('console.config_tab.cancel')}</button>
+        <button className="btn pri" disabled={!tpl || !picked.size || go.isPending} onClick={() => go.mutate()}>{tr('console.config_tab.apply_to', { n: picked.size })}</button>
       </div>
     </Dialog>
   );
 }
 
 /** The admin menu and the app's layout exactly as one role at this school sees them. */
-function Preview({ cfg, schoolId }: { cfg: SchoolConfig; schoolId: string }) {
-  const app = useApp();
+function Preview({ cfg, schoolId }: { cfg: SchoolConfig; schoolId: string }) { const app = useApp();
   const [roleId, setRoleId] = useState(cfg.roles[0]?.id ?? '');
   const p = useQuery({ queryKey: ['config-preview', schoolId, roleId, cfg.version], queryFn: () => app.api.config.preview(schoolId, roleId), enabled: !!roleId });
   const label = useMemo(() => Object.fromEntries([...APP_CATALOG.dock, ...APP_CATALOG.home, ...APP_CATALOG.quick].map((c) => [c.key, c.label])), []);
   return (
     <div className="card s12 rise">
-      <div className="ch"><h2>Preview</h2></div>
-      <div className="help">The admin menu this role gets, and what each role sees in the app (bottom tabs in colour, then Home cards).</div>
-      <div style={{ maxWidth: 320 }}><SelectField label="As this role sees it" value={roleId} onChange={setRoleId} options={cfg.roles.map((r) => ({ value: r.id, label: r.name }))} /></div>
+      <div className="ch"><h2>{tr('console.config_tab.preview')}</h2></div>
+      <div className="help">{tr('console.config_tab.the_admin_menu_this_role')}</div>
+      <div style={{ maxWidth: 320 }}><SelectField label={tr('console.config_tab.as_this_role_sees_it')} value={roleId} onChange={setRoleId} options={cfg.roles.map((r) => ({ value: r.id, label: r.name }))} /></div>
       {p.data && (
         <>
           {p.data.menu.map((g) => <div key={g.group} className="kv">{g.group}<b className="tgrow">{g.pages.map((n) => <span key={n.id} className="chip">{n.label}</span>)}</b></div>)}
           {APP_ROLES.map((r) => (
-            <div key={r} className="kv">App · {APP_ROLE_LABELS[r]}<b className="tgrow">{p.data!.app.roles.includes(r)
+            <div key={r} className="kv">{tr('console.config_tab.app')}{' '}{APP_ROLE_LABELS[r]}<b className="tgrow">{p.data!.app.roles.includes(r)
               ? [...p.data!.app.layout[r].dock.map((k) => <span key={`d${k}`} className="chip v">{label[k] ?? k}</span>), ...p.data!.app.layout[r].home.map((k) => <span key={`h${k}`} className="chip">{label[k] ?? k}</span>)]
-              : 'Does not use the app'}</b></div>
+              : tr('console.config_tab.does_not_use_the_app')}</b></div>
           ))}
         </>
       )}
@@ -354,138 +279,59 @@ function Preview({ cfg, schoolId }: { cfg: SchoolConfig; schoolId: string }) {
   );
 }
 
-/** For each app role: its bottom tabs, Home cards and quick buttons, in order, from what the school's modules offer that role. */
-function AppLayoutEditor({ value, has, disabled, onChange }: { value: Record<AppRole, AppLayout>; has: { modules: readonly string[]; features: readonly string[] }; disabled: boolean; onChange: (v: unknown) => void }) {
-  const [role, setRole] = useState<AppRole>('parent');
-  const cur = value[role] ?? { dock: [], home: [], quick: [] };
-  const slots = [['dock', 'Bottom tabs', 4], ['home', 'Home cards', 12], ['quick', 'Quick buttons', 6]] as const;
-  const set = (slot: keyof AppLayout, key: string, max: number) => {
-    const list = cur[slot];
-    const next = list.includes(key) ? list.filter((x) => x !== key) : list.length >= max ? list : [...list, key];
-    onChange({ ...value, [role]: { ...cur, [slot]: next } });
-  };
-  return (
-    <div>
-      <div style={{ maxWidth: 260 }}><Select value={role} onChange={(r) => setRole(r as AppRole)} aria-label="Role" options={APP_ROLES.map((r) => ({ value: r, label: APP_ROLE_LABELS[r] }))} /></div>
-      {slots.map(([slot, title, max]) => {
-        const offered = APP_CATALOG[slot].filter((c) => c.roles.includes(role) && has.modules.includes(c.module) && hasKey(has, c.feature));
-        return (
-          <div key={slot} style={{ marginTop: 10 }}>
-            <div className="help" style={{ margin: '0 0 4px' }}><b>{title}</b> · {cur[slot].length} of {max}{slot === 'dock' ? ' · Profile is always last' : ''}</div>
-            <div className="tgrow">{offered.length ? offered.map((o) => {
-              const at = cur[slot].indexOf(o.key);
-              return <button key={o.key} type="button" className={`chip ${at >= 0 ? 'v' : ''}`} aria-pressed={at >= 0} disabled={disabled} onClick={() => set(slot, o.key, max)}>{at >= 0 ? `${at + 1}. ` : ''}{o.label}</button>;
-            }) : <span className="help" style={{ margin: 0 }}>The school’s modules offer nothing here for this role.</span>}</div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/** A short list of words (leave reasons): add, rename in place, remove. */
-function ListEditor({ items, max, disabled, placeholder, onChange }: { items: string[]; max: number; disabled: boolean; placeholder: string; onChange: (v: unknown) => void }) {
-  const [draft, setDraft] = useState('');
-  const add = () => { const v = draft.trim(); if (v && !items.includes(v) && items.length < max) { onChange([...items, v]); setDraft(''); } };
-  return (
-    <div>
-      {items.map((it, i) => (
-        <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 }}>
-          <div style={{ flex: 1 }}><Field label={`Item ${i + 1}`} value={it} maxLength={40} disabled={disabled} onChange={(v) => onChange(items.map((x, j) => (j === i ? v : x)))} /></div>
-          <button type="button" className="btn sm" disabled={disabled || items.length <= 1} onClick={() => onChange(items.filter((_, j) => j !== i))}>Remove</button>
-        </div>
-      ))}
-      {items.length < max && (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 8 }}>
-          <div style={{ flex: 1 }}><Field label="New" value={draft} maxLength={40} disabled={disabled} placeholder={placeholder} onChange={setDraft} /></div>
-          <button type="button" className="btn sm" disabled={disabled || !draft.trim()} onClick={add}>Add</button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-const keyOf = (name: string) => name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24) || 'item';
-
-/** The school's houses and their colours. */
-function HousesEditor({ value, max, disabled, onChange }: { value: { key: string; name: string; color: string }[]; max: number; disabled: boolean; onChange: (v: unknown) => void }) {
-  const put = (i: number, patch: Partial<{ name: string; color: string }>) => onChange(value.map((h, j) => (j === i ? { ...h, ...patch, ...(patch.name !== undefined ? { key: keyOf(patch.name) } : {}) } : h)));
-  return (
-    <div>
-      {!value.length && <div className="help" style={{ margin: 0 }}>No houses: profiles and the roll-call grid show none.</div>}
-      {value.map((h, i) => (
-        <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 6, flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 160 }}><Field label="House" value={h.name} maxLength={24} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
-          <ColourField label="Colour" value={h.color} disabled={disabled} onChange={(c) => put(i, { color: c })} />
-          <button type="button" className="btn sm" disabled={disabled} onClick={() => onChange(value.filter((_, j) => j !== i))}>Remove</button>
-        </div>
-      ))}
-      {value.length < max && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={() => onChange([...value, { key: `house-${value.length + 1}`, name: `House ${value.length + 1}`, color: DEFAULT_BRAND }])}>Add a house</button>}
-    </div>
-  );
-}
-
-/** Categories of notices or events: a name and the colour pair they are drawn in. */
-function CategoriesEditor({ value, max, disabled, onChange }: { value: Category[]; max: number; disabled: boolean; onChange: (v: unknown) => void }) {
-  const put = (i: number, patch: Partial<Category>) => onChange(value.map((c, j) => (j === i ? { ...c, ...patch } : c)));
-  return (
-    <div>
-      {value.map((c, i) => (
-        <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 6, flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 160 }}><Field label="Category" value={c.name} maxLength={24} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
-          <div style={{ width: 160 }}><SelectField label="Colour" value={c.tone} disabled={disabled} onChange={(t) => put(i, { tone: t as Category['tone'] })} options={CATEGORY_TONES.map((t) => ({ value: t, label: CATEGORY_TONE_LABELS[t] }))} /></div>
-          <span className={`chip ${c.tone}`} style={{ marginBottom: 10 }}>{c.name || 'Category'}</span>
-          <button type="button" className="btn sm" disabled={disabled || value.length <= 1} onClick={() => onChange(value.filter((_, j) => j !== i))}>Remove</button>
-        </div>
-      ))}
-      {value.length < max && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={() => onChange([...value, { key: `cat-${Date.now().toString(36).slice(-6)}`, name: 'New category', tone: 'v' }])}>Add a category</button>}
-      <div className="help">A category’s key stays when it is renamed, so notices and events already written keep it.</div>
-    </div>
-  );
-}
-
-/** Grades from the lowest percentage that earns each, highest first. */
-function GradingEditor({ value, max, disabled, onChange }: { value: { grade: string; minPct: number }[]; max: number; disabled: boolean; onChange: (v: unknown) => void }) {
-  const sorted = (rows: { grade: string; minPct: number }[]) => [...rows].sort((a, b) => b.minPct - a.minPct);
-  const put = (i: number, patch: Partial<{ grade: string; minPct: number }>) => onChange(value.map((g, j) => (j === i ? { ...g, ...patch } : g)));
-  const lowest = value.length ? Math.min(...value.map((g) => g.minPct)) : 0;
-  return (
-    <div>
-      {value.map((g, i) => (
-        <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 6 }}>
-          <div style={{ width: 120 }}><Field label="Grade" value={g.grade} maxLength={4} disabled={disabled} onChange={(v) => put(i, { grade: v })} /></div>
-          <div style={{ width: 160 }}><NumberField label="From (%)" min={0} max={100} value={String(g.minPct)} disabled={disabled} onChange={(v) => put(i, { minPct: v === '' ? 0 : Number(v) })} /></div>
-          <button type="button" className="btn sm" disabled={disabled || value.length <= 1} onClick={() => onChange(value.filter((_, j) => j !== i))}>Remove</button>
-        </div>
-      ))}
-      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-        {value.length < max && <button type="button" className="btn sm" disabled={disabled} onClick={() => onChange([...value, { grade: '?', minPct: 0 }])}>Add a grade</button>}
-        <button type="button" className="btn sm" disabled={disabled} onClick={() => onChange(sorted(value))}>Put in order</button>
-      </div>
-      {lowest > 0 && <div className="help">No grade starts at 0%, so marks below {lowest}% would get no grade. Add one that starts at 0.</div>}
-    </div>
-  );
-}
-
 /** The seed colour card of the School board: what the brand colour's hue makes, each colour with the text it carries checked against AA. */
-function HueSwatches({ colour }: { colour: string }) {
-  const h = hueOf(/^#[0-9a-fA-F]{6}$/.test(colour) ? colour : DEFAULT_BRAND);
+function HueSwatches({ colour }: { colour: string }) { const h = hueOf(/^#[0-9a-fA-F]{6}$/.test(colour) ? colour : DEFAULT_BRAND);
   const t = hueTokens(h, 'light');
-  const ROWS: [string, string, string, string][] = [['deep', 'Deep', 'Frame, menu and tab bar', 'on-deep'], ['bright', 'Bright', 'You are here, the main number', 'on-bright'], ['brand', 'Brand', 'Buttons and links', 'on-brand'],
-    ['brand-soft', 'Soft', 'Selected rows, quiet buttons', 'brand-ink'], ['hero', 'Hero', 'The headline card', 'on-deep'], ['heat4', 'Heat', 'How much, quiet to loud', 'heat-hi-t']];
+  const ROWS: [string, string, string, string][] = [['deep', tr('console.config_tab.deep'), tr('console.config_tab.frame_menu_and_tab_bar'), 'on-deep'], ['bright', tr('console.config_tab.bright'), tr('console.config_tab.you_are_here_the_main'), 'on-bright'], ['brand', tr('console.config_tab.brand'), tr('console.config_tab.buttons_and_links'), 'on-brand'],
+    ['brand-soft', tr('console.config_tab.soft'), tr('console.config_tab.selected_rows_quiet_buttons'), 'brand-ink'], ['hero', tr('console.config_tab.hero'), tr('console.config_tab.the_headline_card'), 'on-deep'], ['heat4', tr('console.config_tab.heat'), tr('console.config_tab.how_much_quiet_to_loud'), 'heat-hi-t']];
   return (
     <div className="hue-sw" style={{ marginTop: 12 }}>
-      <div className="help" style={{ margin: '0 0 6px' }}>Hue {h}° · one hue makes every colour, in light, dark and AMOLED</div>
+      <div className="help" style={{ margin: '0 0 6px' }}>{tr('console.config_tab.hue')}{' '}{h}{tr('console.config_tab.one_hue_makes_every_colour')}</div>
       {ROWS.map(([k, name, what, on]) => (
         <div key={k} className="kv" style={{ alignItems: 'center' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <i style={{ background: t[k] }} aria-hidden="true" />
             <span><b style={{ display: 'block', color: 'var(--ink)', fontWeight: 600 }}>{name}</b><small>{what}</small></span>
           </span>
-          <span className="chip g" data-tip={`Text on it: ${hueContrast(t[on]!, t[k]!).toFixed(1)} to 1`}>AA</span>
+          <span className="chip g" data-tip={tr('console.config_tab.text_on_it_to_1', { p0: hueContrast(t[on]!, t[k]!).toFixed(1) })}>{tr('console.config_tab.aa')}</span>
         </div>
       ))}
-      <div className="help" style={{ marginTop: 8 }}>Every text pair is checked against WCAG AA for every hue, so any colour can be published.</div>
+      <div className="help" style={{ marginTop: 8 }}>{tr('console.config_tab.every_text_pair_is_checked')}</div>
+    </div>
+  );
+}
+
+/**
+ * Whose setting it is, and Tangent's lock for this school: a locked setting keeps Tangent's value whatever the school chooses
+ * (on a security or privacy setting the value is a floor the school may tighten). The reason is shown to the school.
+ */
+function LockLine({ k, cfg, schoolId, can, current, say }: { k: SettingKey; cfg: SchoolConfig; schoolId: string; can: boolean; current: unknown; say: Say }) { const app = useApp();
+  const qc = useQueryClient();
+  const [asking, setAsking] = useState(false);
+  const [note, setNote] = useState('');
+  const lock = cfg.locks.find((l) => l.key === k);
+  const floor = !!TIGHTEN[k];
+  const go = useMutation({ mutationFn: (locked: boolean) => app.api.config.lock(schoolId, { key: k, locked, value: current, note: note.trim() }),
+    onSuccess: (_r, locked) => { setAsking(false); setNote(''); void qc.invalidateQueries({ queryKey: ['config', schoolId] }); say(locked ? (floor ? tr('console.config_tab.set_as_the_school_s') : tr('console.config_tab.locked_for_this_school')) : tr('console.config_tab.unlocked_the_school_can_change')); },
+    onError: (e) => say((e as Error).message, 'bad') });
+  const owner = settingOwner(k);
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 14 }}>
+      <span className={`chip ${owner === 'tangent' ? 'v' : ''}`}>{owner === 'tangent' ? tr('console.config_tab.tangent_s') : tr('console.config_tab.the_school_s')}</span>
+      {lock && <span className="chip a" data-tip={lock.note || undefined}>{floor ? tr('console.config_tab.minimum_set_by_tangent') : tr('console.config_tab.locked_by_tangent')}</span>}
+      {can && owner === 'school' && (lock
+        ? <button className="btn sm ghost" disabled={go.isPending} onClick={() => go.mutate(false)}>{tr('console.config_tab.unlock')}</button>
+        : <button className="btn sm ghost" onClick={() => setAsking(true)}>{floor ? tr('console.config_tab.set_as_minimum') : tr('console.config_tab.lock_for_this_school')}</button>)}
+      {asking && (
+        <Dialog title={floor ? tr('console.config_tab.set_as_the_school_s_2') : tr('console.config_tab.lock_this_setting')} tag={{ text: SETTINGS_META[k].label, tone: 'v' }} onClose={() => setAsking(false)} width={480}>
+          <div className="help" style={{ marginTop: 0 }}>{floor ? tr('console.config_tab.the_school_can_make_it') : tr('console.config_tab.the_school_sees_it_read')} {tr('console.config_tab.the_value_is_the_one')}</div>
+          <Field label={tr('console.config_tab.why_the_school_sees_this')} value={note} onChange={setNote} maxLength={200} placeholder={tr('console.config_tab.for_example_the_group_sets')} />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+            <button className="btn" onClick={() => setAsking(false)}>{tr('console.config_tab.cancel')}</button>
+            <button className="btn pri" disabled={go.isPending} onClick={() => go.mutate(true)}>{floor ? tr('console.config_tab.set_minimum') : tr('console.config_tab.lock')}</button>
+          </div>
+        </Dialog>
+      )}
     </div>
   );
 }

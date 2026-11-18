@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { EmptyCard, PageScope, Presence, ToastSlot, type ToastProps } from '@tangent/web-ui';
+import { EmptyCard, PageScope, Presence, ToastSlot, type ToastProps, t } from '@tangent/web-ui';
 import './pages.css';
 
 interface PageProps {
@@ -31,7 +31,7 @@ export function Page({ title, sub, actions, tabs, filters, children, overlays, t
         {(tabs || filters) && <div className="pbar rise">{tabs}{tabs && filters && <span className="grow"></span>}{filters}</div>}
         {error ? (
           <div style={{ maxWidth: 520 }}>
-            <EmptyCard error title={title} chip={{ text: 'Couldn’t load', tone: 'c' }} icon="warning" heading="That didn’t load" body={error.message} actions={<button className="btn pri" onClick={error.retry}>Try again</button>} />
+            <EmptyCard error title={title} chip={{ text: t('admin.page.couldn_t_load'), tone: 'c' }} icon="warning" heading={t('admin.page.that_didn_t_load')} body={error.message} actions={<button className="btn pri" onClick={error.retry}>{t('admin.page.try_again')}</button>} />
           </div>
         ) : loading ? <div className="skc" style={{ height: 320, borderRadius: 28 }} /> : children}
       </main>

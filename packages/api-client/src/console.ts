@@ -1,8 +1,8 @@
 import type {
   ActionRequest, ActionRow, LoginChallenge, AuditRow, BackupRow, RestoreDrillRow, ChangeRequestRow, ConfigPatch, ConfigTemplateRow, EffectiveConfig, RoleDef, RoleDefSave, SchoolConfig, BlueprintInput, BlueprintRow, BuildRow, ConsoleLoginResponse, ConsoleTokens, ConsoleUserRow, ErrorGroup, FleetSummary, FlagRow, InvoiceRowC, LoginRequest,
-  CellCreate, CellPatch, ComplianceCreate, ComplianceRow, ComplianceUpdate, DataRequestAcross, MigrationRow, PlanRow, PlanSave, SubprocessorRow, RoleTemplate, SchoolDetailsPatch, PolicyDoc, ProvisionRunRow, ReleaseRow, SandboxMessage, SchoolDetail, SchoolRow, StepKey, SupportSessionRow, SupportToken, VerifyRequest, WizardDraftRow,
+  CellCreate, CellPatch, PackPart, ImportRunRow, ComplianceCreate, ComplianceRow, ComplianceUpdate, DataRequestAcross, MigrationRow, PlanRow, PlanSave, SubprocessorRow, RoleTemplate, SchoolDetailsPatch, PolicyDoc, ProvisionRunRow, ReleaseRow, SandboxMessage, SchoolDetail, SchoolRow, StepKey, SupportSessionRow, SupportToken, VerifyRequest, WizardDraftRow,
   WizardPayload, WizardReview, EntitlementRow, ImportBatchRow, ImportInput, ImportPreview, MigrationView, ReadinessMark, UploadRow,
-  ActivityQuery, ActivityView, ConnectionInput, ConnectionPatch, HookEventRow, IntegrationsView, JobRow, RouteInput as IntRouteInput, TemplateInput } from '@tangent/contracts';
+  DraftResult, I18nSurface, LanguageSummary, TranslationPut, TranslationRow, ActivityQuery, ActivityView, ConnectionInput, ConnectionPatch, HookEventRow, IntegrationsView, JobRow, RouteInput as IntRouteInput, TemplateInput } from '@tangent/contracts';
 import type { Http } from './http';
 
 /** What the console sends to preview or import: the file name may be left out. */
@@ -25,10 +25,18 @@ export function consoleApi(h: Http) {
     resetAuthenticator: (password: string) => h.post<void>(`${base}/auth/authenticator/reset`, { password }),
     logout: () => h.post<void>(`${base}/auth/logout`),
     logoutAll: () => h.post<void>(`${base}/auth/logout-all`),
-    fleet: () => h.get<FleetSummary>(`${base}/fleet`),
+    fleet: () => h.get<FleetSummary>(`${base}/fleet`, { tz: Intl.DateTimeFormat().resolvedOptions().timeZone }),
     dismissIncident: (id: string) => h.post<void>(`${base}/fleet/incident/${id}/dismiss`),
     errors: (days = 7, handled = false) => h.get<ErrorGroup[]>(`${base}/errors`, { days, handled: handled ? 'true' : undefined }),
     errorHandled: (fingerprint: string) => h.post<void>(`${base}/errors/${encodeURIComponent(fingerprint)}/handled`),
+    languages: {
+      summary: () => h.get<LanguageSummary[]>(`${base}/languages`),
+      rows: (lang: string, surface: I18nSurface, filter: 'all' | 'missing' | 'review', q = '') => h.get<TranslationRow[]>(`${base}/languages/${lang}/${surface}`, { filter, q: q || undefined }),
+      put: (lang: string, surface: I18nSurface, b: TranslationPut) => h.put<TranslationRow>(`${base}/languages/${lang}/${surface}`, b),
+      draft: (lang: string, b: { surface: I18nSurface; limit?: number }) => h.post<DraftResult>(`${base}/languages/${lang}/draft`, b),
+      exportCsv: (lang: string, surface: I18nSurface) => h.get<{ csv: string }>(`${base}/languages/${lang}/${surface}/export`),
+      importCsv: (lang: string, surface: I18nSurface, csv: string) => h.post<{ saved: number; refused: string[] }>(`${base}/languages/${lang}/${surface}/import`, { csv }),
+    },
     backups: (schoolId: string) => h.get<BackupRow[]>(`${base}/schools/${schoolId}/backups`),
     migration: {
       view: (schoolId: string) => h.get<MigrationView>(`${base}/schools/${schoolId}/import`),
@@ -37,7 +45,7 @@ export function consoleApi(h: Http) {
       upload: (schoolId: string, uploadId: string) => h.get<{ fileName: string; content: string }>(`${base}/schools/${schoolId}/import/uploads/${uploadId}`),
       setAside: (schoolId: string, uploadId: string, reason: string) => h.post<UploadRow[]>(`${base}/schools/${schoolId}/import/uploads/${uploadId}/set-aside`, { reason }),
       preview: (schoolId: string, b: ImportInputIn) => h.post<ImportPreview>(`${base}/schools/${schoolId}/import/preview`, b),
-      commit: (schoolId: string, b: ImportInputIn) => h.post<ImportBatchRow>(`${base}/schools/${schoolId}/import/commit`, b),
+      commit: (schoolId: string, b: ImportInputIn) => h.post<ImportBatchRow | { run: ImportRunRow }>(`${base}/schools/${schoolId}/import/commit`, b),
       undo: (schoolId: string, batchId: string) => h.post<ImportBatchRow[]>(`${base}/schools/${schoolId}/import/batches/${batchId}/undo`),
       exportAll: (schoolId: string) => h.blob(`${base}/schools/${schoolId}/import/export`),
       sample: (schoolId: string, students: number) => h.post<ImportBatchRow[]>(`${base}/schools/${schoolId}/import/sample`, { students }),
@@ -46,6 +54,7 @@ export function consoleApi(h: Http) {
       get: (schoolId: string) => h.get<SchoolConfig>(`${base}/schools/${schoolId}/config`),
       patch: (schoolId: string, b: ConfigPatch) => h.patch<SchoolConfig | { pending: true; actionId: string }>(`${base}/schools/${schoolId}/config`, b),
       rollback: (schoolId: string, versionId: string) => h.post<SchoolConfig>(`${base}/schools/${schoolId}/config/rollback`, { versionId }),
+      lock: (schoolId: string, b: { key: string; locked: boolean; value?: unknown; note?: string }) => h.put<SchoolConfig>(`${base}/schools/${schoolId}/config/locks`, b),
       preview: (schoolId: string, roleId: string) => h.get<Pick<EffectiveConfig, 'menu' | 'app' | 'modules' | 'school'>>(`${base}/schools/${schoolId}/config/preview`, { roleId }),
       createRole: (schoolId: string, b: RoleDefSave) => h.post<RoleDef[]>(`${base}/schools/${schoolId}/roles`, b),
       saveRole: (schoolId: string, roleId: string, b: RoleDefSave) => h.put<RoleDef[]>(`${base}/schools/${schoolId}/roles/${roleId}`, b),
@@ -78,6 +87,8 @@ export function consoleApi(h: Http) {
     school: (id: string) => h.get<SchoolDetail>(`${base}/schools/${id}`),
     setChecklist: (id: string, key: string, state: 'done' | 'waiting' | 'todo') => h.patch<{ ok: true }>(`${base}/schools/${id}/checklist`, { key, state }),
     setDetails: (id: string, b: SchoolDetailsPatch) => h.patch<{ ok: true }>(`${base}/schools/${id}/details`, b),
+    packPreview: (id: string, country: string, curriculum: string) => h.get<PackPart[]>(`${base}/schools/${id}/packs/preview`, { country, curriculum }),
+    packApply: (id: string, b: { country: string; curriculum: string; groups: string[]; note: string }) => h.post<{ actionId: string; status: string }>(`${base}/schools/${id}/packs/apply`, b),
     plans: () => h.get<PlanRow[]>(`${base}/plans`),
     plan: {
       add: (b: PlanSave) => h.post<PlanRow[]>(`${base}/plans`, b),

@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Header, HttpCode, Inject, Injectable, Param, Patch, Post, type OnModuleInit } from '@nestjs/common';
 import { activeFeatures, activeModules } from '@tangent/config-engine';
-import { IMPORT_KINDS, ImportInput, ReadinessMark, SampleLoad, importKind, inr, type EntitlementDoc, type ImportBatchRow, type ImportPreview, type MigrationView, type UploadRow } from '@tangent/contracts';
-import { commitImport, exportAll, listBatches, pg, previewImport, sampleSchool, templateXlsx, undoBatch } from '@tangent/db';
+import { fmtMoney, IMPORT_KINDS, ImportInput, type ImportRunRow, ReadinessMark, SampleLoad, importKind, type EntitlementDoc, type ImportBatchRow, type ImportPreview, type MigrationView, type UploadRow, tx } from '@tangent/contracts';
+import { commitImport, exportAll, listBatches, newId, pg, previewImport, readTable, sampleSchool, templateXlsx, undoBatch } from '@tangent/db';
 import { ApiError, ZodPipe, notFound } from '@tangent/nest-kit';
 import { z } from 'zod';
 import type { Registry } from '@tangent/tenancy';
@@ -12,6 +12,9 @@ import { withSchoolDb } from './school-db.js';
 import { REGISTRY } from './tokens.js';
 
 const n = async (pool: pg.Pool, sql: string) => Number((await pool.query<{ n: string }>(sql)).rows[0]!.n);
+/** An import this big runs in the background: the page does not wait for it, and the console shows it running, then done. */
+const BIG_ROWS = 2000;
+const BIG_BYTES = 1024 * 1024;
 
 /** Tangent's onboarding team moves a school in: files in, checked, imported as batches that add up, and undone if wrong. */
 @Injectable()
@@ -19,6 +22,8 @@ export class Migration implements OnModuleInit {
   constructor(private readonly db: Db, private readonly actions: Actions, @Inject(ENV) private readonly env: Env, @Inject(REGISTRY) private readonly registry: Registry) {}
 
   onModuleInit(): void {
+    // A run this server was doing when it stopped never finishes: it is failed so it can be run again.
+    void this.db.pool.query("update import_runs set status = 'failed', error = 'The server restarted while it ran. Run it again.', done_at = now() where status = 'running' and started_at < now() - interval '2 hours'").catch(() => undefined);
     // Go live is the end of moving in: the school's Moving in page closes and the day is kept. Only with every item green.
     this.actions.handle('school.golive', async (schoolId, _params, by) => {
       const r = (await this.db.pool.query<{ name: string; slug: string; status: string; went_live_at: Date | null }>('select name, slug, status, went_live_at from schools where id = $1 and deleted_at is null', [schoolId])).rows[0];
@@ -58,7 +63,7 @@ export class Migration implements OnModuleInit {
   private async kindFor(id: string, kind: string): Promise<{ entitlement: EntitlementDoc }> {
     const s = await this.school(id);
     if (!importKind(kind)) throw notFound('That kind of import');
-    if (!s.kinds.includes(kind)) throw new ApiError('validation', `This school’s plan does not include ${importKind(kind)!.label.toLowerCase()}. Change it on the school’s Plan and modules tab first.`);
+    if (!s.kinds.includes(kind)) throw new ApiError('validation', tx('This school’s plan does not include {p0}. Change it on the school’s Plan and modules tab first.', { p0: importKind(kind)!.label.toLowerCase() }));
     return s;
   }
 
@@ -83,13 +88,16 @@ export class Migration implements OnModuleInit {
       const oldDues = typeof s.checklist['golive.old_dues'] === 'number' ? (s.checklist['golive.old_dues'] as number) : null;
       const ticked = (k: string) => s.checklist[`golive.${k}`] === true;
       const fees = s.kinds.includes('fee_dues');
+      // Amounts in the school's own currency and way of writing them.
+      const cur = (await this.db.pool.query<{ currency: string; locale: string }>('select currency, locale from schools where id = $1', [id])).rows[0];
+      const owed = (n: number) => fmtMoney(n, cur?.currency, cur?.locale);
       const readiness = [
         { key: 'structure', label: 'The year and its classes are set up', done: year > 0 && classes > 0, detail: `${classes} classes${year ? '' : ', no current year'}` },
         { key: 'staff', label: 'Staff are in', done: staff > 1, detail: `${staff} staff` },
         { key: 'students', label: 'Every student has a family who can sign in', done: students > 0 && orphans === 0, detail: orphans ? `${orphans} students have no guardian phone` : `${students} students, ${families} families` },
         // Reconciled to the rupee: what is still owed here against the old system's own dues report.
         ...(fees ? [{ key: 'fees', label: 'Opening fee dues are in and match the old system', done: dues > 0 && oldDues !== null && outstanding === oldDues,
-          detail: oldDues === null ? `₹${inr(outstanding)} owed here; type the old system’s total to compare` : outstanding === oldDues ? `₹${inr(outstanding)}, the same as the old system` : `₹${inr(outstanding)} here, ₹${inr(oldDues)} in the old system` }] : []),
+          detail: oldDues === null ? `${owed(outstanding)} owed here; type the old system’s total to compare` : outstanding === oldDues ? `${owed(outstanding)}, the same as the old system` : `${owed(outstanding)} here, ${owed(oldDues)} in the old system` }] : []),
         ...(s.modules.has('timetable') ? [{ key: 'timetable', label: 'The timetable is in', done: slots > 0, detail: `${slots} lessons a week` }] : []),
         { key: 'config_reviewed', label: 'Tangent has reviewed the school’s configuration', done: ticked('config_reviewed'), detail: ticked('config_reviewed') ? 'Done' : 'Not yet', manual: true },
         { key: 'staff_trained', label: 'The school’s staff are trained', done: ticked('staff_trained'), detail: ticked('staff_trained') ? 'Done' : 'Not yet', manual: true },
@@ -97,7 +105,7 @@ export class Migration implements OnModuleInit {
         { key: 'families_invited', label: 'Families are invited', done: families > 0 && invited === families, detail: `${invited} of ${families}` },
         { key: 'families_in', label: 'Most families have signed in', done: families > 0 && signed / families >= 0.8, detail: `${signed} of ${families}` },
       ];
-      return { kinds: IMPORT_KINDS.filter((k) => s.kinds.includes(k.key)), batches, uploads, readiness, dues: fees ? { outstanding, oldSystem: oldDues } : undefined, students, studentLimit: s.entitlement.limits.students };
+      return { kinds: IMPORT_KINDS.filter((k) => s.kinds.includes(k.key)), batches, runs: await this.runs(id), uploads, readiness, dues: fees ? { outstanding, oldSystem: oldDues } : undefined, students, studentLimit: s.entitlement.limits.students };
     });
   }
 
@@ -131,13 +139,34 @@ export class Migration implements OnModuleInit {
     return this.with(id, (pool) => previewImport(pool, input));
   }
 
-  async commit(id: string, input: ImportInput, by: string): Promise<ImportBatchRow> {
+  /** Small imports apply at once; a big one starts in the background and its run is returned instead. */
+  async commit(id: string, input: ImportInput, by: string): Promise<ImportBatchRow | { run: ImportRunRow }> {
+    await this.kindFor(id, input.kind);
+    const rows = input.rows?.length ?? (() => { try { return Math.max(0, readTable(input.csv ?? '').length - 1); } catch { return 0; } })();
+    if (rows <= BIG_ROWS && (input.csv?.length ?? 0) <= BIG_BYTES) return this.commitNow(id, input, by);
+    if ((await this.db.pool.query("select 1 from import_runs where school_id = $1 and status = 'running'", [id])).rowCount) throw new ApiError('conflict', tx('Another import is running for this school. Wait for it to finish.'));
+    const runId = newId('run');
+    await this.db.pool.query('insert into import_runs (id, school_id, kind, file_name, rows, by) values ($1,$2,$3,$4,$5,$6)', [runId, id, input.kind, input.fileName, rows, by]);
+    void this.commitNow(id, input, by).then(
+      (b) => this.db.pool.query("update import_runs set status = 'done', batch_id = $2, created = $3, updated = $4, skipped = $5, done_at = now() where id = $1", [runId, b.id, b.created, b.updated, b.skipped]),
+      (e: Error) => this.db.pool.query("update import_runs set status = 'failed', error = $2, done_at = now() where id = $1", [runId, e.message.slice(0, 500)]),
+    ).catch(() => undefined);
+    return { run: (await this.runs(id))[0]! };
+  }
+
+  async runs(id: string): Promise<ImportRunRow[]> {
+    const { rows } = await this.db.pool.query('select * from import_runs where school_id = $1 order by started_at desc limit 20', [id]);
+    return rows.map((r) => ({ id: r.id, kind: r.kind, fileName: r.file_name, rows: r.rows, status: r.status, created: r.created, updated: r.updated, skipped: r.skipped, error: r.error, by: r.by,
+      startedAt: r.started_at.toISOString(), doneAt: r.done_at?.toISOString() ?? null }));
+  }
+
+  private async commitNow(id: string, input: ImportInput, by: string): Promise<ImportBatchRow> {
     const s = await this.kindFor(id, input.kind);
     return this.with(id, async (pool) => {
       if (input.kind === 'students') {
         const p = await previewImport(pool, input);
         const total = (await n(pool, 'select count(*) n from students')) + p.counts.create;
-        if (total > s.entitlement.limits.students) throw new ApiError('validation', `This takes the school to ${total} students; its plan allows ${s.entitlement.limits.students}. Raise the limit on the Plan and modules tab first.`);
+        if (total > s.entitlement.limits.students) throw new ApiError('validation', tx('This takes the school to {total} students; its plan allows {students}. Raise the limit on the Plan and modules tab first.', { total, students: s.entitlement.limits.students }));
       }
       const batch = await commitImport(pool, input, by);
       await this.db.pool.query('update schools set students_count = $2 where id = $1', [id, await n(pool, 'select count(*) n from students')]);
@@ -169,7 +198,7 @@ export class Migration implements OnModuleInit {
     if (!demosAllowed(this.env)) throw new ApiError('forbidden', 'A test school is only for the test track, never a real school.');
     return this.with(id, async (pool) => {
       if (await n(pool, 'select count(*) n from students')) throw new ApiError('conflict', 'This school already has students. A test school only goes into an empty one.');
-      if (students > s.entitlement.limits.students) throw new ApiError('validation', `The plan allows ${s.entitlement.limits.students} students. Raise the limit on the Plan and modules tab first.`);
+      if (students > s.entitlement.limits.students) throw new ApiError('validation', tx('The plan allows {students} students. Raise the limit on the Plan and modules tab first.', { students: s.entitlement.limits.students }));
       for (const f of sampleSchool(students).files.filter((f) => s.kinds.includes(f.kind))) await commitImport(pool, { kind: f.kind, csv: f.csv, fileName: f.name }, by);
       await this.db.pool.query('update schools set students_count = $2 where id = $1', [id, await n(pool, 'select count(*) n from students')]);
       await this.db.audit(by, 'import.sample_loaded', 'school', id, { students });
@@ -215,7 +244,7 @@ export class MigrationController {
   }
 
   @Post('commit') @HttpCode(200) @Needs('schools.configure')
-  commit(@Me() me: ConsoleUser, @Param('id') id: string, @Body(new ZodPipe(ImportInput)) body: ImportInput): Promise<ImportBatchRow> {
+  commit(@Me() me: ConsoleUser, @Param('id') id: string, @Body(new ZodPipe(ImportInput)) body: ImportInput): Promise<ImportBatchRow | { run: ImportRunRow }> {
     return this.migration.commit(id, body, me.email);
   }
 

@@ -1,10 +1,11 @@
 import { Body, Controller, Delete, Get, HttpCode, Injectable, Param, Post, Put } from '@nestjs/common';
-import { SETUP_KINDS, SetupSave, importKind, type SetupSection } from '@tangent/contracts';
+import { SETUP_KINDS, SetupSave, importKind, schoolCountry, schoolToday, schoolZone, tx, type SetupSection } from '@tangent/contracts';
 import { commitImport, exportRows, newId, previewImport } from '@tangent/db';
 import { ApiError, ZodPipe, forbidden, notFound } from '@tangent/nest-kit';
 import { Core, CurrentUser, Require, RequireModule } from '../auth/guards.js';
 import { Tenant, type AuthedUser, type TenantCtx } from '../tenancy/tenant.js';
 import { AuditService, SettingsService } from './support.js';
+import { HubService } from './hub.service.js';
 
 const REMOVE: Record<string, { sql: string; inUse: string }> = {
   years: { sql: 'delete from academic_years where id = $1', inUse: 'Classes still belong to this year. Move them to another year first.' },
@@ -24,7 +25,28 @@ const LOCKED: Record<string, string> = {
 /** Classes and calendar: the school edits its own structure through the import engine, so a typed row gets the same checks (and undo) as a file. */
 @Injectable()
 export class SetupService {
-  constructor(private readonly audit: AuditService, private readonly settings: SettingsService) {}
+  constructor(private readonly audit: AuditService, private readonly settings: SettingsService, private readonly hubs: HubService) {}
+
+  /**
+   * The country's public holidays in the current school year (which may span two calendar years), from the Public holidays
+   * connection, each marked when the school already has a holiday that day. The school picks which to add (Year → Holidays).
+   */
+  async publicHolidays(t: TenantCtx): Promise<{ date: string; name: string; have: boolean }[]> {
+    const country = schoolCountry();
+    if (!country) throw new ApiError('validation', tx('Set the school’s country first (School profile).'));
+    const y = (await t.pool.query<{ s: string; e: string }>('select starts_on::text s, ends_on::text e from academic_years where current limit 1')).rows[0];
+    const today = schoolToday();
+    const [from, to] = y ? [y.s, y.e] : [`${today.slice(0, 4)}-01-01`, `${today.slice(0, 4)}-12-31`];
+    const r = await this.hubs.hub.resolve('holidays', t.info.id, t.info.slug).catch(() => null);
+    if (!r?.adapter.holidays) throw new ApiError('school_unavailable', tx('Public holidays are not connected for this school yet. Ask Tangent to connect them (Integrations → Public holidays).'));
+    const years = [...new Set([Number(from.slice(0, 4)), Number(to.slice(0, 4))])];
+    const found = (await Promise.all(years.map((n) => r.adapter.holidays!(r.ctx, country, n)))
+      .catch((e: Error) => { throw new ApiError('school_unavailable', tx('The public holidays could not be read: {message}', { message: e.message })); })).flat();
+    const have = new Set((await t.pool.query<{ d: string }>("select (starts_at at time zone $1)::date::text d from events where kind = 'holiday'", [schoolZone()])).rows.map((x) => x.d));
+    const seen = new Set<string>();
+    return found.filter((h) => h.date >= from && h.date <= to && !seen.has(`${h.date}|${h.name}`) && seen.add(`${h.date}|${h.name}`))
+      .sort((a, b) => a.date.localeCompare(b.date)).map((h) => ({ ...h, have: have.has(h.date) }));
+  }
 
   async sections(t: TenantCtx): Promise<SetupSection[]> {
     const modules = (await this.settings.effective(t)).modules;
@@ -71,14 +93,19 @@ export class SetupService {
 
   /** Bills every active student in the fee's grade (or every grade) once: a student who already has a fee with this name is left alone. */
   async apply(t: TenantCtx, id: string, user: { id: string; name: string }): Promise<{ created: number }> {
-    const fee = (await t.pool.query<{ head: string; title: string; amount: number; due_on: string; grade: number | null }>('select head, title, amount, due_on::text, grade from fee_structures where id = $1', [id])).rows[0];
+    const fee = (await t.pool.query<{ head: string; title: string; amount: number; due_on: string; grade: number | null; category: string | null }>('select head, title, amount, due_on::text, grade, category from fee_structures where id = $1', [id])).rows[0];
     if (!fee) throw notFound('That fee');
+    // A category's own fee goes to that category only; the everyone fee goes to every other student, and to a category's
+    // students only where the category has no fee of its own for that head (for their grade or every grade).
     const { rows } = await t.pool.query<{ id: string }>(
       `select s.id from students s join classes c on c.id = s.class_id where s.status = 'active' and ($1::int is null or c.grade = $1)
-       and not exists (select 1 from fee_invoices i where i.student_id = s.id and lower(i.title) = lower($2))`, [fee.grade, fee.title]);
+       and not exists (select 1 from fee_invoices i where i.student_id = s.id and lower(i.title) = lower($2))
+       and (case when $3::text is not null then s.fee_category = $3
+            else s.fee_category is null or not exists (select 1 from fee_structures o where o.category = s.fee_category and o.head = $4 and (o.grade is null or o.grade = c.grade)) end)`,
+      [fee.grade, fee.title, fee.category, fee.head]);
     if (rows.length) {
       await t.pool.query('insert into fee_invoices (id, student_id, head, title, amount, due_on) select unnest($1::text[]), unnest($2::text[]), $3, $4, $5, $6',
-        [rows.map(() => newId('inv')), rows.map((r) => r.id), fee.head, fee.title, fee.amount, fee.due_on]);
+        [rows.map(() => newId('inv')), rows.map((r) => r.id), fee.head, fee.title, await this.settings.billed(t, fee.head, fee.amount), fee.due_on]);
     }
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'fee.assigned', entity: 'fee_structure', entityId: id, detail: { count: rows.length, title: fee.title, amount: fee.amount } });
     return { created: rows.length };
@@ -93,6 +120,11 @@ export class SetupController {
   @Get() @Require('students.read')
   sections(@Tenant() t: TenantCtx): Promise<SetupSection[]> {
     return this.setup.sections(t);
+  }
+
+  @Get('holidays/public') @Require('setup.write')
+  publicHolidays(@Tenant() t: TenantCtx): Promise<{ date: string; name: string; have: boolean }[]> {
+    return this.setup.publicHolidays(t);
   }
 
   // Each kind belongs to a module (fee structures to fees); `open` checks it, since the kind is in the path.

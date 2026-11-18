@@ -1,20 +1,4 @@
-/** Schools here run on Indian time. All "today" logic goes through these helpers so the API and the UIs agree. */
-const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-
-export function istNow(now: Date = new Date()): Date {
-  return new Date(now.getTime() + IST_OFFSET_MS);
-}
-
-/** YYYY-MM-DD for the given instant in IST. */
-export function istToday(now: Date = new Date()): string {
-  return istNow(now).toISOString().slice(0, 10);
-}
-
-/** Minutes since midnight in IST. */
-export function istMinutes(now: Date = new Date()): number {
-  const d = istNow(now);
-  return d.getUTCHours() * 60 + d.getUTCMinutes();
-}
+/** Days as YYYY-MM-DD and the school's "today" (locale.ts: the school's own time zone). All "today" logic goes through these. */
 
 export function parseDay(day: string): Date {
   return new Date(`${day}T00:00:00Z`);
@@ -78,21 +62,6 @@ export function dayLabel(day: string): string {
 export const plural = (word: string): string =>
   /(s|x|z|ch|sh)$/i.test(word) ? `${word}es` : /[^aeiou]y$/i.test(word) ? `${word.slice(0, -1)}ies` : `${word}s`;
 
-/** Indian digit grouping: 1842300 -> "18,42,300". */
-export function inr(n: number): string {
-  const x = String(Math.round(Math.abs(n)));
-  const last = x.slice(-3);
-  const rest = x.slice(0, -3);
-  const body = rest ? `${rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',')},${last}` : last;
-  return n < 0 ? `-${body}` : body;
-}
-
-/** Lakhs with one decimal, "1.8L", for compact chart labels. */
-export function lakhs(n: number): string {
-  const v = n / 100000;
-  return `${v >= 10 ? Math.round(v) : Math.round(v * 10) / 10}L`;
-}
-
 export function initials(name: string): string {
   return name
     .split(/\s+/)
@@ -100,4 +69,11 @@ export function initials(name: string): string {
     .slice(0, 2)
     .map((w) => w[0]!.toUpperCase())
     .join('');
+}
+
+/** Whether someone born on `dob` has reached `age` years by `today` (ISO days; born on 29 February, they turn a year older on 1 March). */
+export function hasReachedAge(dob: string, today: string, age: number): boolean {
+  const [y, m, d] = today.split('-').map(Number) as [number, number, number];
+  const then = `${String(y - age).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  return dob <= then;
 }

@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Headers, HttpCode, Inject, Injectable, Param, Post } from '@nestjs/common';
 import { POOLS, REGISTRY } from './tokens.js';
 import { catalogueName, changeEntitlement, type EntitlementChange } from '@tangent/config-engine';
-import { ActionRequest, appIdFor, type ActionRow, type BuildRow, type ConsoleRole, type EntitlementDoc } from '@tangent/contracts';
+import { ActionRequest, appIdFor, type ActionRow, type BuildRow, type ConsoleRole, type EntitlementDoc, tx } from '@tangent/contracts';
 import { migrate, newId, pg, pendingMigrations } from '@tangent/db';
 import { ApiError, ZodPipe, notFound } from '@tangent/nest-kit';
 import { constantTimeEqual, randomToken, sha256, unseal } from '@tangent/security';
@@ -179,13 +179,14 @@ export class Actions {
     if (!body.schoolId && body.action !== 'integration.live' && body.action !== 'integration.mode') throw new ApiError('validation', 'Choose the school this is for.');
     const school = body.schoolId ? await this.schools.raw(body.schoolId) : null;
     const pol = await this.policy.get();
-    if (pol.freeze && body.action !== 'school.suspend') throw new ApiError('locked', `Changes are frozen${pol.freezeReason ? `: ${pol.freezeReason}` : ''}. A super admin can lift the freeze under Console settings.`);
+    if (pol.freeze && body.action !== 'school.suspend') throw new ApiError('locked', tx('Changes are frozen{p0}. A super admin can lift the freeze under Console settings.', { p0: pol.freezeReason ? `: ${pol.freezeReason}` : '' }));
     const busy = school ? await this.db.pool.query("select 1 from actions where school_id = $1 and status = 'running'", [school.id]) : { rowCount: 0 };
     if (busy.rowCount) throw new ApiError('conflict', 'Another action is already running for this school.');
     if (school && (body.action === 'school.erase' || body.action === 'retention.erase') && !body.dryRun && body.confirmCode?.trim() !== school.slug) {
-      throw new ApiError('validation', 'That does not match. Nothing was erased.', { fields: { confirmCode: `Type ${school.slug} exactly.` } });
+      throw new ApiError('validation', 'That does not match. Nothing was erased.', { fields: { confirmCode: tx('Type {slug} exactly.', { slug: school.slug }) } });
     }
-    let needs = pol.approvals[body.action]?.needed && !body.dryRun;
+    // Re-applying a pack overwrites what the school chose: always a second person.
+    let needs = (pol.approvals[body.action]?.needed || body.action === 'pack.apply') && !body.dryRun;
     let summary = this.describe(body.action, school?.name ?? 'every school', body.params);
     if (school && body.action === 'entitlements.push') {
       // Checked now, so a bad change never waits for approval; taking anything away from a school always needs a second person.
@@ -231,6 +232,7 @@ export class Actions {
     return ({
       'integration.live': `Take ${String(params.name ?? 'a connection')} live for ${school}`,
       'integration.mode': 'Switch every school to live messages (real providers, no Test inbox)',
+      'pack.apply': `Re-apply ${Array.isArray(params.groups) ? params.groups.join(', ') : 'part'} of the ${String(params.country ?? '')}${params.curriculum ? ` ${String(params.curriculum)}` : ''} starter pack to ${school}`,
       'retention.erase': `Erase the records of people who left ${school} past the retention period`,
       'school.golive': `Take ${school} live (moving in ends)`, 'school.suspend': `Pause ${school}`, 'school.resume': `Resume ${school}`, 'school.erase': `Erase ${school}`, 'entitlements.push': `Push the plan and locks to ${school}`,
       'migration.run': `Run pending migrations for ${school}`, 'domain.set': `Change the address of ${school}`, 'build.app': `Build the app for ${school}`, 'backup.take': `Back up ${school}`, 'backup.restore': `Put ${school} back as it was in a backup`, 'config.apply': `Change risky settings for ${school}`, 'school.move': `Move ${school} to another cell`,
@@ -320,6 +322,9 @@ export class Actions {
         if (to === school.cell) throw new Error(`${school.name} already runs in ${to}.`);
         if (!target.accepting) throw new Error(`Cell ${to} is closed to new schools.`);
         if (Number(target.n) >= target.max_schools) throw new Error(`Cell ${to} is full.`);
+        // A school whose contract keeps its data in one region moves only within it.
+        const keep = (await this.db.pool.query<{ residency: string; region: string }>('select s.residency, c.region from schools s, cells c where s.id = $1 and c.key = $2', [school.id, to])).rows[0];
+        if (keep?.residency && keep.region !== keep.residency) throw new Error(`${school.name}’s data must stay in ${keep.residency}; cell ${to} is in ${keep.region}.`);
         const moved = await moveSchool({
           db: this.db, env: this.env, hub: this.platform, school: { ...school, dbName: school.dbName ?? null }, to,
           backup: () => this.backups.take(school.id, 'manual', `${a.requestedBy} (before moving)`), log: () => done(),

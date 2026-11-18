@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, Injectable, Put } from '@nestjs/common';
-import { ACTIONS, ROLE_TEMPLATES, RoleTemplatesPut, type ConsoleRole, type PolicyDoc, type RoleTemplate } from '@tangent/contracts';
+import { ACTIONS, ROLE_TEMPLATES, RoleTemplatesPut, type ConsoleRole, type PolicyDoc, type RoleTemplate, tx } from '@tangent/contracts';
 import { ZodPipe } from '@tangent/nest-kit';
 import { ApiError } from '@tangent/nest-kit';
 import { Db, Me, Needs, type ConsoleUser } from './core.js';
@@ -15,7 +15,7 @@ export const DEFAULT_POLICY: PolicyDoc = {
   freeze: false,
   freezeReason: '',
   naming: { slugPattern: '^[a-z][a-z0-9-]{2,30}[a-z0-9]$', bundlePrefix: 'com.tangent.' },
-  maintenanceWindow: 'Sun 01:00–03:00 IST',
+  maintenanceWindow: 'Sun 19:30–21:30 UTC',
 };
 
 /** Rules the console runs on: which actions need a second person, how a release rolls, and the freeze switch. All data, all editable. */
@@ -57,7 +57,7 @@ export class RoleTemplates {
     if (new Set(keys).size !== keys.length) throw new ApiError('validation', 'Two starting roles have the same key.');
     // Demo schools and every school's principal rely on these; they can be renamed and changed, not removed.
     const missing = ROLE_TEMPLATES.filter((t) => !keys.includes(t.key));
-    if (missing.length) throw new ApiError('validation', `${missing.map((t) => t.name).join(', ')} cannot be removed; change what it can do instead.`);
+    if (missing.length) throw new ApiError('validation', tx('{p0} cannot be removed; change what it can do instead.', { p0: missing.map((t) => t.name).join(', ') }));
     await this.db.pool.query("insert into console_settings (key, value, updated_by) values ('role_templates', $1, $2) on conflict (key) do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now()", [JSON.stringify(list), user]);
     await this.db.audit(user, 'role_templates.changed', 'policy', 'role_templates', { roles: list.length });
     return this.get();

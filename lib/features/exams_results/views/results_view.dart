@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/utils/open_link.dart';
 import 'package:tangent/core/theme/app_typography.dart';
 import 'package:tangent/core/theme/tokens.dart';
 import 'package:tangent/core/utils/extensions.dart';
@@ -11,7 +12,6 @@ import 'package:tangent/core/widgets/glass.dart';
 import 'package:tangent/core/widgets/page.dart';
 import 'package:tangent/core/widgets/sheets.dart';
 import 'package:tangent/core/widgets/states.dart';
-import 'package:tangent/core/widgets/toast.dart';
 import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/data/models/academics.dart';
 import 'package:tangent/features/exams_results/controllers/results_controller.dart';
@@ -49,7 +49,11 @@ class ResultsView extends GetView<ResultsController> {
           GlassIconButton(
             icon: PhosphorIconsRegular.downloadSimple,
             label: 'results.download'.tr,
-            onTap: () => ToastHelper.show('results.downloaded', kind: ToastKind.success),
+            onTap: () {
+              final r = controller.result;
+              if (r == null) return;
+              unawaited(openFromServer((s) => s.post('/results/${r.examId}/${r.studentId}/link', {})));
+            },
           ),
         ],
         onRefresh: controller.load,

@@ -2,7 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/utils/open_link.dart';
+import 'package:tangent/core/utils/copy.dart';
+import 'package:tangent/core/utils/calendar.dart';
 import 'package:tangent/core/routes/app_routes.dart';
+import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
 import 'package:tangent/core/theme/tokens.dart';
@@ -13,7 +17,6 @@ import 'package:tangent/core/widgets/glass.dart';
 import 'package:tangent/core/widgets/glass_controls.dart';
 import 'package:tangent/core/widgets/page.dart';
 import 'package:tangent/core/widgets/states.dart';
-import 'package:tangent/core/widgets/toast.dart';
 import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/data/models/academics.dart';
 import 'package:tangent/features/dashboard/views/dashboard_view.dart';
@@ -194,7 +197,9 @@ class _HomeworkRow extends StatelessWidget {
       case 2:
         meta = '${mine?.marks ?? 0}/${item.maxMarks}${(mine?.feedback ?? '').isEmpty ? '' : ' · “${mine!.feedback}”'}';
         stamp = mine?.grade ?? '—';
-        tone = (mine?.grade ?? '').startsWith('A') ? AppColors.ok : (c.dark ? AppColors.blackboard.mariText : AppColors.late);
+        // Green when the mark reaches the school's pass mark, whatever its grades are called.
+        final passed = item.maxMarks > 0 && (mine?.marks ?? 0) * 100 / item.maxMarks >= SchoolConfig.passPct;
+        tone = passed ? AppColors.ok : (c.dark ? AppColors.blackboard.mariText : AppColors.late);
       default:
         meta = [
           if (teacher.isNotEmpty) teacher,
@@ -257,13 +262,17 @@ class HomeworkDetailView extends GetView<HomeworkDetailController> {
             icon: PhosphorIconsRegular.bell,
             label: 'homework.remind'.tr,
             color: pigment?.on,
-            onTap: () => ToastHelper.show('homework.reminder_set', kind: ToastKind.success),
+            onTap: item == null
+                ? null
+                : () => unawaited(
+                    addToCalendar(title: 'homework.due_title'.trp({'title': item.title}), first: item.dueOn, details: item.description, remindMinutes: 18 * 60),
+                  ),
           ),
           GlassIconButton(
             icon: PhosphorIconsRegular.export,
             label: 'common.share'.tr,
             color: pigment?.on,
-            onTap: () => ToastHelper.show('homework.shared', kind: ToastKind.success),
+            onTap: item == null ? null : () => unawaited(copyText('${item.title}\n${item.description}')),
           ),
         ],
         topPadding: 0,
@@ -420,7 +429,7 @@ class _DetailBody extends StatelessWidget {
                 children: [
                   for (var i = 0; i < item.attachments.length; i++) ...[
                     if (i > 0) const Hr(indent: 66),
-                    _FileRow(name: item.attachments[i]),
+                    _FileRow(name: item.attachments[i], fileId: item.fileId(item.attachments[i])),
                   ],
                 ],
               ),
@@ -445,16 +454,19 @@ class _DetailBody extends StatelessWidget {
 }
 
 class _FileRow extends StatelessWidget {
-  const _FileRow({required this.name});
+  const _FileRow({required this.name, this.fileId});
 
   final String name;
+
+  /// The file's id on the school's server (none in sample data).
+  final String? fileId;
 
   @override
   Widget build(BuildContext context) {
     final c = context.app;
     final ext = name.contains('.') ? name.split('.').last.toUpperCase() : 'FILE';
     return Pressable(
-      onTap: () => ToastHelper.show('homework.downloaded', kind: ToastKind.success),
+      onTap: () => unawaited(openFile(fileId)),
       scale: .985,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

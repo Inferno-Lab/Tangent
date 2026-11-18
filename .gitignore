@@ -75,3 +75,4 @@ ios/Runner/GoogleService-Info.plist
 design/hue/canvas/
 design/hue/preview/
 design/hue/shots/
+.i18n-skipped.txt

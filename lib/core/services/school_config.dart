@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:tangent/core/config/app_config.dart';
+import 'package:tangent/core/services/language_packs.dart';
 import 'package:tangent/core/services/storage_service.dart';
 import 'package:tangent/core/services/theme_service.dart';
 import 'package:tangent/core/utils/schedule.dart';
@@ -48,7 +50,7 @@ abstract final class SchoolConfig {
   static final roles = <String>[].obs;
 
   /// The languages the app offers (console: The app → Languages offered).
-  static final languages = <String>['en', 'hi', 'mr'].obs;
+  static final languages = <String>['en'].obs;
 
   /// Empty only before anything has loaded; then the modules the school has.
   static final modules = <String>[].obs;
@@ -76,18 +78,44 @@ abstract final class SchoolConfig {
   static set debugSettings(Map<String, dynamic> settings) => _settings = settings;
 
   static T _s<T>(String key, T fallback) => _settings[key] is T ? _settings[key] as T : fallback;
+
+  /// The days the school's timetable keeps lessons under, in order: mon…sun for a week, mon-a…sun-b for A/B weeks, d1…dN for
+  /// a cycle of days (the server's `timetable.keys`; sample content: the seven weekdays).
+  static List<String> get timetableKeys {
+    final tt = _json['timetable'];
+    final keys = tt is Map ? tt['keys'] : null;
+    return keys is List && keys.isNotEmpty ? keys.map((k) => '$k').toList() : const ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  }
+
+  /// The timetable day a date uses for A/B weeks and cycles of days (which holidays move on), from the server; null for a
+  /// weekly timetable, or a date it did not send (closed, or too far away).
+  static String? cycleKey(DateTime date) {
+    final tt = _json['timetable'];
+    final dates = tt is Map ? tt['dates'] : null;
+    if (dates is! Map) return null;
+    final d = '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final k = dates[d];
+    return k is String ? k : '';
+  }
   static List<Map<String, dynamic>> _list(String key) =>
       [for (final e in (_settings[key] as List?) ?? const []) Map<String, dynamic>.from(e as Map)];
+
+  /// Where the school is and how it writes money and dates (the school's settings; the wizard sets them from its country).
+  static String get currency => _s<String>('school.currency', 'USD');
+  static String get country => _s<String>('school.country', '');
+  /// The school's locale in the form intl takes ("en_IN" from "en-IN").
+  static String get locale => _s<String>('school.locale', 'en').replaceAll('-', '_');
 
   static String get schoolName => '${(_json['school'] as Map?)?['name'] ?? ''}';
   static String get schoolAddress => '${(_json['school'] as Map?)?['address'] ?? ''}';
   static String get schoolPhone => '${(_json['school'] as Map?)?['phone'] ?? ''}';
   static String get schoolEmail => '${(_json['school'] as Map?)?['email'] ?? ''}';
 
-  /// What the school calls a class; empty means the app's own (translated) word.
+  /// What the school calls a class in the app's language; empty means the app's own (translated) word.
   static String get classWord {
-    final word = '${(_json['vocabulary'] as Map?)?['class'] ?? ''}'.trim();
-    return word == 'Class' ? '' : word;
+    final lang = Get.find<ThemeService>().locale.value.languageCode;
+    final word = '${(((_json['vocab'] as Map?)?[lang] as Map?)?['class'] as Map?)?['one'] ?? ''}'.trim();
+    return word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1);
   }
 
   static String get privacyNotice => '${(_json['privacy'] as Map?)?['notice'] ?? ''}';
@@ -113,12 +141,39 @@ abstract final class SchoolConfig {
     return houses.firstWhereOrNull((h) => h.key == k || h.name.toLowerCase() == k);
   }
 
-  /// The attendance marks the school uses (present and absent always).
-  static List<String> get attendanceStatuses => List<String>.from(_s<List<dynamic>>('attendance.statuses', const ['present', 'absent', 'late', 'leave']));
-  static List<String> get leaveReasons => List<String>.from(_s<List<dynamic>>('leave.reasons', const ['Other']));
+  /// The school's leave reasons (a school list), each in the reader's language where the school named it there; retired ones are
+  /// not offered. A list of plain words (sample content, an older server) reads as it is. The server takes any of these names.
+  static List<String> get leaveReasons => _names('leave.reasons', const ['Other']);
 
-  /// The first weekday of every week grid: [DateTime.monday] or [DateTime.sunday].
-  static int get weekStarts => _s('calendar.weekStarts', 'mon') == 'sun' ? DateTime.sunday : DateTime.monday;
+  /// Short replies staff pick when answering (the school's list, in the reader's language); empty when the school has none.
+  static List<String> get quickReplies => _names('chat.quickReplies', const []);
+
+  /// When teachers answer messages ("08:00" to "16:00"), or null for any time.
+  static ({String from, String to})? get officeHours {
+    final h = _settings['chat.officeHours'];
+    return h is Map && h['from'] is String && h['to'] is String ? (from: h['from'] as String, to: h['to'] as String) : null;
+  }
+
+  static List<String> _names(String key, List<dynamic> fallback) {
+    final lang = Get.locale?.languageCode ?? 'en';
+    final out = <String>[];
+    for (final r in _s<List<dynamic>>(key, fallback)) {
+      if (r is String) {
+        out.add(r);
+      } else if (r is Map && r['active'] != false) {
+        final names = r['names'];
+        final own = names is Map ? names[lang] : null;
+        out.add(own is String && own.isNotEmpty ? own : '${r['name'] ?? r['key'] ?? ''}');
+      }
+    }
+    return out.where((e) => e.isNotEmpty).toList();
+  }
+
+  /// The first weekday of every week grid, any day the school chose ([DateTime.monday] is 1 … [DateTime.sunday] is 7).
+  static int get weekStarts {
+    final i = const ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].indexOf(_s('calendar.weekStarts', 'mon'));
+    return i < 0 ? DateTime.monday : i + 1;
+  }
 
   /// Grades from the lowest percentage that earns each, highest first.
   static List<(String, double)> get gradingScale => [
@@ -135,6 +190,7 @@ abstract final class SchoolConfig {
   static String get handedInBy => _s('homework.handedInBy', 'either');
 
   static int get libraryMaxLoans => _s<num>('library.maxLoans', 3).toInt();
+  static int get defaultMaxMarks => _s<num>('exams.defaultMaxMarks', 100).toInt();
   static int get libraryMaxRenewals => _s<num>('library.maxRenewals', 1).toInt();
 
   /// Who a family calls about the bus: `office`, `attendant` or `none`.
@@ -162,7 +218,8 @@ abstract final class SchoolConfig {
     Map<String, dynamic>? json;
     if (AppConfig.live) {
       try {
-        json = Map<String, dynamic>.from(await Get.find<RemoteDataSource>().get('/v1/config') as Map);
+        // One quiet retry for a blip (a phone waking, a lift between floors) before saying anything.
+        json = await _fetch().catchError((Object _) => Future<Map<String, dynamic>>.delayed(const Duration(seconds: 3), _fetch));
         await Get.find<StorageService>().writeCache(_cacheKey, jsonEncode(json));
         stale.value = false;
       } on Object {
@@ -177,6 +234,8 @@ abstract final class SchoolConfig {
     await _apply(json);
   }
 
+  static Future<Map<String, dynamic>> _fetch() async => Map<String, dynamic>.from(await Get.find<RemoteDataSource>().get('/v1/config') as Map);
+
   static Future<void> _apply(Map<String, dynamic> json) async {
     _json = json;
     _settings = Map<String, dynamic>.from((json['settings'] as Map?) ?? const {});
@@ -184,13 +243,16 @@ abstract final class SchoolConfig {
     features.assignAll(List<String>.from((json['features'] as List?) ?? const []));
     roles.assignAll(List<String>.from(((json['app'] as Map?)?['roles'] as List?) ?? const []));
     applyRole(role);
-    final langs = List<String>.from((_settings['app.languages'] as List?) ?? const ['en', 'hi', 'mr']);
+    final langs = List<String>.from((_settings['app.languages'] as List?) ?? const ['en']);
     if (langs.isNotEmpty) languages.assignAll(langs);
     // Someone whose language the school does not offer gets the school's default language (or the first one offered).
     final theme = Get.find<ThemeService>();
     if (!languages.contains(theme.locale.value.languageCode)) {
       final fallback = '${(json['school'] as Map?)?['language'] ?? ''}';
       await theme.setLocale(Locale(languages.contains(fallback) ? fallback : languages.first));
+    } else if (!Get.testMode) {
+      unawaited(LanguagePacks.refresh(theme.locale.value.languageCode));
+      unawaited(LanguagePacks.remember(theme.locale.value.languageCode));
     }
     const days = {'mon': DateTime.monday, 'tue': DateTime.tuesday, 'wed': DateTime.wednesday, 'thu': DateTime.thursday, 'fri': DateTime.friday, 'sat': DateTime.saturday, 'sun': DateTime.sunday};
     weeklyOffDays

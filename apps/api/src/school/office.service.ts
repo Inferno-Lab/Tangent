@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { newId } from '@tangent/db';
-import {
-  addDays, dayMonth, inr, istToday, latestSchoolDay, type DataRequestCreate, type DataRequestDecision, type DataRequestRow, type EventReply, type EventRow, type EventSave, type FeeStatus, type InvoiceListQuery,
-  type InvoiceListRow, type InvoiceListSummary, type Paged, type ReceiptRow, type ReportData, type ReportInfo, type ReportQuery, type ThreadCreate, type ThreadDetail, type ThreadPatch, type ThreadReply, type ThreadRow,
-} from '@tangent/contracts';
+import { newId, toCsv, zip } from '@tangent/db';
+import { bestOf, roundPct, tx, fmtNumber, fmtMoney, fmtDate, addDays, dayMonth, schoolToday, latestSchoolDay, type DataRequestCreate, type DataRequestDecision, type DataRequestRow, type EventReply, type EventRow, type EventSave, type FeeStatus, type InvoiceListQuery, type InvoiceListRow, type InvoiceListSummary, type Paged, type ReceiptRow, type ReportData, type ReportInfo, type ReportQuery, type ThreadCreate, type ThreadDetail, type ThreadPatch, type ThreadReply, type ThreadRow } from '@tangent/contracts';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
@@ -11,16 +8,18 @@ import { ChatService } from './chat.service.js';
 
 type User = { id: string; name: string };
 const esc = (q: string) => q.replace(/[\\%_]/g, (c) => `\\${c}`);
-const money = (n: number) => `₹${inr(Math.round(n))}`;
+const money = (n: number) => fmtMoney(n);
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
 
 const REPORTS: ReportInfo[] = [
   { id: 'attendance-class', title: 'Attendance by class', blurb: 'Present, late, absent and leave for every class over a period (the last 30 school days unless chosen).', area: 'Attendance', filters: ['dates', 'class'], needs: 'attendance' },
   { id: 'attendance-low', title: 'Low attendance', blurb: 'Students present on fewer days than the school’s attendance goal over a period (this month unless chosen).', area: 'Attendance', filters: ['dates', 'class'], needs: 'attendance' },
+  { id: 'attendance-persistent', title: 'Persistent absence', blurb: 'Students who missed more than the school’s limit of the year so far (Attendance → Settings), leave included, counted in registers.', area: 'Attendance', filters: ['class'], needs: 'attendance' },
   { id: 'fees-collection', title: 'Fees by type', blurb: 'What was billed, collected and is still due for each kind of fee (fees due in the period, if one is chosen).', area: 'Fees', filters: ['dates', 'class'], needs: 'fees' },
   { id: 'fees-defaulters', title: 'Overdue families', blurb: 'Families with an unpaid fee past its due date, largest first.', area: 'Fees', filters: ['class'], needs: 'fees' },
   { id: 'strength', title: 'Class strength', blurb: 'Students in every class, with the class teacher.', area: 'People', filters: [], needs: null },
   { id: 'results', title: 'Exam results by class', blurb: 'Average and pass rate of every published exam.', area: 'Learning', filters: ['class'], needs: 'exams' },
+  { id: 'results-year', title: 'Year result', blurb: 'Each student’s result for the year so far: every published exam, each kind counting as much as Exams → Settings says.', area: 'Learning', filters: ['class'], needs: 'exams' },
   { id: 'homework', title: 'Homework hand-in', blurb: 'How much homework was set and how much came in on time, by class (homework set in the period, if one is chosen).', area: 'Learning', filters: ['dates', 'class'], needs: 'homework' },
 ];
 
@@ -39,14 +38,14 @@ export class OfficeService {
   private invoiceBase(): string {
     return `with paid as (select invoice_id, sum(amount - refunded) p from payments group by invoice_id),
       inv as (
-        select i.id, i.student_id, s.name student_name, c.name class_name, i.head, i.title, i.amount, i.waived_amount waived, coalesce(paid.p, 0)::int paid, i.due_on::text due_on, i.due_on d,
-          greatest(i.amount - i.waived_amount - coalesce(paid.p, 0), 0)::int outstanding,
+        select i.id, i.student_id, s.name student_name, c.name class_name, i.head, i.title, i.amount, i.waived_amount waived, coalesce(paid.p, 0) paid, i.due_on::text due_on, i.due_on d,
+          greatest(i.amount - i.waived_amount - coalesce(paid.p, 0), 0) outstanding,
           case when i.amount - i.waived_amount - coalesce(paid.p, 0) <= 0 then 'paid' when i.due_on < $1::date then 'overdue' when coalesce(paid.p, 0) > 0 then 'partial' else 'due' end status
         from fee_invoices i join students s on s.id = i.student_id join classes c on c.id = s.class_id left join paid on paid.invoice_id = i.id)`;
   }
 
   async invoiceList(t: TenantCtx, q: InvoiceListQuery): Promise<Paged<InvoiceListRow> & { summary: InvoiceListSummary }> {
-    const params: unknown[] = [istToday()];
+    const params: unknown[] = [schoolToday()];
     const where: string[] = [];
     if (q.status) { params.push(q.status); where.push(`status = $${params.length}`); }
     if (q.head) { params.push(q.head); where.push(`head = $${params.length}`); }
@@ -90,16 +89,24 @@ export class OfficeService {
     return REPORTS.filter((r) => !r.needs || modules.includes(r.needs));
   }
 
+  async reportPeriods(t: TenantCtx): Promise<{ name: string; from: string; to: string; kind: 'term' | 'period' }[]> {
+    const { rows } = await t.pool.query<{ name: string; from: string; to: string; kind: 'term' | 'period' }>(
+      `select name, starts_on::text "from", ends_on::text "to", 'term' kind from terms where year_id = (select id from academic_years where current limit 1)
+       union all select name, starts_on::text, ends_on::text, 'period' from reporting_periods where year_id = (select id from academic_years where current limit 1)
+       order by 2, 4`);
+    return rows;
+  }
+
   async report(t: TenantCtx, id: string, q: ReportQuery = {}): Promise<ReportData> {
     const info = (await this.reportList(t)).find((r) => r.id === id);
     if (!info) throw notFound('That report');
-    const today = istToday();
+    const today = schoolToday();
     const last = latestSchoolDay(today, await this.settings.offDays(t));
     const cls = q.classId ? (await t.pool.query<{ name: string }>('select name from classes where id = $1', [q.classId])).rows[0]?.name ?? null : null;
     if (q.classId && !cls) throw notFound('That class');
     const dated = !!(q.from || q.to);
     const period = (dflt: [string, string]): [string, string] => [q.from ?? dflt[0], q.to ?? dflt[1]];
-    const scope = (p?: [string, string]) => [cls ? `Class ${cls}` : 'Whole school', p ? `${dayMonth(p[0])} to ${dayMonth(p[1])}` : ''].filter(Boolean).join(', ');
+    const scope = (p?: [string, string]) => [cls ?? tx('Whole school'), p ? tx('{from} to {to}', { from: dayMonth(p[0]), to: dayMonth(p[1]) }) : ''].filter(Boolean).join(', ');
     const base = { id, title: info.title };
     if (id === 'attendance-class') {
       const p = period([addDays(last, -42), last]);
@@ -123,6 +130,22 @@ export class OfficeService {
       return { ...base, scope: scope(p), summary: [{ label: `Students below ${goal}%`, value: String(rows.length) }, { label: 'Period', value: `${dayMonth(p[0])} to ${dayMonth(p[1])}` }],
         columns: [{ key: 'student', label: 'Student' }, { key: 'class', label: 'Class' }, { key: 'days', label: 'School days', align: 'right' }, { key: 'absent', label: 'Absent', align: 'right' }, { key: 'rate', label: 'Present', align: 'right' }],
         rows: rows.map((r) => ({ _student: r.id, student: r.name, class: r.class_name, days: Number(r.days), absent: Number(r.absent), rate: `${pct(Number(r.present), Number(r.days))}%` })) };
+    }
+    if (id === 'attendance-persistent') {
+      // From the first day of the school year; every register counts (two a day where the school keeps two), leave included.
+      const start = (await t.pool.query<{ s: string }>('select starts_on::text s from academic_years where current limit 1')).rows[0]?.s ?? `${last.slice(0, 4)}-01-01`;
+      const p = period([start, last]);
+      const below = await this.settings.value<number>(t, 'attendance.persistentPct', 90);
+      const { rows } = await t.pool.query<{ id: string; name: string; class_name: string; n: string; present: string }>(
+        `select s.id, s.name, c.name class_name, count(*) n, count(*) filter (where m.status in ('present','late','half_day')) present
+         from attendance_marks m join attendance_sessions x on x.id = m.session_id join students s on s.id = m.student_id and s.status = 'active' join classes c on c.id = s.class_id
+         where x.date between $1 and $2 and ($4::text is null or c.id = $4) group by s.id, s.name, c.name, c.grade, c.section
+         having count(*) filter (where m.status in ('present','late','half_day'))::float / count(*) < $3
+         order by count(*) filter (where m.status in ('present','late','half_day'))::float / count(*), s.name limit 500`, [p[0], p[1], below / 100, q.classId ?? null]);
+      const two = (await this.settings.value<string>(t, 'attendance.registers', 'day')) === 'ampm';
+      return { ...base, scope: scope(p), summary: [{ label: tx('Below {below}%', { below }), value: String(rows.length) }],
+        columns: [{ key: 'student', label: tx('Student') }, { key: 'class', label: tx('Class') }, { key: 'n', label: two ? tx('Sessions') : tx('School days'), align: 'right' }, { key: 'missed', label: tx('Missed'), align: 'right' }, { key: 'rate', label: tx('Present'), align: 'right' }],
+        rows: rows.map((r) => ({ _student: r.id, student: r.name, class: r.class_name, n: Number(r.n), missed: Number(r.n) - Number(r.present), rate: `${pct(Number(r.present), Number(r.n))}%` })) };
     }
     if (id === 'fees-collection') {
       const { rows } = await t.pool.query<{ head: string; head_name: string; billed: string; collected: string }>(
@@ -151,9 +174,44 @@ export class OfficeService {
     if (id === 'strength') {
       const { rows } = await t.pool.query<{ name: string; teacher: string | null; n: string }>(
         `select c.name, u.name teacher, count(s.id) n from classes c left join users u on u.id = c.class_teacher_id left join students s on s.class_id = c.id and s.status = 'active' group by c.id, c.name, u.name, c.grade, c.section order by c.grade, c.section`);
-      return { ...base, scope: scope(), summary: [{ label: 'Classes', value: String(rows.length) }, { label: 'Students', value: inr(rows.reduce((a, r) => a + Number(r.n), 0)) }],
+      return { ...base, scope: scope(), summary: [{ label: 'Classes', value: String(rows.length) }, { label: 'Students', value: fmtNumber(rows.reduce((a, r) => a + Number(r.n), 0)) }],
         columns: [{ key: 'class', label: 'Class' }, { key: 'teacher', label: 'Class teacher' }, { key: 'students', label: 'Students', align: 'right' }],
         rows: rows.map((r) => ({ class: r.name, teacher: r.teacher ?? 'Not assigned', students: Number(r.n) })) };
+    }
+    if (id === 'results-year') {
+      // Published exams of this school year; each kind of exam counts as its weight (exams.weights), or every exam alike when none are set.
+      const weights = await this.settings.value<Record<string, number>>(t, 'exams.weights', {});
+      const best = await this.settings.value<Record<string, number>>(t, 'exams.bestOf', {});
+      const mode = await this.settings.value<'nearest' | 'up' | 'down'>(t, 'results.rounding', 'nearest');
+      const decimals = await this.settings.value<number>(t, 'results.decimals', 0);
+      const weighted = Object.keys(weights).length > 0;
+      const { rows } = await t.pool.query<{ id: string; name: string; class_name: string; grade: number; kind: string; pct: number }>(
+        `select s.id, s.name, c.name class_name, c.grade, e.kind, r.pct from exams e join classes c on c.id = e.class_id
+         join students s on s.class_id = c.id and s.status = 'active' join exam_results r on r.student_id = s.id and r.exam = e.name
+         where e.status = 'published' and e.starts_on >= coalesce((select starts_on from academic_years where current limit 1), '1900-01-01') and ($1::text is null or c.id = $1)`, [q.classId ?? null]);
+      const by = new Map<string, { name: string; cls: string; grade: number; sum: number; w: number; n: number; kinds: Map<string, number[]> }>();
+      for (const r of rows) {
+        const cur = by.get(r.id) ?? { name: r.name, cls: r.class_name, grade: r.grade, sum: 0, w: 0, n: 0, kinds: new Map() };
+        cur.n++;
+        cur.kinds.set(r.kind, [...(cur.kinds.get(r.kind) ?? []), Number(r.pct)]);
+        by.set(r.id, cur);
+      }
+      // Each kind: only its best so many (exams.bestOf), each counting the kind's weight.
+      for (const v of by.values()) {
+        for (const [kind, pcts] of v.kinds) {
+          const w = weighted ? weights[kind] ?? 0 : 1;
+          if (w <= 0) continue;
+          for (const p of bestOf(pcts, best[kind], (x) => x)) { v.sum += w * p; v.w += w; }
+        }
+      }
+      const out = [];
+      for (const [studentId, v] of [...by].sort((a, b) => a[1].cls.localeCompare(b[1].cls) || a[1].name.localeCompare(b[1].name))) {
+        const pct = v.w ? roundPct(v.sum / v.w, mode, decimals) : null;
+        out.push({ _student: studentId, student: v.name, class: v.cls, exams: v.n, pct: pct === null ? '–' : `${pct}%`, grade: pct === null ? '–' : (await this.settings.grading(t, { grade: v.grade })).grade(pct) });
+      }
+      return { ...base, scope: scope(), summary: [{ label: tx('Students'), value: String(out.length) }, { label: tx('Counted'), value: weighted ? tx('By kind of exam') : tx('Every exam alike') }],
+        columns: [{ key: 'student', label: tx('Student') }, { key: 'class', label: tx('Class') }, { key: 'exams', label: tx('Exams'), align: 'right' }, { key: 'pct', label: tx('Result'), align: 'right' }, { key: 'grade', label: tx('Grade'), align: 'right' }],
+        rows: out };
     }
     if (id === 'results') {
       const grading = await this.settings.grading(t);
@@ -243,15 +301,15 @@ export class OfficeService {
   // Events
 
   async events(t: TenantCtx): Promise<EventRow[]> {
-    const { rows } = await t.pool.query<{ id: string; title: string; starts_at: Date; ends_at: Date | null; kind: EventRow['kind']; venue: string; note: string; audience: string; category: string; needs_rsvp: boolean; lat: number | null; lng: number | null; going: string; maybe: string; cant: string; adults: string; class_id: string | null; class_name: string | null }>(
-      `select e.id, e.title, e.starts_at, e.ends_at, e.kind, e.venue, e.note, e.audience, e.category, e.needs_rsvp, e.lat, e.lng, e.class_id, (select name from classes c where c.id = e.class_id) class_name,
+    const { rows } = await t.pool.query<{ id: string; title: string; starts_at: Date; ends_at: Date | null; kind: EventRow['kind']; venue: string; note: string; audience: string; category: string; needs_rsvp: boolean; lat: number | null; lng: number | null; going: string; maybe: string; cant: string; adults: string; class_id: string | null; class_name: string | null; rsvp_by: string | null; max_adults: number | null; capacity: number | null }>(
+      `select e.id, e.title, e.starts_at, e.ends_at, e.kind, e.venue, e.note, e.audience, e.category, e.needs_rsvp, e.lat, e.lng, e.class_id, (select name from classes c where c.id = e.class_id) class_name, e.rsvp_by::text, e.max_adults, e.capacity,
          count(r.*) filter (where r.status = 'going') going, count(r.*) filter (where r.status = 'maybe') maybe, count(r.*) filter (where r.status = 'cant') cant,
          coalesce(sum(r.adults) filter (where r.status = 'going'), 0) adults
        from events e left join event_rsvps r on r.event_id = e.id where e.kind not in ('routine','cover') group by e.id order by e.starts_at desc limit 200`);
     return rows.map((r) => ({
       id: r.id, title: r.title, startsAt: r.starts_at.toISOString(), endsAt: r.ends_at?.toISOString() ?? null, kind: r.kind, venue: r.venue, note: r.note, audience: r.audience,
       category: r.category, needsRsvp: r.needs_rsvp, lat: r.lat, lng: r.lng, going: Number(r.going), maybe: Number(r.maybe), cant: Number(r.cant), adults: Number(r.adults),
-      classId: r.class_id, className: r.class_name,
+      rsvpBy: r.rsvp_by, maxAdults: r.max_adults, capacity: r.capacity, classId: r.class_id, className: r.class_name,
     }));
   }
 
@@ -267,17 +325,26 @@ export class OfficeService {
     if (body.endsAt && body.endsAt < body.startsAt) throw new ApiError('validation', 'The event cannot end before it starts.', { fields: { endsAt: 'Pick a time after the start.' } });
     if (body.audience === 'class' && !(body.classId && (await t.pool.query('select 1 from classes where id = $1', [body.classId])).rowCount)) throw new ApiError('validation', 'Choose the class.', { fields: { classId: 'Choose the class.' } });
     const classId = body.audience === 'class' ? body.classId : null;
+    // Replies close by the day it starts at the latest; the rules mean nothing on an event that asks for no reply.
+    const rsvp = body.needsRsvp ? body : { rsvpBy: null, maxAdults: null, capacity: null };
+    if (rsvp.rsvpBy && rsvp.rsvpBy > schoolToday(new Date(body.startsAt))) {
+      throw new ApiError('validation', tx('Replies must close by the day the event starts.'), { fields: { rsvpBy: tx('Pick a day up to the event.') } });
+    }
+    if (id && rsvp.capacity) {
+      const going = Number((await t.pool.query<{ n: string }>("select count(*) n from event_rsvps where event_id = $1 and status = 'going'", [id])).rows[0]!.n);
+      if (going > rsvp.capacity) throw new ApiError('validation', tx('{n} children are already going; the limit cannot be lower.', { n: going }), { fields: { capacity: tx('At least {n}.', { n: going }) } });
+    }
     if (id) {
-      const r = await t.pool.query("update events set title = $2, starts_at = $3, ends_at = $4, kind = $5, venue = $6, note = $7, audience = $8, category = $9, needs_rsvp = $10, lat = $11, lng = $12, class_id = $13 where id = $1 and kind not in ('routine','cover')",
-        [id, body.title, body.startsAt, body.endsAt ?? null, body.kind, body.venue, body.note, body.audience, body.category, body.needsRsvp, body.lat, body.lng, classId]);
+      const r = await t.pool.query("update events set title = $2, starts_at = $3, ends_at = $4, kind = $5, venue = $6, note = $7, audience = $8, category = $9, needs_rsvp = $10, lat = $11, lng = $12, class_id = $13, rsvp_by = $14, max_adults = $15, capacity = $16 where id = $1 and kind not in ('routine','cover')",
+        [id, body.title, body.startsAt, body.endsAt ?? null, body.kind, body.venue, body.note, body.audience, body.category, body.needsRsvp, body.lat, body.lng, classId, rsvp.rsvpBy, rsvp.maxAdults, rsvp.capacity]);
       if (!r.rowCount) throw notFound('That event');
     } else {
       id = newId('evt');
-      await t.pool.query('insert into events (id, title, starts_at, ends_at, kind, venue, note, audience, created_by, category, needs_rsvp, lat, lng, class_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)',
-        [id, body.title, body.startsAt, body.endsAt ?? null, body.kind, body.venue, body.note, body.audience, user.id, body.category, body.needsRsvp, body.lat, body.lng, classId]);
+      await t.pool.query('insert into events (id, title, starts_at, ends_at, kind, venue, note, audience, created_by, category, needs_rsvp, lat, lng, class_id, rsvp_by, max_adults, capacity) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)',
+        [id, body.title, body.startsAt, body.endsAt ?? null, body.kind, body.venue, body.note, body.audience, user.id, body.category, body.needsRsvp, body.lat, body.lng, classId, rsvp.rsvpBy, rsvp.maxAdults, rsvp.capacity]);
       if (body.audience !== 'staff') {
-        const g = await t.pool.query<{ phone: string | null }>("select distinct g.phone from guardians g join student_guardians sg on sg.guardian_id = g.id join students s on s.id = sg.student_id where s.status = 'active' and g.phone is not null and ($1::text is null or s.class_id = $1) limit 5000", [classId]);
-        const date = new Date(body.startsAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
+        const g = await t.pool.query<{ phone: string | null }>("select distinct g.phone from guardians g join student_guardians sg on sg.guardian_id = g.id join students s on s.id = sg.student_id where s.status = 'active' and sg.gets_messages and g.phone is not null and ($1::text is null or s.class_id = $1) limit 5000", [classId]);
+        const date = fmtDate(body.startsAt, 'day');
         await this.messenger.notify(t, 'event.created', g.rows.map((x) => ({ to: x.phone!, vars: { title: body.title, date } })));
       }
     }
@@ -295,6 +362,44 @@ export class OfficeService {
 
   private dsr(r: { id: string; kind: DataRequestRow['kind']; subject_name: string; requested_by: string; status: DataRequestRow['status']; note: string; answer: string; user_id: string | null; created_at: Date; resolved_at: Date | null }): DataRequestRow {
     return { id: r.id, kind: r.kind, subjectName: r.subject_name, requestedBy: r.requested_by, status: r.status, note: r.note, answer: r.answer, fromApp: !!r.user_id, createdAt: r.created_at.toISOString(), resolvedAt: r.resolved_at?.toISOString() ?? null };
+  }
+
+  /**
+   * Everything the school keeps about whoever asked from the app (a family: about each of their children too), as one
+   * spreadsheet a kind of record, zipped: the copy a data-access request is answered with. Requests logged at the office
+   * name a person in words only, so they are answered by hand.
+   */
+  async dataExport(t: TenantCtx, user: User, id: string): Promise<{ name: string; zip: Buffer }> {
+    const r = (await t.pool.query<{ user_id: string | null; subject_name: string }>('select user_id, subject_name from data_requests where id = $1', [id])).rows[0];
+    if (!r) throw notFound('That request');
+    if (!r.user_id) throw new ApiError('validation', tx('This request was logged at the office: gather the records by hand.'));
+    const uid = r.user_id;
+    const kids = (await t.pool.query<{ id: string }>(
+      `select s.id from students s where s.user_id = $1 union select sg.student_id from student_guardians sg join guardians g on g.id = sg.guardian_id where g.user_id = $1`, [uid])).rows.map((x) => x.id);
+    const sheets: [string, string][] = [
+      ['account', 'select name, kind, phone, email, status, consented_at, photo_consent, created_at, last_login_at from users where id = $1'],
+      ['students', "select admission_no, name, name_local, (select name from classes c where c.id = s.class_id) class, roll_no, dob, gender, blood_group, house, address, status, admitted_on, left_on, custom from students s where id = any($2)"],
+      ['guardians', 'select distinct g.name, g.relation, g.phone, g.email, g.language from guardians g join student_guardians sg on sg.guardian_id = g.id where sg.student_id = any($2) or g.user_id = $1'],
+      ['attendance', "select st.name student, x.date, x.part, m.status from attendance_marks m join attendance_sessions x on x.id = m.session_id join students st on st.id = m.student_id where m.student_id = any($2) order by x.date"],
+      ['marks', 'select st.name student, e.name exam, sub.name subject, m.score, m.grade, m.absent from exam_marks m join exams e on e.id = m.exam_id join subjects sub on sub.id = m.subject_id join students st on st.id = m.student_id where m.student_id = any($2)'],
+      ['fees', 'select st.name student, i.title, i.amount, i.waived_amount, i.due_on, (select coalesce(sum(p.amount - p.refunded), 0) from payments p where p.invoice_id = i.id) paid from fee_invoices i join students st on st.id = i.student_id where i.student_id = any($2) order by i.due_on'],
+      ['payments', 'select p.receipt_no, p.amount, p.refunded, p.method, p.paid_on from payments p join fee_invoices i on i.id = p.invoice_id where i.student_id = any($2) order by p.paid_on'],
+      ['library', 'select l.title, l.issued_on, l.due_on, l.returned_on, l.fine from library_loans l where l.student_id = any($2) or l.staff_user_id = $1'],
+      ['messages', "select th.subject, m.sender_name, m.body, m.created_at from thread_messages m join threads th on th.id = m.thread_id where th.guardian_id in (select id from guardians where user_id = $1) or th.student_user_id = $1 order by m.created_at"],
+      ['leave', "select a.title, a.subtitle, a.status, a.payload, a.created_at from approvals a where a.kind = 'leave' and (a.subject_ref = any($2) or a.requested_by = $1)"],
+      ['forms', 'select f.title, r.answers, r.created_at from form_responses r join forms f on f.id = r.form_id where r.user_id = $1'],
+    ];
+    const files: { name: string; content: string }[] = [];
+    for (const [name, sql] of sheets) {
+      // Each sheet reads the person, their children, or both: both are always given, so each names them both.
+      const res = await t.pool.query(`select * from (${sql}) q where $1::text is not null and cardinality($2::text[]) >= 0`, [uid, kids]);
+      if (!res.rows.length) continue;
+      const cols = Object.keys(res.rows[0]);
+      const cell = (v: unknown) => (v === null || v === undefined ? '' : v instanceof Date ? v.toISOString() : typeof v === 'object' ? JSON.stringify(v) : String(v));
+      files.push({ name: `${name}.csv`, content: `\uFEFF${toCsv([cols, ...res.rows.map((row) => cols.map((c) => cell(row[c])))])}` });
+    }
+    await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'privacy.exported', entity: 'data_request', entityId: id, detail: { files: files.length } });
+    return { name: `${r.subject_name || 'data'} - ${schoolToday()}.zip`.replace(/[^\w ,.-]+/g, ' '), zip: zip(files.length ? files : [{ name: 'nothing.txt', content: tx('The school keeps nothing else about this person.') }]) };
   }
 
   async dataRequests(t: TenantCtx): Promise<DataRequestRow[]> {

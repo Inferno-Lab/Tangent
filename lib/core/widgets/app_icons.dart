@@ -43,6 +43,7 @@ abstract final class AppIcons {
   static const IconData billing = PhosphorIconsRegular.bank;
   static const IconData compliance = PhosphorIconsRegular.shieldCheck;
   static const IconData team = PhosphorIconsRegular.usersThree;
+  static const IconData languages = PhosphorIconsRegular.translate;
   static const IconData audit = PhosphorIconsRegular.listMagnifyingGlass;
   static const IconData privacy = PhosphorIconsRegular.lockKey;
   static const IconData home = PhosphorIconsRegular.house;
@@ -89,6 +90,7 @@ abstract final class AppIcons {
   static const IconData billingOn = PhosphorIconsFill.bank;
   static const IconData complianceOn = PhosphorIconsFill.shieldCheck;
   static const IconData teamOn = PhosphorIconsFill.usersThree;
+  static const IconData languagesOn = PhosphorIconsFill.translate;
   static const IconData auditOn = PhosphorIconsFill.listMagnifyingGlass;
   static const IconData privacyOn = PhosphorIconsFill.lockKey;
   static const IconData homeOn = PhosphorIconsFill.house;

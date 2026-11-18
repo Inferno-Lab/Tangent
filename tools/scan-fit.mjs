@@ -81,7 +81,8 @@ const scan = () => {
   }
   // 4. words that only appear when a value is missing
   const tw = document.createTreeWalker(document.querySelector('.mn') ?? document.body, NodeFilter.SHOW_TEXT);
-  for (let t = tw.nextNode(); t; t = tw.nextNode()) {
+  // The Languages page shows catalogue texts as written, and some start with a separator.
+  for (let t = location.pathname.endsWith('/languages') ? null : tw.nextNode(); t; t = tw.nextNode()) {
     const s = t.parentElement.textContent.trim();
     if (/undefined|NaN|\[object |null/.test(s) || /^·\s/.test(s)) out.push(`a missing value shows as text: "${s.slice(0, 40)}" in ${nm(t.parentElement)}`);
   }

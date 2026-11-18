@@ -1,4 +1,4 @@
-import {
+import { numeric,
   boolean,
   customType,
   index,
@@ -72,7 +72,7 @@ export const schools = pgTable(
       .notNull(),
     contact: jsonb('contact').$type<{ name: string; phone: string; email: string }>().notNull(),
     gstin: text('gstin').notNull().default(''),
-    board: text('board').notNull().default('CBSE'),
+    board: text('board').notNull().default('Other'),
     address: text('address').notNull().default(''),
     addressing: text('addressing').notNull().default('path'),
     customDomain: text('custom_domain').notNull().default(''),
@@ -83,6 +83,14 @@ export const schools = pgTable(
     /** What the host said about the school's own address: verified, certificate, the DNS target to point at. */
     domainState: jsonb('domain_state').$type<{ verified?: boolean; certificate?: string; target?: string; checkedAt?: string; error?: string }>().notNull().default({}),
     appName: text('app_name').notNull().default(''),
+    /** A copy of the school's own settings (school.country, .timezone, .locale, .currency), so every server knows its "today". */
+    country: text('country').notNull().default(''),
+    /** What it is billed under (D13) and the region its data must stay in (3.7). */
+    contract: jsonb('contract').$type<Record<string, unknown>>().notNull().default({}),
+    residency: text('residency').notNull().default(''),
+    timezone: text('timezone').notNull().default('UTC'),
+    locale: text('locale').notNull().default('en'),
+    currency: text('currency').notNull().default('USD'),
     studentsCount: integer('students_count').notNull().default(0),
     health: text('health').notNull().default('unknown'),
     healthMs: integer('health_ms'),
@@ -308,9 +316,10 @@ export const invoices = pgTable('invoices', {
   schoolId: text('school_id').notNull(),
   schoolName: text('school_name').notNull(),
   period: text('period').notNull(),
-  amount: integer('amount').notNull(),
+  amount: numeric('amount', { precision: 16, scale: 3 }).notNull(),
   status: text('status').notNull(),
   lines: jsonb('lines').$type<{ label: string; amount: number }[]>().notNull().default([]),
+  currency: text('currency').notNull().default('INR'), // india-pack: invoices before contracts were in rupees
   sentAt: timestamp('sent_at', { withTimezone: true }),
   sentTo: text('sent_to'),
   paidOn: date('paid_on'),

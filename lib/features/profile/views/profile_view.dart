@@ -71,14 +71,19 @@ class ProfileView extends GetView<ProfileController> {
                       facts: [
                         (
                           SchoolConfig.classWord.isEmpty ? 'profile.class'.tr : SchoolConfig.classWord,
-                          '${controller.schoolClass?.name.replaceAll(RegExp('[^0-9]'), '') ?? ''} ${controller.schoolClass?.section ?? ''} · ${'fees.roll'.trp({'n': student.rollNo})}',
+                          '${controller.schoolClass?.label ?? ''} · ${'fees.roll'.trp({'n': student.rollNo})}',
                         ),
+                        if (student.nameLocal.isNotEmpty) ('profile.also_written'.tr, student.nameLocal),
                         ('profile.house'.tr, student.house),
                         ('profile.born'.tr, _dob(student.dob)),
                         ('profile.blood'.tr, student.bloodGroup),
+                        // The school's own fields it shows families (named in their language by the server).
+                        for (final f in student.fields.entries) (f.key, f.value),
                       ],
-                      code:
-                          'GIS-${controller.schoolClass?.name.replaceAll(RegExp('[^0-9]'), '') ?? ''}${controller.schoolClass?.section ?? ''}-${student.rollNo}',
+                      // The school's own admission number; sample content shows the class and roll number.
+                      code: student.admissionNo.isNotEmpty
+                          ? student.admissionNo
+                          : '${(controller.schoolClass?.label ?? '').replaceAll(' ', '')}-${student.rollNo}',
                       onPhoto: role == UserRole.student ? () => unawaited(controller.editPhoto()) : null,
                     ),
                   )
@@ -93,7 +98,7 @@ class ProfileView extends GetView<ProfileController> {
                         (
                           'profile.classes'.tr,
                           controller.teaching
-                              .map((c) => '${c.name.replaceAll(RegExp('[^0-9]'), '')} ${c.section}')
+                              .map((c) => c.label)
                               .join(', '),
                         ),
                         ('profile.phone'.tr, teacher.phone),
@@ -339,6 +344,15 @@ class _Tiles extends StatelessWidget {
       if (!teacher)
         (PhosphorIconsRegular.calendarCheck, 'menu.leave', AppRoutes.leave, s('english').fill, s('english').on),
       if (teacher) (PhosphorIconsRegular.bell, 'menu.notifications', AppRoutes.notifications, c.mariSoft, c.mariText),
+      if (teacher && has('staffAttendance')) (PhosphorIconsRegular.clockUser, 'menu.my_attendance', AppRoutes.staffMe, s('english').fill, s('english').on),
+      if (has('diary')) (PhosphorIconsRegular.notePencil, 'menu.diary', teacher ? AppRoutes.teacherDiary : AppRoutes.diary, s('science').fill, s('science').on),
+      if (has('ptm') && Get.find<AuthService>().role != UserRole.student)
+        (PhosphorIconsRegular.calendarPlus, 'menu.meetings', teacher ? AppRoutes.teacherMeetings : AppRoutes.meetings, s('social').fill, s('social').on),
+      if (has('visitors') && teacher) (PhosphorIconsRegular.userPlus, 'menu.invite_visitor', AppRoutes.inviteVisitor, s('computer').fill, s('computer').on),
+      if (has('visitors') && Get.find<AuthService>().role == UserRole.parent) (PhosphorIconsRegular.doorOpen, 'menu.gate_pass', AppRoutes.gatePass, s('hindi').fill, s('hindi').on),
+      if (has('certificates') && Get.find<AuthService>().role == UserRole.parent) (PhosphorIconsRegular.certificate, 'menu.certificates', AppRoutes.certificates, s('maths').fill, s('maths').on),
+      // The school's forms to answer (consent, surveys); a student has none of their own.
+      if (Get.find<AuthService>().role != UserRole.student) (PhosphorIconsRegular.clipboardText, 'menu.forms', AppRoutes.forms, s('maths').fill, s('maths').on),
     ];
     return LayoutBuilder(
       builder: (context, box) {

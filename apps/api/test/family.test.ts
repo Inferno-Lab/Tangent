@@ -1,4 +1,4 @@
-import { addDays, istToday } from '@tangent/contracts';
+import { addDays, schoolToday } from '@tangent/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startHarness, type Harness } from './harness.js';
 
@@ -47,7 +47,8 @@ describe('who is signed in', () => {
   });
   it('lists the classes and teachers the way the app expects', async () => {
     const cls = (await f(parent, '/classes/cls_8a')).json;
-    expect(cls).toMatchObject({ name: 'Class 8', section: 'A' });
+    // The school's own name for the class, not one the app makes up.
+    expect(cls).toMatchObject({ name: '8 A', section: 'A' });
     expect(cls.studentIds.length).toBeGreaterThan(30);
     const mine = (await f(teacher, '/teachers/' + (await f(teacher, '/me')).json.id + '/classes')).json;
     expect(mine.map((c: any) => c.id)).toContain('cls_8a');
@@ -88,7 +89,7 @@ describe('learning', () => {
   });
   it('lets a teacher mark attendance, and the family sees it and is told', async () => {
     const marked = await post(teacher, '/attendance', { stu_aarav: 'absent' });
-    expect(marked.status).toBe(200);
+    expect(marked.status, JSON.stringify(marked.json)).toBe(200);
     const today = (await f(teacher, '/attendance/today?students=stu_aarav,stu_diya')).json;
     expect(today.stu_aarav).toBe('absent');
     const days = (await f(parent, '/students/stu_aarav/attendance')).json;
@@ -104,7 +105,7 @@ describe('learning', () => {
     expect(mid).toBeTruthy();
     expect((await post(teacher, '/classes/cls_8a/marks', { subject: 'maths', values: { stu_aarav: 44, stu_diya: 38 } })).status).toBe(200);
     const draft = (await f(teacher, '/classes/cls_8a/marks?subject=maths')).json;
-    expect(draft).toMatchObject({ stu_aarav: 44, stu_diya: 38 });
+    expect(draft).toEqual({ marks: { stu_aarav: 44, stu_diya: 38 }, maxMarks: 100, grades: [], gradeMarks: {} });
     expect((await post(teacher, '/classes/cls_8a/marks', { subject: 'pe', values: { stu_aarav: 10 } })).status).toBe(409);
     expect((await post(parent, '/classes/cls_8a/marks', { subject: 'maths', values: { stu_aarav: 1 } })).status).toBe(403);
   });
@@ -220,7 +221,7 @@ describe('the teacher’s class', () => {
     expect(other).not.toHaveProperty('attendancePct');
   });
   it('fills approved leave into the roll call and keeps a past day within the correction window', async () => {
-    const day = addDays(istToday(), -1);
+    const day = addDays(schoolToday(), -1);
     const applied = await post(parent, '/leave', { studentId: 'stu_aarav', from: day, to: day, reason: 'Family function' });
     expect((await post(teacher, `/leave/${applied.json.id}/review`, { status: 'approved' })).status).toBe(200);
     const roll = (await f(teacher, `/attendance/roll?classId=cls_8a&date=${day}`)).json;
@@ -228,18 +229,18 @@ describe('the teacher’s class', () => {
     expect(row.onLeave).toBe(true);
     if (!roll.submitted) expect(row.status).toBe('leave');
     expect((await f(parent, `/attendance/roll?classId=cls_8a&date=${day}`)).status).toBe(403);
-    expect((await post(teacher, `/attendance?date=${addDays(istToday(), -20)}`, { stu_aarav: 'present' })).status).toBe(423);
-    expect((await post(teacher, `/attendance?date=${addDays(istToday(), 2)}`, { stu_aarav: 'present' })).status).toBe(400);
+    expect((await post(teacher, `/attendance?date=${addDays(schoolToday(), -20)}`, { stu_aarav: 'present' })).status).toBe(423);
+    expect((await post(teacher, `/attendance?date=${addDays(schoolToday(), 2)}`, { stu_aarav: 'present' })).status).toBe(400);
   });
 });
 
 describe('attendance every period', () => {
   it('lets the period’s teacher mark it, and no one else but someone who approves', async () => {
     // The most recent day the class has lessons: a test run on a Sunday (or a day off) would otherwise find none.
-    let day = istToday();
+    let day = schoolToday();
     let roll = await f(teacher, `/attendance/periods?classId=cls_8a&date=${day}`);
     for (let back = 1; back < 7 && roll.status === 200 && !roll.json.periods.length; back++) {
-      day = addDays(istToday(), -back);
+      day = addDays(schoolToday(), -back);
       roll = await f(teacher, `/attendance/periods?classId=cls_8a&date=${day}`);
     }
     expect(roll.status).toBe(200);
@@ -346,17 +347,21 @@ describe('what the console sets reaches families and the office', () => {
       const r = await h.call('POST', '/v1/fees/payments', { token: admin, body: { studentId: 'stu_aarav', invoiceId: 'inv_any', amount: 1, method: 'upi' } });
       expect(r.status).toBe(400);
       expect(r.json.fields.method).toBeTruthy();
-      expect((await h.call('GET', '/v1/shell', { token: admin })).json.school.paymentMethods).toEqual(['cash']);
+      // A school saved before methods had names is read as the methods it always had.
+      expect((await h.call('GET', '/v1/shell', { token: admin })).json.school.paymentMethods).toEqual([{ key: 'cash', name: 'Cash', kind: 'cash' }]);
+      await h.setSettings({ 'fees.paymentMethods': [{ key: 'mpesa', name: 'M-Pesa', kind: 'wallet' }] });
+      expect((await h.call('POST', '/v1/fees/payments', { token: admin, body: { studentId: 'stu_aarav', invoiceId: 'inv_any', amount: 1, method: 'cash' } })).status).toBe(400);
+      expect((await h.call('POST', '/v1/fees/payments', { token: admin, body: { studentId: 'stu_aarav', invoiceId: 'inv_any', amount: 1, method: 'mpesa' } })).status).toBe(404);
     } finally {
       await h.setSettings({ 'fees.paymentMethods': ['cash', 'upi', 'card', 'netbanking', 'cheque'] });
     }
   });
   it('names students the school’s way in the admin menu', async () => {
-    await h.setSettings({ 'vocab.student': 'Pupil' });
+    await h.setSettings({ 'vocab.words': { en: { student: { one: 'Pupil' } } } });
     try {
       expect((await h.call('GET', '/v1/config', { token: admin })).json.menu.flatMap((g: { pages: { label: string }[] }) => g.pages.map((p) => p.label))).toContain('Pupils');
     } finally {
-      await h.setSettings({ 'vocab.student': 'Student' });
+      await h.setSettings({ 'vocab.words': {} });
     }
   });
 });
@@ -364,6 +369,7 @@ describe('what the console sets reaches families and the office', () => {
 describe('the days a school is closed', () => {
   it('leaves the school’s weekly off days out of the attendance week', async () => {
     const weekday = (d: string) => new Date(`${d}T00:00:00Z`).getUTCDay();
+    await h.setSettings({ 'calendar.weeklyOff': ['sun'] });
     const sundays = (await h.call('GET', '/v1/attendance/week', { token: admin })).json as { date: string }[];
     expect(sundays.some((p) => weekday(p.date) === 6)).toBe(true);
     expect(sundays.some((p) => weekday(p.date) === 0)).toBe(false);
@@ -373,7 +379,7 @@ describe('the days a school is closed', () => {
       expect(week).toHaveLength(sundays.length);
       expect(week.some((p) => [0, 6].includes(weekday(p.date)))).toBe(false);
     } finally {
-      await h.setSettings({ 'calendar.weeklyOff': ['sun'] });
+      await h.setSettings({ 'calendar.weeklyOff': [] });
     }
   });
 });
@@ -427,17 +433,69 @@ describe('messages and background work through the Hub', () => {
     const hub = h.app.get(HubService);
     await h.setSettings({ 'fees.lateFeePct': 5 });
     await h.registry.query('delete from job_queue');
-    const today = new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
-    expect(await hub.queueDaily(today)).toBeGreaterThan(0);
-    expect(await hub.queueDaily(today)).toBe(0);
+    expect(await hub.queueDaily()).toBeGreaterThan(0);
+    expect(await hub.queueDaily()).toBe(0);
     await h.registry.query('update job_queue set run_at = now()');
     for (let i = 0; i < 4; i++) await hub.tick();
     const jobs = (await h.registry.query("select kind, status, result, last_error from job_queue where kind = 'fees.lateFines'")).rows;
     expect(jobs[0]).toMatchObject({ status: 'done' });
-    const count = Number(/(\d+) late fines/.exec(jobs[0].result)![1]);
+    const count = Number(/(\d+) late fees/.exec(jobs[0].result)![1]);
     expect(count).toBeGreaterThan(0);
     await h.registry.query("update job_queue set status = 'queued', run_at = now(), payload = payload || '{\"again\":true}' where kind = 'fees.lateFines'");
     await hub.tick();
-    expect((await h.registry.query("select result from job_queue where kind = 'fees.lateFines'")).rows[0].result).toMatch(/^0 late fines/);
+    expect((await h.registry.query("select result from job_queue where kind = 'fees.lateFines'")).rows[0].result).toMatch(/^0 late fees/);
+  });
+
+  it('queues each school’s morning jobs for 09:00 on its own clock and its own day (§3.9.9)', async () => {
+    const { HubService } = await import('../src/school/hub.service.js');
+    const hub = h.app.get(HubService);
+    await h.addSchool('dubai-clock', { plan: 'premium', data: 'empty' });
+    await h.registry.query("update schools set timezone = 'America/New_York' where slug = $1", [h.slug]);
+    await h.registry.query("update schools set timezone = 'Asia/Dubai' where slug = 'dubai-clock'");
+    await h.registry.query('delete from job_queue');
+    // 06:00 UTC: 01:00 in New York (its 09:00 is still to come) and 10:00 in Dubai (its 09:00 has passed).
+    const now = new Date('2026-11-17T06:00:00Z');
+    await hub.queueDaily(now);
+    const jobs = (await h.registry.query<{ slug: string; run_at: Date; day: string }>(
+      "select s.slug, j.run_at, j.payload->>'day' as day from job_queue j join schools s on s.id = j.school_id where j.kind = 'fees.reminders'")).rows;
+    const at = (slug: string) => jobs.find((j) => j.slug === slug)!;
+    expect(at(h.slug)).toMatchObject({ day: '2026-11-17' });
+    expect(at(h.slug).run_at.toISOString()).toBe('2026-11-17T14:00:00.000Z');
+    expect(at('dubai-clock')).toMatchObject({ day: '2026-11-17' });
+    expect(at('dubai-clock').run_at.toISOString()).toBe(now.toISOString());
+    await h.registry.query("update schools set timezone = 'Asia/Kolkata' where slug = $1", [h.slug]);
+    await h.registry.query('delete from job_queue');
+  });
+
+  it('opens a receipt outside the app from a signed link, only for the family’s own children', async () => {
+    const t = (await h.app.get((await import('../src/tenancy/tenant.js')).TenantService).resolve(h.slug)).pool;
+    const mine = (await t.query("select p.id from payments p join fee_invoices i on i.id = p.invoice_id where i.student_id = 'stu_aarav' limit 1")).rows[0]?.id;
+    const other = (await t.query("select p.id from payments p join fee_invoices i on i.id = p.invoice_id where i.student_id = 'stu_diya' limit 1")).rows[0]?.id;
+    expect(mine).toBeTruthy();
+    const link = await post(parent, `/receipts/${mine}/link`);
+    expect(link.status).toBe(200);
+    const path = new URL(link.json.url).pathname;
+    const pdf = await h.call('GET', path);
+    expect(pdf.headers['content-type']).toContain('application/pdf');
+    expect((await h.call('GET', `${path}x`)).status).toBe(410);
+    if (other) expect((await post(parent, `/receipts/${other}/link`)).status).toBe(404);
+  });
+
+  it('adds an event and a week of lessons to the phone’s calendar from a calendar file', async () => {
+    const one = await post(parent, '/calendar/link', { events: [{ title: 'Sports day; bring water', start: '2026-12-04', details: 'Line 1\nLine 2', alarmMinutes: 60 }] });
+    expect(one.status).toBe(200);
+    const file = await h.call('GET', new URL(one.json.url).pathname);
+    expect(file.headers['content-type']).toContain('text/calendar');
+    expect(file.text).toContain('SUMMARY:Sports day\\; bring water');
+    expect(file.text).toContain('DESCRIPTION:Line 1\\nLine 2');
+    expect(file.text).toContain('DTSTART;VALUE=DATE:20261204');
+    expect(file.text).toContain('TRIGGER:-PT60M');
+    const week = await post(parent, '/timetable/calendar-link', { classId: 'cls_8a' });
+    const lessons = (await h.call('GET', new URL(week.json.url).pathname)).text;
+    expect(lessons).toMatch(/RRULE:FREQ=WEEKLY;UNTIL=\d{8}T235959Z/);
+    expect(lessons).toMatch(/DTSTART;TZID=Asia\/Kolkata:\d{8}T\d{6}/);
+    // A family cannot ask for another class's week.
+    expect((await post(parent, '/timetable/calendar-link', { classId: 'cls_8b' })).status).toBe(403);
   });
 });
+

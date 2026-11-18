@@ -3,6 +3,7 @@ import { Icon } from './Icon';
 import { useEffect, useRef, useState } from 'react';
 import { leavingProps, useLeaving, useReturnFocus } from './Presence';
 import './palette.css';
+import { t } from './i18n';
 
 export interface PaletteHit {
   group: string;
@@ -30,7 +31,7 @@ export interface PaletteProps {
 }
 
 /** Search and commands in one box. Arrow keys move, Enter opens, Escape closes. */
-export function Palette({ hits, query, onQuery, onPick, onClose, placeholder = 'Search people, money, notices, settings', empty }: PaletteProps) {
+export function Palette({ hits, query, onQuery, onPick, onClose, placeholder = t('ui.palette.search_people_money_notices_settings'), empty }: PaletteProps) {
   const [at, setAt] = useState(0);
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => { ref.current?.focus(); }, []);
@@ -42,11 +43,11 @@ export function Palette({ hits, query, onQuery, onPick, onClose, placeholder = '
     else if (e.key === 'Enter' && hits[at]) onPick(hits[at]!);
   };
   return (
-    <div className="pal" role="dialog" aria-modal="true" aria-label="Search and commands" onKeyDown={key}>
+    <div className="pal" role="dialog" aria-modal="true" aria-label={t('ui.palette.search_and_commands')} onKeyDown={key}>
       <div className="pin">
         <Icon name="search" />
-        <input ref={ref} value={query} onChange={(e) => onQuery(e.target.value)} placeholder={placeholder} aria-label="Search" />
-        <span className="kbd">Esc</span>
+        <input ref={ref} value={query} onChange={(e) => onQuery(e.target.value)} placeholder={placeholder} aria-label={t('ui.palette.search')} />
+        <span className="kbd">{t('ui.palette.esc')}</span>
       </div>
       {hits.map((p, i) => (
         <div key={`${p.group}-${p.href}-${i}`} style={{ display: 'contents' }}>
@@ -58,8 +59,8 @@ export function Palette({ hits, query, onQuery, onPick, onClose, placeholder = '
           </button>
         </div>
       ))}
-      {hits.length === 0 && <div className="none">{empty ?? `No matches for “${query}”.`}</div>}
-      <div className="pf"><span>↑ ↓ move</span><span>Enter opens</span><span style={{ marginLeft: 'auto' }}>Ctrl K anywhere</span></div>
+      {hits.length === 0 && <div className="none">{empty ?? t('ui.palette.no_matches_for', { query })}</div>}
+      <div className="pf"><span>{t('ui.palette.move')}</span><span>{t('ui.palette.enter_opens')}</span><span style={{ marginInlineStart: 'auto' }}>{t('ui.palette.ctrl_k_anywhere')}</span></div>
     </div>
   );
 }

@@ -1,16 +1,17 @@
 import { Body, Controller, Delete, Get, HttpCode, Inject, Injectable, Param, Patch, Post, Put, Query, type OnModuleInit } from '@nestjs/common';
-import { activeFeatures, activeModules, diffSettings, resolveConfig, validateSettingsChanges } from '@tangent/config-engine';
+import { activeFeatures, activeModules, moduleByKey, resolveConfig, validateSettingsChanges } from '@tangent/config-engine';
 import {
-  ConfigPatch, PERMISSIONS, RoleDefSave, SETTINGS_META,
-  type ChangeRequestRow, type ConfigTemplateRow, type ConfigVersionRow, type EffectiveConfig, type EntitlementDoc, type RoleDef, type SchoolConfig,
-} from '@tangent/contracts';
-import { newId, type pg } from '@tangent/db';
+  ConfigPatch, PERMISSIONS, PackApply, RoleDefSave, SETTINGS_META, SettingLockPut, packSettings, type PackPart,
+  type ChangeRequestRow, type ConfigTemplateRow, type ConfigVersionRow, type EffectiveConfig, type EntitlementDoc, type RoleDef, type SchoolConfig } from '@tangent/contracts';
+import { RoleError, StaleSettings, deleteRole, newId, readSettings, recordSettingsVersion, saveRole, writeSettings, type pg } from '@tangent/db';
 import { ApiError, ZodPipe, notFound } from '@tangent/nest-kit';
 import { z } from 'zod';
 import { Actions } from './actions.js';
 import { Db, Me, Needs, type ConsoleUser } from './core.js';
 import { ENV, type Env } from './env.js';
 import { withSchoolDb } from './school-db.js';
+import { REGISTRY } from './tokens.js';
+import type { Registry } from '@tangent/tenancy';
 
 /** What a template never carries from one school to another: who the school is. */
 const OWN_KEYS = ['school.name', 'school.shortName', 'school.tagline', 'school.place', 'school.phone', 'school.email', 'school.address', 'brand.logoText',
@@ -19,13 +20,18 @@ const KNOWN = new Set<string>(PERMISSIONS);
 
 type Q = pg.Pool | pg.PoolClient;
 
+/** A role rule broken (packages/db roles.ts), as the API's error. */
+async function roleCall<T>(fn: () => Promise<T>): Promise<T> {
+  try { return await fn(); } catch (e) { if (e instanceof RoleError) throw e.code === 'not_found' ? notFound('That role') : new ApiError(e.code, e.message, e.fields ? { fields: e.fields } : undefined); throw e; }
+}
+
 /**
  * A school's configuration, as only Tangent changes it: settings, roles and who holds them. Every change becomes a version
  * (who, what, why) that can be rolled back; a whole setup can be saved as a template and applied to other schools.
  */
 @Injectable()
 export class ConfigService implements OnModuleInit {
-  constructor(private readonly db: Db, @Inject(ENV) private readonly env: Env, private readonly actions: Actions) {}
+  constructor(private readonly db: Db, @Inject(ENV) private readonly env: Env, private readonly actions: Actions, @Inject(REGISTRY) private readonly registry: Registry) {}
 
   /** Risky changes wait in Approvals; when a second person says yes, this applies them. */
   onModuleInit(): void {
@@ -33,6 +39,29 @@ export class ConfigService implements OnModuleInit {
       const r = await this.apply(schoolId, by, { changes: params.changes as Record<string, unknown>, note: String(params.note ?? ''), expectedVersion: params.expectedVersion as number | undefined });
       return `Applied. The configuration is now version ${r.version}.`;
     });
+    // Worked out again when approved, so it applies what differs then, not what differed when asked.
+    this.actions.handle('pack.apply', async (schoolId, params, by) => {
+      const p = PackApply.parse(params);
+      const parts = (await this.packParts(schoolId, p.country, p.curriculum)).filter((x) => p.groups.includes(x.group));
+      const changes = Object.fromEntries(parts.flatMap((x) => x.changes.map((c) => [c.key, c.after])));
+      if (!Object.keys(changes).length) return 'Nothing to change: the school already has those values.';
+      const r = await this.apply(schoolId, by, { changes, note: p.note || `Re-applied ${p.groups.join(', ')} from the ${p.country}${p.curriculum ? ` ${p.curriculum}` : ''} pack` });
+      return `Re-applied ${Object.keys(changes).length} settings. The configuration is now version ${r.version}.`;
+    });
+  }
+
+  /** A pack's values for this school, by part (each setting's group), only where the school has something else. */
+  async packParts(schoolId: string, country: string, curriculum: string): Promise<PackPart[]> {
+    const now = (await this.get(schoolId)).values;
+    const by = new Map<string, PackPart>();
+    for (const [key, after] of Object.entries(packSettings(country, curriculum))) {
+      const meta = SETTINGS_META[key as keyof typeof SETTINGS_META];
+      if (!meta || JSON.stringify(now[key] ?? null) === JSON.stringify(after)) continue;
+      const part = by.get(meta.group) ?? { group: meta.group, label: moduleByKey(meta.group)?.name ?? meta.group, changes: [] };
+      part.changes.push({ key, label: meta.label, before: now[key] ?? null, after });
+      by.set(meta.group, part);
+    }
+    return [...by.values()];
   }
 
   private school<T>(schoolId: string, fn: (pool: pg.Pool) => Promise<T>): Promise<T> {
@@ -42,15 +71,11 @@ export class ConfigService implements OnModuleInit {
   private async entitlement(schoolId: string): Promise<EntitlementDoc> {
     const r = (await this.db.pool.query<{ entitlement: EntitlementDoc; plan: string }>('select entitlement, plan from schools where id = $1 and deleted_at is null', [schoolId])).rows[0];
     if (!r) throw notFound('That school');
-    return { ...r.entitlement, plan: r.plan, overrides: r.entitlement.overrides ?? {}, locks: r.entitlement.locks ?? [] };
+    return { ...r.entitlement, plan: r.plan, overrides: r.entitlement.overrides ?? {}, locks: r.entitlement.locks ?? [], lockNotes: r.entitlement.lockNotes ?? {} };
   }
 
-  private async values(q: Q): Promise<{ version: number; values: Record<string, unknown> }> {
-    const [rows, meta] = await Promise.all([
-      q.query<{ key: string; value: unknown }>('select key, value from settings'),
-      q.query<{ value: number }>("select value from meta where key = 'settings.version'"),
-    ]);
-    return { version: Number(meta.rows[0]?.value ?? 1), values: Object.fromEntries(rows.rows.map((r) => [r.key, r.value])) };
+  private values(q: Q): Promise<{ version: number; values: Record<string, unknown> }> {
+    return readSettings(q);
   }
 
   private async roles(q: Q): Promise<RoleDef[]> {
@@ -64,16 +89,18 @@ export class ConfigService implements OnModuleInit {
     const versions = await this.db.pool.query<{ id: string; version: number; changes: ConfigVersionRow['changes']; note: string; by: string; at: Date }>(
       'select id, version, changes, note, by, at from config_versions where school_id = $1 order by at desc limit 30', [schoolId]);
     return this.school(schoolId, async (p) => {
-      const [cur, roles, classes, heads, staff] = await Promise.all([
+      const [cur, roles, classes, heads, staff, subjects] = await Promise.all([
         this.values(p), this.roles(p),
         p.query<{ id: string; name: string }>('select id, name from classes order by grade, section'),
         p.query<{ key: string; name: string }>('select key, name from fee_heads order by sort, name'),
         p.query<{ id: string; name: string; designation: string; role_id: string | null }>(
           "select u.id, u.name, s.designation, (select ur.role_id from user_roles ur where ur.user_id = u.id limit 1) role_id from users u join staff s on s.user_id = u.id where u.status = 'active' order by u.name"),
+        p.query<{ id: string; name: string }>('select id, name from subjects order by name'),
       ]);
       return {
-        ...cur, entitled: activeModules(ent), features: activeFeatures(ent, activeModules(ent)), roles, classes: classes.rows, feeHeads: heads.rows,
+        ...cur, entitled: activeModules(ent), features: activeFeatures(ent, activeModules(ent)), roles, classes: classes.rows, feeHeads: heads.rows, subjects: subjects.rows,
         staff: staff.rows.map((s) => ({ id: s.id, name: s.name, designation: s.designation, roleId: s.role_id })),
+        locks: ent.locks.map((key) => ({ key, value: ent.overrides[key] ?? null, note: ent.lockNotes?.[key] ?? '' })),
         versions: versions.rows.map((v) => ({ id: v.id, version: v.version, changes: v.changes, note: v.note, by: v.by, at: v.at.toISOString() })),
       };
     });
@@ -87,45 +114,39 @@ export class ConfigService implements OnModuleInit {
     if (!checked.ok) throw new ApiError('validation', checked.problems[0]!.message, { fields: Object.fromEntries(checked.problems.map((p) => [p.key, p.message])) });
     const unknown = resets.find((k) => !(k in SETTINGS_META));
     if (unknown) throw new ApiError('validation', 'That setting does not exist.', { fields: { [unknown]: 'That setting does not exist.' } });
-    const after = await this.school(schoolId, async (p) => {
-      const client = await p.connect();
-      try {
-        await client.query('begin');
-        await client.query("select pg_advisory_xact_lock(hashtext('settings'))");
-        const before = await this.values(client);
-        if (patch.expectedVersion !== undefined && patch.expectedVersion !== before.version) {
-          throw new ApiError('conflict', 'Someone else changed this school’s configuration a moment ago. Reload to see their change.');
-        }
-        for (const [k, v] of Object.entries(checked.values)) {
-          await client.query(
-            'insert into settings (key, value, updated_by, updated_at) values ($1,$2,$3,now()) on conflict (key) do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now()',
-            [k, JSON.stringify(v), `tangent:${by}`]);
-        }
-        if (resets.length) await client.query('delete from settings where key = any($1)', [resets]);
-        await client.query("insert into meta (key, value) values ('settings.version', '2') on conflict (key) do update set value = to_jsonb((meta.value)::int + 1)");
-        const now = await this.values(client);
-        const changes = diffSettings(before.values, now.values);
-        await client.query('insert into audit_log (id, actor_id, actor_name, action, entity, detail) values ($1,null,$2,$3,$4,$5)',
-          [newId('aud'), `Tangent · ${by}`, 'settings.changed', 'settings', JSON.stringify({ keys: changes.map((c) => c.key).join(', '), note: patch.note ?? '' })]);
-        await client.query('commit');
-        return { ...now, changes };
-      } catch (err) {
-        await client.query('rollback').catch(() => undefined);
-        throw err;
-      } finally {
-        client.release();
-      }
-    });
+    const after = await this.school(schoolId, (p) => writeSettings(p, { changes: { ...checked.values, ...Object.fromEntries(resets.map((k) => [k, null])) }, expectedVersion: patch.expectedVersion, note: patch.note, actorId: null, actorName: `Tangent · ${by}` }))
+      .catch((e) => { throw e instanceof StaleSettings ? new ApiError('conflict', 'Someone else changed this school’s configuration a moment ago. Reload to see their change.') : e; });
     if (after.changes.length) {
-      await this.db.pool.query('insert into config_versions (id, school_id, version, values, changes, note, by) values ($1,$2,$3,$4,$5,$6,$7)',
-        [newId('cfv'), schoolId, after.version, JSON.stringify(after.values), JSON.stringify(after.changes), patch.note ?? '', by]);
-      // Who the school is lives in its settings; the registry keeps a copy for the fleet, the console and the school's address.
-      const v = after.values as Record<string, unknown>;
-      const id = (k: string) => (typeof v[k] === 'string' && (v[k] as string).trim() ? (v[k] as string).trim() : null);
-      await this.db.pool.query('update schools set config_version = config_version + 1, name = coalesce($2, name), short_name = coalesce($3, short_name), color = coalesce($4, color), logo_text = coalesce($5, logo_text) where id = $1',
-        [schoolId, id('school.name'), id('school.shortName'), id('brand.color'), id('brand.logoText')]);
+      await recordSettingsVersion(this.db.pool, schoolId, after, patch.note ?? '', by);
       await this.db.audit(by, 'config.changed', 'school', schoolId, { keys: after.changes.map((c) => c.key).join(', ') });
     }
+    return this.get(schoolId);
+  }
+
+  /**
+   * Fixes one setting for one school at a value, or lifts the fix. The school then sees it read-only with the reason; on a
+   * setting it may only tighten (security, privacy), the value is a floor and the school may still be stricter.
+   */
+  async lock(schoolId: string, by: string, body: SettingLockPut): Promise<SchoolConfig> {
+    if (!(body.key in SETTINGS_META)) throw new ApiError('validation', 'That setting does not exist.');
+    const ent = await this.entitlement(schoolId);
+    const locks = ent.locks.filter((k) => k !== body.key);
+    const overrides = { ...ent.overrides };
+    const notes = { ...(ent.lockNotes ?? {}) };
+    delete overrides[body.key];
+    delete notes[body.key];
+    if (body.locked) {
+      const checked = validateSettingsChanges({ [body.key]: body.value }, []);
+      if (!checked.ok) throw new ApiError('validation', checked.problems[0]!.message, { fields: { [body.key]: checked.problems[0]!.message } });
+      locks.push(body.key);
+      overrides[body.key] = checked.values[body.key];
+      if (body.note) notes[body.key] = body.note;
+    }
+    const { plan: _plan, ...doc } = { ...ent, locks, overrides, lockNotes: notes, version: ent.version + 1 };
+    await this.db.pool.query('update schools set entitlement = $2, config_version = config_version + 1 where id = $1', [schoolId, JSON.stringify(doc)]);
+    const slug = (await this.db.pool.query<{ slug: string }>('select slug from schools where id = $1', [schoolId])).rows[0]?.slug;
+    if (slug) this.registry.invalidate(slug);
+    await this.db.audit(by, body.locked ? 'setting.locked' : 'setting.unlocked', 'school', schoolId, { key: body.key, note: body.note });
     return this.get(schoolId);
   }
 
@@ -144,24 +165,8 @@ export class ConfigService implements OnModuleInit {
   // Roles: only Tangent makes and changes them.
 
   async saveRole(schoolId: string, by: string, id: string | null, body: RoleDefSave): Promise<RoleDef[]> {
-    const bad = body.permissions.find((p) => !KNOWN.has(p));
-    if (bad) throw new ApiError('validation', `There is no permission called ${bad}.`);
     return this.school(schoolId, async (p) => {
-      if (id) {
-        const cur = (await p.query<{ locked: boolean }>('select locked from roles where id = $1', [id])).rows[0];
-        if (!cur) throw notFound('That role');
-        if (cur.locked) throw new ApiError('conflict', 'The principal role always has everything and cannot be changed.');
-        await p.query('update roles set name = $2, description = $3, permissions = $4 where id = $1', [id, body.name, body.description, JSON.stringify(body.permissions)]);
-      } else {
-        const key = `custom_${body.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}`;
-        id = `role_${key}`;
-        if ((await p.query('select 1 from roles where id = $1 or lower(name) = lower($2)', [id, body.name])).rowCount) throw new ApiError('validation', 'There is already a role with that name.', { fields: { name: 'Already used.' } });
-        await p.query('insert into roles (id, key, name, description, permissions, locked) values ($1,$2,$3,$4,$5,false)', [id, key, body.name, body.description, JSON.stringify(body.permissions)]);
-      }
-      // People in the role get the change within about half a minute (their token version moves on).
-      await p.query('update users set token_version = token_version + 1 where id in (select user_id from user_roles where role_id = $1)', [id]);
-      await p.query('insert into audit_log (id, actor_id, actor_name, action, entity, entity_id, detail) values ($1,null,$2,$3,$4,$5,$6)',
-        [newId('aud'), `Tangent · ${by}`, 'role.saved', 'role', id, JSON.stringify({ name: body.name, permissions: body.permissions.length })]);
+      await roleCall(() => saveRole(p, { id: null, name: `Tangent · ${by}` }, id, body));
       await this.db.audit(by, 'role.saved', 'school', schoolId, { role: body.name });
       return this.roles(p);
     });
@@ -169,12 +174,8 @@ export class ConfigService implements OnModuleInit {
 
   async deleteRole(schoolId: string, by: string, id: string): Promise<RoleDef[]> {
     return this.school(schoolId, async (p) => {
-      const r = (await this.roles(p)).find((x) => x.id === id);
-      if (!r) throw notFound('That role');
-      if (r.locked) throw new ApiError('conflict', 'The principal role cannot be deleted.');
-      if (r.people) throw new ApiError('conflict', `${r.people} ${r.people === 1 ? 'person has' : 'people have'} this role. Move them to another role first.`);
-      await p.query('delete from roles where id = $1', [id]);
-      await this.db.audit(by, 'role.removed', 'school', schoolId, { role: r.name });
+      await roleCall(() => deleteRole(p, { id: null, name: `Tangent · ${by}` }, id));
+      await this.db.audit(by, 'role.removed', 'school', schoolId, { roleId: id });
       return this.roles(p);
     });
   }
@@ -265,6 +266,19 @@ export class ConfigController {
     return this.config.get(id);
   }
 
+  /** What re-applying a country's (and curriculum's) starter pack would change, part by part. */
+  @Get('schools/:id/packs/preview') @Needs('schools.read')
+  packPreview(@Param('id') id: string, @Query(new ZodPipe(PackApply.pick({ country: true, curriculum: true }))) q: { country: string; curriculum: string }): Promise<PackPart[]> {
+    return this.config.packParts(id, q.country, q.curriculum);
+  }
+
+  /** Asks to re-apply some parts: a second person approves, then what differs then is applied. */
+  @Post('schools/:id/packs/apply') @HttpCode(200) @Needs('schools.configure')
+  async packApply(@Me() me: ConsoleUser, @Param('id') id: string, @Body(new ZodPipe(PackApply)) body: PackApply): Promise<{ actionId: string; status: string }> {
+    const a = await this.actions.request(me, { action: 'pack.apply', schoolId: id, params: body, dryRun: false });
+    return { actionId: a.id, status: a.status };
+  }
+
   /** Risky settings (marked in SETTINGS_META) wait for a second person; the rest apply at once. */
   @Patch('schools/:id/config') @Needs('schools.configure')
   async patch(@Me() me: ConsoleUser, @Param('id') id: string, @Body(new ZodPipe(ConfigPatch)) body: ConfigPatch): Promise<SchoolConfig | { pending: true; actionId: string }> {
@@ -278,6 +292,11 @@ export class ConfigController {
       return this.config.get(id);
     }
     return this.config.apply(id, me.email, body);
+  }
+
+  @Put('schools/:id/config/locks') @Needs('schools.configure')
+  lock(@Me() me: ConsoleUser, @Param('id') id: string, @Body(new ZodPipe(SettingLockPut)) body: SettingLockPut): Promise<SchoolConfig> {
+    return this.config.lock(id, me.email, body);
   }
 
   @Post('schools/:id/config/rollback') @HttpCode(200) @Needs('schools.configure')

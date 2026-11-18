@@ -416,4 +416,4 @@ export class Hub {
   }
 }
 
-const norm = (s: string) => (s.includes('@') ? s.trim().toLowerCase() : s.replace(/\D/g, '').slice(-10));
+const norm = (s: string) => (s.includes('@') ? s.trim().toLowerCase() : s.replace(/\D/g, ''));

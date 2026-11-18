@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tangent/core/theme/app_colors.dart';
+import 'package:tangent/core/translations/languages.dart';
 
 /// Anek Latin + Anek Devanagari (one family, three languages), the type the app had before Tangent Hue: the width axis
 /// carries the hierarchy, wide and heavy for numbers and headings. Hue's roles and sizes stay.
@@ -20,7 +21,8 @@ TextStyle hueText(
 }) {
   return TextStyle(
     fontFamily: kSans,
-    fontFamilyFallback: const [kDeva],
+    // Devanagari and Arabic are bundled; another script's Noto font is fetched when its language is picked (LanguagePacks).
+    fontFamilyFallback: const [kDeva, 'NotoSansArabic', ...kScriptFonts],
     fontSize: size,
     fontWeight: FontWeight.values[((weight / 100).round() - 1).clamp(0, 8)],
     fontVariations: [FontVariation('wght', weight), FontVariation('wdth', width)],

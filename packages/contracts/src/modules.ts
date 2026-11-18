@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { IsoDate } from './common.js';
 import { Permission } from './permissions.js';
 import type { FeeStatus } from './school.js';
+import { localized } from './i18n.js';
+import { CustomValues } from './fields.js';
 
 // Homework
 
@@ -63,6 +65,8 @@ export interface HomeworkDetail extends HomeworkRow {
 
 export const ExamCreate = z.object({
   name: z.string().trim().min(3, 'Name the exam').max(80),
+  /** The kind of exam, a key of the school's list (exams.types): a unit test, a term exam… Weighting and reports go by it. */
+  kind: z.string().trim().max(32).default(''),
   classId: z.string().min(1, 'Choose a class'),
   /** More classes sitting the same papers (a school-wide mid-term): one exam is made for each, together. */
   alsoClassIds: z.array(z.string().min(1)).max(60).default([]),
@@ -71,12 +75,16 @@ export const ExamCreate = z.object({
   subjects: z.array(z.object({
     subjectId: z.string().min(1), onDate: IsoDate.nullable().optional(), maxMarks: z.number().int().min(1).max(200).default(100),
     startsAt: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(), endsAt: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(), room: z.string().trim().max(40).default(''),
+    /** Who watches the room while the paper is sat. */
+    invigilatorId: z.string().min(1).nullable().optional(),
   })).min(1, 'Pick at least one subject').max(12),
 });
 export type ExamCreate = z.infer<typeof ExamCreate>;
 
 export const ExamMarksPut = z.object({
-  marks: z.array(z.object({ studentId: z.string().min(1), subjectId: z.string().min(1), score: z.number().min(0).max(200).nullable(), absent: z.boolean().default(false) })).min(1).max(2000),
+  // A subject graded without marks (its scheme's entry is "grade") takes `grade`, one of the scheme's grades, and no score.
+  marks: z.array(z.object({ studentId: z.string().min(1), subjectId: z.string().min(1), score: z.number().min(0).max(200).nullable(), absent: z.boolean().default(false), grade: z.string().trim().max(12).optional(),
+    criteria: z.record(z.string(), z.number().int().min(0).max(100)).optional() })).min(1).max(2000),
 });
 export type ExamMarksPut = z.infer<typeof ExamMarksPut>;
 
@@ -88,7 +96,15 @@ export interface ExamRow {
   startsOn: string;
   endsOn: string;
   status: 'upcoming' | 'marking' | 'published';
-  subjects: { subjectId: string; name: string; onDate: string | null; maxMarks: number; startsAt: string | null; endsAt: string | null; room: string }[];
+  /** The kind of exam (a key of exams.types), '' when none was given. */
+  kind: string;
+  subjects: {
+    subjectId: string; name: string; onDate: string | null; maxMarks: number; startsAt: string | null; endsAt: string | null; room: string; invigilatorId: string | null; invigilatorName: string | null;
+    /** The grades a teacher picks from when this subject is graded without marks; none when it takes marks. */
+    grades: string[];
+    /** A rubric subject's criteria (a level for each, the score their total on the paper's maximum); none otherwise. */
+    criteria: { key: string; name: string; max: number }[];
+  }[];
   /** Why published results were reopened (empty unless they were). */
   reopenedNote: string;
   /** Marks entered out of marks expected (students × subjects). */
@@ -98,14 +114,18 @@ export interface ExamRow {
 
 export interface ExamMarksView {
   exam: ExamRow;
-  students: { studentId: string; name: string; rollNo: string; marks: Record<string, { score: number | null; absent: boolean }> }[];
+  students: { studentId: string; name: string; rollNo: string; marks: Record<string, { score: number | null; absent: boolean; grade: string | null; criteria?: Record<string, number> | null }>; remark: string }[];
 }
+
+/** Each student's remark on an exam, written or picked from the school's remarks (exams.remarks); empty removes it. */
+export const ExamRemarksPut = z.object({ remarks: z.array(z.object({ studentId: z.string().min(1), remark: z.string().trim().max(400) })).min(1).max(200) });
+export type ExamRemarksPut = z.infer<typeof ExamRemarksPut>;
 
 export interface ExamResults {
   exam: ExamRow;
   average: number;
   passPct: number;
-  rows: { studentId: string; name: string; rollNo: string; total: number; max: number; pct: number; grade: string; rank: number }[];
+  rows: { studentId: string; name: string; rollNo: string; total: number; max: number; pct: number; grade: string; rank: number; gpa: number | null }[];
 }
 
 // People: staff, admissions, roles
@@ -124,37 +144,44 @@ export interface StaffRow {
   maxPeriods: number;
   status: 'active' | 'inactive';
   joinedOn: string | null;
+  /** Their line manager (workflow steps can go to them). */
+  managerId: string | null;
+  managerName: string | null;
   /** invited: sent a first password, not signed in yet; none: never invited (brought in by an import). */
   access: 'none' | 'invited' | 'signed_in';
+  /** The school's own fields (fields.custom.staff), by key. */
+  custom: CustomValues;
 }
 
 export const StaffCreate = z.object({
   name: z.string().trim().min(2, 'Enter the name').max(80),
   email: z.string().trim().toLowerCase().email('Enter a valid email'),
-  phone: z.string().trim().min(8, 'Enter a phone number').max(24),
+  phone: z.string().trim().min(1, 'Enter a phone number').max(24),
   designation: z.string().trim().min(2).max(60).default('Teacher'),
   department: z.string().trim().max(60).optional(),
   subjectIds: z.array(z.string()).max(8).default([]),
   roleId: z.string().min(1, 'Choose a role'),
+  managerId: z.string().min(1).nullable().optional(),
+  custom: CustomValues.optional(),
 });
 export type StaffCreate = z.infer<typeof StaffCreate>;
 
 export const StaffPatch = z.object({
   name: z.string().trim().min(2, 'Enter the name').max(80).optional(),
   email: z.string().trim().toLowerCase().email('Enter a valid email').optional(),
-  phone: z.string().trim().min(8, 'Enter a phone number').max(24).optional(),
+  phone: z.string().trim().min(1, 'Enter a phone number').max(24).optional(),
   designation: z.string().trim().min(2).max(60).optional(),
   department: z.string().trim().max(60).nullable().optional(),
   subjectIds: z.array(z.string()).max(8).optional(),
   roleId: z.string().min(1).optional(),
   status: z.enum(['active', 'inactive']).optional(),
+  managerId: z.string().min(1).nullable().optional(),
+  custom: CustomValues.optional(),
 });
 export type StaffPatch = z.infer<typeof StaffPatch>;
 
-export const ENQUIRY_STAGES = ['enquiry', 'applied', 'test', 'offer', 'enrolled', 'declined'] as const;
-export type EnquiryStage = (typeof ENQUIRY_STAGES)[number];
-/** The stages between enquiry and enrolment a school may use (console: `admissions.stages`). */
-export const OPTIONAL_STAGES = ['applied', 'test', 'offer'] as const;
+/** An enquiry's stage: 'enquiry', one of the school's own stages (admissions.stages), 'enrolled' or 'declined'. */
+export type EnquiryStage = string;
 
 export interface EnquiryRow {
   id: string;
@@ -166,7 +193,14 @@ export interface EnquiryRow {
   email: string | null;
   source: string;
   stage: EnquiryStage;
-  testOn: string | null;
+  /** The day of the stage it is in, when that stage happens on a day (a test, an interview). */
+  stageOn: string | null;
+  /** Scores written down at scored stages, by stage key. */
+  scores: Record<string, string>;
+  /** Documents received, by name, with the day each came in. */
+  docs: Record<string, string>;
+  /** The child's date of birth, when the family gave it (an online application). */
+  dob: string | null;
   note: string;
   studentId: string | null;
   createdAt: string;
@@ -177,7 +211,7 @@ export const EnquiryCreate = z.object({
   // Early years are 0 and below (Nursery, LKG, UKG), as the school's classes number them.
   gradeSought: z.number().int().min(-3, 'Choose a grade').max(14),
   guardianName: z.string().trim().min(2, 'Enter the guardian’s name').max(80),
-  phone: z.string().trim().min(8, 'Enter a phone number').max(24),
+  phone: z.string().trim().min(1, 'Enter a phone number').max(24),
   email: z.string().trim().email('Enter a valid email').optional().or(z.literal('')),
   /** One of the school's own enquiry sources (`admissions.sources`). */
   source: z.string().trim().min(1).max(40).default('Walk-in'),
@@ -189,14 +223,34 @@ export const EnquiryPatch = z.object({
   childName: z.string().trim().min(2, 'Enter the child’s name').max(80).optional(),
   gradeSought: z.number().int().min(-3).max(14).optional(),
   guardianName: z.string().trim().min(2, 'Enter the guardian’s name').max(80).optional(),
-  phone: z.string().trim().min(8, 'Enter a phone number').max(24).optional(),
+  phone: z.string().trim().min(1, 'Enter a phone number').max(24).optional(),
   email: z.string().trim().email('Enter a valid email').or(z.literal('')).optional(),
   source: z.string().trim().min(1).max(40).optional(),
-  stage: z.enum(ENQUIRY_STAGES).optional(),
-  testOn: IsoDate.nullable().optional(),
+  stage: z.string().trim().min(1).max(24).optional(),
+  stageOn: IsoDate.nullable().optional(),
+  /** The score at the stage it is in (a mark, a grade, "passed"); empty clears it. */
+  score: z.string().trim().max(20).optional(),
+  /** Documents ticked (true) or unticked (false) as received. */
+  docs: z.record(z.string().trim().min(1).max(40), z.boolean()).optional(),
   note: z.string().trim().max(400).optional(),
 });
 export type EnquiryPatch = z.infer<typeof EnquiryPatch>;
+
+/** A family's own application from the school's page (admissions.onlineForm). `website` is a field people never see. */
+export const EnquiryApply = z.object({
+  childName: z.string().trim().min(2, 'Enter the child’s name').max(80),
+  gradeSought: z.number().int().min(-3, 'Choose a grade').max(14),
+  dob: IsoDate.optional(),
+  guardianName: z.string().trim().min(2, 'Enter your name').max(80),
+  phone: z.string().trim().min(1, 'Enter a phone number').max(24),
+  email: z.string().trim().email('Enter a valid email').optional().or(z.literal('')),
+  note: z.string().trim().max(400).default(''),
+  consent: z.literal(true, { message: 'Agree to the privacy notice to apply' }),
+  website: z.string().max(200).optional(),
+});
+export type EnquiryApply = z.infer<typeof EnquiryApply>;
+/** What the application page shows before anyone signs in. */
+export interface ApplyInfo { open: boolean; school: string; grades: { value: number; label: string }[] }
 
 export const EnquiryEnrol = z.object({ classId: z.string().min(1, 'Choose a class'), dob: IsoDate });
 export type EnquiryEnrol = z.infer<typeof EnquiryEnrol>;
@@ -348,6 +402,10 @@ export const EventSave = z.object({
   category: z.string().trim().max(24).default(''),
   /** Ask families whether they are coming. */
   needsRsvp: z.boolean().default(false),
+  /** Replies close at the end of this day (none: until it starts); at most this many grown-ups per family; this many children going. */
+  rsvpBy: IsoDate.nullable().default(null),
+  maxAdults: z.number().int().min(0).max(20).nullable().default(null),
+  capacity: z.number().int().min(1).max(100_000).nullable().default(null),
   lat: z.number().min(-90).max(90).nullable().default(null),
   lng: z.number().min(-180).max(180).nullable().default(null),
 });
@@ -372,6 +430,9 @@ export interface EventRow {
   cant: number;
   /** Grown-ups coming with the children who are going. */
   adults: number;
+  rsvpBy: string | null;
+  maxAdults: number | null;
+  capacity: number | null;
   classId: string | null;
   className: string | null;
 }
@@ -425,23 +486,38 @@ export interface MessageEvent {
   opens?: string;
 }
 
-export const MESSAGE_EVENTS: MessageEvent[] = [
+export const MESSAGE_EVENTS: MessageEvent[] = localized([
   { key: 'attendance.absent', label: 'Child marked absent or late', to: 'families', vars: ['student', 'status', 'school'], text: '{student} was marked {status} today at {school}.', defaults: { push: true, sms: true, email: false }, urgent: true, opens: '/attendance', needs: 'attendance.parentAlerts' },
   { key: 'attendance.reminder', label: 'Teacher has not marked attendance', to: 'staff', vars: ['teacher'], text: 'Hi {teacher}, please mark attendance for your class today.', defaults: { push: true, sms: true, email: false }, opens: '/teacher/attendance', needs: 'attendance' },
   { key: 'fees.reminder', label: 'Fee reminder', to: 'families', vars: ['student', 'school'], text: 'Reminder: fees for {student} are due. Pay in the Tangent app to get an instant receipt.', defaults: { push: true, sms: true, email: false }, opens: '/fees', needs: 'fees.reminders' },
+  { key: 'fees.overdue', label: 'Fee overdue', to: 'families', vars: ['student', 'school'], text: 'A fee for {student} at {school} is overdue. Please pay it in the Tangent app, or at the office.', defaults: { push: true, sms: true, email: false }, opens: '/fees', needs: 'fees.reminders' },
   { key: 'fees.receipt', label: 'Payment received', to: 'families', vars: ['receipt', 'amount', 'title'], text: 'Receipt {receipt}: {amount} received for {title}. Thank you.', defaults: { push: true, sms: true, email: true }, opens: '/fees', needs: 'fees' },
   { key: 'timetable.published', label: 'Timetable changed', to: 'staff', vars: ['school'], text: 'The timetable was updated. Open the Tangent app to see your new periods.', defaults: { push: true, sms: true, email: false }, opens: '/timetable', needs: 'timetable' },
   { key: 'homework.new', label: 'New homework', to: 'families', vars: ['student', 'subject', 'title', 'due'], text: 'New {subject} homework for {student}: {title}, due {due}.', defaults: { push: true, sms: false, email: false }, opens: '/homework', needs: 'homework' },
   { key: 'exam.results', label: 'Results published', to: 'families', vars: ['student', 'exam'], text: 'Results for {exam} are out. See how {student} did in the Tangent app.', defaults: { push: true, sms: true, email: false }, opens: '/results', needs: 'exams' },
   { key: 'notice.published', label: 'New notice', to: 'families', vars: ['title', 'school'], text: 'New notice from {school}: {title}. Read it in the Tangent app.', defaults: { push: true, sms: false, email: false }, opens: '/notices', needs: 'notices' },
   { key: 'event.created', label: 'New event', to: 'families', vars: ['title', 'date'], text: '{title} on {date}. Tell us if you can come in the Tangent app.', defaults: { push: true, sms: false, email: false }, opens: '/events', needs: 'events' },
+  { key: 'admissions.stage', label: 'Admission moved to a stage the family hears about', to: 'families', vars: ['child', 'stage', 'date', 'school'], text: '{child}’s application at {school} has moved to: {stage}. {date}', defaults: { push: false, sms: true, email: true }, needs: 'people.admissions' },
+  { key: 'admissions.received', label: 'Online application received', to: 'families', vars: ['child', 'school'], text: 'Thank you. {school} has received the application for {child} and will be in touch.', defaults: { push: false, sms: true, email: true }, needs: 'people.admissions' },
   { key: 'admissions.offer', label: 'Admission offer', to: 'families', vars: ['child', 'school'], text: 'Good news: {child} has been offered a place at {school}. Please visit the office to complete admission.', defaults: { push: false, sms: true, email: true }, needs: 'people.admissions' },
+  { key: 'staffLeave.decided', label: 'Staff leave answered', to: 'staff', vars: ['type', 'from', 'to', 'status'], text: 'Your {type} from {from} to {to} was {status}.', defaults: { push: true, sms: false, email: true }, opens: '/staff/me', needs: 'staffAttendance' },
+  { key: 'diary.entry', label: 'New diary entry', to: 'families', vars: ['class', 'kind', 'text'], text: '{class} diary, {kind}: {text}', defaults: { push: true, sms: false, email: false }, opens: '/diary', needs: 'diary' },
+  { key: 'meeting.open', label: 'Parent-teacher meeting open to book', to: 'families', vars: ['title', 'date', 'student'], text: '{title} on {date}: book a time with {student}’s teachers in the Tangent app.', defaults: { push: true, sms: true, email: false }, opens: '/meetings', needs: 'ptm' },
+  { key: 'meeting.reminder', label: 'Parent-teacher meeting tomorrow', to: 'families', vars: ['teacher', 'time', 'date', 'place'], text: 'Reminder: your meeting with {teacher} is at {time} on {date}. {place}', defaults: { push: true, sms: true, email: false }, opens: '/meetings', needs: 'ptm' },
+  { key: 'meeting.cancelled', label: 'Parent-teacher meeting cancelled', to: 'families', vars: ['teacher', 'time', 'date'], text: 'Your meeting with {teacher} at {time} on {date} was cancelled. Book another time in the Tangent app.', defaults: { push: true, sms: true, email: false }, opens: '/meetings', needs: 'ptm' },
+  { key: 'visitor.arrived', label: 'Your visitor has arrived', to: 'staff', vars: ['visitor', 'purpose'], text: '{visitor} is at reception to see you ({purpose}).', defaults: { push: true, sms: false, email: false }, urgent: true, needs: 'visitors' },
+  { key: 'visitor.pass', label: 'Pass for an invited visitor', to: 'families', vars: ['visitor', 'date', 'code', 'school'], text: 'Hello {visitor}, you are expected at {school} on {date}. Show this code at reception: {code}.', defaults: { push: false, sms: true, email: true }, urgent: true, needs: 'visitors' },
+  { key: 'gatepass.consent', label: 'The school asks to send a child home early', to: 'families', vars: ['student', 'time', 'reason'], text: 'The school asks to send {student} home early at {time}: {reason}. Answer in the Tangent app.', defaults: { push: true, sms: true, email: false }, urgent: true, opens: '/gate-pass', needs: 'visitors' },
+  { key: 'gatepass.decided', label: 'Early leave answered', to: 'families', vars: ['student', 'time', 'status'], text: 'Early leave for {student} at {time} was {status}.', defaults: { push: true, sms: true, email: false }, urgent: true, opens: '/gate-pass', needs: 'visitors' },
+  { key: 'pickup.done', label: 'Child collected', to: 'families', vars: ['student', 'name', 'time'], text: '{student} was collected by {name} at {time}.', defaults: { push: true, sms: false, email: false }, urgent: true, opens: '/gate-pass', needs: 'visitors' },
+  { key: 'certificate.ready', label: 'Certificate ready', to: 'families', vars: ['type', 'student'], text: '{type} for {student} is ready. Download it in the Tangent app.', defaults: { push: true, sms: true, email: false }, opens: '/certificates', needs: 'certificates' },
   { key: 'leave.decided', label: 'Leave request answered', to: 'families', vars: ['who', 'from', 'to', 'status'], text: 'Leave for {who} from {from} to {to} was {status}.', defaults: { push: true, sms: true, email: false }, opens: '/leave', needs: 'attendance' },
   { key: 'family.invite', label: 'Invite a family to the app', to: 'families', vars: ['student', 'school'], text: '{school} now uses Tangent. Install the Tangent app and sign in with this phone number to follow {student}’s day.', defaults: { push: false, sms: true, email: false }, urgent: true, needs: 'people' },
   { key: 'bus.near', label: 'Bus near the stop', to: 'families', vars: ['student', 'stop', 'minutes'], text: 'The bus is about {minutes} minutes from {stop}. Please get {student} ready.', defaults: { push: true, sms: false, email: false }, urgent: true, opens: '/transport', needs: 'transport.liveBus' },
   { key: 'library.ready', label: 'Reserved book ready', to: 'families', vars: ['student', 'title'], text: '{title}, reserved for {student}, is ready at the library desk.', defaults: { push: true, sms: false, email: false }, opens: '/library', needs: 'library.reservations' },
   { key: 'fees.refunded', label: 'Refund sent', to: 'families', vars: ['receipt', 'amount'], text: 'A refund of {amount} on receipt {receipt} is on its way to the account you paid from.', defaults: { push: true, sms: true, email: true }, opens: '/fees', needs: 'fees.refunds' },
   { key: 'staff.invite', label: 'Staff invite', to: 'staff', vars: ['name', 'school', 'password'], text: 'Welcome to {school}, {name}. Sign in with your email and the temporary password {password}, then choose your own.', defaults: { push: false, sms: false, email: true }, urgent: true, needs: 'people' },
+  { key: 'approval.waiting', label: 'A request waits for you', to: 'staff', vars: ['name', 'title', 'days'], text: '{name}, “{title}” has waited {days} days for you in Approvals.', defaults: { push: true, sms: false, email: true }, needs: 'school' },
   { key: 'student.invite', label: 'Invite a student to the app', to: 'families', vars: ['student', 'school'], text: '{school} now uses Tangent. {student}, install the Tangent app and sign in with this number to see your homework and timetable.', defaults: { push: false, sms: true, email: true }, urgent: true, needs: 'people' },
   { key: 'office.message', label: 'A message from the office', to: 'families', vars: ['text', 'school'], text: '{text} ({school})', defaults: { push: true, sms: true, email: false }, needs: 'people' },
   { key: 'privacy.answered', label: 'Data request answered', to: 'families', vars: ['request', 'status', 'note'], text: 'Your request ({request}) was {status}. {note}', defaults: { push: true, sms: false, email: true }, needs: 'school', opens: '/settings/privacy' },
@@ -453,4 +529,4 @@ export const MESSAGE_EVENTS: MessageEvent[] = [
   { key: 'library.overdue', label: 'Library book overdue', to: 'families', vars: ['student', 'title', 'days', 'fine'], text: '{title}, borrowed by {student}, is {days} days late. Fine so far: {fine}.', defaults: { push: true, sms: false, email: false }, opens: '/library', needs: 'library' },
   { key: 'bus.late', label: 'Bus running late or stopped', to: 'families', vars: ['route', 'minutes', 'reason'], text: 'The {route} bus is running about {minutes} minutes late: {reason}.', defaults: { push: true, sms: true, email: false }, urgent: true, opens: '/transport', needs: 'transport.liveBus' },
   { key: 'bus.dropped', label: 'Child got on or off the bus', to: 'families', vars: ['student', 'stop', 'event', 'time'], text: '{student} {event} the bus at {stop}, {time}.', defaults: { push: true, sms: false, email: false }, urgent: true, opens: '/transport', needs: 'transport.liveBus' },
-];
+]);

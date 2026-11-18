@@ -9,7 +9,6 @@ import 'package:tangent/data/repositories/directory_repository.dart';
 
 class GalleryController extends GetxController with Loadable {
   final onlyChild = false.obs;
-  final favourites = <String>{}.obs;
   List<GalleryAlbum> albums = [];
   String? childId;
   String? childName;

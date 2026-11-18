@@ -40,6 +40,7 @@ Aarav (`stu_aarav`) has an overdue lab fee and a Term 2 fee inside the due windo
 | `leave_requests.json` | array | Leave applications |
 | `gallery.json` | array | Albums with photos |
 | `notifications.json` | array | In-app notifications |
+| `school_life.json` | object | Staff day and leave, diary entries, meetings, gate passes and pick-up people, invited visitors and certificates, in the family API's shapes (`staff`, `diary`, `diaryClasses`, `diaryKinds`, `classDiary`, `meetings`, `teacherMeetings`, `gatePass`, `purposes`, `invites`, `certificates`) |
 | `school_info.json` | object | Greenfield International School, Pune |
 | `demo_accounts.json` | array | The three cards on the login screen |
 
@@ -77,7 +78,7 @@ Aarav (`stu_aarav`) has an overdue lab fee and a Term 2 fee inside the due windo
 
 **User:** `id`, `role`, `name`, `email`, `phone`, `avatarUrl`, `password`, `childIds`, optional `studentId`, optional `teacherId`.
 
-**Student:** `id`, `userId`, `name`, `classId`, `rollNo`, `dob`, `bloodGroup`, `house`, `avatarUrl`, `guardianName`, `guardianPhone`, `address`.
+**Student:** `id`, `userId`, `name`, `classId`, `rollNo`, `dob`, `bloodGroup`, `house`, `avatarUrl`, `guardianName`, `guardianPhone`, `address`, and optional `fields` (the school's own fields it shows in the app, label → value; `{}` when none).
 
 **Class:** `id`, `name`, `section`, `classTeacherId`, `room`, `studentIds`.
 

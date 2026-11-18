@@ -32,6 +32,9 @@ class QuickRow extends StatelessWidget {
     'timetable': ('quick.timetable', AppIcons.timetable, AppRoutes.timetable),
     'homework': ('quick.homework', AppIcons.homework, AppRoutes.homework),
     'events': ('quick.events', AppIcons.events, AppRoutes.events),
+    'bookMeeting': ('quick.book_meeting', PhosphorIconsRegular.calendarPlus, AppRoutes.meetings),
+    'gatePass': ('quick.gate_pass', PhosphorIconsRegular.doorOpen, AppRoutes.gatePass),
+    'certificates': ('quick.certificates', PhosphorIconsRegular.certificate, AppRoutes.certificates),
   };
 
   @override
@@ -142,9 +145,9 @@ class _DueRow extends StatelessWidget {
           leading: _MoneyCover(overdue: overdue),
           title: '${fee.title}$child',
           subtitle: overdue
-              ? 'home.fee_late'.trp({'amount': Formatters.inr(fee.amount), 'n': '$late'})
+              ? 'home.fee_late'.trp({'amount': Formatters.money(fee.amount), 'n': '$late'})
               : 'home.fee_due_on'.trp({
-                  'amount': Formatters.inr(fee.amount),
+                  'amount': Formatters.money(fee.amount),
                   'date': DateFormat('EEE d MMM').format(fee.dueDate),
                 }),
           subtitleColor: overdue ? c.badText : null,
@@ -311,7 +314,7 @@ class ChildrenStrip extends StatelessWidget {
                                   children: [
                                     TextSpan(
                                       text:
-                                          ' · ${child.schoolClass.name.replaceAll(RegExp('[^0-9]'), '')} ${child.schoolClass.section}',
+                                          ' · ${child.schoolClass.label}',
                                       style: context.type.cap,
                                     ),
                                   ],

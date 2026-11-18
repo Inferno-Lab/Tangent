@@ -1,14 +1,18 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { reportErrors } from '@tangent/web-ui';
-import { Outlet, createRootRouteWithContext, createRoute, createRouter, redirect, useRouter, lazyRouteComponent } from '@tanstack/react-router';
+import { Outlet, createRootRouteWithContext, createRoute, createRouter, redirect, useParams, useRouter, lazyRouteComponent } from '@tanstack/react-router';
 import { useMemo } from 'react';
 import { AppContext, type AppCtx } from './app/context';
 import { makeClient, session, type Client } from './app/client';
 import { SupportBanner } from './app/SupportBanner';
 import { LoginRoute } from './pages/login/LoginRoute';
+import { ApplyRoute } from './pages/apply/ApplyRoute';
+import { FormRoute } from './pages/forms/FormRoute';
+import { VerifyRoute } from './pages/certificates/VerifyRoute';
 import { NotFoundPage } from './pages/status/StatusPages';
 import { PlanGate } from './pages/status/PlanGate';
 import { AppLayout } from './app/Layout';
+import { SettingsTab } from './app/SettingsView';
 
 export interface RouterCtx {
   slug: string;
@@ -18,6 +22,12 @@ export interface RouterCtx {
 const root = createRootRouteWithContext<RouterCtx>()({ component: Outlet, notFoundComponent: NotFoundPage });
 
 const login = createRoute({ getParentRoute: () => root, path: '/login', component: LoginRoute });
+// A family's application for a seat, before anyone signs in (the school turns it on).
+const apply = createRoute({ getParentRoute: () => root, path: '/apply', component: ApplyRoute });
+// A school form anyone with its link fills, before anyone signs in.
+const formLink = createRoute({ getParentRoute: () => root, path: '/form/$token', component: FormRoute });
+// What a certificate's QR code opens, for anyone.
+const verifyLink = createRoute({ getParentRoute: () => root, path: '/verify/$token', component: VerifyRoute });
 
 /** Everything behind sign-in. Without a session the visitor is sent to /login. */
 const authed = createRoute({
@@ -57,14 +67,25 @@ const authed = createRoute({
 });
 
 // Each page also answers at `<page>/<tab>`: the tabs its module defines (app/tabs.tsx reads which one).
+// Any page's Settings tab (`<page>/settings`) is the one shared settings view, with the page's own title and tabs.
 const page = (path: string, load: () => Promise<Record<string, unknown>>, name: string) => {
   const component = lazyRouteComponent(load as never, name);
   const at = createRoute({ getParentRoute: () => authed, path, component });
-  return path === '/' ? [at] : [at, createRoute({ getParentRoute: () => authed, path: `${path}/$tab`, component })];
+  const Tabbed = () => {
+    const { tab } = useParams({ strict: false }) as { tab?: string };
+    const Page = component;
+    return tab === 'settings' ? <SettingsTab path={path} /> : <Page />;
+  };
+  // The router loads a lazy page before drawing only when it is the route's own component; Tabbed draws it inside, so the
+  // tab route waits for it (otherwise it suspends mid-render and React reports a misuse of use()).
+  return path === '/' ? [at] : [at, createRoute({ getParentRoute: () => authed, path: `${path}/$tab`, component: Tabbed, loader: () => component.preload?.() })];
 };
 
 const routeTree = root.addChildren([
   login,
+  apply,
+  formLink,
+  verifyLink,
   authed.addChildren([
     ...page('/', () => import('./pages/dashboard/DashboardPage'), 'DashboardPage'),
     ...page('/approvals', () => import('./pages/approvals/ApprovalsPage'), 'ApprovalsPage'),
@@ -78,6 +99,7 @@ const routeTree = root.addChildren([
     ...page('/staff', () => import('./pages/staff/StaffPage'), 'StaffPage'),
     ...page('/admissions', () => import('./pages/admissions/AdmissionsPage'), 'AdmissionsPage'),
     ...page('/reports', () => import('./pages/reports/ReportsPage'), 'ReportsPage'),
+    ...page('/forms', () => import('./pages/forms/FormsPage'), 'FormsPage'),
     ...page('/messages', () => import('./pages/messages/MessagesPage'), 'MessagesPage'),
     ...page('/events', () => import('./pages/events/EventsPage'), 'EventsPage'),
     ...page('/profile', () => import('./pages/profile/ProfilePage'), 'ProfilePage'),
@@ -88,6 +110,11 @@ const routeTree = root.addChildren([
     ...page('/transport', () => import('./pages/transport/TransportPage'), 'TransportPage'),
     ...page('/gallery', () => import('./pages/gallery/GalleryPage'), 'GalleryPage'),
     ...page('/year', () => import('./pages/year/YearPage'), 'YearPage'),
+    ...page('/staff-attendance', () => import('./pages/staff-time/StaffTimePage'), 'StaffTimePage'),
+    ...page('/diary', () => import('./pages/diary/DiaryPage'), 'DiaryPage'),
+    ...page('/meetings', () => import('./pages/meetings/MeetingsPage'), 'MeetingsPage'),
+    ...page('/visitors', () => import('./pages/visitors/VisitorsPage'), 'VisitorsPage'),
+    ...page('/certificates', () => import('./pages/certificates/CertificatesPage'), 'CertificatesPage'),
     ...page('/account', () => import('./pages/account/AccountPage'), 'AccountPage'),
     ...page('/design', () => import('./design/DesignPage'), 'DesignPage'),
   ]),

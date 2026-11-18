@@ -1,7 +1,7 @@
 import { Inject, Injectable, Module, type DynamicModule, type OnApplicationShutdown } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { PoolManager, Registry } from '@tangent/tenancy';
-import { AuthController, MeController } from './auth/auth.controller.js';
+import { AuthController, FamilyAccountController, MeController } from './auth/auth.controller.js';
 import { AuthService } from './auth/auth.service.js';
 import { AuthGuard, PermissionsGuard } from './auth/guards.js';
 import { ApiExceptionFilter } from '@tangent/nest-kit';
@@ -27,6 +27,7 @@ import { StudentsService } from './school/students.service.js';
 import { AuditService, Messenger, SettingsService } from './school/support.js';
 import { SweepService } from './school/sweep.service.js';
 import { ChangeRequestsController, ErrorReports, ErrorsController } from './school/errors.js';
+import { I18nController } from './school/i18n.controller.js';
 import { MovingInController, MovingInService } from './school/moving-in.js';
 import { SetupController, SetupService } from './school/setup.js';
 import { TimetableService } from './school/timetable.service.js';
@@ -39,9 +40,17 @@ import { GalleryService } from './school/gallery.service.js';
 import { HooksController } from './school/hooks.controller.js';
 import { HubService } from './school/hub.service.js';
 import { LibraryService } from './school/library.service.js';
+import { FamilyFormsController, FormsController, FormsService } from './school/forms.service.js';
+import { PhotoZipController, PhotoZipService } from './school/photo-zip.js';
+import { ReportSchedules, ReportSchedulesController } from './school/report-schedules.js';
 import { PaymentsService } from './school/payments.service.js';
 import { TransportService } from './school/transport.service.js';
 import { YearService } from './school/year.service.js';
+import { FamilyStaffTimeController, StaffTimeController, StaffTimeService } from './school/staff-time.js';
+import { DiaryController, DiaryService, FamilyDiaryController } from './school/diary.service.js';
+import { FamilyMeetingsController, MeetingsController, MeetingsService } from './school/meetings.service.js';
+import { FamilyVisitorsController, VisitorsController, VisitorsService } from './school/visitors.service.js';
+import { CertificatesController, CertificatesService, FamilyCertificatesController } from './school/certificates.service.js';
 import { POOLS, REGISTRY, TenantGuard, TenantService } from './tenancy/tenant.js';
 
 const OWNS = Symbol('OWNS');
@@ -70,8 +79,11 @@ export class AppModule {
     return {
       module: AppModule,
       controllers: [
+        FamilyAccountController, FormsController, FamilyFormsController, PhotoZipController, ReportSchedulesController,
+        StaffTimeController, FamilyStaffTimeController, DiaryController, FamilyDiaryController, MeetingsController, FamilyMeetingsController, VisitorsController, FamilyVisitorsController,
+        CertificatesController, FamilyCertificatesController,
         AuthController, MeController, ClassesController, StudentsController, AttendanceController, FeesController, ApprovalsController, NoticesController,
-        TimetableController, DashboardController, SettingsController, HealthController, LearningController, PeopleController, OfficeController, FamilyController, ErrorsController, ChangeRequestsController, SetupController, MovingInController,
+        TimetableController, DashboardController, SettingsController, HealthController, LearningController, PeopleController, OfficeController, FamilyController, ErrorsController, I18nController, ChangeRequestsController, SetupController, MovingInController,
         HooksController, FilesController, SchoolLogoController, ChannelsController, FeesOnlineController, ReportCardsController, LibraryController, TransportController, GalleryController, YearController, FamilyCampusController, FinderController,
       ],
       providers: [
@@ -81,7 +93,8 @@ export class AppModule {
         { provide: OWNS, useValue: !shared },
         Shutdown,
         TenantService, AuthService, AuditService, Messenger, SettingsService, StudentsService, AttendanceService, FeesService, ApprovalsService, TimetableService, DashboardService, MetricsService, LearningService, PeopleService, OfficeService, FamilyService, StreamService, ChatService, NoticesService, SweepService, ErrorReports, SetupService, MovingInService,
-        HubService, FilesService, PaymentsService, DocumentsService, LibraryService, TransportService, GalleryService, YearService,
+        HubService, FilesService, PaymentsService, DocumentsService, LibraryService, FormsService, PhotoZipService, ReportSchedules, TransportService, GalleryService, YearService,
+        StaffTimeService, DiaryService, MeetingsService, VisitorsService, CertificatesService,
         // Order matters: find the school, then the person, then what they may do.
         { provide: APP_GUARD, useClass: TenantGuard },
         { provide: APP_GUARD, useClass: AuthGuard },

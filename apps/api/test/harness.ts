@@ -18,7 +18,7 @@ export interface Harness {
   server: DevPostgres;
   registry: pg.Pool;
   slug: string;
-  call: (method: string, url: string, opts?: { token?: string; body?: unknown; school?: string; headers?: Record<string, string>; cookies?: Record<string, string> }) => Promise<{ status: number; json: any; text: string; cookies: Record<string, string>; headers: Record<string, string | string[] | undefined> }>;
+  call: (method: string, url: string, opts?: { token?: string; body?: unknown; school?: string; headers?: Record<string, string>; cookies?: Record<string, string> }) => Promise<{ status: number; json: any; text: string; raw: Buffer; cookies: Record<string, string>; headers: Record<string, string | string[] | undefined> }>;
   login: (identifier?: string, password?: string) => Promise<string>;
   close: () => Promise<void>;
   /** Writes a school's settings straight into its database, as the console does (schools cannot). */
@@ -27,10 +27,12 @@ export interface Harness {
   addSchool: (slug: string, o: { plan: string; data: 'demo' | 'empty'; demoMode?: boolean; status?: string }) => Promise<void>;
   /** Changes a school's entitlement in the registry as the console does (fields given replace the stored ones) and drops the API's cached copy. */
   entitle: (patch: Record<string, unknown>, slug?: string) => Promise<void>;
+  /** Runs one query in a school's own database (for state no route sets, like a family's saved language). */
+  schoolSql: (sql: string, params?: unknown[], slug?: string) => Promise<any[]>;
 }
 
 export async function startHarness(port?: number): Promise<Harness> {
-  const server = await startDevPostgres({ dataDir: path.join(mkdtempSync(path.join(tmpdir(), 'tangent-api-')), 'data'), port, fresh: true });
+  const server = await startDevPostgres({ dataDir: path.join(mkdtempSync(path.join(tmpdir(), 'tangent-api-')), 'data'), port, fresh: true, throwaway: true });
   const regUrl = await ensureDatabase(server.url, 'registry');
   const registry = new pg.Pool({ connectionString: regUrl, max: 4 });
   await migrate(registry, 'registry');
@@ -49,12 +51,14 @@ export async function startHarness(port?: number): Promise<Harness> {
       admin: { name: 'Neha Menon', email: 'neha.menon@greenfield.edu.in', phone: '+91 98220 41200', passwordHash: demoHash },
       modules: plan.modules, data: o.data, demoPasswordHash: demoHash,
     });
-    // No quiet hours unless a test sets them: messages are held in quiet hours, so results would depend on the clock.
-    await pool.query("insert into settings (key, value) values ('notify.quietFrom', '\"00:00\"'), ('notify.quietTo', '\"00:00\"') on conflict (key) do update set value = excluded.value");
+    // No quiet hours unless a test sets them: messages are held in quiet hours, so results would depend on the clock. The
+    // school is open every day for the same reason (AGENTS rule 12: any day of the week must work); a test sets its own week.
+    await pool.query("insert into settings (key, value) values ('notify.quietFrom', '\"00:00\"'), ('notify.quietTo', '\"00:00\"'), ('calendar.weeklyOff', '[]') on conflict (key) do update set value = excluded.value");
     await pool.end();
     await registry.query(
-      `insert into schools (id, slug, name, short_name, color, logo_text, status, plan, cell, target, region, db_url_sealed, db_name, entitlement, contact, demo)
-       values ($1,$2,'Greenfield International School','Greenfield','#6A4CF5','G',$3,$4,'local-1','local','local',$5,$6,$7,$8,$9)`,
+      // The demo school is in India: its phones, clock and money are India's (a school without a country starts neutral).
+      `insert into schools (id, slug, name, short_name, color, logo_text, status, plan, cell, target, region, db_url_sealed, db_name, entitlement, contact, demo, country, timezone, locale, currency)
+       values ($1,$2,'Greenfield International School','Greenfield','#6A4CF5','G',$3,$4,'local-1','local','local',$5,$6,$7,$8,$9,'IN','Asia/Kolkata','en-IN','INR')`,
       [newId('sch'), slug, o.status ?? 'live', o.plan, seal(url, SECRET), dbName, JSON.stringify({ modules: plan.modules, limits: plan.limits, locks: [], overrides: {}, version: 1 }), JSON.stringify({ name: 'Neha', phone: '1', email: 'a@b.c' }), o.demoMode ?? true]);
   };
 
@@ -87,13 +91,18 @@ export async function startHarness(port?: number): Promise<Harness> {
       const eq = pair.indexOf('=');
       if (eq > 0 && !cookies[pair.slice(0, eq)]) cookies[pair.slice(0, eq)] = decodeURIComponent(pair.slice(eq + 1));
     }
-    return { status: res.statusCode, json, text: res.body, cookies, headers: res.headers as Record<string, string | string[] | undefined> };
+    return { status: res.statusCode, json, text: res.body, raw: res.rawPayload, cookies, headers: res.headers as Record<string, string | string[] | undefined> };
   };
   const login = async (identifier = 'neha.menon@greenfield.edu.in', password = 'nest2026') => {
     const step1 = await call('POST', '/v1/auth/login', { body: { identifier, password } });
     if (step1.json.step === 'done') return step1.json.tokens.accessToken as string;
     const step2 = await call('POST', '/v1/auth/verify', { body: { challengeId: step1.json.challenge.challengeId, code: '424242' } });
     return step2.json.accessToken as string;
+  };
+  const schoolSql: Harness['schoolSql'] = async (sql, params = [], school = slug) => {
+    const dbName = (await registry.query<{ db_name: string }>('select db_name from schools where slug = $1', [school])).rows[0]!.db_name;
+    const pool = new pg.Pool({ connectionString: await ensureDatabase(server.url, dbName), max: 1 });
+    try { return (await pool.query(sql, params)).rows; } finally { await pool.end(); }
   };
   const setSettings: Harness['setSettings'] = async (changes, school = slug) => {
     const dbName = (await registry.query<{ db_name: string }>('select db_name from schools where slug = $1', [school])).rows[0]!.db_name;
@@ -114,7 +123,7 @@ export async function startHarness(port?: number): Promise<Harness> {
     app.get<{ invalidate: (s?: string) => void }>(REGISTRY).invalidate(school);
   };
   return {
-    app, server, registry, slug, call, login, addSchool, setSettings, setDemo, entitle,
+    app, server, registry, slug, call, login, addSchool, setSettings, setDemo, entitle, schoolSql,
     close: async () => { await app.close(); await registry.end(); await server.stop(); },
   };
 }

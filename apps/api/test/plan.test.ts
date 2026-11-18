@@ -1,6 +1,6 @@
 import { RequestMethod } from '@nestjs/common';
 import { featureByKey, moduleByKey } from '@tangent/config-engine';
-import { istToday } from '@tangent/contracts';
+import { schoolToday } from '@tangent/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module.js';
 import { startHarness, type Harness } from './harness.js';
@@ -77,7 +77,7 @@ describe('a school gets only what it has', () => {
     expect((await h.call('GET', '/v1/fees/summary', { token })).status).toBe(200);
     expect((await h.call('GET', '/v1/config', { token })).json.features).toEqual(expect.arrayContaining(['fees.reminders', 'attendance.teacherApp']));
     // A message that belongs to a feature the school does not have is never sent.
-    const date = istToday();
+    const date = schoolToday();
     const day = (await h.call('GET', `/v1/attendance/day?classId=cls_7a&date=${date}`, { token })).json;
     const before = (await h.registry.query("select count(*)::int n from sandbox_messages where body like '%marked absent%'")).rows[0].n;
     const marks = day.marks.map((m: { studentId: string }, i: number) => ({ studentId: m.studentId, status: i === 0 ? 'absent' : 'present' }));

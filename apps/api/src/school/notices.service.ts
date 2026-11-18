@@ -1,27 +1,41 @@
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { enqueue, newId, type Job } from '@tangent/db';
-import type { NoticeCreate, NoticeRow } from '@tangent/contracts';
+import type { NoticeCreate, NoticeRow, NoticeTargets } from '@tangent/contracts';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import { TenantService, type TenantCtx } from '../tenancy/tenant.js';
 import { FilesService } from './files.service.js';
 import { HubService } from './hub.service.js';
 import { StreamService } from './stream.service.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
+import { fmtDate, tx } from '@tangent/contracts';
 
 type User = { id: string; name: string; permissions: readonly string[] };
 type Row = {
-  id: string; title: string; body: string; audience: string; class_id: string | null; class_name: string | null; category: string; pinned: boolean; needs_ack: boolean;
+  id: string; title: string; body: string; audience: string; class_id: string | null; class_name: string | null; category: string; pinned: boolean; needs_ack: boolean; targets: NoticeTargets | null;
   status: 'draft' | 'pending' | 'published'; author: string | null; author_id: string | null; published_at: Date | null; publish_at: Date | null; edited_at: Date | null; created_at: Date;
 };
 
+/**
+ * Whether student `s` is one a notice is for: its one class, and any of its targets (classes, year groups, houses; none of a
+ * kind: every one). `c` and `g` are the notice's class and targets, as columns or parameters.
+ */
+const forStudent = (c: string, g: string) => `(${c} is null or s.class_id = ${c})
+  and (coalesce(jsonb_array_length(${g}->'classes'), 0) = 0 or s.class_id in (select jsonb_array_elements_text(${g}->'classes')))
+  and (coalesce(jsonb_array_length(${g}->'grades'), 0) = 0 or (select cl.grade::text from classes cl where cl.id = s.class_id) in (select jsonb_array_elements_text(${g}->'grades')))
+  and (coalesce(jsonb_array_length(${g}->'houses'), 0) = 0 or lower(coalesce(s.house, '')) in (select lower(jsonb_array_elements_text(${g}->'houses'))))`;
+/** A notice aimed at some students' classes, years or houses does not go to staff; staff can be narrowed to some roles. */
+const forStaff = (c: string, g: string) => `${c} is null and coalesce(jsonb_array_length(${g}->'classes'), 0) = 0 and coalesce(jsonb_array_length(${g}->'grades'), 0) = 0
+  and coalesce(jsonb_array_length(${g}->'houses'), 0) = 0
+  and (coalesce(jsonb_array_length(${g}->'roles'), 0) = 0 or exists (select 1 from user_roles ur join roles ro on ro.id = ur.role_id where ur.user_id = u.id and ro.key in (select jsonb_array_elements_text(${g}->'roles'))))`;
+
 /** The people a notice reaches, as SQL over users (parents, students, staff), for counts and messages alike. */
-const REACH = `
+const reachSql = (a = 'n.audience', c = 'n.class_id', g = 'n.targets') => `
   select distinct u.id, u.phone from users u
   where u.status = 'active' and (
-    (n.audience in ('everyone','parents','class') and u.id in (select g.user_id from guardians g join student_guardians sg on sg.guardian_id = g.id join students s on s.id = sg.student_id
-      where s.status = 'active' and (n.class_id is null or s.class_id = n.class_id)))
-    or (n.audience in ('everyone','students','class') and u.id in (select s.user_id from students s where s.status = 'active' and (n.class_id is null or s.class_id = n.class_id)))
-    or (n.audience in ('everyone','staff') and n.class_id is null and u.kind = 'staff'))`;
+    (${a} in ('everyone','parents','class') and u.id in (select g.user_id from guardians g join student_guardians sg on sg.guardian_id = g.id join students s on s.id = sg.student_id
+      where s.status = 'active' and ${forStudent(c, g)}))
+    or (${a} in ('everyone','students','class') and u.id in (select s.user_id from students s where s.status = 'active' and ${forStudent(c, g)}))
+    or (${a} in ('everyone','staff') and u.kind = 'staff' and ${forStaff(c, g)}))`;
 
 /**
  * Notices from the office and from teachers: written, scheduled, approved where the school asks, published, corrected and taken
@@ -52,14 +66,14 @@ export class NoticesService implements OnModuleInit {
     const [files, reach] = await Promise.all([
       this.files.list(t, 'notice_attachment', ids),
       t.pool.query<{ id: string; audience: string; read: string; acked: string }>(
-        `select n.id, (select count(*) from (${REACH}) x) audience,
+        `select n.id, (select count(*) from (${reachSql()}) x) audience,
            (select count(*) from notice_reads r where r.notice_id = n.id) read, (select count(*) from notice_reads r where r.notice_id = n.id and r.acked_at is not null) acked
          from notices n where n.id = any($1) and n.status = 'published'`, [ids]),
     ]);
     return rows.map((r) => {
       const c = reach.rows.find((x) => x.id === r.id);
       return {
-        id: r.id, title: r.title, body: r.body, audience: r.audience, classId: r.class_id, className: r.class_name, category: r.category, pinned: r.pinned, needsAck: r.needs_ack,
+        id: r.id, title: r.title, body: r.body, audience: r.audience, classId: r.class_id, className: r.class_name, targets: r.targets ?? {}, category: r.category, pinned: r.pinned, needsAck: r.needs_ack,
         status: r.status !== 'published' && r.publish_at ? 'scheduled' : r.status, author: r.author ?? 'School office', authorId: r.author_id,
         publishedAt: r.published_at?.toISOString() ?? null, publishAt: r.publish_at?.toISOString() ?? null, editedAt: r.edited_at?.toISOString() ?? null, createdAt: r.created_at.toISOString(),
         files: files.filter((f) => f.ownerId === r.id && f.status === 'clean').map((f) => ({ id: f.id, name: f.name, mime: f.mime })),
@@ -82,6 +96,26 @@ export class NoticesService implements OnModuleInit {
       const teaches = await t.pool.query('select 1 from classes c where c.id = $1 and (c.class_teacher_id = $2 or exists (select 1 from timetable_slots s where s.class_id = c.id and s.teacher_id = $2))', [b.classId, user.id]);
       if (!teaches.rowCount) throw forbidden('You can write to the classes you teach.');
     }
+    // Targets narrow who it reaches; only someone who publishes to the school uses them, and each must be one the school has.
+    const g = b.targets ?? {};
+    const any = (g.classes?.length ?? 0) + (g.grades?.length ?? 0) + (g.houses?.length ?? 0) + (g.roles?.length ?? 0) > 0;
+    if (any && !user.permissions.includes('notices.publish')) throw forbidden(tx('Only someone allowed to publish notices can choose year groups, houses or roles.'));
+    if (g.classes?.length && (await t.pool.query<{ n: string }>('select count(*) n from classes where id = any($1)', [g.classes])).rows[0]!.n !== String(new Set(g.classes).size)) {
+      throw new ApiError('validation', tx('Choose classes from the list.'), { fields: { targets: tx('Choose from the list.') } });
+    }
+    if (g.grades?.length) {
+      const have = new Set((await t.pool.query<{ grade: number }>('select distinct grade from classes')).rows.map((r) => r.grade));
+      if (g.grades.some((x) => !have.has(x))) throw new ApiError('validation', tx('Choose year groups the school has.'), { fields: { targets: tx('Choose from the list.') } });
+    }
+    if (g.houses?.length) {
+      const houses = (await this.settings.value<{ name: string }[]>(t, 'people.houses', [])).map((h) => h.name.toLowerCase());
+      if (g.houses.some((x) => !houses.includes(x.toLowerCase()))) throw new ApiError('validation', tx('Choose the school’s houses.'), { fields: { targets: tx('Choose from the list.') } });
+    }
+    if (g.roles?.length) {
+      if (b.audience !== 'staff' && b.audience !== 'everyone') throw new ApiError('validation', tx('Roles are for notices to staff.'), { fields: { targets: tx('Only for staff.') } });
+      const keys = new Set((await t.pool.query<{ key: string }>('select key from roles')).rows.map((r) => r.key));
+      if (g.roles.some((x) => !keys.has(x))) throw new ApiError('validation', tx('Choose the school’s roles.'), { fields: { targets: tx('Choose from the list.') } });
+    }
     const cats = await this.settings.value<{ key: string }[]>(t, 'notices.categories', []);
     if (cats.length && !cats.some((c) => c.key === b.category)) throw new ApiError('validation', 'Choose one of the school’s categories.', { fields: { category: 'Choose a category.' } });
     if (b.publishAt && new Date(b.publishAt) <= new Date()) throw new ApiError('validation', 'Choose a time that has not passed yet.', { fields: { publishAt: 'That time has passed.' } });
@@ -96,12 +130,12 @@ export class NoticesService implements OnModuleInit {
     const now = b.publish && !b.publishAt && !needsApproval;
     const status = !wantsOut ? 'draft' : needsApproval ? 'pending' : now ? 'published' : 'draft';
     await t.pool.query(
-      'insert into notices (id, title, body, audience, class_id, status, author_id, published_at, category, pinned, needs_ack, publish_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
-      [id, b.title, b.body, b.audience, b.audience === 'class' ? b.classId : null, status, user.id, now ? new Date() : null, b.category, b.pinned, b.needsAck, b.publishAt ?? null]);
+      'insert into notices (id, title, body, audience, class_id, status, author_id, published_at, category, pinned, needs_ack, publish_at, targets) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
+      [id, b.title, b.body, b.audience, b.audience === 'class' ? b.classId : null, status, user.id, now ? new Date() : null, b.category, b.pinned, b.needsAck, b.publishAt ?? null, JSON.stringify(b.targets ?? {})]);
     await this.attach(t, id, b.fileIds);
     if (status === 'pending') {
       await t.pool.query("insert into approvals (id, kind, title, subtitle, requester_name, requested_by, subject_ref, payload) values ($1,'notice',$2,$3,$4,$5,$6,$7)",
-        [newId('apr'), b.title, `Written by ${user.name}${b.publishAt ? `, to go out ${new Date(b.publishAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}` : ''}`, user.name, user.id, id, JSON.stringify({ noticeId: id })]);
+        [newId('apr'), b.title, `Written by ${user.name}${b.publishAt ? `, to go out ${fmtDate(b.publishAt, 'stamp')}` : ''}`, user.name, user.id, id, JSON.stringify({ noticeId: id })]);
     }
     if (b.publishAt && !needsApproval) await enqueue(this.hubs.hub.o.pool as never, 'notices.publish', t.info.id, { noticeId: id }, new Date(b.publishAt));
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: `notice.${b.publishAt && status === 'draft' ? 'scheduled' : status}`, entity: 'notice', entityId: id, detail: { title: b.title } });
@@ -126,8 +160,8 @@ export class NoticesService implements OnModuleInit {
     const n = await this.own(t, user, id);
     await this.check(t, user, { ...b, publishAt: n.status === 'published' ? null : b.publishAt });
     await t.pool.query(
-      'update notices set title = $2, body = $3, audience = $4, class_id = $5, category = $6, pinned = $7, needs_ack = $8, publish_at = $9, edited_at = case when status = $10 then now() else edited_at end where id = $1',
-      [id, b.title, b.body, b.audience, b.audience === 'class' ? b.classId : null, b.category, b.pinned, b.needsAck, n.status === 'published' ? null : b.publishAt ?? null, 'published']);
+      'update notices set title = $2, body = $3, audience = $4, class_id = $5, category = $6, pinned = $7, needs_ack = $8, publish_at = $9, edited_at = case when status = $10 then now() else edited_at end, targets = $11 where id = $1',
+      [id, b.title, b.body, b.audience, b.audience === 'class' ? b.classId : null, b.category, b.pinned, b.needsAck, n.status === 'published' ? null : b.publishAt ?? null, 'published', JSON.stringify(b.targets ?? {})]);
     await this.attach(t, id, b.fileIds);
     if (n.status !== 'published' && b.publishAt) await enqueue(this.hubs.hub.o.pool as never, 'notices.publish', t.info.id, { noticeId: id }, new Date(b.publishAt));
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'notice.edited', entity: 'notice', entityId: id, detail: { title: b.title } });
@@ -169,19 +203,22 @@ export class NoticesService implements OnModuleInit {
   }
 
   async announce(t: TenantCtx, id: string): Promise<void> {
-    const n = (await t.pool.query<{ title: string; audience: string; class_id: string | null }>("select title, audience, class_id from notices where id = $1 and status = 'published' and deleted_at is null", [id])).rows[0];
+    const n = (await t.pool.query<{ title: string; audience: string; class_id: string | null; targets: unknown }>("select title, audience, class_id, targets from notices where id = $1 and status = 'published' and deleted_at is null", [id])).rows[0];
     if (!n) return;
-    const people = (await t.pool.query<{ id: string; phone: string | null }>(`select * from (${REACH}) x`.replace(/\bn\.(audience|class_id)\b/g, (_m, k: string) => (k === 'audience' ? '$1::text' : '$2::text')), [n.audience, n.class_id])).rows;
+    const people = (await t.pool.query<{ id: string; phone: string | null }>(`select * from (${reachSql('$1::text', '$2::text', '$3::jsonb')}) x`, [n.audience, n.class_id, JSON.stringify(n.targets ?? {})])).rows;
     await this.messenger.notify(t, 'notice.published', people.filter((p) => p.phone).map((p) => ({ to: p.phone!, vars: { title: n.title } })));
     await this.stream.emit(t, people.map((p) => p.id), { type: 'notification', data: { notice: id } });
   }
 
   // The app: what a person reads, marks read and acknowledges.
 
-  async forReader(t: TenantCtx, userId: string, classIds: string[], kind: 'staff' | 'guardian' | 'student'): Promise<(NoticeRow & { read: boolean; acked: boolean })[]> {
+  async forReader(t: TenantCtx, userId: string, studentIds: string[], kind: 'staff' | 'guardian' | 'student'): Promise<(NoticeRow & { read: boolean; acked: boolean })[]> {
     const audiences = kind === 'staff' ? ['everyone', 'staff'] : kind === 'student' ? ['everyone', 'students', 'class'] : ['everyone', 'parents', 'class'];
-    const list = (await this.rows(t, "and n.status = 'published' and n.audience = any($1) and (n.class_id is null or n.class_id = any($2))", [audiences, classIds]))
-      .filter((n) => kind !== 'staff' || n.audience !== 'class');
+    // A family or student reads a notice that is for one of their children (its classes, years, houses); staff, one for their roles.
+    const who = kind === 'staff'
+      ? `$3::text[] is not null and exists (select 1 from users u where u.id = $2 and ${forStaff('n.class_id', 'n.targets')})`
+      : `$2::text is not null and exists (select 1 from students s where s.id = any($3::text[]) and ${forStudent('n.class_id', 'n.targets')})`;
+    const list = await this.rows(t, `and n.status = 'published' and n.audience = any($1) and ${who}`, [audiences, userId, studentIds]);
     const reads = (await t.pool.query<{ notice_id: string; acked_at: Date | null }>('select notice_id, acked_at from notice_reads where user_id = $1 and notice_id = any($2)', [userId, list.map((n) => n.id)])).rows;
     return list.map((n) => ({ ...n, read: reads.some((r) => r.notice_id === n.id), acked: reads.some((r) => r.notice_id === n.id && r.acked_at) }));
   }
@@ -194,10 +231,9 @@ export class NoticesService implements OnModuleInit {
 
   /** For the office: the people a notice that asks for acknowledgement has not been acknowledged by yet. */
   async notAcked(t: TenantCtx, id: string): Promise<{ id: string; name: string; phone: string | null }[]> {
-    const n = (await t.pool.query<{ audience: string; class_id: string | null }>('select audience, class_id from notices where id = $1', [id])).rows[0];
+    const n = (await t.pool.query<{ audience: string; class_id: string | null; targets: unknown }>('select audience, class_id, targets from notices where id = $1', [id])).rows[0];
     if (!n) throw notFound('That notice');
-    const sql = `select u.id, u.name, u.phone from users u where u.id in (select x.id from (${REACH}) x) and u.id not in (select user_id from notice_reads where notice_id = $3 and acked_at is not null) order by u.name`
-      .replace(/\bn\.(audience|class_id)\b/g, (_m, k: string) => (k === 'audience' ? '$1::text' : '$2::text'));
-    return (await t.pool.query(sql, [n.audience, n.class_id, id])).rows;
+    const sql = `select u.id, u.name, u.phone from users u where u.id in (select x.id from (${reachSql('$1::text', '$2::text', '$4::jsonb')}) x) and u.id not in (select user_id from notice_reads where notice_id = $3 and acked_at is not null) order by u.name`;
+    return (await t.pool.query(sql, [n.audience, n.class_id, id, JSON.stringify(n.targets ?? {})])).rows;
   }
 }

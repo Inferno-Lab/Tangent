@@ -22,7 +22,7 @@ beforeAll(async () => {
   const inbox = async (to: string, re: RegExp) => re.exec((await h.registry.query("select body from sandbox_messages where school_slug = 'moveschool' and to_addr = $1 order by created_at desc limit 1", [to])).rows[0].body)![1]!;
   const password = await inbox('asha@moveschool.test', /temporary password (\S+)\./);
   const a = await h.s('POST', '/v1/auth/login', { school: 'moveschool', body: { identifier: 'asha@moveschool.test', password } });
-  school = (await h.s('POST', '/v1/auth/verify', { school: 'moveschool', body: { challengeId: a.json.challenge.challengeId, code: await inbox('+91 90000 22222', /(\d{6})/) } })).json.accessToken;
+  school = (await h.s('POST', '/v1/auth/verify', { school: 'moveschool', body: { challengeId: a.json.challenge.challengeId, code: await inbox('+919000022222', /(\d{6})/) } })).json.accessToken;
 }, 240_000);
 afterAll(async () => {
   await h?.close();
@@ -84,6 +84,20 @@ describe('the Migration workspace', () => {
     expect((await view()).uploads.find((u: any) => u.id === file.id).status).toBe('new');
   }, 60_000);
 
+  it('runs a big import in the background, one at a time, and shows its result', async () => {
+    const day = (i: number) => new Date(Date.UTC(2040, 0, 1) + i * 86_400_000).toISOString().slice(0, 10);
+    const csv = ['name,starts_on', ...Array.from({ length: 2100 }, (_, i) => `Closed day ${i},${day(i)}`)].join('\n');
+    const r = await post('/commit', { kind: 'holidays', csv, fileName: 'many-holidays.csv' });
+    expect(r.json.run).toMatchObject({ kind: 'holidays', rows: 2100, status: 'running' });
+    expect((await post('/commit', { kind: 'holidays', csv, fileName: 'again.csv' })).status).toBe(409);
+    let run: any;
+    for (let i = 0; i < 300; i++) {
+      run = (await view()).runs.find((x: any) => x.id === r.json.run.id);
+      if (run.status !== 'running') break;
+      await new Promise((ok) => setTimeout(ok, 200));
+    }
+    expect(run).toMatchObject({ status: 'done', created: 2100, skipped: 0 });
+  }, 120_000);
   it('refuses to take a school past its plan’s student limit', async () => {
     const { students, studentLimit } = await view();
     const rows = Array.from({ length: studentLimit - students + 1 }, (_, i) => `X/${i},Child ${i},1 A,2019-01-01,Parent ${i},9876${String(i).padStart(6, '0')}`).join('\n');

@@ -47,6 +47,8 @@ export interface Http {
   text(path: string, query?: Query): Promise<string>;
   /** A file to save, such as a ZIP export. */
   blob(path: string, query?: Query): Promise<Blob>;
+  /** A file made from what is sent (a preview of a document being edited). */
+  postBlob(path: string, body: unknown): Promise<Blob>;
   /** Reload the access token from the refresh cookie after a page load. */
   restore(): Promise<boolean>;
 }
@@ -112,6 +114,8 @@ export function createHttp(opts: HttpOptions): Http {
     const headers: Record<string, string> = {
       ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
       ...(token && !path.includes('/auth/login') && !path.includes('/auth/verify') && !path.includes('/auth/refresh') ? { authorization: `Bearer ${token}` } : {}),
+      // The reader's language (web-ui i18n sets it on <html>), so the server answers in it.
+      ...(typeof document !== 'undefined' && document.documentElement?.lang ? { 'accept-language': document.documentElement.lang } : {}),
       ...opts.headers?.(),
     };
     if (opts.cookieRefresh && (path.includes('/auth/refresh') || path.includes('/auth/logout'))) {
@@ -167,6 +171,7 @@ export function createHttp(opts: HttpOptions): Http {
     del: (path) => json('DELETE', path),
     text: async (path, query) => (await send('GET', path, undefined, query, true)).text(),
     blob: async (path, query) => (await send('GET', path, undefined, query, true)).blob(),
+    postBlob: async (path, body) => (await send('POST', path, body, undefined, true)).blob(),
     restore: () => (access ? Promise.resolve(true) : refresh()),
   };
 }

@@ -5,9 +5,11 @@ import { FilesService } from './files.service.js';
 import { LearningService } from './learning.service.js';
 import { pdf, type PdfLine } from './pdf.js';
 import { SettingsService } from './support.js';
+import { DEFAULT_TEMPLATES, gradeIn, pctOfGrade, schoolToday, fmtDate, fmtMoney, fmtNumber, readReceiptTax, tx, type Block, type DocKind, type DocTemplate, type DocTemplates } from '@tangent/contracts';
+import { schoolContext } from '@tangent/tenancy';
 
-const rupees = (n: number) => `₹${n.toLocaleString('en-IN')}`;
-const date = (d: string) => new Date(`${d}T00:00:00+05:30`).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' });
+// A receipt or report card is written in the school's own way: its currency, its dates.
+const date = (d: string) => fmtDate(d, 'long');
 
 /** Printable receipts and report cards, made on request (nothing to keep in sync): the school's header, then the facts. */
 @Injectable()
@@ -18,7 +20,7 @@ export class DocumentsService {
     private readonly files: FilesService,
   ) {}
 
-  private async header(t: TenantCtx, title: string): Promise<PdfLine[]> {
+  private async header(t: TenantCtx): Promise<PdfLine[]> {
     const v = (await this.settings.doc(t)).values;
     const address = [v['school.address'], v['school.place']].filter(Boolean).map(String).join(', ');
     return [
@@ -27,64 +29,121 @@ export class DocumentsService {
       ...(v['school.phone'] || v['school.email'] ? [{ text: [v['school.phone'], v['school.email']].filter(Boolean).join(' · '), size: 10 }] : []),
       ...(v['fees.receiptNote'] ? String(v['fees.receiptNote']).split('\n').map((l) => ({ text: l, size: 9 })) : []),
       { text: '', rule: true, gap: 14 },
-      { text: title, size: 14, bold: true, gap: 26 },
     ];
   }
 
+  /**
+   * A document from its template (§3.6.2): the school's own for this kind, or `draft` (a preview of one being edited), else
+   * the starter layout. Words of the starter layout come from the catalogue; the school's own come in the reader's language
+   * where it wrote them. `items` is the document's own lines.
+   */
+  async render(t: TenantCtx, kind: DocKind, fill: Record<string, string>, items: PdfLine[], draft?: DocTemplate, extra: { photo?: Buffer | null; qr?: string } = {}): Promise<{ data: Buffer }> {
+    const own = draft ?? (await this.settings.value<DocTemplates>(t, 'documents.templates', {}))[kind];
+    const tpl = own ?? DEFAULT_TEMPLATES[kind];
+    const lang = schoolContext.getStore()?.lang ?? 'en';
+    const say = (b: Block, field: 'text' | 'value') => tx(b.names?.[lang]?.[field] || b[field] || '', fill);
+    const lines: PdfLine[] = [];
+    for (const b of tpl.blocks) {
+      if (b.when && ['', '0', 'none'].includes(fill[b.when] ?? '')) continue;
+      const style = { size: b.size, bold: b.bold, align: b.align };
+      if (b.kind === 'school') lines.push(...(await this.header(t)));
+      else if (b.kind === 'heading') lines.push({ text: say(b, 'text'), size: b.size ?? 14, bold: b.bold ?? true, gap: 26, align: b.align });
+      else if (b.kind === 'text') lines.push({ text: say(b, 'text'), ...style });
+      else if (b.kind === 'fact') lines.push({ text: say(b, 'text'), right: say(b, 'value'), ...style });
+      else if (b.kind === 'items') lines.push(...items);
+      else if (b.kind === 'rule') lines.push({ text: '', rule: true, gap: 18 });
+      else if (b.kind === 'gap') lines.push({ text: '', gap: (b.size ?? 12) * 2 });
+      else if (b.kind === 'pageBreak') lines.push({ text: '', page: true });
+      else if (b.kind === 'photo') { if (extra.photo) lines.push({ text: '', image: extra.photo }); }
+      else if (b.kind === 'qr') { if (extra.qr) lines.push({ text: '', qr: extra.qr }); }
+      else if (b.kind === 'signatures') {
+        // Two places to sign a row, under room to sign.
+        const names = say(b, 'value').split('\n').map((x) => x.trim()).filter(Boolean);
+        for (let i = 0; i < names.length; i += 2) lines.push({ text: names[i]!, right: names[i + 1], gap: 60, ...style });
+      }
+    }
+    return { data: await pdf(lines, { logo: await this.files.logoBytes(t), size: tpl.size }) };
+  }
+
   /** A receipt for one payment; `students` limits it to a family's own children. */
-  async receipt(t: TenantCtx, paymentId: string, students: string[] | null): Promise<{ name: string; data: Buffer }> {
+  async receipt(t: TenantCtx, paymentId: string, students: string[] | null, draft?: DocTemplate): Promise<{ name: string; data: Buffer }> {
     const p = (await t.pool.query<{ receipt_no: string; amount: number; refunded: number; method: string; reference: string | null; paid_on: string; title: string; student: string; student_id: string; admission_no: string; class: string; tax: Record<string, any> | null; cancelled_at: Date | null; cancel_reason: string }>(
       `select p.receipt_no, p.amount, p.refunded, p.method, p.reference, p.paid_on::text, i.title, s.name student, s.id student_id, s.admission_no, c.name class, p.tax, p.cancelled_at, p.cancel_reason
        from payments p join fee_invoices i on i.id = p.invoice_id join students s on s.id = i.student_id join classes c on c.id = s.class_id where p.id = $1`, [paymentId])).rows[0];
     if (!p || (students && !students.includes(p.student_id))) throw notFound('That receipt');
-    const lines: PdfLine[] = [
-      ...(await this.header(t, p.tax ? 'Tax receipt' : 'Fee receipt')),
-      { text: 'Receipt number', right: p.receipt_no },
-      { text: 'Date', right: date(p.paid_on) },
-      { text: 'Student', right: `${p.student} (${p.admission_no})` },
-      { text: 'Class', right: p.class },
-      { text: '', rule: true, gap: 18 },
-      { text: p.title, right: rupees(p.amount), bold: true, gap: 22 },
-    ];
-    if (p.tax) {
-      lines.push({ text: `Taxable value (SAC ${p.tax.sac})`, right: rupees(p.tax.taxable), size: 10 });
-      lines.push({ text: `CGST ${p.tax.ratePct / 2}%`, right: rupees(p.tax.cgst), size: 10 }, { text: `SGST ${p.tax.ratePct / 2}%`, right: rupees(p.tax.sgst), size: 10 });
-      lines.push({ text: `GSTIN ${p.tax.gstin}`, size: 10 });
+    const lines: PdfLine[] = [{ text: p.title, right: fmtMoney(p.amount), bold: true, gap: 22 }];
+    const methods = await this.settings.value<{ key: string; name: string }[]>(t, 'fees.paymentMethods', []);
+    const tax = readReceiptTax(p.tax);
+    if (tax) {
+      lines.push({ text: tax.code ? tx('Taxable value ({codeLabel} {code})', { codeLabel: tax.codeLabel, code: tax.code }) : tx('Taxable value'), right: fmtMoney(tax.taxable), size: 10 });
+      for (const part of tax.parts) lines.push({ text: `${part.name} ${fmtNumber(part.pct)}%`, right: fmtMoney(part.amount), size: 10 });
+      lines.push({ text: `${tax.numberLabel} ${tax.number}`, size: 10 });
     }
-    if (p.cancelled_at) lines.push({ text: `Cancelled on ${date(p.cancelled_at.toISOString().slice(0, 10))}: ${p.cancel_reason}`, bold: true, size: 10 });
-    else if (p.refunded) lines.push({ text: 'Refunded', right: `- ${rupees(p.refunded)}`, size: 10 });
-    lines.push({ text: '', rule: true, gap: 18 }, { text: 'Paid by', right: `${p.method.toUpperCase()}${p.reference ? ` · ${p.reference}` : ''}`, size: 10 },
-      { text: 'This receipt was made by Tangent and needs no signature.', size: 9, gap: 40 });
-    return { name: `${p.receipt_no}.pdf`, data: await pdf(lines, { logo: await this.files.logoBytes(t) }) };
+    if (p.cancelled_at) lines.push({ text: tx('Cancelled on {day}: {reason}', { day: date(p.cancelled_at.toISOString().slice(0, 10)), reason: p.cancel_reason }), bold: true, size: 10 });
+    else if (p.refunded) lines.push({ text: tx('Refunded'), right: `- ${fmtMoney(p.refunded)}`, size: 10 });
+    const method = `${methods.find((m) => m.key === p.method)?.name ?? p.method}${p.reference ? ` · ${p.reference}` : ''}`;
+    const fill = { school: String((await this.settings.doc(t)).values['school.name'] ?? t.info.name), student: p.student, class: p.class, admissionNo: p.admission_no, receiptNo: p.receipt_no,
+      date: date(p.paid_on), title: p.title, amount: fmtMoney(p.amount), method, reference: p.reference ?? '', taxName: tax?.name ?? 'none', taxNumber: tax?.number ?? '' };
+    return { name: `${p.receipt_no}.pdf`, ...(await this.render(t, 'receipt', fill, lines, draft)) };
+  }
+
+  /**
+   * A template being edited, printed with the school's latest receipt or published result, or with sample values while it has
+   * none, so the school sees its layout before it saves it.
+   */
+  async preview(t: TenantCtx, kind: DocKind, draft: DocTemplate): Promise<{ name: string; data: Buffer }> {
+    if (kind === 'receipt') {
+      const id = (await t.pool.query<{ id: string }>('select id from payments order by created_at desc limit 1')).rows[0]?.id;
+      if (id) return this.receipt(t, id, null, draft);
+    } else if (kind === 'reportCard') {
+      const r = (await t.pool.query<{ exam: string; student: string }>(
+        "select e.id exam, m.student_id student from exams e join exam_marks m on m.exam_id = e.id where e.status = 'published' order by e.published_at desc nulls last, m.student_id limit 1")).rows[0];
+      if (r) return this.reportCard(t, r.exam, r.student, null, draft);
+    }
+    const school = String((await this.settings.doc(t)).values['school.name'] ?? t.info.name);
+    const fill: Record<string, string> = {
+      school, student: 'Alex Morgan', class: '5 A', admissionNo: '2026/0001', rollNo: '12', receiptNo: 'RCPT-2026-00001', date: date(schoolToday()), title: tx('Tuition, first term'),
+      amount: fmtMoney(1000), method: tx('Cash'), reference: '', taxName: 'none', taxNumber: '', exam: tx('Mid-term exams'), percent: '82', grade: 'A', gpa: '', result: tx('Passed'), rank: '', classSize: '30', remark: tx('Works carefully and asks good questions.'),
+      ...(kind === 'certificate' ? { title: tx('Enrolment certificate') } : {}), number: 'CERT-2026-0001', body: tx('This is to certify that Alex Morgan, admission number 2026/0001, is a student of 5 A this year.'),
+      name: 'Alex Morgan', role: tx('Student'), bloodGroup: 'O+', phone: '', validUntil: date(schoolToday()), purpose: tx('Meeting a member of staff'), host: 'Sam Lee', time: '10:30',
+      reason: tx('Unwell'), collector: tx('Mother'), approvedBy: tx('Class teacher'),
+    };
+    const items: PdfLine[] = kind === 'receipt' ? [{ text: fill.title!, right: fill.amount, bold: true, gap: 22 }]
+      : kind === 'reportCard' ? [{ text: tx('Subject'), right: tx('Marks · grade'), bold: true, gap: 22 }, { text: tx('Mathematics'), right: '82 / 100 · A' }, { text: tx('Science'), right: '78 / 100 · B' }] : [];
+    return { name: 'preview.pdf', ...(await this.render(t, kind, fill, items, draft, { qr: 'https://example.org/verify' })) };
   }
 
   /** A report card for one student in one published exam. */
-  async reportCard(t: TenantCtx, examId: string, studentId: string, students: string[] | null): Promise<{ name: string; data: Buffer }> {
+  async reportCard(t: TenantCtx, examId: string, studentId: string, students: string[] | null, draft?: DocTemplate): Promise<{ name: string; data: Buffer }> {
     if (students && !students.includes(studentId)) throw notFound('That report card');
     const res = await this.learning.results(t, examId);
     const row = res.rows.find((r) => r.studentId === studentId);
     if (!row || (students && res.exam.status !== 'published')) throw notFound('That report card');
-    const s = (await t.pool.query<{ name: string; admission_no: string; class: string; roll_no: string }>(
-      'select s.name, s.admission_no, c.name class, s.roll_no from students s join classes c on c.id = s.class_id where s.id = $1', [studentId])).rows[0]!;
-    const grading = await this.settings.grading(t);
+    const s = (await t.pool.query<{ name: string; admission_no: string; class: string; roll_no: string; grade: number }>(
+      'select s.name, s.admission_no, c.name class, s.roll_no, c.grade from students s join classes c on c.id = s.class_id where s.id = $1', [studentId])).rows[0]!;
+    // Each subject in its own scheme where the school grades it differently (§3.6.6).
+    const grading = await this.settings.grading(t, { grade: s.grade });
     // A family sees the class rank only when the console says so (results.showRank); the office always does.
     const showRank = !students || (await this.settings.value<boolean>(t, 'results.showRank', false));
-    const marks = (await t.pool.query<{ subject: string; score: string | null; absent: boolean; max_marks: number }>(
-      `select coalesce(sub.name, m.subject_id) subject, m.score, m.absent, x.max_marks from exam_marks m join exam_subjects x on x.exam_id = m.exam_id and x.subject_id = m.subject_id
+    const marks = (await t.pool.query<{ subject: string; subject_id: string; score: string | null; absent: boolean; max_marks: number; grade: string | null }>(
+      `select coalesce(sub.name, m.subject_id) subject, m.subject_id, m.score, m.absent, x.max_marks, m.grade from exam_marks m join exam_subjects x on x.exam_id = m.exam_id and x.subject_id = m.subject_id
        left join subjects sub on sub.id = m.subject_id where m.exam_id = $1 and m.student_id = $2 order by subject`, [examId, studentId])).rows;
     const lines: PdfLine[] = [
-      ...(await this.header(t, `Report card: ${res.exam.name}`)),
-      { text: 'Student', right: `${s.name} (${s.admission_no})` },
-      { text: 'Class and roll number', right: `${s.class} · ${s.roll_no || '-'}` },
-      { text: '', rule: true, gap: 18 },
-      { text: 'Subject', right: 'Marks · grade', bold: true, gap: 22 },
-      ...marks.map((m) => ({ text: m.subject, right: m.absent ? 'Absent' : `${Math.round(Number(m.score ?? 0))} / ${m.max_marks} · ${grading.grade(Math.round((Number(m.score ?? 0) / m.max_marks) * 100))}` })),
-      { text: '', rule: true, gap: 18 },
-      { text: 'Overall', right: `${row.pct}% · grade ${row.grade}`, bold: true, gap: 22 },
-      { text: 'Result', right: row.pct >= grading.pass ? 'Passed' : 'Needs support' },
-      ...(showRank ? [{ text: 'Rank in class', right: `${row.rank} of ${res.rows.length}` }] : []),
-      { text: 'Class teacher', gap: 60 }, { text: 'Principal', right: 'Parent', gap: 0 },
+      { text: tx('Subject'), right: tx('Marks · grade'), bold: true, gap: 22 },
+      ...marks.map((m) => {
+        // A grade given straight away stands as it is (with its descriptor); marks show as the school writes numbers, halves included.
+        const scheme = grading.schemeOf(m.subject_id);
+        const g = m.grade ? gradeIn(scheme, pctOfGrade(scheme, m.grade) ?? 0) : grading.of(Math.round((Number(m.score ?? 0) / m.max_marks) * 100), m.subject_id);
+        const desc = g.descriptor ? ` (${g.descriptor})` : '';
+        return { text: m.subject, right: m.absent ? tx('Absent') : m.grade ? `${m.grade}${desc}` : `${fmtNumber(Number(m.score ?? 0))} / ${m.max_marks} · ${g.grade}${desc}` };
+      }),
     ];
-    return { name: `${s.admission_no}-${res.exam.name.replace(/[^\w-]+/g, '_')}.pdf`, data: await pdf(lines, { logo: await this.files.logoBytes(t) }) };
+    const fill = {
+      school: String((await this.settings.doc(t)).values['school.name'] ?? t.info.name), student: s.name, class: s.class, admissionNo: s.admission_no, rollNo: s.roll_no || '-',
+      exam: res.exam.name, percent: fmtNumber(row.pct), grade: row.grade, gpa: row.gpa !== null ? fmtNumber(row.gpa) : '', result: row.pct >= grading.pass ? tx('Passed') : tx('Needs support'),
+      rank: showRank ? String(row.rank) : '', classSize: String(res.rows.length),
+      remark: (await t.pool.query<{ remark: string }>('select remark from exam_remarks where exam_id = $1 and student_id = $2', [examId, studentId])).rows[0]?.remark ?? '',
+    };
+    return { name: `${s.admission_no}-${res.exam.name.replace(/[^\w-]+/g, '_')}.pdf`, ...(await this.render(t, 'reportCard', fill, lines, draft)) };
   }
 }

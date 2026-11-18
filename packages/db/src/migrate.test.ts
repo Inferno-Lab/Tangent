@@ -11,7 +11,7 @@ import { runIfDue } from './jobs.js';
 
 let server: DevPostgres;
 beforeAll(async () => {
-  server = await startDevPostgres({ dataDir: path.join(mkdtempSync(path.join(tmpdir(), 'tangent-pg-')), 'data'), fresh: true });
+  server = await startDevPostgres({ dataDir: path.join(mkdtempSync(path.join(tmpdir(), 'tangent-pg-')), 'data'), fresh: true, throwaway: true });
 }, 120_000);
 afterAll(async () => { await server?.stop(); });
 
@@ -39,6 +39,28 @@ describe('migrations', () => {
       expect(await pendingMigrations(pool, 'school')).toEqual([]);
       const { rows } = await pool.query("select count(*)::int as n from information_schema.tables where table_schema='public' and table_name in ('students','payments','settings')");
       expect(rows[0].n).toBe(3);
+      // Money is exact in any currency's decimals (docs/one-shot-plan.md §3.9.8): never a float, never whole units only.
+      const money = await pool.query<{ c: string; t: string }>(
+        `select table_name || '.' || column_name c, data_type t from information_schema.columns where table_schema = 'public'
+           and column_name ~ '(^|_)(amount|amounts|fee|fine|fines|refunded|price|cost|total|owed|paid|balance)$' and data_type <> 'numeric'
+           and data_type not in ('jsonb', 'boolean', 'text', 'date', 'timestamp with time zone')
+           -- Counts that happen to be called a total (photos in a zip), not money.
+           and table_name || '.' || column_name not in ('photo_imports.total')`);
+      expect(money.rows.map((r) => `${r.c}: ${r.t}`)).toEqual([]);
+    } finally { await pool.end(); }
+  });
+
+  it('moves an existing school’s words into vocab.words and keeps the app languages it had', async () => {
+    const pool = new pg.Pool({ connectionString: await ensureDatabase(server.url, 'school_test_words'), max: 2 });
+    try {
+      await migrate(pool, 'school', { upTo: '0035_phones_e164' });
+      await pool.query(`insert into meta (key, value) values ('seeded.mode', '"demo"') on conflict (key) do nothing`);
+      await pool.query(`insert into settings (key, value, updated_by) values ('school.language', '"en"', 'x'), ('vocab.student', '"Pupil"', 'x'), ('vocab.class', '"Class"', 'x'), ('vocab.classes', '""', 'x')`);
+      await migrate(pool, 'school');
+      const v = Object.fromEntries((await pool.query<{ key: string; value: unknown }>('select key, value from settings')).rows.map((r) => [r.key, r.value]));
+      expect(v['vocab.words']).toEqual({ en: { student: { one: 'Pupil' } } });
+      expect(v['app.languages']).toEqual(['en', 'hi', 'mr']);
+      expect(Object.keys(v).filter((k) => /^vocab\.(student|class)/.test(k))).toEqual([]);
     } finally { await pool.end(); }
   });
 

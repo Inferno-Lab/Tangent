@@ -13,7 +13,7 @@ export const PAGES = {
   fleet: 'buildings', onboarding: 'rocket-launch', modules: 'puzzle-piece', cells: 'hard-drives', releases: 'package',
   migrations: 'git-branch', builds: 'device-mobile', flags: 'flag', blueprints: 'compass-tool', integrations: 'plugs-connected',
   health: 'heartbeat', approvals: 'seal-check', requests: 'tray', support: 'lifebuoy', inbox: 'envelope-simple',
-  billing: 'bank', compliance: 'shield-check', team: 'users-three',
+  billing: 'bank', compliance: 'shield-check', team: 'users-three', languages: 'translate',
   // school admin pages added since the boards
   audit: 'list-magnifying-glass', privacy: 'lock-key',
   // app tabs and header

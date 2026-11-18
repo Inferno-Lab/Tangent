@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
 import {
-  istToday,
-  type ExamCreate, type ExamMarksPut, type ExamMarksView, type ExamResults, type ExamRow, type HomeworkCreate, type HomeworkDetail, type HomeworkMarks, type HomeworkRow,
-} from '@tangent/contracts';
+  schoolToday, gpaOf, roundPct, gradeIn, gradesOf, pctOfGrade, type ExamRemarksPut,
+  type ExamCreate, type ExamMarksPut, type ExamMarksView, type ExamResults, type ExamRow, type HomeworkCreate, type HomeworkDetail, type HomeworkMarks, type HomeworkRow, tx } from '@tangent/contracts';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
@@ -88,7 +87,7 @@ export class LearningService {
     ]);
     if (!cls.rows[0]) throw new ApiError('validation', 'Choose a class from the list.', { fields: { classId: 'Choose a class from the list.' } });
     if (!sub.rows[0]) throw new ApiError('validation', 'Choose a subject from the list.', { fields: { subjectId: 'Choose a subject from the list.' } });
-    const today = istToday();
+    const today = schoolToday();
     if (body.dueOn < today) throw new ApiError('validation', 'The due date cannot be in the past.', { fields: { dueOn: 'Pick today or a later day.' } });
     const status = body.draft ? 'draft' : 'set';
     const client = await t.pool.connect();
@@ -113,7 +112,7 @@ export class LearningService {
     // Families hear about homework when it is set, not while it is a draft, and not again for a correction.
     if (status === 'set' && was === 'draft') {
       const g = await t.pool.query<{ phone: string | null; name: string }>(
-        `select g.phone, s.name from students s join student_guardians sg on sg.student_id = s.id and sg.is_primary join guardians g on g.id = sg.guardian_id where s.class_id = $1 and s.status = 'active'`, [body.classId]);
+        `select g.phone, s.name from students s join student_guardians sg on sg.student_id = s.id and sg.gets_messages join guardians g on g.id = sg.guardian_id where s.class_id = $1 and s.status = 'active'`, [body.classId]);
       await this.messenger.notify(t, 'homework.new', g.rows.filter((r) => r.phone).map((r) => ({ to: r.phone!, vars: { student: r.name, subject: sub.rows[0]!.name, title: body.title, due: body.dueOn } })));
     }
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: isNew ? `homework.${status === 'draft' ? 'drafted' : 'set'}` : 'homework.changed', entity: 'homework', entityId: id, detail: { class: cls.rows[0].name, title: body.title } });
@@ -130,9 +129,9 @@ export class LearningService {
     const hw = (await t.pool.query<{ due_on: string; max_marks: number; class_id: string }>('select due_on::text, max_marks, class_id from homework where id = $1', [id])).rows[0];
     if (!hw) throw notFound('That homework');
     for (const m of body.marks) {
-      if (m.score != null && m.score > hw.max_marks) throw new ApiError('validation', `Marks cannot be more than ${hw.max_marks}.`, { fields: { score: `The most is ${hw.max_marks}.` } });
+      if (m.score != null && m.score > hw.max_marks) throw new ApiError('validation', tx('Marks cannot be more than {max_marks}.', { max_marks: hw.max_marks }), { fields: { score: tx('The most is {max_marks}.', { max_marks: hw.max_marks }) } });
     }
-    const today = istToday();
+    const today = schoolToday();
     const client = await t.pool.connect();
     try {
       await client.query('begin');
@@ -167,22 +166,36 @@ export class LearningService {
   // Exams
 
   async exams(t: TenantCtx, classId?: string): Promise<ExamRow[]> {
-    const { rows } = await t.pool.query<{ id: string; name: string; class_id: string; class_name: string; starts_on: string; ends_on: string; status: ExamRow['status']; students: string; reopened_note: string }>(
-      `select e.id, e.name, e.class_id, c.name class_name, e.starts_on::text, e.ends_on::text, e.status, e.reopened_note,
+    const { rows } = await t.pool.query<{ id: string; name: string; kind: string; class_id: string; class_name: string; grade: number; starts_on: string; ends_on: string; status: ExamRow['status']; students: string; reopened_note: string }>(
+      `select e.id, e.name, e.kind, e.class_id, c.name class_name, c.grade, e.starts_on::text, e.ends_on::text, e.status, e.reopened_note,
          (select count(*) from students s where s.class_id = e.class_id and s.status = 'active') students
        from exams e join classes c on c.id = e.class_id where ($1::text is null or e.class_id = $1) order by e.starts_on desc, c.grade, c.section limit 100`, [classId ?? null]);
     if (!rows.length) return [];
     const ids = rows.map((r) => r.id);
     const [subs, entered] = await Promise.all([
-      t.pool.query<{ exam_id: string; subject_id: string; name: string; on_date: string | null; max_marks: number; starts_at: string | null; ends_at: string | null; room: string }>(
-        'select x.exam_id, x.subject_id, s.name, x.on_date::text, x.max_marks, x.starts_at, x.ends_at, x.room from exam_subjects x join subjects s on s.id = x.subject_id where x.exam_id = any($1) order by x.on_date nulls last, x.starts_at nulls last, s.name', [ids]),
-      t.pool.query<{ exam_id: string; n: string }>('select exam_id, count(*) n from exam_marks where exam_id = any($1) and (score is not null or absent) group by exam_id', [ids]),
+      t.pool.query<{ exam_id: string; subject_id: string; name: string; on_date: string | null; max_marks: number; starts_at: string | null; ends_at: string | null; room: string; invigilator_id: string | null; invigilator: string | null }>(
+        `select x.exam_id, x.subject_id, s.name, x.on_date::text, x.max_marks, x.starts_at, x.ends_at, x.room, x.invigilator_id, u.name invigilator
+         from exam_subjects x join subjects s on s.id = x.subject_id left join users u on u.id = x.invigilator_id where x.exam_id = any($1) order by x.on_date nulls last, x.starts_at nulls last, s.name`, [ids]),
+      t.pool.query<{ exam_id: string; n: string }>('select exam_id, count(*) n from exam_marks where exam_id = any($1) and (score is not null or grade is not null or absent) group by exam_id', [ids]),
     ]);
     const enteredBy = new Map(entered.rows.map((e) => [e.exam_id, Number(e.n)]));
+    // A subject the school grades straight away (its scheme's entry is "grade") lists the grades to pick from.
+    const gradings = new Map<number, Awaited<ReturnType<SettingsService['grading']>>>();
+    for (const g of new Set(rows.map((r) => r.grade))) gradings.set(g, await this.settings.grading(t, { grade: g }));
     return rows.map((r) => {
-      const subjects = subs.rows.filter((s) => s.exam_id === r.id).map((s) => ({ subjectId: s.subject_id, name: s.name, onDate: s.on_date, maxMarks: s.max_marks, startsAt: s.starts_at, endsAt: s.ends_at, room: s.room }));
-      return { id: r.id, name: r.name, classId: r.class_id, className: r.class_name, startsOn: r.starts_on, endsOn: r.ends_on, status: r.status, subjects, entered: enteredBy.get(r.id) ?? 0, expected: Number(r.students) * subjects.length, reopenedNote: r.reopened_note };
+      const grading = gradings.get(r.grade)!;
+      const subjects = subs.rows.filter((s) => s.exam_id === r.id).map((s) => {
+        const scheme = grading.schemeOf(s.subject_id);
+        return { subjectId: s.subject_id, name: s.name, onDate: s.on_date, maxMarks: s.max_marks, startsAt: s.starts_at, endsAt: s.ends_at, room: s.room, invigilatorId: s.invigilator_id, invigilatorName: s.invigilator, grades: scheme.entry === 'grade' ? gradesOf(scheme) : [],
+          criteria: scheme.kind === 'rubric' ? scheme.criteria ?? [] : [] };
+      });
+      return { id: r.id, name: r.name, kind: r.kind, classId: r.class_id, className: r.class_name, startsOn: r.starts_on, endsOn: r.ends_on, status: r.status, subjects, entered: enteredBy.get(r.id) ?? 0, expected: Number(r.students) * subjects.length, reopenedNote: r.reopened_note };
     });
+  }
+
+  /** An exam's papers, with the grades a subject graded without marks takes. */
+  async examSubjects(t: TenantCtx, id: string): Promise<ExamRow['subjects']> {
+    return (await this.exam(t, id)).subjects;
   }
 
   private async exam(t: TenantCtx, id: string): Promise<ExamRow> {
@@ -191,8 +204,35 @@ export class LearningService {
     return (await this.exams(t, cls.class_id)).find((e) => e.id === id)!;
   }
 
+  /**
+   * An exam's kind is one of the school's (exams.types); each invigilator is active staff, and is not in two rooms at once:
+   * not two of these papers at the same time, nor a paper of another exam then.
+   */
+  private async checkPapers(t: TenantCtx, body: ExamCreate, exclude: string[]): Promise<void> {
+    if (body.kind) {
+      const types = await this.settings.value<{ key: string }[]>(t, 'exams.types', []);
+      if (!types.some((x) => x.key === body.kind)) throw new ApiError('validation', tx('Choose one of the school’s kinds of exam.'), { fields: { kind: tx('Choose from the list.') } });
+    }
+    const people = [...new Set(body.subjects.map((s) => s.invigilatorId).filter((x): x is string => !!x))];
+    if (!people.length) return;
+    const active = new Set((await t.pool.query<{ id: string }>("select id from users where id = any($1) and kind = 'staff' and status = 'active'", [people])).rows.map((r) => r.id));
+    const gone = people.find((p) => !active.has(p));
+    if (gone) throw new ApiError('validation', tx('Choose invigilators from the staff list.'), { fields: { subjects: tx('Choose from the staff list.') } });
+    const timed = body.subjects.filter((s) => s.invigilatorId && s.onDate && s.startsAt && s.endsAt);
+    const over = (a: { startsAt?: string | null; endsAt?: string | null }, b: { starts_at: string | null; ends_at: string | null }) => !!(a.startsAt && a.endsAt && b.starts_at && b.ends_at && a.startsAt < b.ends_at && b.starts_at < a.endsAt);
+    for (const [i, a] of timed.entries()) {
+      const twice = timed.slice(i + 1).find((b) => b.invigilatorId === a.invigilatorId && b.onDate === a.onDate && over(a, { starts_at: b.startsAt ?? null, ends_at: b.endsAt ?? null }));
+      if (twice) throw new ApiError('conflict', tx('The same person invigilates two papers at once on {date}.', { date: a.onDate! }), { fields: { subjects: tx('Two papers at once.') } });
+      const elsewhere = (await t.pool.query<{ starts_at: string | null; ends_at: string | null; name: string }>(
+        'select x.starts_at, x.ends_at, e.name from exam_subjects x join exams e on e.id = x.exam_id where x.invigilator_id = $1 and x.on_date = $2 and not (x.exam_id = any($3))', [a.invigilatorId, a.onDate, exclude])).rows;
+      const clash = elsewhere.find((b) => over(a, b));
+      if (clash) throw new ApiError('conflict', tx('That invigilator is already watching {exam} then.', { exam: clash.name }), { fields: { subjects: tx('Busy then.') } });
+    }
+  }
+
   async createExam(t: TenantCtx, user: User, body: ExamCreate): Promise<ExamRow> {
     if (body.endsOn < body.startsOn) throw new ApiError('validation', 'The last day cannot be before the first day.', { fields: { endsOn: 'Pick a day on or after the first day.' } });
+    await this.checkPapers(t, body, []);
     const classIds = [...new Set([body.classId, ...body.alsoClassIds])];
     const cls = await t.pool.query('select id from classes where id = any($1)', [classIds]);
     if (cls.rowCount !== classIds.length) throw new ApiError('validation', 'Choose classes from the list.', { fields: { classId: 'Choose a class from the list.' } });
@@ -205,8 +245,11 @@ export class LearningService {
     try {
       await client.query('begin');
       for (const [i, classId] of classIds.entries()) {
-        await client.query('insert into exams (id, name, class_id, starts_on, ends_on, created_by) values ($1,$2,$3,$4,$5,$6)', [ids[i], body.name, classId, body.startsOn, body.endsOn, user.id]);
-        for (const s of body.subjects) await client.query('insert into exam_subjects (exam_id, subject_id, on_date, max_marks, starts_at, ends_at, room) values ($1,$2,$3,$4,$5,$6,$7)', [ids[i], s.subjectId, s.onDate ?? null, s.maxMarks, s.startsAt ?? null, s.endsAt ?? null, s.room]);
+        await client.query('insert into exams (id, name, kind, class_id, starts_on, ends_on, created_by) values ($1,$2,$3,$4,$5,$6,$7)', [ids[i], body.name, body.kind, classId, body.startsOn, body.endsOn, user.id]);
+        for (const s of body.subjects) {
+          await client.query('insert into exam_subjects (exam_id, subject_id, on_date, max_marks, starts_at, ends_at, room, invigilator_id) values ($1,$2,$3,$4,$5,$6,$7,$8)',
+            [ids[i], s.subjectId, s.onDate ?? null, s.maxMarks, s.startsAt ?? null, s.endsAt ?? null, s.room, s.invigilatorId ?? null]);
+        }
       }
       await client.query('commit');
     } catch (err) {
@@ -221,17 +264,19 @@ export class LearningService {
 
   async marksView(t: TenantCtx, id: string): Promise<ExamMarksView> {
     const exam = await this.exam(t, id);
-    const [stu, marks] = await Promise.all([
+    const [stu, marks, remarks] = await Promise.all([
       t.pool.query<{ id: string; name: string; roll_no: string }>("select id, name, roll_no from students where class_id = $1 and status = 'active' order by roll_no, name", [exam.classId]),
-      t.pool.query<{ student_id: string; subject_id: string; score: string | null; absent: boolean }>('select student_id, subject_id, score, absent from exam_marks where exam_id = $1', [id]),
+      t.pool.query<{ student_id: string; subject_id: string; score: string | null; absent: boolean; grade: string | null; criteria: Record<string, number> | null }>('select student_id, subject_id, score, absent, grade, criteria from exam_marks where exam_id = $1', [id]),
+      t.pool.query<{ student_id: string; remark: string }>('select student_id, remark from exam_remarks where exam_id = $1', [id]),
     ]);
-    const by = new Map<string, Record<string, { score: number | null; absent: boolean }>>();
+    const by = new Map<string, Record<string, { score: number | null; absent: boolean; grade: string | null; criteria: Record<string, number> | null }>>();
     for (const m of marks.rows) {
       const cur = by.get(m.student_id) ?? {};
-      cur[m.subject_id] = { score: m.score == null ? null : Number(m.score), absent: m.absent };
+      cur[m.subject_id] = { score: m.score == null ? null : Number(m.score), absent: m.absent, grade: m.grade, criteria: m.criteria };
       by.set(m.student_id, cur);
     }
-    return { exam, students: stu.rows.map((s) => ({ studentId: s.id, name: s.name, rollNo: s.roll_no, marks: by.get(s.id) ?? {} })) };
+    const said = new Map(remarks.rows.map((r) => [r.student_id, r.remark]));
+    return { exam, students: stu.rows.map((s) => ({ studentId: s.id, name: s.name, rollNo: s.roll_no, marks: by.get(s.id) ?? {}, remark: said.get(s.id) ?? '' })) };
   }
 
   /**
@@ -245,17 +290,18 @@ export class LearningService {
     const marked = new Set((await t.pool.query<{ subject_id: string }>('select distinct subject_id from exam_marks where exam_id = $1', [id])).rows.map((r) => r.subject_id));
     const gone = [...marked].filter((s) => !body.subjects.some((x) => x.subjectId === s));
     if (gone.length) throw new ApiError('conflict', 'A subject that already has marks cannot be taken out of the exam.');
+    await this.checkPapers(t, body, [id]);
     const client = await t.pool.connect();
     try {
       await client.query('begin');
-      await client.query('update exams set name = $2, starts_on = $3, ends_on = $4 where id = $1', [id, body.name, body.startsOn, body.endsOn]);
+      await client.query('update exams set name = $2, starts_on = $3, ends_on = $4, kind = $5 where id = $1', [id, body.name, body.startsOn, body.endsOn, body.kind]);
       await client.query('delete from exam_subjects where exam_id = $1 and not (subject_id = any($2))', [id, body.subjects.map((s) => s.subjectId)]);
       for (const s of body.subjects) {
         const was = e.subjects.find((x) => x.subjectId === s.subjectId);
         await client.query(
-          `insert into exam_subjects (exam_id, subject_id, on_date, max_marks, starts_at, ends_at, room) values ($1,$2,$3,$4,$5,$6,$7)
-           on conflict (exam_id, subject_id) do update set on_date = excluded.on_date, max_marks = excluded.max_marks, starts_at = excluded.starts_at, ends_at = excluded.ends_at, room = excluded.room`,
-          [id, s.subjectId, s.onDate ?? null, marked.has(s.subjectId) && was ? was.maxMarks : s.maxMarks, s.startsAt ?? null, s.endsAt ?? null, s.room]);
+          `insert into exam_subjects (exam_id, subject_id, on_date, max_marks, starts_at, ends_at, room, invigilator_id) values ($1,$2,$3,$4,$5,$6,$7,$8)
+           on conflict (exam_id, subject_id) do update set on_date = excluded.on_date, max_marks = excluded.max_marks, starts_at = excluded.starts_at, ends_at = excluded.ends_at, room = excluded.room, invigilator_id = excluded.invigilator_id`,
+          [id, s.subjectId, s.onDate ?? null, marked.has(s.subjectId) && was ? was.maxMarks : s.maxMarks, s.startsAt ?? null, s.endsAt ?? null, s.room, s.invigilatorId ?? null]);
       }
       await client.query('commit');
     } catch (err) {
@@ -282,20 +328,46 @@ export class LearningService {
     if (exam.status === 'published') throw new ApiError('locked', 'The results are out, so the marks are locked. Someone allowed to publish results can reopen them, saying why.');
     const max = new Map(exam.subjects.map((s) => [s.subjectId, s.maxMarks]));
     const students = new Set((await t.pool.query<{ id: string }>('select id from students where class_id = $1', [exam.classId])).rows.map((r) => r.id));
+    const byGrade = new Map(exam.subjects.filter((s) => s.grades.length).map((s) => [s.subjectId, s.grades]));
+    const rubric = new Map(exam.subjects.filter((s) => s.criteria.length).map((s) => [s.subjectId, s.criteria]));
     for (const m of body.marks) {
+      // A rubric subject: a level for every criterion within its top, and the score is their share of the paper's maximum.
+      const crit = rubric.get(m.subjectId);
+      if (m.criteria && !crit) throw new ApiError('validation', tx('This subject is not marked on criteria.'));
+      if (crit && m.criteria && !m.absent) {
+        const missing = crit.filter((c) => m.criteria![c.key] === undefined);
+        if (missing.length) throw new ApiError('validation', tx('Give a level for every criterion: {names}.', { names: missing.map((c) => c.name).join(', ') }));
+        const over = crit.find((c) => m.criteria![c.key]! > c.max);
+        if (over) throw new ApiError('validation', tx('{name} goes up to {max}.', { name: over.name, max: over.max }));
+        const extra = Object.keys(m.criteria).find((k) => !crit.some((c) => c.key === k));
+        if (extra) throw new ApiError('validation', tx('There is no criterion “{key}”.', { key: extra }));
+        const sum = crit.reduce((a, c) => a + m.criteria![c.key]!, 0);
+        const most = crit.reduce((a, c) => a + c.max, 0);
+        m.score = Math.round((sum / most) * max.get(m.subjectId)! * 100) / 100;
+      } else if (!crit || m.absent) m.criteria = undefined;
       const cap = max.get(m.subjectId);
       if (cap === undefined) throw new ApiError('validation', 'That subject is not part of this exam.');
       if (!students.has(m.studentId)) throw new ApiError('validation', 'One of those students is not in this class.');
-      if (m.score != null && m.score > cap) throw new ApiError('validation', `Marks cannot be more than ${cap}.`, { fields: { score: `The most is ${cap}.` } });
+      const grades = byGrade.get(m.subjectId);
+      if (grades) {
+        // Graded without marks: a grade of the subject's scheme (or absent), never a score.
+        if (m.score != null) throw new ApiError('validation', tx('This subject is graded, not marked: choose a grade.'), { fields: { score: tx('Choose a grade.') } });
+        if (m.grade && !grades.some((g) => g.toLowerCase() === m.grade!.toLowerCase())) throw new ApiError('validation', tx('Choose one of the grades: {grades}.', { grades: grades.join(', ') }), { fields: { grade: tx('Choose from the list.') } });
+        m.grade = m.grade ? grades.find((g) => g.toLowerCase() === m.grade!.toLowerCase()) : undefined;
+      } else {
+        if (m.grade) throw new ApiError('validation', tx('This subject takes marks, not a grade.'), { fields: { grade: tx('Enter marks.') } });
+        if (m.score != null && m.score > cap) throw new ApiError('validation', tx('Marks cannot be more than {cap}.', { cap }), { fields: { score: tx('The most is {cap}.', { cap }) } });
+      }
     }
     const client = await t.pool.connect();
     try {
       await client.query('begin');
       for (const m of body.marks) {
-        if (m.score == null && !m.absent) await client.query('delete from exam_marks where exam_id = $1 and student_id = $2 and subject_id = $3', [id, m.studentId, m.subjectId]);
+        if (m.score == null && !m.grade && !m.absent) await client.query('delete from exam_marks where exam_id = $1 and student_id = $2 and subject_id = $3', [id, m.studentId, m.subjectId]);
         else await client.query(
-          'insert into exam_marks (exam_id, student_id, subject_id, score, absent) values ($1,$2,$3,$4,$5) on conflict (exam_id, student_id, subject_id) do update set score = excluded.score, absent = excluded.absent',
-          [id, m.studentId, m.subjectId, m.absent ? null : m.score, m.absent]);
+          `insert into exam_marks (exam_id, student_id, subject_id, score, absent, grade, criteria) values ($1,$2,$3,$4,$5,$6,$7)
+           on conflict (exam_id, student_id, subject_id) do update set score = excluded.score, absent = excluded.absent, grade = excluded.grade, criteria = excluded.criteria`,
+          [id, m.studentId, m.subjectId, m.absent ? null : m.score, m.absent, m.absent ? null : m.grade ?? null, m.criteria ? JSON.stringify(m.criteria) : null]);
       }
       // Marks that change after publishing no longer match what families see, so the exam goes back to marking.
       await client.query("update exams set status = 'marking' where id = $1 and status in ('upcoming','published')", [id]);
@@ -310,25 +382,44 @@ export class LearningService {
     return this.marksView(t, id);
   }
 
-  async results(t: TenantCtx, id: string): Promise<ExamResults> {
+  /** Each student's total, percentage, grade and GPA in one exam; a grade given straight away counts as the bottom of its band. */
+  private async scoreExam(t: TenantCtx, id: string) {
     const { exam, students } = await this.marksView(t, id);
-    const grading = await this.settings.grading(t);
+    const year = (await t.pool.query<{ grade: number }>('select grade from classes where id = $1', [exam.classId])).rows[0]?.grade ?? null;
+    const grading = await this.settings.grading(t, { grade: year });
+    const mode = await this.settings.value<'nearest' | 'up' | 'down'>(t, 'results.rounding', 'nearest');
     const max = new Map(exam.subjects.map((s) => [s.subjectId, s.maxMarks]));
-    const scored = students.filter((s) => Object.keys(s.marks).length).map((s) => {
+    const rows = students.filter((s) => Object.keys(s.marks).length).map((s) => {
       let total = 0;
       let outOf = 0;
+      const points: (number | null)[] = [];
       for (const sub of exam.subjects) {
         const m = s.marks[sub.subjectId];
         if (!m) continue;
-        outOf += max.get(sub.subjectId)!;
-        total += m.score ?? 0;
+        const cap = max.get(sub.subjectId)!;
+        const scheme = grading.schemeOf(sub.subjectId);
+        const asPct = m.grade ? pctOfGrade(scheme, m.grade) ?? 0 : null;
+        outOf += cap;
+        total += asPct !== null ? (asPct / 100) * cap : m.score ?? 0;
+        if (!m.absent) points.push(gradeIn(scheme, asPct ?? Math.round(((m.score ?? 0) / cap) * 100)).points);
       }
-      const pct = outOf ? Math.round((total / outOf) * 100) : 0;
-      return { studentId: s.studentId, name: s.name, rollNo: s.rollNo, total, max: outOf, pct, grade: grading.grade(pct), rank: 0 };
-    }).sort((a, b) => b.total / Math.max(b.max, 1) - a.total / Math.max(a.max, 1) || a.name.localeCompare(b.name));
-    let rank = 0;
-    let prev = -1;
-    scored.forEach((r, i) => { if (r.pct !== prev) { rank = i + 1; prev = r.pct; } r.rank = rank; });
+      const pct = outOf ? roundPct((total / outOf) * 100, mode) : 0;
+      return { studentId: s.studentId, name: s.name, rollNo: s.rollNo, total: Math.round(total * 100) / 100, max: outOf, pct, grade: grading.grade(pct), rank: 0, gpa: gpaOf(points) };
+    });
+    return { exam, grading, rows };
+  }
+
+  async results(t: TenantCtx, id: string): Promise<ExamResults> {
+    const { exam, grading, rows } = await this.scoreExam(t, id);
+    const scored = rows.sort((a, b) => b.total / Math.max(b.max, 1) - a.total / Math.max(a.max, 1) || a.name.localeCompare(b.name));
+    // Ranked within the class, or among every class of the year group sitting an exam of the same name (results.rankWithin).
+    const within = await this.settings.value<string>(t, 'results.rankWithin', 'class');
+    const pool = within === 'year' ? await this.yearRows(t, exam, scored) : scored;
+    const order = [...new Set(pool.map((r) => r.pct))].sort((a, b) => b - a);
+    const ranks = new Map<number, number>();
+    let seen = 0;
+    for (const pct of order) { ranks.set(pct, seen + 1); seen += pool.filter((r) => r.pct === pct).length; }
+    scored.forEach((r) => { r.rank = ranks.get(r.pct) ?? 0; });
     return {
       exam,
       average: scored.length ? Math.round(scored.reduce((a, r) => a + r.pct, 0) / scored.length) : 0,
@@ -337,10 +428,34 @@ export class LearningService {
     };
   }
 
+  /** Every student's result in the exams of the same name for the same year group (for a rank across the year). */
+  private async yearRows(t: TenantCtx, exam: ExamRow, own: { pct: number }[]): Promise<{ pct: number }[]> {
+    const others = (await t.pool.query<{ id: string }>(
+      'select e.id from exams e join classes c on c.id = e.class_id where e.name = $1 and e.id <> $2 and c.grade = (select grade from classes where id = $3)', [exam.name, exam.id, exam.classId])).rows;
+    const out = [...own];
+    for (const o of others) out.push(...(await this.scoreExam(t, o.id)).rows);
+    return out;
+  }
+
+  /** Remarks on students' reports for this exam, written or picked from the school's (exams.remarks); empty removes one. */
+  async putRemarks(t: TenantCtx, user: User, id: string, body: ExamRemarksPut): Promise<ExamMarksView> {
+    const exam = await this.exam(t, id);
+    if (exam.status === 'published') throw new ApiError('locked', tx('The results are out, so the remarks are locked. Reopen the results to change them.'));
+    const students = new Set((await t.pool.query<{ id: string }>('select id from students where class_id = $1', [exam.classId])).rows.map((r) => r.id));
+    if (body.remarks.some((r) => !students.has(r.studentId))) throw new ApiError('validation', 'One of those students is not in this class.');
+    for (const r of body.remarks) {
+      if (!r.remark) await t.pool.query('delete from exam_remarks where exam_id = $1 and student_id = $2', [id, r.studentId]);
+      else await t.pool.query(`insert into exam_remarks (exam_id, student_id, remark, by_id) values ($1,$2,$3,$4)
+        on conflict (exam_id, student_id) do update set remark = excluded.remark, by_id = excluded.by_id, updated_at = now()`, [id, r.studentId, r.remark, user.id]);
+    }
+    await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'exam.remarks', entity: 'exam', entityId: id, detail: { remarks: body.remarks.length } });
+    return this.marksView(t, id);
+  }
+
   async publishExam(t: TenantCtx, user: User, id: string): Promise<{ families: number; exam: ExamRow }> {
     const res = await this.results(t, id);
     const missing = res.exam.expected - res.exam.entered;
-    if (missing > 0) throw new ApiError('conflict', `${missing} ${missing === 1 ? 'mark is' : 'marks are'} still missing. Enter every mark, or mark the student absent, before publishing.`);
+    if (missing > 0) throw new ApiError('conflict', tx('{missing, plural, one {# mark is} other {# marks are}} still missing. Enter every mark, or mark the student absent, before publishing.', { missing }));
     const client = await t.pool.connect();
     try {
       await client.query('begin');
@@ -356,7 +471,7 @@ export class LearningService {
       client.release();
     }
     const g = await t.pool.query<{ phone: string | null; name: string }>(
-      `select g.phone, s.name from students s join student_guardians sg on sg.student_id = s.id and sg.is_primary join guardians g on g.id = sg.guardian_id where s.class_id = $1 and s.status = 'active'`, [res.exam.classId]);
+      `select g.phone, s.name from students s join student_guardians sg on sg.student_id = s.id and sg.gets_messages join guardians g on g.id = sg.guardian_id where s.class_id = $1 and s.status = 'active'`, [res.exam.classId]);
     // Results going out again after a correction say what changed.
     const again = !!res.exam.reopenedNote;
     const families = await this.messenger.notify(t, again ? 'exam.reopened' : 'exam.results', g.rows.filter((r) => r.phone).map((r) => ({ to: r.phone!, vars: { student: r.name, exam: res.exam.name, note: res.exam.reopenedNote } })));

@@ -23,7 +23,7 @@ const section = (all: any[], kind: string) => all.find((s) => s.kind === kind);
 describe('classes and calendar', () => {
   it('lists every part of setup in the import columns, and saves a typed row through the same checks', async () => {
     const all = (await get('/v1/setup')).json;
-    expect(all.map((s: any) => s.kind)).toEqual(['years', 'terms', 'holidays', 'classes', 'subjects', 'periods', 'fee_structures']);
+    expect(all.map((s: any) => s.kind)).toEqual(['years', 'terms', 'reporting_periods', 'holidays', 'classes', 'subjects', 'periods', 'fee_structures']);
     expect(section(all, 'classes').rows.find((r: any) => r.class === '8 A')).toMatchObject({ id: 'cls_8a', grade: '8', section: 'A' });
     const bad = await send('PUT', '/v1/setup/periods', { row: { number: '9', label: 'Period 9', starts_at: '15:00', ends_at: '14:00' } });
     expect(bad.status).toBe(400);
@@ -116,6 +116,6 @@ describe('going live', () => {
     expect(r.statusCode).toBe(200);
     expect(r.headers['content-type']).toBe('application/zip');
     expect(r.rawPayload.subarray(0, 2).toString()).toBe('PK');
-    expect(r.rawPayload.toString('latin1')).toContain('08-students.csv');
+    expect(r.rawPayload.toString('latin1')).toContain('09-students.csv');
   }, 30_000);
 });

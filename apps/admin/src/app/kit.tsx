@@ -1,8 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Field, FilePick, tintFor, Icon, type IconName } from '@tangent/web-ui';
+import { Field, FilePick, tintFor, Icon, type IconName, t as tr } from '@tangent/web-ui';
 import { useApp } from './context';
 import { HttpError } from '@tangent/api-client';
+import { fmtDate, gradeChoices } from '@tangent/contracts';
 
 export const Ico = ({ d }: { d: IconName }) => <Icon name={d} />;
 export const PLUS = 'plus';
@@ -23,11 +24,11 @@ export { AreaField } from '@tangent/web-ui';
 /** What a failed call says, split into field messages when the server named fields. */
 export function problem(e: unknown): Record<string, string> {
   if (e instanceof HttpError && Object.keys(e.fields).length) return e.fields;
-  return { _: (e as Error).message || 'Something went wrong. Try again.' };
+  return { _: (e as Error).message || tr('admin.kit.something_went_wrong_try_again') };
 }
 
-export const dateLabel = (day: string) => new Date(`${day}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-export const stamp = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true });
+export const dateLabel = (day: string) => fmtDate(day, 'day');
+export const stamp = (iso: string) => fmtDate(iso, 'stamp');
 
 /** Find a student by name or admission number; the choice shows as a chip that clears with a click. */
 export function StudentPick({ label, value, onChange, error }: { label: string; value: { id: string; name: string; className: string } | null; onChange: (s: { id: string; name: string; className: string } | null) => void; error?: string }) {
@@ -40,18 +41,18 @@ export function StudentPick({ label, value, onChange, error }: { label: string; 
         <label>{label}</label>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <span className="chip v">{value.name} · {value.className}</span>
-          <button type="button" className="btn sm" onClick={() => onChange(null)}>Change</button>
+          <button type="button" className="btn sm" onClick={() => onChange(null)}>{tr('admin.kit.change')}</button>
         </div>
       </div>
     );
   }
   return (
     <div>
-      <Field label={label} value={q} onChange={setQ} error={error} placeholder="Type a name or admission number" icon={SEARCH} autoComplete="off" />
+      <Field label={label} value={q} onChange={setQ} error={error} placeholder={tr('admin.kit.type_a_name_or_admission')} icon={SEARCH} autoComplete="off" />
       {q.trim().length >= 2 && (
         <div className="tgrow" style={{ marginTop: 8 }}>
           {(found.data?.items ?? []).map((s) => <button key={s.id} type="button" className="chip" onClick={() => { onChange({ id: s.id, name: s.name, className: s.className }); setQ(''); }}>{s.name} · {s.className}</button>)}
-          {found.data && !found.data.items.length && <span className="help">No student matches.</span>}
+          {found.data && !found.data.items.length && <span className="help">{tr('admin.kit.no_student_matches')}</span>}
         </div>
       )}
     </div>
@@ -71,17 +72,17 @@ export const SEARCH = 'search';
 export function Attach({ files, onChange, max = 3 }: { files: File[]; onChange: (f: File[]) => void; max?: number }) {
   const [err, setErr] = useState('');
   const pick = (f: File) => {
-    if (!['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(f.type)) return setErr('Attach a PDF or a photo (JPEG, PNG, WebP).');
-    if (f.size > 15 * 1024 * 1024) return setErr('That file is over 15 MB.');
+    if (!['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(f.type)) return setErr(tr('admin.kit.attach_a_pdf_or_a'));
+    if (f.size > 15 * 1024 * 1024) return setErr(tr('admin.kit.that_file_is_over_15'));
     setErr('');
     onChange([...files, f]);
   };
   return (
     <div className="fld">
-      <label>Attachments (optional)</label>
+      <label>{tr('admin.kit.attachments_optional')}</label>
       <div className="tgrow">
-        {files.map((f, i) => <button key={`${f.name}${i}`} type="button" className="chip v" data-tip="Remove" onClick={() => onChange(files.filter((_, j) => j !== i))}>{f.name} ×</button>)}
-        {files.length < max && <FilePick accept="application/pdf,image/jpeg,image/png,image/webp" className="btn sm" onPick={pick}>Attach a file</FilePick>}
+        {files.map((f, i) => <button key={`${f.name}${i}`} type="button" className="chip v" data-tip={tr('admin.kit.remove')} onClick={() => onChange(files.filter((_, j) => j !== i))}>{f.name} ×</button>)}
+        {files.length < max && <FilePick accept="application/pdf,image/jpeg,image/png,image/webp" className="btn sm" onPick={pick}>{tr('admin.kit.attach_a_file')}</FilePick>}
       </div>
       {err && <div className="emsg" role="alert">{err}</div>}
     </div>
@@ -111,9 +112,7 @@ export function useSetting<T>(key: string, fallback: T): T {
 export function useGrades(): { value: string; label: string }[] {
   const { api } = useApp();
   const q = useQuery({ queryKey: ['classes'], queryFn: api.classes, staleTime: 5 * 60_000 });
-  const seen = new Map<number, string>();
-  for (const c of q.data ?? []) if (!seen.has(c.grade)) seen.set(c.grade, c.section && c.name.endsWith(c.section) ? c.name.slice(0, -c.section.length).trim() : c.name);
-  return [...seen].sort((a, b) => a[0] - b[0]).map(([g, name]) => ({ value: String(g), label: /^\d+$/.test(name) ? `Grade ${name}` : name }));
+  return gradeChoices(q.data ?? []).map((g) => ({ value: String(g.value), label: /^\d+$/.test(g.name) ? tr('admin.kit.grade', { name: g.name }) : g.name }));
 }
 
 /** The record a page has open, kept in the address (`?open=<id>`), so a link, a reload or a bookmark lands on it. */
@@ -130,13 +129,13 @@ export function useOpenParam(key = 'open'): [string | null, (id: string | null) 
 
 /** A form's field errors and its message, from an API error. */
 export const fieldsOf = (e: unknown): Record<string, string> => (e instanceof HttpError ? e.fields : {});
-export const messageOf = (e: unknown) => (e instanceof Error ? e.message : 'Something went wrong. Try again.');
+export const messageOf = (e: unknown) => (e instanceof Error ? e.message : tr('admin.kit.something_went_wrong_try_again'));
 
 /** Cancel and the form's submit button, at the foot of a dialog's form. */
 export function DialogActions({ onClose, busy, label, danger }: { onClose: () => void; busy: boolean; label: string; danger?: boolean }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-      <button type="button" className="btn" onClick={onClose}>Cancel</button>
+      <button type="button" className="btn" onClick={onClose}>{tr('admin.kit.cancel')}</button>
       <button type="submit" className={`btn ${danger ? 'dngf' : 'pri'}`} disabled={busy}>{busy && <span className="spin" aria-hidden="true" />}{label}</button>
     </div>
   );

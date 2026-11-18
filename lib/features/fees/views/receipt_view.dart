@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/utils/open_link.dart';
 import 'package:tangent/core/config/app_config.dart';
+import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
 import 'package:tangent/core/theme/tokens.dart';
@@ -9,7 +13,6 @@ import 'package:tangent/core/utils/formatters.dart';
 import 'package:tangent/core/widgets/glass.dart';
 import 'package:tangent/core/widgets/page.dart';
 import 'package:tangent/core/widgets/states.dart';
-import 'package:tangent/core/widgets/toast.dart';
 import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/data/models/campus.dart';
 import 'package:tangent/features/fees/controllers/fees_controller.dart';
@@ -22,7 +25,7 @@ Map<String, Object?> receiptArgs(Receipt r, FeesController controller) => {
   'roll': controller.student?.rollNo,
   'class': controller.schoolClass == null
       ? null
-      : '${controller.schoolClass!.name.replaceAll(RegExp('[^0-9]'), '')} ${controller.schoolClass!.section}',
+      : controller.schoolClass!.label,
 };
 
 /// Receipt: the stored receipt printed on a perforated slip.
@@ -41,8 +44,8 @@ class ReceiptView extends StatelessWidget {
         children: [EmptyState(title: 'fees.no_receipt', body: 'fees.no_receipt_body')],
       );
     }
-    final number =
-        'GIS/${receipt.paidOn.year % 100}-${(receipt.paidOn.year + 1) % 100}/${receipt.id.replaceAll(RegExp('[^0-9]'), '').padLeft(4, '0').substring(receipt.id.replaceAll(RegExp('[^0-9]'), '').padLeft(4, '0').length - 4)}';
+    // The school's own receipt number; sample receipts show their id.
+    final number = receipt.number.isNotEmpty ? receipt.number : receipt.id.toUpperCase();
     final rows = [
       if (args['student'] != null)
         (
@@ -52,7 +55,7 @@ class ReceiptView extends StatelessWidget {
         ),
       ('fees.paid_on'.tr, DateFormat('EEE d MMM y, HH:mm').format(receipt.paidOn), false),
       ('fees.method'.tr, 'fees.${receipt.method}'.tr, false),
-      (receipt.method == 'upi' ? 'fees.upi_reference'.tr : 'fees.reference'.tr, receipt.reference, true),
+      ('fees.reference'.tr, receipt.reference, true),
       ('fees.receipt_no'.tr, number, true),
     ];
     return Scaffold(
@@ -89,7 +92,7 @@ class ReceiptView extends StatelessWidget {
                   icon: PhosphorIconsRegular.export,
                   label: 'fees.share_receipt'.tr,
                   color: AppColors.white,
-                  onTap: () => ToastHelper.show('fees.shared', kind: ToastKind.success),
+                  onTap: () => unawaited(openFromServer((s) => s.post('/receipts/${receipt.id}/link', {}))),
                 ),
               ],
             ),
@@ -127,7 +130,7 @@ class ReceiptView extends StatelessWidget {
                     kind: BtnKind.quiet,
                     icon: PhosphorIconsRegular.downloadSimple,
                     expand: true,
-                    onPressed: () => ToastHelper.show('fees.downloaded', kind: ToastKind.success),
+                    onPressed: () => unawaited(openFromServer((s) => s.post('/receipts/${receipt.id}/link', {}))),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -167,10 +170,13 @@ class _Slip extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Overline(AppConfig.schoolName),
-                  const SizedBox(height: 4),
-                  Text('fees.school_address'.tr, style: context.type.cap),
+                  // The school's own address, as it set it (nothing when it has none).
+                  if (SchoolConfig.schoolAddress.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(SchoolConfig.schoolAddress, style: context.type.cap),
+                  ],
                   const SizedBox(height: 20),
-                  Text(Formatters.inr(receipt.amount), style: context.type.dl),
+                  Text(Formatters.money(receipt.amount), style: context.type.dl),
                   const SizedBox(height: 6),
                   Text(receipt.title, style: context.type.t),
                   const Padding(padding: EdgeInsets.only(top: 20, bottom: 8), child: DashedLine()),
@@ -185,7 +191,7 @@ class _Slip extends StatelessWidget {
                           Expanded(
                             child: Text(
                               r.$2,
-                              textAlign: TextAlign.right,
+                              textAlign: TextAlign.end,
                               style: r.$3
                                   ? context.type.mono.copyWith(color: c.ink)
                                   : AppText.chip(color: c.ink, height: 1.3),
@@ -195,7 +201,12 @@ class _Slip extends StatelessWidget {
                       ),
                     ),
                   const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: DashedLine()),
-                  Text('fees.receipt_note'.tr, style: context.type.cap),
+                  Text(
+                    SchoolConfig.schoolPhone.isEmpty
+                        ? 'fees.receipt_note'.tr
+                        : 'fees.receipt_note_phone'.trp({'phone': SchoolConfig.schoolPhone}),
+                    style: context.type.cap,
+                  ),
                 ],
               ),
               Positioned(

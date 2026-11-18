@@ -23,7 +23,7 @@ export interface Harness {
 }
 
 export async function startHarness(extra: Record<string, string> = {}): Promise<Harness> {
-  const server = await startDevPostgres({ dataDir: path.join(mkdtempSync(path.join(tmpdir(), 'tangent-console-')), 'data'), fresh: true });
+  const server = await startDevPostgres({ dataDir: path.join(mkdtempSync(path.join(tmpdir(), 'tangent-console-')), 'data'), fresh: true, throwaway: true });
   const regUrl = await ensureDatabase(server.url, 'registry');
   const base = { NODE_ENV: 'test', REGISTRY_DATABASE_URL: regUrl, SECRETS_KEY: 'test-secret-key-for-sealing-0123456789', JWT_SECRET: 'jwt-secret-for-tests-0123456789abcd', PORT: '0' };
   const env = loadEnv({ ...base, DEMO_CODE: '424242', STEP_PAUSE_MS: '0', PROBE_SECONDS: '0', ADMIN_BASE_URL: 'http://localhost:5173', ...extra });
@@ -66,7 +66,7 @@ export async function startHarness(extra: Record<string, string> = {}): Promise<
 }
 
 export const wizardPayload = (slug: string, over: Record<string, unknown> = {}) => ({
-  basics: { name: `${slug} School`, shortName: slug.slice(0, 8), slug, board: 'CBSE', address: '1 Main Road', city: 'Pune', contactName: 'Asha Rao', contactPhone: '+91 90000 11111', contactEmail: `office@${slug}.test`, gstin: '', language: 'en' },
+  basics: { name: `${slug} School`, shortName: slug.slice(0, 8), slug, board: 'CBSE', address: '1 Main Road', city: 'Pune', contactName: 'Asha Rao', contactPhone: '+91 90000 11111', contactEmail: `office@${slug}.test`, gstin: '', language: 'en', country: 'IN', timezone: 'Asia/Kolkata', locale: 'en-IN', currency: 'INR' },
   plan: { plan: 'standard', modules: ['people', 'attendance', 'fees', 'notices', 'timetable'], addOns: [], locks: [], students: 300 },
   branding: { color: '#0EA5E9', logoText: slug.slice(0, 1).toUpperCase(), appName: `${slug} App`, tagline: 'Learning together' },
   placement: { target: 'local', cell: 'local-1', addressing: 'path', customDomain: '' },

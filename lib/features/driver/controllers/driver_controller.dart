@@ -41,14 +41,24 @@ class DriverController extends GetxController with Loadable {
     if (running != null) unawaited(_share(running.id));
   }, isEmpty: () => routes.isEmpty);
 
-  /// Morning before noon, afternoon after.
-  String get kindNow => Clock.now().hour < 12 ? 'morning' : 'afternoon';
+  /// The trip it is time for on this route: the last whose time has come (the first before any has); without the school's
+  /// list (an older server), morning before noon and afternoon after.
+  TripSession sessionNow(DriverRoute route) {
+    final now = Clock.now();
+    final hm = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    if (route.sessions.isEmpty) {
+      return now.hour < 12
+          ? TripSession(key: 'morning', name: 'driver.morning'.tr, from: '00:00')
+          : TripSession(key: 'afternoon', name: 'driver.afternoon'.tr, from: '12:00');
+    }
+    return route.sessions.lastWhere((s) => s.from.compareTo(hm) <= 0, orElse: () => route.sessions.first);
+  }
 
   String? markOf(DriverRoute route, String tripId, String studentId) =>
       route.marks.where((m) => m.tripId == tripId && m.studentId == studentId).firstOrNull?.event;
 
   Future<void> start(DriverRoute route) => _act(() async {
-    final id = await _repo.start(routeId: route.id, kind: kindNow);
+    final id = await _repo.start(routeId: route.id, kind: sessionNow(route).key);
     await load();
     await _share(id);
   }, 'driver.started');

@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:get/get.dart';
 import 'package:tangent/core/config/app_config.dart';
+import 'package:tangent/core/services/storage_service.dart';
 
 /// Sends crashes to Tangent's error list (the console's Health page). Only builds for a real school report; debug runs print.
 abstract final class ErrorReporter {
@@ -19,6 +21,30 @@ abstract final class ErrorReporter {
       report(error, stack);
       return false;
     };
+    // Reports kept while offline go once the app is up again.
+    if (AppConfig.live && !kDebugMode) Future<void>.delayed(const Duration(seconds: 20), () => unawaited(_flush()));
+  }
+
+  static StorageService? get _storage => Get.isRegistered<StorageService>() ? Get.find<StorageService>() : null;
+
+  static List<Map<String, dynamic>> get _queue =>
+      [for (final x in _storage?.read<List<dynamic>>(StorageKeys.errorQueue) ?? const <dynamic>[]) Map<String, dynamic>.from(x as Map)];
+
+  static Future<void> _flush() async {
+    final queue = _queue;
+    if (queue.isEmpty) return;
+    await _storage?.write(StorageKeys.errorQueue, <dynamic>[]);
+    for (final body in queue) {
+      if (!await _post(body)) {
+        await _keep(body);
+        return;
+      }
+    }
+  }
+
+  static Future<void> _keep(Map<String, dynamic> body) async {
+    final queue = [..._queue, body];
+    await _storage?.write(StorageKeys.errorQueue, queue.sublist(queue.length > 20 ? queue.length - 20 : 0));
   }
 
   static void report(Object error, StackTrace? stack) {
@@ -30,6 +56,22 @@ abstract final class ErrorReporter {
   }
 
   static Future<void> _send(String message, StackTrace? stack) async {
+    final trace = stack?.toString() ?? '';
+    final body = {
+      'source': 'app',
+      'message': message.length > 500 ? message.substring(0, 500) : message,
+      if (trace.isNotEmpty) 'stack': trace.length > 4000 ? trace.substring(0, 4000) : trace,
+      'release': '${AppConfig.version}+${AppConfig.build}',
+    };
+    // Not sent (offline): kept on the phone and sent with the next report that gets through.
+    if (await _post(body)) {
+      await _flush();
+    } else {
+      await _keep(body);
+    }
+  }
+
+  static Future<bool> _post(Map<String, dynamic> body) async {
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
     try {
       final base = AppConfig.apiBase.replaceAll(RegExp(r'/$'), '');
@@ -37,16 +79,12 @@ abstract final class ErrorReporter {
       req.headers
         ..contentType = ContentType.json
         ..set('x-school', AppConfig.schoolSlug);
-      final trace = stack?.toString() ?? '';
-      req.write(jsonEncode({
-        'source': 'app',
-        'message': message.length > 500 ? message.substring(0, 500) : message,
-        if (trace.isNotEmpty) 'stack': trace.length > 4000 ? trace.substring(0, 4000) : trace,
-        'release': '${AppConfig.version}+${AppConfig.build}',
-      }));
-      await (await req.close()).drain<void>();
+      req.write(jsonEncode(body));
+      final res = await req.close();
+      await res.drain<void>();
+      return res.statusCode < 500;
     } on Object {
-      // shortcut: a report that cannot be sent is dropped; queue it on the phone if offline crashes need counting.
+      return false;
     } finally {
       client.close(force: true);
     }

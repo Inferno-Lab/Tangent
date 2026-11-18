@@ -1,8 +1,8 @@
 import { Inject, Injectable, Logger, type OnApplicationShutdown, type OnModuleInit } from '@nestjs/common';
-import { istToday } from '@tangent/contracts';
+import { schoolInstant, schoolToday } from '@tangent/contracts';
 import { enqueue, scheduleJob, work, type Job } from '@tangent/db';
 import { Hub } from '@tangent/integrations';
-import type { PoolManager, Registry } from '@tangent/tenancy';
+import { withSchool, type PoolManager, type Registry } from '@tangent/tenancy';
 import type { Pool } from 'pg';
 import { ENV, type Env } from '../env.js';
 import { POOLS, REGISTRY } from '../tenancy/tenant.js';
@@ -42,13 +42,15 @@ export class HubService implements OnModuleInit, OnApplicationShutdown {
     scheduleJob(this.registry.pool as never, 'school-daily-jobs', 60 * 60_000, () => this.queueDaily(), () => undefined);
   }
 
-  /** Reminders, late fines and reconciliation for every live school, run from 09:00 India time. */
-  async queueDaily(today = istToday()): Promise<number> {
-    const runAt = new Date(Math.max(Date.now(), Date.parse(`${today}T09:00:00+05:30`)));
+  /** Reminders, late fines and reconciliation for every live school, each from 09:00 on its own clock and its own "today". */
+  async queueDaily(now = new Date()): Promise<number> {
     let n = 0;
-    for (const id of await this.liveSchools()) {
-      for (const kind of ['fees.reminders', 'fees.lateFines', 'payments.reconcile'] as const) {
-        if (await enqueue(this.registry.pool as never, kind, id, { day: today }, runAt)) n++;
+    const { rows } = await this.registry.pool.query<{ id: string; timezone: string }>("select id, timezone from schools where deleted_at is null and status = 'live'");
+    for (const s of rows) {
+      const today = schoolToday(now, s.timezone);
+      const runAt = new Date(Math.max(now.getTime(), schoolInstant(today, '09:00', s.timezone).getTime()));
+      for (const kind of ['fees.reminders', 'fees.lateFines', 'payments.reconcile', 'approvals.timeLimits', 'reports.scheduled', 'meetings.remind'] as const) {
+        if (await enqueue(this.registry.pool as never, kind, s.id, { day: today }, runAt)) n++;
       }
     }
     return n;
@@ -74,7 +76,10 @@ export class HubService implements OnModuleInit, OnApplicationShutdown {
   private async run(job: Job): Promise<string | void> {
     const fn = this.handlers.get(job.kind);
     if (!fn) throw new Error(`Nothing handles ${job.kind} jobs.`);
-    return fn(job);
+    // A school's job runs on its own clock and in its own currency (its "today", its money).
+    const slug = job.schoolId ? (await this.registry.pool.query<{ slug: string }>('select slug from schools where id = $1 or slug = $1', [job.schoolId])).rows[0]?.slug : null;
+    const info = slug ? await this.registry.school(slug) : null;
+    return withSchool(info, () => fn(job));
   }
 
   /** A school's database, for work that runs outside a request. */
@@ -94,7 +99,7 @@ export class HubService implements OnModuleInit, OnApplicationShutdown {
     const s = await this.schoolPool(slug);
     if (!s) return [];
     const { rows } = await s.pool.query<{ token: string }>(
-      "select d.token from devices d join users u on u.id = d.user_id where right(regexp_replace(coalesce(u.phone, ''), '\\D', '', 'g'), 10) = right(regexp_replace($1, '\\D', '', 'g'), 10) or lower(u.email) = lower($1)",
+      "select d.token from devices d join users u on u.id = d.user_id where u.phone = $1 or lower(u.email) = lower($1)",
       [to]);
     return rows.map((r) => r.token);
   }

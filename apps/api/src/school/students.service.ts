@@ -1,14 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { commitImport, newId, previewImport } from '@tangent/db';
-import {
-  addDays, dayLabel, initials, istToday, latestSchoolDay, schoolDaysEnding,
-  type AssignFee, type AttendanceStatus, type ContactReveal, type FeeStatus, type ImportResult, type MessageRequest,
-  type GuardianRow, type GuardiansPut, type Paged, type StudentCreate, type StudentDetail, type StudentPatch, type StudentQuery, type StudentRow, type StudentSummary, type StudentViews,
-} from '@tangent/contracts';
+import { nextNumber, commitImport, newId, previewImport } from '@tangent/db';
+import { schoolInstant, addDays, dayLabel, initials, schoolToday, latestSchoolDay, schoolDaysEnding, type AssignFee, type AttendanceStatus, type ContactReveal, type FeeStatus, type ImportResult, type MessageRequest, type GuardianRow, type GuardiansPut, type Paged, type StudentCreate, type StudentDetail, type StudentPatch, type StudentQuery, type StudentRow, type StudentSummary, type StudentViews, type ListItem, listKey, tx, addressProblems, joinAddress, type AddressFormat, composeName, type ContactChannel, type LeavingKind, type StudentLeaveInput } from '@tangent/contracts';
 import { maskPhone } from '@tangent/security';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
-import { AuditService, Messenger, SettingsService } from './support.js';
+import { AuditService, Messenger, SettingsService, checkLeaveClash } from './support.js';
 
 const FEE_HORIZON_DAYS = 30;
 
@@ -29,7 +25,7 @@ export class StudentsService {
 
   /** The latest school day and the ten before it, for the tick marks. */
   private days(OFF_DAYS: readonly number[], n = 10): { last: string; days: string[]; today: string } {
-    const today = istToday();
+    const today = schoolToday();
     return { today, last: latestSchoolDay(today, OFF_DAYS), days: schoolDaysEnding(today, n, OFF_DAYS) };
   }
 
@@ -76,7 +72,7 @@ export class StudentsService {
     const where: string[] = [];
     const params: unknown[] = [today, addDays(today, FEE_HORIZON_DAYS)];
     const add = (v: unknown) => { params.push(v); return `$${params.length}`; };
-    if (q.query) where.push(`(s.name ilike ${add(`%${esc(q.query)}%`)} or s.admission_no ilike ${add(`%${esc(q.query)}%`)})`);
+    if (q.query) where.push(`(s.name ilike ${add(`%${esc(q.query)}%`)} or s.name_local ilike ${add(`%${esc(q.query)}%`)} or s.admission_no ilike ${add(`%${esc(q.query)}%`)})`);
     if (q.classId) where.push(`s.class_id = ${add(q.classId)}`);
     if (q.house) where.push(`s.house = ${add(q.house)}`);
     if (q.feeStatus === 'overdue') where.push('coalesce(fee.overdue, 0) > 0');
@@ -121,8 +117,7 @@ export class StudentsService {
     const out = new Map<string, (AttendanceStatus | null)[]>();
     if (!ids.length) return out;
     const { rows } = await t.pool.query<{ student_id: string; date: string; status: AttendanceStatus }>(
-      `select m.student_id, to_char(s.date, 'YYYY-MM-DD') date, m.status from attendance_marks m join attendance_sessions s on s.id = m.session_id
-       where m.student_id = any($1) and s.date = any($2::date[])`, [ids, days]);
+      `select d.student_id, to_char(d.date, 'YYYY-MM-DD') date, d.status from attendance_days d where d.student_id = any($1) and d.date = any($2::date[])`, [ids, days]);
     for (const id of ids) out.set(id, days.map(() => null));
     for (const r of rows) out.get(r.student_id)![days.indexOf(r.date)] = r.status;
     return out;
@@ -147,7 +142,7 @@ export class StudentsService {
          avg(a.now_pct) a_now, avg(a.prev_pct) a_prev
        from students s
        left join od on od.student_id = s.id
-       left join lateral (select m.status, ses.submitted_at from attendance_marks m join attendance_sessions ses on ses.id = m.session_id where m.student_id = s.id and ses.date = $2::date) td on true
+       left join lateral (select d.status, d.submitted_at from attendance_days d where d.student_id = s.id and d.date = $2::date) td on true
        left join lateral (select
           avg(case when ses.date > '${split}' then (case when m.status in ('present','late','half_day') then 1.0 else 0.0 end) end) now_pct,
           avg(case when ses.date <= '${split}' then (case when m.status in ('present','late','half_day') then 1.0 else 0.0 end) end) prev_pct
@@ -213,7 +208,8 @@ export class StudentsService {
       this.activity(t, id),
       t.pool.query<{ phone: string | null; email: string | null; last_login_at: Date | null }>('select u.phone, u.email, u.last_login_at from students s join users u on u.id = s.user_id where s.id = $1', [id]),
     ]);
-    const extra = (await t.pool.query<{ gender: StudentDetail['gender']; status: string; left_on: string | null; reason: string | null }>("select gender, status, left_on::text, leaving_reason reason from students where id = $1", [id])).rows[0];
+    const extra = (await t.pool.query<{ gender: StudentDetail['gender']; status: string; left_on: string | null; reason: string | null; kind: LeavingKind | null; transfer_to: string | null; custom: StudentDetail['custom']; address_parts: StudentDetail['addressParts']; given_name: string | null; family_name: string | null; name_local: string | null; fee_category: string | null }>(
+      'select gender, status, left_on::text, leaving_reason reason, leaving_kind kind, transfer_to, custom, address_parts, given_name, family_name, name_local, fee_category from students where id = $1', [id])).rows[0];
     const has = await this.has(t);
     const acc = account.rows[0];
     const base = this.mask(this.row(r, ticks.get(id)!), has);
@@ -225,7 +221,9 @@ export class StudentsService {
         homework: has.homework ? { onTime: Number(hw.rows[0]!.on_time), total: Number(hw.rows[0]!.total) } : { onTime: 0, total: 0 }, libraryOut: has.library ? Number(lib.rows[0]!.n) : 0,
       },
       chips: { house: r.house }, recentActivity: acts, roll24: has.attendance ? roll24 : roll24.map(() => null),
-      gender: extra?.gender ?? null, guardians: await this.guardians(t, id), left: extra?.status === 'left' && extra.left_on ? { on: extra.left_on, reason: extra.reason ?? '' } : null,
+      gender: extra?.gender ?? null, custom: extra?.custom ?? {}, addressParts: extra?.address_parts ?? {}, guardians: await this.guardians(t, id),
+      givenName: extra?.given_name ?? null, familyName: extra?.family_name ?? null, nameLocal: extra?.name_local ?? null, feeCategory: extra?.fee_category ?? null,
+      left: extra?.status === 'left' && extra.left_on ? { on: extra.left_on, reason: extra.reason ?? '', kind: extra.kind ?? 'withdrawn', transferTo: extra.transfer_to } : null,
       appAccount: acc ? { phone: acc.phone ? maskPhone(acc.phone) : '', email: acc.email ?? '', lastSignIn: acc.last_login_at?.toISOString() ?? null } : null,
     };
   }
@@ -251,7 +249,7 @@ export class StudentsService {
     const h = hw.rows[0];
     if (h) out.push({ id: h.id, at: h.at.toISOString(), label: `Handed in “${h.title}”`, sub: '', tone: 'v' });
     const a = att.rows[0];
-    if (a) out.push({ id: a.id, at: `${a.date}T08:00:00+05:30`, label: a.status === 'late' ? 'Arrived late' : 'Absent', sub: a.marker ? `marked by ${a.marker}` : '', tone: 'a' });
+    if (a) out.push({ id: a.id, at: schoolInstant(a.date, '08:00').toISOString(), label: a.status === 'late' ? 'Arrived late' : 'Absent', sub: a.marker ? `marked by ${a.marker}` : '', tone: 'a' });
     return out;
   }
 
@@ -265,14 +263,44 @@ export class StudentsService {
 
   /** The fields the school requires beyond the always-needed ones (console: students.required), checked on add and edit. */
   private async required(t: TenantCtx, body: StudentPatch): Promise<void> {
+    // An address typed in the country's parts is checked and written as one line too (§3.3.5).
+    if (body.addressParts) {
+      const format = await this.settings.value<AddressFormat>(t, 'people.addressFormat', []);
+      const bad = addressProblems(format, body.addressParts);
+      if (Object.keys(bad).length) throw new ApiError('validation', 'Check the address.', { fields: Object.fromEntries(Object.entries(bad).map(([k, m]) => [`address.${k}`, m])) });
+      body.address = joinAddress(format, body.addressParts);
+    }
     const need = await this.settings.value<string[]>(t, 'students.required', []);
     const missing = need.filter((k) => k in body ? !String((body as Record<string, unknown>)[k] ?? '').trim() : false);
     if (missing.length) throw new ApiError('validation', 'Fill in the fields your school keeps for every student.', { fields: Object.fromEntries(missing.map((k) => [k, 'Your school needs this.'])) });
+    // A fee category is one of the school's (fees.categories), kept by its key.
+    if (body.feeCategory) {
+      const key = listKey(await this.settings.value<ListItem[]>(t, 'fees.categories', []), body.feeCategory);
+      if (!key) throw new ApiError('validation', tx('Choose one of the school’s fee categories.'), { fields: { feeCategory: tx('Choose from the list.') } });
+      body.feeCategory = key;
+    }
+    // Gender and blood group come from the school's lists (§3.6.5): stored as the item's key, whatever was typed.
+    for (const [field, list] of [['gender', 'lists.genders'], ['bloodGroup', 'lists.bloodGroups']] as const) {
+      const typed = body[field];
+      if (!typed) continue;
+      const key = listKey(await this.settings.value<ListItem[]>(t, list, []), typed);
+      if (!key) throw new ApiError('validation', 'Choose from the school’s list.', { fields: { [field]: 'Choose from the list.' } });
+      body[field] = key;
+    }
   }
 
   async create(t: TenantCtx, body: StudentCreate, user: { id: string; name: string }): Promise<StudentDetail> {
+    // Given and family names, when typed, make the full name; the parts are kept for the register and the second script beside it.
+    if (body.givenName && body.familyName) body.name = composeName(body.givenName, body.familyName, await this.settings.value(t, 'people.nameOrder', 'given-family'));
+    const name = body.name ?? '';
     const need = await this.settings.value<string[]>(t, 'students.required', []);
-    await this.required(t, Object.fromEntries(need.map((k) => [k, (body as Record<string, unknown>)[k] ?? ''])) as StudentPatch);
+    const checked = { ...Object.fromEntries(need.map((k) => [k, (body as Record<string, unknown>)[k] ?? ''])), gender: body.gender, bloodGroup: body.bloodGroup, addressParts: body.addressParts, feeCategory: body.feeCategory } as StudentPatch;
+    await this.required(t, checked);
+    body.feeCategory = checked.feeCategory;
+    body.gender = checked.gender;
+    body.bloodGroup = checked.bloodGroup;
+    if (checked.addressParts) body.address = checked.address;
+    const custom = await this.settings.custom(t, 'student', body.custom ?? {}, true);
     if (body.admissionNo && (await t.pool.query('select 1 from students where lower(admission_no) = lower($1)', [body.admissionNo])).rowCount) {
       throw new ApiError('validation', 'Another student has that admission number.', { fields: { admissionNo: 'Already used.' } });
     }
@@ -280,24 +308,28 @@ export class StudentsService {
     if (!cls.rows[0]) throw new ApiError('validation', 'Choose a class from the list.', { fields: { classId: 'Choose a class from the list.' } });
     const limit = t.info.entitlement.limits.students;
     const count = Number((await t.pool.query<{ n: string }>('select count(*) n from students')).rows[0]!.n);
-    if (count >= limit) throw new ApiError('locked', `Your plan allows ${limit} students. Ask Tangent to raise the limit.`);
-    const year = new Date().getUTCFullYear();
-    const seq = Number((await t.pool.query<{ n: string }>("select count(*) n from students where admission_no like $1", [`${year}/%`])).rows[0]!.n) + 501;
+    if (count >= limit) throw new ApiError('locked', tx('Your plan allows {limit} students. Ask Tangent to raise the limit.', { limit }));
+    // The school's own admission numbers (People → Settings) when the office does not type one.
+    const pattern = await this.settings.value<string>(t, 'people.admissionNumber', '{yyyy}/{seq:4}');
+    const start = await this.settings.value<number>(t, 'people.admissionStart', 1);
+    const ay = (await t.pool.query<{ label: string }>('select label from academic_years where current limit 1')).rows[0]?.label ?? '';
     const id = newId('stu');
     const roll = body.rollNo || String(Number((await t.pool.query<{ n: string }>('select count(*) n from students where class_id = $1', [body.classId])).rows[0]!.n) + 1).padStart(2, '0');
-    const digits = body.guardianPhone.replace(/\D/g, '').slice(-10);
-    if (digits.length < 10) throw new ApiError('validation', 'Add the guardian’s 10-digit phone number.', { fields: { guardianPhone: 'Use a 10-digit phone number.' } });
-    const byPhone = "right(regexp_replace(coalesce(phone,''), '\\D', '', 'g'), 10) = $1";
+    const digits = this.settings.phone(t, body.guardianPhone, 'guardianPhone');
+    const byPhone = 'phone = $1';
     const client = await t.pool.connect();
     try {
       await client.query('begin');
-      await client.query('insert into students (id, admission_no, name, class_id, roll_no, dob, blood_group, address, gender, house, admitted_on) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, current_date)',
-        [id, body.admissionNo || `${year}/${String(seq).padStart(4, '0')}`, body.name, body.classId, roll, body.dob, body.bloodGroup ?? null, body.address ?? null, body.gender ?? null, body.house || null]);
+      const admissionNo = body.admissionNo || (await nextNumber(client, { pattern, start, day: schoolToday(), ay, table: 'students', column: 'admission_no' }));
+      await client.query(`insert into students (id, admission_no, name, class_id, roll_no, dob, blood_group, address, gender, house, admitted_on, custom, address_parts, given_name, family_name, name_local, fee_category)
+        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+        [id, admissionNo, name, body.classId, roll, body.dob, body.bloodGroup ?? null, body.address || null, body.gender ?? null, body.house || null, schoolToday(), JSON.stringify(custom), JSON.stringify(body.addressParts ?? {}),
+          body.givenName || null, body.familyName || null, body.nameLocal || null, body.feeCategory || null]);
       // One family, one guardian: a brother or sister joins the guardian who already has that phone number.
       let g = (await client.query<{ id: string; user_id: string | null }>(`select id, user_id from guardians where ${byPhone} limit 1`, [digits])).rows[0];
       if (!g) {
         g = { id: newId('gdn'), user_id: null };
-        await client.query("insert into guardians (id, name, phone, relation) values ($1,$2,$3,'Parent')", [g.id, body.guardianName, body.guardianPhone]);
+        await client.query("insert into guardians (id, name, phone, relation) values ($1,$2,$3,'Parent')", [g.id, body.guardianName, digits]);
       }
       await client.query('insert into student_guardians (student_id, guardian_id, is_primary) values ($1,$2,true)', [id, g.id]);
       // The family's app account: signs in with a code to this phone, no password.
@@ -305,7 +337,7 @@ export class StudentsService {
         let uid = (await client.query<{ id: string }>(`select id from users where ${byPhone} limit 1`, [digits])).rows[0]?.id;
         if (!uid) {
           uid = newId('usr');
-          await client.query("insert into users (id, kind, name, phone) values ($1,'guardian',$2,$3)", [uid, body.guardianName, body.guardianPhone]);
+          await client.query("insert into users (id, kind, name, phone) values ($1,'guardian',$2,$3)", [uid, body.guardianName, digits]);
         }
         await client.query('update guardians set user_id = $2 where id = $1', [g.id, uid]);
       }
@@ -316,7 +348,7 @@ export class StudentsService {
     } finally {
       client.release();
     }
-    await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'student.created', entity: 'student', entityId: id, detail: { name: body.name } });
+    await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'student.created', entity: 'student', entityId: id, detail: { name } });
     return this.detail(t, id);
   }
 
@@ -324,13 +356,25 @@ export class StudentsService {
   async update(t: TenantCtx, id: string, b: StudentPatch, user: { id: string; name: string }): Promise<StudentDetail> {
     const was = (await t.pool.query<{ class_id: string }>("select class_id from students where id = $1 and status = 'active'", [id])).rows[0];
     if (!was) throw notFound('That student');
+    if (b.givenName !== undefined || b.familyName !== undefined) {
+      const cur = (await t.pool.query<{ given_name: string | null; family_name: string | null }>('select given_name, family_name from students where id = $1', [id])).rows[0]!;
+      const given = b.givenName ?? cur.given_name ?? '', family = b.familyName ?? cur.family_name ?? '';
+      if (given && family) b.name = composeName(given, family, await this.settings.value(t, 'people.nameOrder', 'given-family'));
+      else if (given || family) throw new ApiError('validation', 'Enter both the given and the family name, or neither.', { fields: { [given ? 'familyName' : 'givenName']: 'Enter this too.' } });
+    } else if (b.name !== undefined) { b.givenName = ''; b.familyName = ''; }
     await this.required(t, b);
+    const custom = b.custom ? await this.settings.custom(t, 'student', b.custom, false) : null;
     if (b.classId && !(await t.pool.query('select 1 from classes where id = $1', [b.classId])).rowCount) throw new ApiError('validation', 'Choose a class from the list.', { fields: { classId: 'Choose a class from the list.' } });
     if (b.admissionNo && (await t.pool.query('select 1 from students where lower(admission_no) = lower($1) and id <> $2', [b.admissionNo, id])).rowCount) {
       throw new ApiError('validation', 'Another student has that admission number.', { fields: { admissionNo: 'Already used.' } });
     }
-    const cols: Record<keyof StudentPatch, string> = { name: 'name', classId: 'class_id', rollNo: 'roll_no', dob: 'dob', gender: 'gender', house: 'house', admissionNo: 'admission_no', bloodGroup: 'blood_group', address: 'address' };
-    const set = (Object.keys(cols) as (keyof StudentPatch)[]).filter((k) => b[k] !== undefined);
+    if (custom) await t.pool.query('update students set custom = custom || $2::jsonb where id = $1', [id, JSON.stringify(custom)]);
+    if (b.addressParts) await t.pool.query('update students set address_parts = $2 where id = $1', [id, JSON.stringify(b.addressParts)]);
+    const cols: Record<Exclude<keyof StudentPatch, 'custom' | 'addressParts'>, string> = {
+      name: 'name', classId: 'class_id', rollNo: 'roll_no', dob: 'dob', gender: 'gender', house: 'house', admissionNo: 'admission_no', bloodGroup: 'blood_group', address: 'address',
+      givenName: 'given_name', familyName: 'family_name', nameLocal: 'name_local', feeCategory: 'fee_category',
+    };
+    const set = (Object.keys(cols) as (keyof typeof cols)[]).filter((k) => b[k] !== undefined);
     if (set.length) {
       await t.pool.query(`update students set ${set.map((k, i) => `${cols[k]} = $${i + 2}`).join(', ')} where id = $1`, [id, ...set.map((k) => (b[k] === '' ? null : b[k]))]);
     }
@@ -339,10 +383,13 @@ export class StudentsService {
   }
 
   async guardians(t: TenantCtx, studentId: string): Promise<GuardianRow[]> {
-    const { rows } = await t.pool.query<{ id: string; name: string; phone: string | null; email: string | null; relation: string | null; can_collect: boolean; is_primary: boolean; user_id: string | null; login: Date | null }>(
-      `select g.id, g.name, g.phone, g.email, g.relation, sg.can_collect, sg.is_primary, g.user_id, u.last_login_at login from student_guardians sg join guardians g on g.id = sg.guardian_id
-       left join users u on u.id = g.user_id where sg.student_id = $1 order by sg.is_primary desc, g.name`, [studentId]);
-    return rows.map((r) => ({ id: r.id, name: r.name, phone: r.phone ? maskPhone(r.phone) : '', email: r.email ?? '', relation: r.relation ?? 'Parent', canCollect: r.can_collect, isPrimary: r.is_primary, hasApp: !!r.login }));
+    const { rows } = await t.pool.query<{ id: string; name: string; phone: string | null; email: string | null; relation: string | null; language: string | null; can_collect: boolean; is_primary: boolean; gets_messages: boolean; gets_bills: boolean; channels_off: ContactChannel[]; user_id: string | null; login: Date | null }>(
+      `select g.id, g.name, g.phone, g.email, g.relation, g.language, sg.can_collect, sg.is_primary, sg.gets_messages, sg.gets_bills, g.channels_off, g.user_id, u.last_login_at login
+       from student_guardians sg join guardians g on g.id = sg.guardian_id left join users u on u.id = g.user_id where sg.student_id = $1 order by sg.is_primary desc, g.name`, [studentId]);
+    return rows.map((r) => ({
+      id: r.id, name: r.name, phone: r.phone ? maskPhone(r.phone) : '', email: r.email ?? '', relation: r.relation ?? 'Parent', language: r.language ?? '', canCollect: r.can_collect, isPrimary: r.is_primary, hasApp: !!r.login,
+      getsMessages: r.gets_messages, getsBills: r.gets_bills, channelsOff: r.channels_off ?? [],
+    }));
   }
 
   /**
@@ -351,7 +398,19 @@ export class StudentsService {
    */
   async setGuardians(t: TenantCtx, studentId: string, b: GuardiansPut, user: { id: string; name: string }): Promise<GuardianRow[]> {
     if (!(await t.pool.query('select 1 from students where id = $1', [studentId])).rowCount) throw notFound('That student');
-    const byPhone = "right(regexp_replace(coalesce(phone,''), '\\D', '', 'g'), 10) = $1";
+    // How each is related comes from the school's list; a relation typed before the list existed is kept as it was.
+    const rels = await this.settings.value<ListItem[]>(t, 'lists.relationships', []);
+    const was = new Set((await this.guardians(t, studentId)).map((g) => g.relation.toLowerCase()));
+    b.guardians.forEach((g, i) => {
+      const key = listKey(rels, g.relation);
+      if (key) g.relation = key;
+      else if (!was.has(g.relation.toLowerCase())) throw new ApiError('validation', 'Choose how each guardian is related from the list.', { fields: { [`guardians.${i}.relation`]: 'Choose from the list.' } });
+    });
+    const byPhone = 'phone = $1';
+    // The same phone twice would be one guardian saved twice with different answers.
+    const phones = b.guardians.map((g) => (g.id && /[^\d\s+()-]/.test(g.phone) ? `id:${g.id}` : this.settings.phone(t, g.phone)));
+    const twice = phones.findIndex((p, i) => phones.indexOf(p) !== i);
+    if (twice >= 0) throw new ApiError('validation', 'Two guardians have the same phone number.', { fields: { [`guardians.${twice}.phone`]: 'Already given above.' } });
     const client = await t.pool.connect();
     try {
       await client.query('begin');
@@ -359,14 +418,16 @@ export class StudentsService {
       for (const g of b.guardians) {
         // An existing guardian keeps their (masked) phone unless a new one is typed in full.
         const known = g.id ? (await client.query<{ id: string; phone: string | null }>('select id, phone from guardians where id = $1', [g.id])).rows[0] : undefined;
-        const phone = known && /[^\d\s+()-]/.test(g.phone) ? known.phone ?? '' : g.phone;
-        const digits = phone.replace(/\D/g, '').slice(-10);
-        if (digits.length < 10) throw new ApiError('validation', `Add ${g.name}’s 10-digit phone number.`, { fields: { phone: 'Use a 10-digit phone number.' } });
+        const phone = known && /[^\d\s+()-]/.test(g.phone) ? known.phone ?? '' : this.settings.phone(t, g.phone);
+        const digits = phone;
         let id = known?.id ?? (await client.query<{ id: string }>(`select id from guardians where ${byPhone} limit 1`, [digits])).rows[0]?.id;
-        if (id) await client.query('update guardians set name = $2, phone = $3, email = $4, relation = $5 where id = $1', [id, g.name, phone, g.email || null, g.relation]);
+        if (id) {
+          await client.query('update guardians set name = $2, phone = $3, email = $4, relation = $5, language = case when $7 then $6 else language end, channels_off = coalesce($8, channels_off) where id = $1',
+            [id, g.name, phone, g.email || null, g.relation, g.language || null, g.language !== undefined, g.channelsOff ? JSON.stringify(g.channelsOff) : null]);
+        }
         else {
           id = newId('gdn');
-          await client.query('insert into guardians (id, name, phone, email, relation) values ($1,$2,$3,$4,$5)', [id, g.name, phone, g.email || null, g.relation]);
+          await client.query('insert into guardians (id, name, phone, email, relation, language, channels_off) values ($1,$2,$3,$4,$5,$6,$7)', [id, g.name, phone, g.email || null, g.relation, g.language || null, JSON.stringify(g.channelsOff ?? [])]);
         }
         const d = digits;
         const has = (await client.query<{ user_id: string | null }>('select user_id from guardians where id = $1', [id])).rows[0]?.user_id;
@@ -375,8 +436,10 @@ export class StudentsService {
           if (!uid) { uid = newId('usr'); await client.query("insert into users (id, kind, name, phone) values ($1,'guardian',$2,$3)", [uid, g.name, phone]); }
           await client.query('update guardians set user_id = $2 where id = $1', [id, uid]);
         }
-        await client.query(`insert into student_guardians (student_id, guardian_id, is_primary, can_collect) values ($1,$2,$3,$4)
-          on conflict (student_id, guardian_id) do update set is_primary = excluded.is_primary, can_collect = excluded.can_collect`, [studentId, id, g.isPrimary, g.canCollect]);
+        // Left out (an older app or sheet), only the guardian contacted first gets the messages and the bills.
+        await client.query(`insert into student_guardians (student_id, guardian_id, is_primary, can_collect, gets_messages, gets_bills) values ($1,$2,$3,$4,$5,$6)
+          on conflict (student_id, guardian_id) do update set is_primary = excluded.is_primary, can_collect = excluded.can_collect, gets_messages = excluded.gets_messages, gets_bills = excluded.gets_bills`,
+          [studentId, id, g.isPrimary, g.canCollect, g.getsMessages ?? g.isPrimary, g.getsBills ?? g.isPrimary]);
         keep.push(id);
       }
       await client.query('delete from student_guardians where student_id = $1 and guardian_id <> all($2)', [studentId, keep]);
@@ -391,14 +454,33 @@ export class StudentsService {
     return this.guardians(t, studentId);
   }
 
+  /** Leave the office records itself: approved at once, so the roll call starts with it and the family sees it in the app. */
+  async recordLeave(t: TenantCtx, studentId: string, b: StudentLeaveInput, user: { id: string; name: string }): Promise<{ id: string }> {
+    const s = (await t.pool.query<{ name: string }>("select name from students where id = $1 and status = 'active'", [studentId])).rows[0];
+    if (!s) throw notFound('That student');
+    const to = b.halfDay ? b.from : b.to;
+    if (to < b.from) throw new ApiError('validation', tx('The last day cannot be before the first day.'), { fields: { to: tx('Before the first day.') } });
+    if (addDays(b.from, 366) < to) throw new ApiError('validation', tx('Leave can be at most a year. Record a longer absence as leaving the school.'), { fields: { to: tx('Too far.') } });
+    await checkLeaveClash(t.pool, studentId, b.from, to, b.halfDay);
+    const id = newId('apr');
+    const when = b.halfDay ? `${b.from} (${b.halfDay === 'am' ? 'morning' : 'afternoon'})` : b.from === to ? b.from : `${b.from} – ${to}`;
+    await t.pool.query(
+      `insert into approvals (id, kind, title, subtitle, requester_name, requested_by, subject_ref, payload, status, decided_by, decided_at)
+       values ($1,'leave',$2,$3,$4,$5,$6,$7,'approved',$5,now())`,
+      [id, `Leave for ${s.name}`, `${when} · ${b.reason.slice(0, 60)}`, user.name, user.id, studentId,
+        JSON.stringify({ studentLeave: true, studentId, from: b.from, to, halfDay: b.halfDay ?? null, reason: b.reason, note: '', fileIds: [], byOffice: true })]);
+    await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'student.leave', entity: 'student', entityId: studentId, detail: { from: b.from, to } });
+    return { id };
+  }
+
   /** The school's own sheet of students, through the same engine as Migration: bad lines are reported, the rest go in as one batch. */
   async importCsv(t: TenantCtx, csv: string, user: { id: string; name: string }): Promise<ImportResult> {
     const input = { kind: 'students', csv, fileName: 'Students page' };
     const p = await previewImport(t.pool, input);
-    if (p.missing.length) throw new ApiError('validation', `The first row must name the columns. Nothing is matched to ${p.missing.join(', ')}.`);
+    if (p.missing.length) throw new ApiError('validation', tx('The first row must name the columns. Nothing is matched to {p0}.', { p0: p.missing.join(', ') }));
     const limit = t.info.entitlement.limits.students;
     const count = Number((await t.pool.query<{ n: string }>('select count(*) n from students')).rows[0]!.n);
-    if (count + p.counts.create > limit) throw new ApiError('locked', `Your plan allows ${limit} students and this sheet would make ${count + p.counts.create}. Ask Tangent to raise the limit.`);
+    if (count + p.counts.create > limit) throw new ApiError('locked', tx('Your plan allows {limit} students and this sheet would make {p1}. Ask Tangent to raise the limit.', { limit, p1: count + p.counts.create }));
     const errors = p.rows.filter((r) => r.errors.length).map((r) => ({ line: r.line, message: r.errors.join(' ') }));
     if (p.counts.create + p.counts.update === 0) return { created: 0, updated: 0, skipped: errors.length, errors };
     const batch = await commitImport(t.pool, input, user.name);
@@ -417,7 +499,7 @@ export class StudentsService {
 
   async message(t: TenantCtx, body: MessageRequest, user: { id: string; name: string }): Promise<{ sent: number }> {
     const { rows } = await t.pool.query<{ student_id: string; phone: string | null; name: string }>(
-      'select sg.student_id, g.phone, s.name from student_guardians sg join guardians g on g.id = sg.guardian_id join students s on s.id = sg.student_id where sg.student_id = any($1) and sg.is_primary', [body.ids]);
+      'select sg.student_id, g.phone, s.name from student_guardians sg join guardians g on g.id = sg.guardian_id join students s on s.id = sg.student_id where sg.student_id = any($1) and sg.gets_messages', [body.ids]);
     const targets = rows.filter((r) => r.phone);
     // How it travels (the app, SMS, WhatsApp, email) is the console's rule for "A message from the office", not the sender's pick.
     const sent = await this.messenger.notify(t, 'office.message', targets.map((r) => ({ to: r.phone!, vars: { text: body.body } })));
@@ -434,10 +516,10 @@ export class StudentsService {
     if (!roles.includes('student')) throw new ApiError('conflict', 'Your school does not use the app for students. Ask Tangent to switch it on.');
     const s = (await t.pool.query<{ name: string; user_id: string | null }>("select name, user_id from students where id = $1 and status = 'active'", [studentId])).rows[0];
     if (!s) throw notFound('That student');
-    const phone = b.phone?.replace(/[^\d+]/g, '') || null;
+    const phone = b.phone?.trim() ? this.settings.phone(t, b.phone) : null;
     const email = b.email?.trim().toLowerCase() || null;
     if (!phone && !email) throw new ApiError('validation', 'Give the student’s own phone or email.', { fields: { phone: 'Phone or email is needed.' } });
-    const taken = (await t.pool.query<{ id: string }>("select id from users where id <> coalesce($3, '') and ((lower(email) = $1 and $1 is not null) or (right(regexp_replace(coalesce(phone,''), '\\D', '', 'g'), 10) = right($2, 10) and $2 is not null))", [email, phone, s.user_id])).rows[0];
+    const taken = (await t.pool.query<{ id: string }>("select id from users where id <> coalesce($3, '') and ((lower(email) = $1 and $1 is not null) or (phone = $2 and $2 is not null))", [email, phone, s.user_id])).rows[0];
     if (taken) throw new ApiError('conflict', 'That phone or email already signs in to another account. Use the student’s own.');
     let id = s.user_id;
     if (id) await t.pool.query('update users set phone = $2, email = $3 where id = $1', [id, phone, email]);
@@ -455,16 +537,17 @@ export class StudentsService {
   async invite(t: TenantCtx, ids: string[], user: { id: string; name: string }): Promise<{ sent: number }> {
     const { rows } = await t.pool.query<{ phone: string; name: string }>(
       `select distinct on (g.phone) g.phone, s.name from student_guardians sg join guardians g on g.id = sg.guardian_id join students s on s.id = sg.student_id
-       where sg.student_id = any($1) and sg.is_primary and g.phone is not null order by g.phone, s.name`, [ids]);
+       where sg.student_id = any($1) and sg.gets_messages and g.phone is not null order by g.phone, s.name`, [ids]);
     const sent = await this.messenger.notify(t, 'family.invite', rows.map((r) => ({ to: r.phone, vars: { student: r.name } })));
     await t.pool.query(`update users set invited_at = coalesce(invited_at, now()) where id in
-      (select g.user_id from student_guardians sg join guardians g on g.id = sg.guardian_id where sg.student_id = any($1) and sg.is_primary)`, [ids]);
+      (select g.user_id from student_guardians sg join guardians g on g.id = sg.guardian_id where sg.student_id = any($1) and sg.gets_messages)`, [ids]);
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'family.invited', entity: 'student', detail: { families: sent } });
     return { sent };
   }
 
   async assignFee(t: TenantCtx, body: AssignFee, user: { id: string; name: string }): Promise<{ created: number }> {
-    const rows = body.ids.map((id) => [newId('inv'), id, body.head, body.title, body.amount, body.dueOn]);
+    const amount = await this.settings.billed(t, body.head, body.amount);
+    const rows = body.ids.map((id) => [newId('inv'), id, body.head, body.title, amount, body.dueOn]);
     const params: unknown[] = [];
     const tuples = rows.map((r) => `(${r.map((v) => { params.push(v); return `$${params.length}`; }).join(',')})`);
     await t.pool.query(`insert into fee_invoices (id, student_id, head, title, amount, due_on) values ${tuples.join(',')}`, params);

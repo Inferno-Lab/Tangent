@@ -1,6 +1,5 @@
 abstract final class AppRoutes {
   static const splash = '/splash';
-  static const onboarding = '/onboarding';
   static const login = '/login';
   static const shell = '/shell';
   static const attendance = '/attendance';
@@ -9,6 +8,16 @@ abstract final class AppRoutes {
   static const homeworkScan = '/scan/homework';
   static const timetable = '/timetable';
   static const results = '/results';
+  static const examTimetable = '/exams/timetable';
+  static const forms = '/forms';
+  static const staffMe = '/staff/me';
+  static const diary = '/diary';
+  static const teacherDiary = '/teacher/diary';
+  static const meetings = '/meetings';
+  static const teacherMeetings = '/teacher/meetings';
+  static const gatePass = '/gate-pass';
+  static const inviteVisitor = '/visitors/invite';
+  static const certificates = '/certificates';
   static const fees = '/fees';
   static const receipt = '/fees/receipt';
   static const notices = '/notices';
@@ -35,4 +44,5 @@ abstract final class AppRoutes {
   static const teacherGrade = '/teacher/grading';
   static const teacherMarks = '/teacher/marks/:classId';
   static const teacherNotice = '/teacher/notice';
+  static const teacherRoster = '/teacher/class/:classId';
 }

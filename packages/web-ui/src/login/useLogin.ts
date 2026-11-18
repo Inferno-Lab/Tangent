@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { rollDigits } from '../digits';
 import { markStyle } from '../shell/Sidebar';
+import { catalogueLanguages, chooseLanguage, currentLanguage, t as tr } from '../i18n';
+import { languageOf } from '@tangent/contracts';
 
 const EYE_ON = 'show';
 const EYE_OFF = 'hide';
-const LANGS = [['English', 'en'], ['हिन्दी', 'hi'], ['मराठी', 'mr']] as const;
 
 /** The parts of a failed call the form reads. The API client's error has all of them. */
 export interface LoginFailure {
@@ -43,7 +44,7 @@ export interface LoginController {
   initialEmail?: string;
 }
 
-const failure = (e: unknown): LoginFailure => (e && typeof e === 'object' && 'message' in e ? (e as LoginFailure) : { message: 'Something went wrong. Try again.' });
+const failure = (e: unknown): LoginFailure => (e && typeof e === 'object' && 'message' in e ? (e as LoginFailure) : { message: tr('ui.use_login.something_went_wrong_try_again') });
 
 /** Everything the sign-in page does: the two steps, the errors that shake, and the helpers for demo schools. */
 export function useLogin(c: LoginController, themeCls: string) {
@@ -62,9 +63,9 @@ export function useLogin(c: LoginController, themeCls: string) {
   const [code, setCode] = useState('');
   const [otpErr, setOtpErr] = useState(false);
   const [otpMsg, setOtpMsg] = useState('');
-  const [lang, setLang] = useState(() => {
-    try { const i = LANGS.findIndex((l) => l[1] === localStorage.getItem('tangent.lang')); return i < 0 ? 0 : i; } catch { return 0; }
-  });
+  // The languages this app has words in: the picker offers only those (English until a catalogue arrives).
+  const [langs, setLangs] = useState<string[]>(['en']);
+  useEffect(() => { void catalogueLanguages().then(setLangs); }, []);
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [name, setName] = useState('');
   const [forgotNote, setForgotNote] = useState('');
@@ -81,8 +82,8 @@ export function useLogin(c: LoginController, themeCls: string) {
 
   const next = async () => {
     if (busy) return;
-    if (!email.trim()) return bad(() => setEmErr(cons ? 'Enter your Tangent email to continue.' : 'Enter your email or phone number to continue.'));
-    if (!pw) return bad(() => { setPwErr(true); setPwMsg('Enter your password to continue.'); });
+    if (!email.trim()) return bad(() => setEmErr(cons ? tr('ui.use_login.enter_your_tangent_email_to') : tr('ui.use_login.enter_your_email_or_phone')));
+    if (!pw) return bad(() => { setPwErr(true); setPwMsg(tr('ui.use_login.enter_your_password_to_continue')); });
     setBusy(true);
     try {
       const res = await c.submitCredentials(email.trim(), pw);
@@ -93,14 +94,14 @@ export function useLogin(c: LoginController, themeCls: string) {
       const f = failure(e);
       bad(() => {
         if (f.fields?.identifier) setEmErr(f.fields.identifier);
-        else { setPwErr(true); setPwMsg(f.attemptsLeft !== undefined && f.attemptsLeft <= 2 ? `${f.message} ${f.attemptsLeft} ${f.attemptsLeft === 1 ? 'try' : 'tries'} left.` : f.message); }
+        else { setPwErr(true); setPwMsg(f.attemptsLeft !== undefined && f.attemptsLeft <= 2 ? tr('ui.use_login.left', { message: f.message, attemptsLeft: f.attemptsLeft }) : f.message); }
       });
     }
   };
 
   const forgot = async () => {
-    if (!c.resetStart) { setForgotNote('Ask a super admin to set a new password for you in Team.'); return; }
-    if (!email.trim()) return bad(() => setEmErr('Type your email or phone number first, then press “Forgot it?”.'));
+    if (!c.resetStart) { setForgotNote(tr('ui.use_login.ask_a_super_admin_to')); return; }
+    if (!email.trim()) return bad(() => setEmErr(tr('ui.use_login.type_your_email_or_phone')));
     if (busy) return;
     setBusy(true);
     try {
@@ -114,12 +115,12 @@ export function useLogin(c: LoginController, themeCls: string) {
   const verifyNow = async (v: string) => {
     if (busy || !challenge) return;
     if (resetting) {
-      if (v.length < 6 || newPw.length < 8) return bad(() => { setOtpErr(true); setOtpMsg(v.length < 6 ? 'Type the 6-digit code.' : 'Choose a password of at least 8 characters.'); });
+      if (v.length < 6 || newPw.length < 8) return bad(() => { setOtpErr(true); setOtpMsg(v.length < 6 ? tr('ui.use_login.type_the_6_digit_code') : tr('ui.use_login.choose_a_password_of_at')); });
       setBusy(true);
       try {
         await c.resetFinish!(challenge.challengeId, v, newPw);
         setBusy(false); setResetting(false); setPw(''); setStep('cred');
-        setForgotNote('Your password is changed. Sign in with the new one.');
+        setForgotNote(tr('ui.use_login.your_password_is_changed_sign'));
       } catch (e) {
         const f = failure(e);
         bad(() => { setOtpErr(true); setOtpMsg(f.message); if (f.attemptsLeft !== undefined) setTries(f.attemptsLeft); });
@@ -145,30 +146,30 @@ export function useLogin(c: LoginController, themeCls: string) {
     privacyOpen, privacy: c.privacy, togglePrivacy: () => setPrivacyOpen((o) => !o),
     // Tangent's own sign-in (the console, or the admin before a school is known) shows the Tangent icon; a school's shows its initial.
     tangent: c.product === 'console' || c.schoolName === 'Tangent',
-    cardA: cons ? 'Schools live' : 'Attendance today', aD: rollDigits(cons ? '312' : '94.2'), aU: cons ? '' : '%',
-    cardB: cons ? 'Release 2026.10.3' : 'Fees this month', bN: cons ? 'Wave 3' : '18.4k', bU: cons ? 'of 6' : '', bChip: cons ? 'Healthy' : '+8.7%', bChip2: cons ? '141 updated' : '62% of due',
-    toastT: cons ? 'Wave 3 passed every check' : 'Attendance sent for 8 A',
-    headline: cons ? 'Run every school from one calm board.' : 'Everything the school office needs, in one calm place.',
-    subline: cons ? 'Releases, cells, support and billing for the whole Tangent fleet.' : 'Attendance, fees, exams and every message to families.',
-    langs: LANGS.map((l, i) => ({ n: l[0], code: l[1], on: i === lang ? 'on' : '', pick: () => { setLang(i); try { localStorage.setItem('tangent.lang', l[1]); document.documentElement.lang = l[1]; } catch { /* ignore */ } } })),
+    cardA: cons ? tr('ui.use_login.schools_live') : tr('ui.use_login.attendance_today'), aD: rollDigits(cons ? '312' : '94.2'), aU: cons ? '' : '%',
+    cardB: cons ? tr('ui.use_login.release_2026_10_3') : tr('ui.use_login.fees_this_month'), bN: cons ? tr('ui.use_login.wave_3') : '18.4k', bU: cons ? tr('ui.use_login.of_6') : '', bChip: cons ? tr('ui.use_login.healthy') : '+8.7%', bChip2: cons ? tr('ui.use_login.141_updated') : tr('ui.use_login.62_of_due'),
+    toastT: cons ? tr('ui.use_login.wave_3_passed_every_check') : tr('ui.use_login.attendance_sent_for_8_a'),
+    headline: cons ? tr('ui.use_login.run_every_school_from_one') : tr('ui.use_login.everything_the_school_office_needs'),
+    subline: cons ? tr('ui.use_login.releases_cells_support_and_billing') : tr('ui.use_login.attendance_fees_exams_and_every'),
+    langs: langs.map((code) => ({ n: languageOf(code).own, code, on: code === currentLanguage() ? 'on' : '', pick: () => chooseLanguage(code) })),
     isCred: step === 'cred', isOtp: step === 'otp', isOk: step === 'ok',
-    title: cons ? 'Console sign in' : 'Welcome back', sub: cons ? 'Tangent team members only. Every sign-in is recorded.' : `Sign in to the ${c.shortName} staff room.`, cta: cons ? 'Continue' : 'Sign in',
+    title: cons ? tr('ui.use_login.console_sign_in') : tr('ui.use_login.welcome_back'), sub: cons ? tr('ui.use_login.tangent_team_members_only_every') : tr('ui.use_login.sign_in_to_the_staff', { shortName: c.shortName }), cta: cons ? tr('ui.use_login.continue') : tr('ui.use_login.sign_in'),
     email, onEmail: (e: { target: { value: string } }) => { setEmail(e.target.value); setEmErr(''); },
-    emailPh: cons ? 'you@tangent.app' : 'Your email or phone number',
+    emailPh: cons ? 'you@tangent.app' : tr('ui.use_login.your_email_or_phone_number'),
     pw, onPw: (e: { target: { value: string } }) => { setPw(e.target.value); setPwErr(false); },
-    pwType: show ? 'text' : 'password', eyeD: show ? EYE_OFF : EYE_ON, eyeLabel: show ? 'Hide password' : 'Show password', toggleEye: () => setShow((s) => !s),
+    pwType: show ? 'text' : 'password', eyeD: show ? EYE_OFF : EYE_ON, eyeLabel: show ? tr('ui.use_login.hide_password') : tr('ui.use_login.show_password'), toggleEye: () => setShow((s) => !s),
     emCls: emErr ? 'err shake' : '', emInv: emErr ? 'true' : 'false', emErr: !!emErr, emMsg: emErr, pwCls: pwErr ? 'err shake' : '', pwInv: pwErr ? 'true' : 'false', pwErr, pwMsg,
     showDemo: c.demoMode, fillDemo: () => { setPw('nest2026'); setPwErr(false); },
     forgot: () => void forgot(), forgotNote, isReset: resetting, newPw, onNewPw: (e: { target: { value: string } }) => { setNewPw(e.target.value); setOtpErr(false); }, npCls: '',
-    idLabel: cons ? 'Tangent email' : 'Email or phone number', idType: cons ? 'email' : 'text',
+    idLabel: cons ? tr('ui.use_login.tangent_email') : tr('ui.use_login.email_or_phone_number'), idType: cons ? 'email' : 'text',
     busy, notBusy: !busy,
     next: () => void next(),
-    otpTitle: challenge?.enroll ? 'Set up your authenticator' : challenge?.channel === 'app' ? 'Open your authenticator' : `Check your ${challenge?.channel === 'sms' ? 'messages' : 'inbox'}`,
+    otpTitle: challenge?.enroll ? tr('ui.use_login.set_up_your_authenticator') : challenge?.channel === 'app' ? tr('ui.use_login.open_your_authenticator') : tr('ui.use_login.check_your', { channel: challenge?.channel === 'sms' ? 'sms' : 'email' }),
     otpSub: challenge?.enroll
-      ? 'Add Tangent to an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password…) with the key below, then type the 6-digit code it shows. You’ll use it at every sign-in.'
+      ? tr('ui.use_login.add_tangent_to_an_authenticator')
       : challenge?.channel === 'app'
-        ? 'Type the 6-digit code your authenticator app shows for Tangent.'
-        : `We sent a 6-digit code by ${challenge?.channel === 'sms' ? 'text message' : 'email'} to ${(challenge?.maskedTo ?? email).replace(/ /g, '\u00a0')}. It works for ${Math.max(1, Math.round((challenge?.expiresInSeconds ?? 600) / 60))} minutes.${resetting ? ' Type it with your new password.' : ''}`,
+        ? tr('ui.use_login.type_the_6_digit_code_2')
+        : tr('ui.use_login.we_sent_a_6_digit', { p0: challenge?.channel === 'sms' ? tr('ui.use_login.by_text_message') : tr('ui.use_login.by_email_channel'), p1: (challenge?.maskedTo ?? email).replace(/ /g, '\u00a0'), p2: Math.max(1, Math.round((challenge?.expiresInSeconds ?? 600) / 60)), p3: resetting ? tr('ui.use_login.type_it_with_your_new_password') : '' }),
     enroll: challenge?.enroll ?? null, back: () => { setStep('cred'); setCode(''); setOtpErr(false); setResetting(false); },
     boxes, code, otpBad: otpErr ? 'bad shake' : '', otpErr, otpMsg, tries,
     onCode: (e: { target: { value: string } }) => {

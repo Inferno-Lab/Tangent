@@ -25,7 +25,12 @@
     "events",
     "gallery",
     "library",
-    "transport"
+    "transport",
+    "staffAttendance",
+    "diary",
+    "ptm",
+    "visitors",
+    "certificates"
   ],
   "features": [
     "people.admissions",
@@ -39,7 +44,7 @@
     "fees.onlinePayment",
     "fees.reminders",
     "fees.lateFines",
-    "fees.gstReceipts",
+    "fees.taxReceipts",
     "fees.refunds",
     "notices.teacherPosts",
     "chat.familyChat",
@@ -58,9 +63,11 @@
     "school.email": "hello@greenfield.edu.in",
     "school.address": "42, Baner Road, Baner, Pune 411045",
     "school.language": "en",
+    "school.country": "IN",
+    "school.timezone": "Asia/Kolkata",
+    "school.locale": "en-IN",
+    "school.currency": "INR",
     "brand.logoText": "G",
-    "theme.colors": {},
-    "approvals.feeWaiver": "principal",
     "approvals.notice": "required",
     "attendance.notifyParents": true,
     "attendance.lockAfterDays": 2,
@@ -80,8 +87,10 @@
     "calendar.schoolEdits": true,
     "calendar.weeklyOff": [],
     "feeStructures.schoolEdits": true,
-    "fees.receiptPrefix": "RCPT-{year}-",
-    "fees.receiptStart": 9001,
+    "fees.receiptPrefix": "RCPT-{yyyy}-{seq:5}",
+    "fees.receiptStart": 1,
+    "people.admissionNumber": "{yyyy}/{seq:4}",
+    "people.admissionStart": 1,
     "fees.receiptNote": "",
     "fees.gstin": "",
     "fees.gstSac": "999293",
@@ -96,16 +105,48 @@
     "library.staffMaxLoans": 5,
     "transport.nearMinutes": 10,
     "fees.paymentMethods": [
-      "cash",
-      "upi",
-      "card",
-      "netbanking",
-      "cheque"
+      {
+        "key": "cash",
+        "name": "Cash",
+        "kind": "cash"
+      },
+      {
+        "key": "upi",
+        "name": "UPI",
+        "kind": "wallet"
+      },
+      {
+        "key": "card",
+        "name": "Card",
+        "kind": "card"
+      },
+      {
+        "key": "netbanking",
+        "name": "Net banking",
+        "kind": "bank"
+      },
+      {
+        "key": "cheque",
+        "name": "Cheque",
+        "kind": "cheque"
+      }
     ],
-    "vocab.student": "Student",
-    "vocab.class": "Class",
-    "vocab.students": "",
-    "vocab.classes": "",
+    "vocab.words": {},
+    "admissions.sources": [
+      "Walk-in",
+      "Phone",
+      "Website",
+      "Referral",
+      "Event"
+    ],
+    "admissions.stages": [
+      "applied",
+      "test",
+      "offer"
+    ],
+    "letters.family": "Dear {guardian},\n\n{school} now has its own app. You can follow {student}’s school day on your phone: attendance, homework, results, fees and notices, as your school uses them.\n\n1. Scan the code, or open {link}, to get the {school} app.\n2. Sign in with your phone number ending {phoneEnd}.\n3. Type the code we send you. There is no password to remember.\n\nIf your phone number has changed, tell the school office.",
+    "letters.student": "Dear {student},\n\n{school} now has its own app for you: your timetable, homework, results and notices.\n\n1. Scan the code, or open {link}, to get the {school} app.\n2. Sign in with the phone number or email the school has for you.\n3. Type the code we send you.\n\nAsk your class teacher if you need help.",
+    "students.required": [],
     "people.houses": [
       {
         "key": "emerald",
@@ -130,10 +171,30 @@
     ],
     "calendar.weekStarts": "mon",
     "attendance.statuses": [
-      "present",
-      "absent",
-      "late",
-      "leave"
+      {
+        "key": "present",
+        "name": "Present",
+        "meaning": "present",
+        "code": "P"
+      },
+      {
+        "key": "absent",
+        "name": "Absent",
+        "meaning": "absent",
+        "code": "A"
+      },
+      {
+        "key": "late",
+        "name": "Late",
+        "meaning": "late",
+        "code": "L"
+      },
+      {
+        "key": "leave",
+        "name": "On leave",
+        "meaning": "leave",
+        "code": "V"
+      }
     ],
     "leave.reasons": [
       "Unwell",
@@ -143,7 +204,11 @@
       "Other"
     ],
     "homework.showClassProgress": false,
+    "homework.defaultDueDays": 2,
+    "homework.defaultMarks": 20,
     "homework.handedInBy": "either",
+    "exams.defaultMaxMarks": 100,
+    "exams.leadDays": 7,
     "results.showRank": false,
     "grading.scale": [
       {
@@ -341,11 +406,36 @@
     "brand.color": "#6A4CF5"
   },
   "vocabulary": {
-    "student": "Student",
-    "students": "Students",
-    "class": "Class",
-    "classes": "Classes"
+    "student": "student",
+    "students": "students",
+    "guardian": "parent",
+    "guardians": "parents",
+    "teacher": "teacher",
+    "teachers": "teachers",
+    "class": "class",
+    "classes": "classes",
+    "section": "section",
+    "sections": "sections",
+    "house": "house",
+    "houses": "houses",
+    "term": "term",
+    "terms": "terms",
+    "period": "period",
+    "periods": "periods",
+    "rollNumber": "roll number",
+    "rollNumbers": "roll numbers",
+    "admissionNumber": "admission number",
+    "admissionNumbers": "admission numbers",
+    "reportCard": "report card",
+    "reportCards": "report cards",
+    "homework": "homework",
+    "homeworks": "homework",
+    "principal": "principal",
+    "principals": "principals",
+    "fees": "fees",
+    "feesMany": "fees"
   },
+  "vocab": {},
   "limits": {
     "students": 5000,
     "storageGb": 100,
@@ -410,6 +500,7 @@
           "chat"
         ],
         "home": [
+          "checkIn",
           "dayRibbon",
           "notices",
           "events"
@@ -427,7 +518,9 @@
           "trips",
           "chat"
         ],
-        "home": [],
+        "home": [
+          "checkIn"
+        ],
         "quick": []
       }
     }

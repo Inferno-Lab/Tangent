@@ -1,6 +1,7 @@
 import { Icon } from './Icon';
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { Pop } from './Menu';
+import { t as tr } from './i18n';
 
 // Colours are #RRGGBB, or #RRGGBBAA when see-through. Inside, the picker works in HSV so the square and the hue slider are exact.
 interface Hsva { h: number; s: number; v: number; a: number }
@@ -41,7 +42,7 @@ function toHsl(hex: string): string {
   const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
   const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
   const h = d === 0 ? 0 : max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-  return `hsl(${Math.round((h * 60 + 360) % 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%)`;
+  return tr('ui.colour_picker.hsl', { p0: Math.round((h * 60 + 360) % 360), p1: Math.round(s * 100), p2: Math.round(l * 100) });
 }
 
 const num = (t: string, scale: number) => (t.endsWith('%') ? (parseFloat(t) / 100) * scale : parseFloat(t));
@@ -93,39 +94,39 @@ export function ColourPicker({ value, onChange, label, alpha = true }: { value: 
   };
   const commit = () => { const p = parseColour(text); if (p) put(alpha ? fromHex(p, c.h) : { ...fromHex(p, c.h), a: 1 }); else setText(toHex(c)); };
   const Dropper = (globalThis as { EyeDropper?: EyeDropperCtor }).EyeDropper;
-  const hue = `hsl(${c.h} 100% 50%)`;
+  const hue = tr('ui.colour_picker.hsl_100_50', { h: c.h });
   const solid = toHex({ ...c, a: 1 });
   const [r, g, b] = hsvToRgb(c).map(Math.round);
   return (
     <div className="cpk">
-      <div ref={area} className="cpk-sv" style={{ background: hue }} role="slider" tabIndex={0} aria-label={`${label}: saturation and brightness`}
-        aria-valuetext={`${Math.round(c.s * 100)}% saturation, ${Math.round(c.v * 100)}% brightness`}
+      <div ref={area} className="cpk-sv" style={{ background: hue }} role="slider" tabIndex={0} aria-label={tr('ui.colour_picker.saturation_and_brightness', { label })}
+        aria-valuetext={tr('ui.colour_picker.saturation_brightness', { p0: Math.round(c.s * 100), p1: Math.round(c.v * 100) })}
         onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); fromPointer(e); }}
         onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) fromPointer(e); }} onKeyDown={keys}>
         <i style={{ left: `${c.s * 100}%`, top: `${(1 - c.v) * 100}%`, background: solid }} />
       </div>
-      <input className="cpk-hue" type="range" min={0} max={359} value={Math.round(c.h)} aria-label={`${label}: hue`} onChange={(e) => put({ ...c, h: Number(e.target.value) })} />
+      <input className="cpk-hue" type="range" min={0} max={359} value={Math.round(c.h)} aria-label={tr('ui.colour_picker.hue', { label })} onChange={(e) => put({ ...c, h: Number(e.target.value) })} />
       {alpha && (
-        <input className="cpk-alpha" type="range" min={0} max={100} value={Math.round(c.a * 100)} aria-label={`${label}: opacity`}
+        <input className="cpk-alpha" type="range" min={0} max={100} value={Math.round(c.a * 100)} aria-label={tr('ui.colour_picker.opacity', { label })}
           style={{ '--cpk': solid } as React.CSSProperties} onChange={(e) => put({ ...c, a: Number(e.target.value) / 100 })} />
       )}
       <div className="cpk-row">
         <span className="cpk-chip" style={{ '--cpk': toHex(c) } as React.CSSProperties} aria-hidden="true" />
         <div className="inp sm cpk-in">
           <input value={text} onChange={(e) => setText(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === 'Enter') commit(); }}
-            aria-label={`${label}: hex, rgb() or hsl()`} spellCheck={false} placeholder="#2F5BD3, rgb(), hsl()" />
+            aria-label={tr('ui.colour_picker.hex_rgb_or_hsl', { label })} spellCheck={false} placeholder="#2F5BD3, rgb(), hsl()" />
         </div>
         {Dropper && (
-          <button type="button" className="mini" aria-label="Pick a colour from the screen" data-tip="Pick from the screen"
+          <button type="button" className="mini" aria-label={tr('ui.colour_picker.pick_a_colour_from_the')} data-tip={tr('ui.colour_picker.pick_from_the_screen')}
             onClick={() => void new Dropper().open().then((res) => put(fromHex(parseColour(res.sRGBHex) ?? toHex(c), c.h))).catch(() => undefined)}>
             <Icon name="edit" />
           </button>
         )}
       </div>
       <div className="cpk-out num">
-        <span>rgb({r} {g} {b}{c.a < 1 ? ` / ${Math.round(c.a * 100)}%` : ''})</span>
+        <span>{tr('ui.colour_picker.rgb')}{r} {g} {b}{c.a < 1 ? ` / ${Math.round(c.a * 100)}%` : ''})</span>
         <span>{toHsl(toHex(c))}</span>
-        {c.a < 1 && <span>{Math.round(c.a * 100)}% opaque</span>}
+        {c.a < 1 && <span>{Math.round(c.a * 100)}{tr('ui.colour_picker.opaque')}</span>}
       </div>
     </div>
   );

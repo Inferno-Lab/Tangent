@@ -1,8 +1,8 @@
 # Tangent product map
 
-**Status: decisions taken (2026-11-10) and carried out by the one-pass fix (PR #35).**
+**Status:** in force. The one-pass repair (PR #35) moved every page to match it; rules 5 and 7 changed on 2026-11-12. The next pass is [`one-shot-plan.md`](one-shot-plan.md).
 
-This page says where every thing in Tangent lives and why. It is the missing rulebook: `docs/DESIGN.md` says how a page looks, this says where a page, a tab, a setting or a button belongs. Once approved, every existing page is moved to match it in one pass, and every new module in `docs/features-plan.md` is placed by it before any code is written.
+This page says where every thing in Tangent lives and why. It is the missing rulebook: `docs/DESIGN.md` says how a page looks, this says where a page, a tab, a setting or a button belongs. Every new module in `docs/one-shot-plan.md` is placed by it before any code is written.
 
 Lines marked **D1, D2…** were decisions for the owner; section 9 lists them, all taken as proposed.
 
@@ -14,9 +14,9 @@ Every choice below follows from these. When a new thing does not fit, the rule i
 2. **One grouping idea per menu.** The admin menu is grouped by the job being done. The console menu is grouped by what is being worked on. No group is a place for leftovers.
 3. **A menu item is a thing people work with** (Students, Fees, Library). Different views of the same thing are tabs on its page, not more menu items.
 4. **Every tab has its own address**, so it can be linked, bookmarked and reached with Back.
-5. **Tangent decides how a school works; the school does its work.** Settings, roles, modules, colours, wording and app layout are changed only in the console. The admin holds the school's own data and daily work.
+5. **The school runs its own day; Tangent keeps what is paid for, risky or technical** (changed 2026-11-12, `docs/one-shot-plan.md` section 1). Every setting declares its owner. School-owned settings (how attendance, grading, fees, library, transport… work, the school's lists, words and app layout) are edited in the admin on the page of the module they change. Tangent-owned ones (plan, modules, limits, providers, app build and theme, security and retention floors) are changed in the console. Tangent can change anything for support and lock a single setting for a single school. Every school starts from a starter pack, so nothing has to be set up.
 6. **A setting lives with the thing it changes.** Settings are grouped by module. Only settings that belong to no module sit in a short fixed list of school-wide groups (section 5).
-7. **The school sees a rule where it applies**, read-only, on the page it affects ("Attendance can be changed for 2 days. Set by Tangent."), not on a separate page of settings it cannot change.
+7. **A setting is edited where it applies**: on the Settings tab of the module it changes. A Tangent-owned or locked setting shows there read-only with its reason ("Locked by Tangent: your group sets fees centrally.").
 8. **Shared services have one home and every module plugs into them:** approvals, reports, audit log, import, messages to families, search, dashboard cards. A module never builds its own.
 9. **Nothing that is a school's data is written in code.** Fee types, roles, menu labels, class names, payment methods and message wording come from data the console or the school keeps.
 10. **One name, one meaning.** A word used in a menu or heading names one thing across admin, console and app. One-time things (setting a school up) leave the menu when they are finished. A person's own preference is not a school setting.
@@ -82,7 +82,7 @@ What changes and why:
 
 ### 3.2 Where future modules go
 
-So that no new module is "thrown wherever there is room". Numbers are the module numbers in `docs/features-plan.md`. A module marked "tab" or "inside" gets no menu item of its own.
+So that no new module is "thrown wherever there is room". Numbers are the module numbers in `docs/one-shot-plan.md` section 6. A module marked "tab" or "inside" gets no menu item of its own.
 
 | Group | Modules |
 |---|---|
@@ -149,6 +149,8 @@ Ten tabs today, kept in memory with no address. Proposed: eight, each with its o
 "Migration" stops being a tab name (rule 10): the school's tab is **Data**, the admin's is **Moving in**, the console's is **Database changes**.
 
 ## 5. Settings
+
+> Who owns each setting, and where the school edits it, is now in `docs/one-shot-plan.md` Appendix A; this section keeps the grouping.
 
 One grouping rule (rule 6): a module's settings are under that module. School-wide groups are only these six. The 13 groups of today mix four different ideas.
 

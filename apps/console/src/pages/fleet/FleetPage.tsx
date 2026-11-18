@@ -1,17 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Dialog, EmptyCard, PageScope, tintFor, EmptyNote } from '@tangent/web-ui';
+import { Dialog, EmptyCard, PageScope, tintFor, EmptyNote, t as tr, listOf } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { url } from '../../app/base';
 import { useShellChrome } from '../../app/Layout';
-import { curve, initials, statusOf } from '../../app/format';
+import { curve, initials, statusOf, count } from '../../app/format';
 import { FleetHue } from './FleetHue';
 
 const TICKS = 60;
-const STATE: Record<string, string> = { draft: 'Ready to start', rolling: 'Rolling out', paused: 'Paused', halted: 'Halted', done: 'Finished', rolled_back: 'Rolled back' };
+const STATE: Record<string, string> = { draft: tr('console.fleet_page.ready_to_start'), rolling: tr('console.fleet_page.rolling_out'), paused: tr('console.fleet_page.paused'), halted: tr('console.fleet_page.halted'), done: tr('console.fleet_page.finished'), rolled_back: tr('console.fleet_page.rolled_back') };
 
-export function FleetPage() {
-  const app = useApp();
+export function FleetPage() { const app = useApp();
   const chrome = useShellChrome();
   const qc = useQueryClient();
   const [ci, setCi] = useState(-1);
@@ -31,19 +30,17 @@ export function FleetPage() {
 
   useEffect(() => { if (f && ci < 0) setCi(Math.min(23, new Date().getHours())); }, [f, ci]);
 
-  if (fleet.isError && !f) {
-    return (
+  if (fleet.isError && !f) { return (
       <PageScope page="fleet">
-        <main className="mn"><header className="hd"><div><h1>Fleet</h1></div></header>
-          <div><EmptyCard error title="Fleet" chip={{ text: 'Couldn’t load', tone: 'c' }} icon="warning" heading="That didn’t load" body={(fleet.error as Error).message} actions={<button className="btn pri" onClick={() => void fleet.refetch()}>Try again</button>} /></div>
+        <main className="mn"><header className="hd"><div><h1>{tr('console.fleet_page.fleet')}</h1></div></header>
+          <div><EmptyCard error title={tr('console.fleet_page.fleet')} chip={{ text: tr('console.fleet_page.couldn_t_load'), tone: 'c' }} icon="warning" heading={tr('console.fleet_page.that_didn_t_load')} body={(fleet.error as Error).message} actions={<button className="btn pri" onClick={() => void fleet.refetch()}>{tr('console.fleet_page.try_again')}</button>} /></div>
         </main>
       </PageScope>
     );
   }
-  if (!f) {
-    return (
+  if (!f) { return (
       <PageScope page="fleet">
-        <main className="mn" aria-busy="true"><header className="hd"><div><h1>Fleet</h1><p>&nbsp;</p></div></header>
+        <main className="mn" aria-busy="true"><header className="hd"><div><h1>{tr('console.fleet_page.fleet')}</h1><p>&nbsp;</p></div></header>
           <div className="skc" style={{ height: 240, borderRadius: 28 }} />
         </main>
       </PageScope>
@@ -69,92 +66,83 @@ export function FleetPage() {
   const cy = 228 - (today[at]! / max) * 190;
   const delta = today[at]! - before[at]!;
   const peak = hours.reduce((m, h) => (h.value > m.value ? h : m), hours[0]!);
-  const place = (clientX: number, box: HTMLElement) => {
-    const r = box.getBoundingClientRect();
+  const place = (clientX: number, box: HTMLElement) => { const r = box.getBoundingClientRect();
     setCi(Math.max(0, Math.min(23, Math.round(((clientX - r.left) / r.width) * 23))));
   };
 
   const list = [...(schools.data ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const clock = (iso: string) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  const cellRows = f.cells.map((c) => {
-    const here = list.filter((s) => s.cell === c.key);
+  const cellRows = f.cells.map((c) => { const here = list.filter((s) => s.cell === c.key);
     const pct = c.max ? Math.round((c.schools / c.max) * 100) : 0;
     const bad = here.some((s) => s.health === 'degraded' || s.health === 'down');
     const upd = here.some((s) => prevOf.get(s.id)?.state === 'rolling');
-    const st = bad ? { t: 'Elevated', c: 'a', col: 'var(--warn)' } : upd ? { t: 'Updating', c: 'v', col: 'var(--brand)' } : { t: 'Healthy', c: 'g', col: 'var(--ok)' };
-    return { n: `Cell ${c.key}`, s: c.schools, p: pct, st: st.t, cc: st.c, col: st.col, off: (138 * (1 - Math.min(100, pct) / 100)).toFixed(1), href: url('/cells'), open: (e: React.MouseEvent) => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); app.go('/cells'); } };
+    const st = bad ? { t: tr('console.fleet_page.elevated'), c: 'a', col: 'var(--warn)' } : upd ? { t: tr('console.fleet_page.updating'), c: 'v', col: 'var(--brand)' } : { t: tr('console.fleet_page.healthy'), c: 'g', col: 'var(--ok)' };
+    return { n: tr('console.fleet_page.cell', { key: c.key }), s: c.schools, p: pct, st: st.t, cc: st.c, col: st.col, off: (138 * (1 - Math.min(100, pct) / 100)).toFixed(1), href: url('/cells'), open: (e: React.MouseEvent) => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); app.go('/cells'); } };
   });
   // The newest few; the whole list, with search and filters, is the Schools page.
-  const rows = list.slice(0, 8).map((s) => {
-    const t = tintFor(s.name);
+  const rows = list.slice(0, 8).map((s) => { const t = tintFor(s.name);
     const r = prevOf.get(s.id);
     const newer = r?.state === 'done';
     const st = statusOf(s);
-    return {
-      id: s.id, n: s.name, cell: s.cell, ini: initials(s.name), bg: t.bg, fg: t.fg, from: r?.prev ?? s.versions.api, to: rel?.version ?? s.versions.api, vy: newer ? -26 : 0,
-      st: st.text, cc: st.tone, p: s.healthMs != null ? `${s.healthMs} ms` : '–',
-      href: url(`/schools/${s.id}`), open: (e: React.MouseEvent) => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); app.go(`/schools/${s.id}`); },
-    };
+    return { id: s.id, n: s.name, cell: s.cell, ini: initials(s.name), bg: t.bg, fg: t.fg, from: r?.prev ?? s.versions.api, to: rel?.version ?? s.versions.api, vy: newer ? -26 : 0,
+      st: st.text, cc: st.tone, p: s.healthMs != null ? tr('console.fleet_page.ms', { healthMs: s.healthMs }) : '–',
+      href: url(`/schools/${s.id}`), open: (e: React.MouseEvent) => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); app.go(`/schools/${s.id}`); } };
   });
   const month = new Date().toISOString().slice(0, 7);
   const incident = f.incident;
   const hOk = f.healthy, hWarn = f.degraded, hBad = Math.max(0, f.live - f.healthy - f.degraded);
   const upcoming = f.upcoming;
 
-  const v = {
-    ...chrome, pending: chrome.pending,
-    subtitle: `${f.schools} ${f.schools === 1 ? 'school' : 'schools'} in ${f.cells.length} ${f.cells.length === 1 ? 'cell' : 'cells'}`,
-    chartSub: f.readingAt ? `Last reading ${clock(f.readingAt)}` : 'No readings yet',
+  const v = { ...chrome, pending: chrome.pending,
+    subtitle: tr('console.fleet_page.in', { schools: f.schools, length: f.cells.length }),
+    chartSub: f.readingAt ? tr('console.fleet_page.last_reading', { clock: clock(f.readingAt) }) : tr('console.fleet_page.no_readings_yet'),
     openAlerts: () => setAlerts(true), onboard: () => app.go('/onboarding/new'), openReleases: () => app.go('/releases'), openCells: () => app.go('/cells'),
     openSchools: () => app.go('/schools'), openHealth: () => app.go('/health'), openOnboarding: () => app.go('/onboarding'), more: list.length > rows.length ? list.length : 0,
     alertCount: chrome.pending + (incident?.state === 'open' ? 1 : 0) + (f.degraded > 0 ? 1 : 0),
-    pausedCls: paused ? 'paused' : '', relState: rel ? STATE[rel.status] : 'No release yet', relVersion: rel?.version ?? '–',
-    relLine: rel ? `${rel.waves.length ? `Wave ${wave} of ${rel.waves.length} · ` : ''}${done} of ${total} schools` : 'Create a release to update every school in waves.',
+    pausedCls: paused ? 'paused' : '', relState: rel ? STATE[rel.status] : tr('console.fleet_page.no_release_yet'), relVersion: rel?.version ?? '–',
+    relLine: rel ? tr('console.fleet_page.of_schools', { p0: rel.waves.length ? tr('console.fleet_page.wave_of', { wave, length: rel.waves.length }) : '', done, total }) : tr('console.fleet_page.create_a_release_to_update'),
     hasRelease: !!rel, done, total, ticks: Array.from({ length: TICKS }, (_, k) => ({ c: k < on - 1 ? 'on' : k === on - 1 && rolling ? 'now' : k < on ? 'on' : '' })),
     waves: (rel?.waves ?? []).map((w) => ({ c: w.status === 'done' ? 'd' : w.status === 'rolling' || w.status === 'halted' ? 'c' : '' })),
-    canPause: !!live && rel?.status !== 'halted', canRollback: !!live, relCta: rel ? 'Open releases' : 'Create a release', busy: pause.isPending || rollback.isPending,
-    pauseLabel: paused ? 'Resume wave' : 'Pause wave', pauseIc: paused ? 'play' : 'pause',
+    canPause: !!live && rel?.status !== 'halted', canRollback: !!live, relCta: rel ? tr('console.fleet_page.open_releases') : tr('console.fleet_page.create_a_release'), busy: pause.isPending || rollback.isPending,
+    pauseLabel: paused ? tr('console.fleet_page.resume_wave') : tr('console.fleet_page.pause_wave'), pauseIc: paused ? 'play' : 'pause',
     pause: () => rel && pause.mutate({ id: rel.id, paused: !paused }), rollback: () => setConfirm(true),
     live: f.live, newThisMonth: (schools.data ?? []).filter((s) => s.createdAt.startsWith(month)).length,
-    soon: f.onboarding ? `${f.onboarding} ${f.onboarding === 1 ? 'is' : 'are'} still being set up` : 'None waiting to start',
-    p95: f.p95Ms ? `p95 ${f.p95Ms} ms` : 'p95 not measured yet', hOk, hWarn, hBad,
+    soon: f.onboarding ? tr('console.fleet_page.still_being_set_up', { onboarding: f.onboarding }) : tr('console.fleet_page.none_waiting_to_start'),
+    p95: f.p95Ms ? tr('console.fleet_page.p95_ms', { p95Ms: f.p95Ms }) : tr('console.fleet_page.p95_not_measured_yet'), hOk, hWarn, hBad,
     p1: curve(today, max), p2: curve(before, max), pArea: curve(today, max, true),
     // The bubble stays inside the chart near the ends of the day; the dot and the line still sit on the hour.
     tx: Math.min(86, Math.max(14, (at / 23) * 100)).toFixed(2),
-    cx: ((at / 23) * 100).toFixed(2), cy: cy.toFixed(1), ty: Math.max(84, cy).toFixed(1), cv: today[at]!.toLocaleString('en-IN'),
-    ct: `${String(at).padStart(2, '0')}:00 · ${delta >= 0 ? '+' : ''}${delta.toLocaleString('en-IN')} vs yesterday`,
-    chartLabel: `Requests per minute across the day, highest around ${String(peak.hour).padStart(2, '0')}:00 at ${peak.value.toLocaleString('en-IN')}`,
+    cx: ((at / 23) * 100).toFixed(2), cy: cy.toFixed(1), ty: Math.max(84, cy).toFixed(1), cv: count(today[at]!),
+    ct: tr('console.fleet_page.00_vs_yesterday', { p0: String(at).padStart(2, '0'), p1: delta >= 0 ? '+' : '', count: count(delta) }),
+    chartLabel: tr('console.fleet_page.requests_per_minute_across_the', { p0: String(peak.hour).padStart(2, '0'), count: count(peak.value) }),
     cmove: (e: React.MouseEvent<HTMLElement>) => place(e.clientX, e.currentTarget), ctouch: (e: React.TouchEvent<HTMLElement>) => place(e.touches[0]!.clientX, e.currentTarget),
     cells: cellRows, rows, loading: schools.isLoading,
-    inc: incident ? {
-      cls: incident.state === 'resolved' ? 'ok' : '', chip: incident.state === 'resolved' ? 'g' : 'c', tag: incident.state === 'resolved' ? 'Resolved' : `Incident${incident.schoolName ? ` · ${incident.schoolName}` : ''}`,
-      title: incident.title, body: incident.body, dismiss: () => dismiss.mutate(incident.id), open: incident.schoolId ? () => app.go(`/schools/${incident.schoolId}/technical`) : undefined,
-    } : null,
+    inc: incident ? { cls: incident.state === 'resolved' ? 'ok' : '', chip: incident.state === 'resolved' ? 'g' : 'c', tag: incident.state === 'resolved' ? tr('console.fleet_page.resolved') : tr('console.fleet_page.incident', { p0: incident.schoolName ? ` · ${incident.schoolName}` : '' }),
+      title: incident.title, body: incident.body, dismiss: () => dismiss.mutate(incident.id), open: incident.schoolId ? () => app.go(`/schools/${incident.schoolId}/technical`) : undefined } : null,
     recheck: () => probe.mutate(),
     up: upcoming.length
-      ? { title: `${upcoming.length} ${upcoming.length === 1 ? 'school starts' : 'schools start'} soon`, body: `${upcoming.map((u) => u.name).slice(0, 2).join(' and ')} ${upcoming.length === 1 ? 'is' : 'are'} being set up for the first admin.` }
-      : { title: 'No schools waiting', body: 'Onboard a school and it shows up here while it is being set up.' },
+      ? { title: tr('console.fleet_page.soon', { n: upcoming.length }), body: tr('console.fleet_page.being_set_up_for_the', { p0: listOf(upcoming.map((u) => u.name).slice(0, 2)), n: upcoming.length }) }
+      : { title: tr('console.fleet_page.no_schools_waiting'), body: tr('console.fleet_page.onboard_a_school_and_it') },
     alertsDialog: alerts && (
-      <Dialog title="Alerts" tag={{ text: chrome.pending || (f.degraded && f.degraded > 0) || incident?.state === 'open' ? 'Needs you' : 'All clear', tone: chrome.pending || incident?.state === 'open' ? 'a' : 'g' }} onClose={() => setAlerts(false)} width={460}>
+      <Dialog title={tr('console.fleet_page.alerts')} tag={{ text: chrome.pending || (f.degraded && f.degraded > 0) || incident?.state === 'open' ? tr('console.fleet_page.needs_you') : tr('console.fleet_page.all_clear'), tone: chrome.pending || incident?.state === 'open' ? 'a' : 'g' }} onClose={() => setAlerts(false)} width={460}>
         <div className="stack">
-          {incident?.state === 'open' && <div className="kv" style={{ alignItems: 'flex-start' }}><span><b style={{ color: 'var(--ink)' }}>{incident.title}</b><br /><small style={{ color: 'var(--ink3)' }}>{incident.body}</small></span><b><button className="btn sm" onClick={() => { setAlerts(false); app.go(incident.schoolId ? `/schools/${incident.schoolId}/technical` : '/health'); }}>Open</button></b></div>}
-          {chrome.pending > 0 && <div className="kv"><span>{chrome.pending} {chrome.pending === 1 ? 'request is' : 'requests are'} waiting for a second person</span><b><button className="btn sm" onClick={() => { setAlerts(false); app.go('/approvals'); }}>Review</button></b></div>}
-          {f.degraded > 0 && <div className="kv"><span>{f.degraded} {f.degraded === 1 ? 'school is' : 'schools are'} answering slowly</span><b><button className="btn sm" onClick={() => { setAlerts(false); app.go('/health'); }}>Open health</button></b></div>}
-          {!chrome.pending && !f.degraded && incident?.state !== 'open' && <EmptyNote icon="checkCircle" title="Nothing needs you right now" body="Approvals, incidents and slow schools appear here." />}
+          {incident?.state === 'open' && <div className="kv" style={{ alignItems: 'flex-start' }}><span><b style={{ color: 'var(--ink)' }}>{incident.title}</b><br /><small style={{ color: 'var(--ink3)' }}>{incident.body}</small></span><b><button className="btn sm" onClick={() => { setAlerts(false); app.go(incident.schoolId ? `/schools/${incident.schoolId}/technical` : '/health'); }}>{tr('console.fleet_page.open')}</button></b></div>}
+          {chrome.pending > 0 && <div className="kv"><span>{tr('console.fleet_page.waiting_for_a_second_person', { n: chrome.pending })}</span><b><button className="btn sm" onClick={() => { setAlerts(false); app.go('/approvals'); }}>{tr('console.fleet_page.review')}</button></b></div>}
+          {f.degraded > 0 && <div className="kv"><span>{tr('console.fleet_page.answering_slowly', { n: f.degraded })}</span><b><button className="btn sm" onClick={() => { setAlerts(false); app.go('/health'); }}>{tr('console.fleet_page.open_health')}</button></b></div>}
+          {!chrome.pending && !f.degraded && incident?.state !== 'open' && <EmptyNote icon="checkCircle" title={tr('console.fleet_page.nothing_needs_you_right_now')} body={tr('console.fleet_page.approvals_incidents_and_slow_schools')} />}
         </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}><button className="btn pri" onClick={() => setAlerts(false)}>Done</button></div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}><button className="btn pri" onClick={() => setAlerts(false)}>{tr('console.fleet_page.done')}</button></div>
       </Dialog>
     ),
     dialog: confirm && rel ? (
-      <Dialog title={`Mark ${rel.version} as rolled back?`} tag={{ text: 'The code does not change', tone: 'a' }} onClose={() => setConfirm(false)} width={460}>
-        <p>Schools signed off on {rel.version} are marked with the version they had before, and the rollout stops. The code they run changes only when the earlier version is deployed again.</p>
+      <Dialog title={tr('console.fleet_page.mark_as_rolled_back', { version: rel.version })} tag={{ text: tr('console.fleet_page.the_code_does_not_change'), tone: 'a' }} onClose={() => setConfirm(false)} width={460}>
+        <p>{tr('console.fleet_page.schools_signed_off_on')}{' '}{rel.version} {tr('console.fleet_page.are_marked_with_the_version')}</p>
         {error && <div className="emsg" role="alert" style={{ marginBottom: 12 }}>{error}</div>}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <button className="btn" onClick={() => setConfirm(false)}>Keep rolling</button>
-          <button className="btn dngf" disabled={rollback.isPending} onClick={() => rollback.mutate(rel.id)}>Mark as rolled back</button>
+          <button className="btn" onClick={() => setConfirm(false)}>{tr('console.fleet_page.keep_rolling')}</button>
+          <button className="btn dngf" disabled={rollback.isPending} onClick={() => rollback.mutate(rel.id)}>{tr('console.fleet_page.mark_as_rolled_back_2')}</button>
         </div>
       </Dialog>
-    ) : null,
-  };
+    ) : null };
   return <FleetHue v={{ ...v, openApprovals: () => app.go('/approvals'), schoolHref: (id: string) => url(`/schools/${id}`), goSchool: (id: string) => app.go(`/schools/${id}`) }} f={f} schools={schools.data ?? []} actions={chrome.actions?.data ?? []} />;
 }

@@ -42,13 +42,14 @@ export interface PushMessage { tokens: string[]; title: string; body: string; da
 export interface PushResult { sent: number; failedTokens: string[] }
 
 /** One payment-link the family opens in a browser: no SDK in the app. */
-export interface LinkInput { amountPaise: number; reference: string; description: string; customer: { name: string; phone?: string; email?: string }; callbackUrl: string; expiresAt?: Date }
-export interface PaymentEvent { kind: 'paid' | 'failed' | 'refunded'; reference: string; providerPaymentId: string; amountPaise: number; method?: string; refundId?: string }
+/** `amountMinor` is in the currency's smallest unit (paise, cents, fils). */
+export interface LinkInput { amountMinor: number; currency: string; reference: string; description: string; customer: { name: string; phone?: string; email?: string }; callbackUrl: string; expiresAt?: Date }
+export interface PaymentEvent { kind: 'paid' | 'failed' | 'refunded'; reference: string; providerPaymentId: string; amountMinor: number; method?: string; refundId?: string }
 export interface PaymentsAdapter {
   createLink(c: Ctx, input: LinkInput): Promise<{ linkId: string; url: string }>;
-  refund(c: Ctx, providerPaymentId: string, amountPaise: number, note: string): Promise<{ refundId: string }>;
+  refund(c: Ctx, providerPaymentId: string, amountMinor: number, note: string, currency: string): Promise<{ refundId: string }>;
   /** What the provider settled to the school for these days: for the daily reconciliation. */
-  settlements?(c: Ctx, from: Date, to: Date): Promise<{ providerPaymentId: string; amountPaise: number }[]>;
+  settlements?(c: Ctx, from: Date, to: Date): Promise<{ providerPaymentId: string; amountMinor: number }[]>;
 }
 
 export interface StorageAdapter {
@@ -97,6 +98,8 @@ export interface BuildsAdapter {
 export interface TrackingAdapter { positions(c: Ctx): Promise<{ vehicle: string; lat: number; lng: number; at: Date }[]> }
 /** A template as the provider lists it, for importing into the console's Templates. */
 export interface ProviderTemplate { id: string; name: string; language: string; text: string; status: string }
+/** Texts to draft in another language, in order; `glossary` holds words a school or Tangent fixed ("Fees" → "Frais"). */
+export interface TranslateInput { texts: string[]; from: string; to: string; glossary?: Record<string, string> }
 
 /** One provider: the capabilities it implements, a test, and how it reads its webhooks. */
 export interface Adapter {
@@ -114,6 +117,10 @@ export interface Adapter {
   databases?: DatabasesAdapter;
   hosting?: HostingAdapter;
   tracking?: TrackingAdapter;
+  /** Drafts of `texts` in another language, one per text in the same order ('' where it could not). */
+  translate?(c: Ctx, t: TranslateInput): Promise<string[]>;
+  /** A country's (ISO 3166-1) nationwide public holidays in a calendar year, as dates (YYYY-MM-DD) and names. */
+  holidays?(c: Ctx, country: string, year: number): Promise<{ date: string; name: string }[]>;
   /** The provider's approved message templates, for importing (WhatsApp providers that can list them). */
   templates?(c: Ctx): Promise<ProviderTemplate[]>;
   test(c: Ctx, input: { to?: string }): Promise<{ ok: boolean; detail: string }>;
@@ -145,8 +152,8 @@ export function at(obj: unknown, path: string): unknown {
 
 /** Digits only, with India's 91 in front of a ten-digit number. */
 export function e164(phone: string): string {
-  const d = phone.replace(/\D/g, '');
-  return d.length === 10 ? `91${d}` : d;
+  // Schools keep every number in international form (contracts phones.ts): the provider gets its digits.
+  return phone.replace(/\D/g, '');
 }
 
 export class ProviderError extends Error {

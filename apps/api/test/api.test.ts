@@ -1,4 +1,4 @@
-import { istToday } from '@tangent/contracts';
+import { schoolToday } from '@tangent/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startHarness, type Harness } from './harness.js';
 
@@ -189,7 +189,10 @@ describe('a student’s record', () => {
       { name: 'Sam Test', phone: '9822099002', email: 'sam@example.com', relation: 'Father', canCollect: false, isPrimary: true },
     ] } });
     expect(g.status).toBe(200);
-    expect(g.json).toEqual([expect.objectContaining({ name: 'Sam Test', isPrimary: true, canCollect: false }), expect.objectContaining({ name: 'Pat Test', relation: 'Mother', isPrimary: false })]);
+    expect(g.json).toEqual([expect.objectContaining({ name: 'Sam Test', isPrimary: true, canCollect: false }), expect.objectContaining({ name: 'Pat Test', relation: 'mother', isPrimary: false })]);
+    // Gender, blood group and relations come from the school's lists: a word not on them is refused.
+    expect((await h.call('PATCH', `/v1/students/${made.json.id}`, { token, body: { gender: 'robot' } })).status).toBe(400);
+    expect((await h.call('PUT', `/v1/students/${made.json.id}/guardians`, { token, body: { guardians: [{ name: 'Sam Test', phone: '9822099002', relation: 'Neighbour', canCollect: true, isPrimary: true }] } })).status).toBe(400);
     expect((await h.call('PUT', `/v1/students/${made.json.id}/guardians`, { token, body: { guardians: [{ name: 'No One', phone: '9822099003', relation: 'Aunt', canCollect: true, isPrimary: false }] } })).status).toBe(400);
     await h.setSettings({ 'students.required': ['address'] });
     expect((await h.call('PATCH', `/v1/students/${made.json.id}`, { token, body: { address: '' } })).status).toBe(400);
@@ -201,7 +204,8 @@ describe('access', () => {
   it('stops a teacher from opening fees or settings', async () => {
     const tt = await h.login('sunita.desai@greenfield.edu.in');
     expect((await h.call('GET', '/v1/fees/summary', { token: tt })).status).toBe(403);
-    expect((await h.call('PATCH', '/v1/settings', { token: tt, body: { changes: { 'school.name': 'Hacked school' } } })).status).toBe(404);
+    // Someone without the right to change settings cannot, whatever they send.
+    expect((await h.call('PATCH', '/v1/settings', { token: tt, body: { expectedVersion: 1, changes: { 'school.name': 'Hacked school' } } })).status).toBe(403);
     expect((await h.call('GET', '/v1/students?limit=2', { token: tt })).status).toBe(200);
   });
   it('closes modules the plan does not include', async () => {
@@ -226,13 +230,16 @@ describe('access', () => {
 
 describe('dashboard and approvals', () => {
   it('builds the dashboard from real data', async () => {
+    // The sample school's own week (closed on Sundays): its day at school is the last school day.
+    await h.setSettings({ 'calendar.weeklyOff': ['sun'] });
     const d = (await h.call('GET', '/v1/dashboard', { token })).json;
+    await h.setSettings({ 'calendar.weeklyOff': [] });
     expect(d.greetingName).toBe('Neha Menon');
     expect(d.present.total).toBeGreaterThanOrEqual(1498);
     expect(d.charts.attendance.points).toHaveLength(6);
     expect(d.classRolls).toHaveLength(6);
     expect(d.feeHeads.map((x: any) => x.head)).toEqual(['tuition', 'transport', 'activities', 'lab']);
-    expect(d.needsYou.map((n: any) => n.kind)).toEqual(['leave', 'fee_waiver', 'attendance', 'notice']);
+    expect(d.needsYou.map((n: any) => n.kind)).toEqual(['staff_leave', 'fee_waiver', 'attendance', 'notice']);
     expect(d.timeline.length).toBeGreaterThan(3);
   });
   it('approves, then undoes, a concession and applies it to the invoice', async () => {
@@ -260,7 +267,7 @@ describe('dashboard and approvals', () => {
 
 describe('attendance and fees', () => {
   it('marks a class, refuses the future, and notifies guardians of absences', async () => {
-    const date = istToday();
+    const date = schoolToday();
     const day = (await h.call('GET', `/v1/attendance/day?classId=cls_6a&date=${date}`, { token })).json;
     expect(day.marks.length).toBeGreaterThan(30);
     const marks = day.marks.map((m: any, i: number) => ({ studentId: m.studentId, status: i === 0 ? 'absent' : 'present' }));
@@ -367,13 +374,12 @@ describe('timetable', () => {
   });});
 
 describe('settings', () => {
-  it('shows the school its setup, and gives the school no way to change it (only the console can)', async () => {
+  it('shows the school its setup, lets it change its own settings and never Tangent’s', async () => {
     const before = (await h.call('GET', '/v1/settings', { token })).json;
     expect(before.usage.students).toBeGreaterThan(0);
     expect(before.usage.studentLimit).toBeGreaterThanOrEqual(before.usage.students);
-    expect((await h.call('PATCH', '/v1/settings', { token, body: { changes: { 'school.name': 'Changed by the school' } } })).status).toBe(404);
-    expect((await h.call('POST', '/v1/roles', { token, body: { name: 'Mine', permissions: [] } })).status).toBe(404);
-    expect((await h.call('PUT', '/v1/roles/role_teacher', { token, body: { name: 'Mine', permissions: [] } })).status).toBe(404);
+    const version = (await h.call('GET', '/v1/settings/edit', { token })).json.version;
+    expect((await h.call('PATCH', '/v1/settings', { token, body: { expectedVersion: version, changes: { 'brand.color': '#123456' } } })).status).toBe(400);
     expect((await h.call('GET', '/v1/me', { token })).json.permissions).not.toContain('settings.write');
   });
   it('follows what the console sets: colour, and the modules of the plan (the only place modules are chosen)', async () => {

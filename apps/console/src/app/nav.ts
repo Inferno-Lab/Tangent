@@ -1,49 +1,51 @@
 import type { NavGroup, PageIcon } from '@tangent/web-ui';
 import type { ConsolePermission } from '@tangent/contracts';
 import { url } from './base';
+import { t as tr } from '@tangent/web-ui';
 
 export interface Tab { key: string; label: string; needs?: ConsolePermission }
 interface Def { id: string; label: string; icon: PageIcon; keys: string; to: string; needs?: ConsolePermission; tabs?: Tab[] }
 
 /** The console menu, grouped by what is being worked on (docs/product-map.md §4.1). A page's tabs each have an address. */
 export const DEFS: { name: string; items: Def[] }[] = [
-  { name: 'Schools', items: [
-    { id: 'fleet', label: 'Fleet', icon: 'fleet', keys: 'G F', to: '/' },
-    { id: 'onb', label: 'Onboarding', icon: 'onboarding', keys: 'G O', to: '/onboarding' },
-    { id: 'req', label: 'Requests', icon: 'requests', keys: 'G Q', to: '/requests' },
-    { id: 'sup', label: 'Support sessions', icon: 'support', keys: 'G S', to: '/support', needs: 'support.access' },
+  { name: tr('console.nav.schools'), items: [
+    { id: 'fleet', label: tr('console.nav.fleet'), icon: 'fleet', keys: 'G F', to: '/' },
+    { id: 'onb', label: tr('console.nav.onboarding'), icon: 'onboarding', keys: 'G O', to: '/onboarding' },
+    { id: 'req', label: tr('console.nav.requests'), icon: 'requests', keys: 'G Q', to: '/requests' },
+    { id: 'sup', label: tr('console.nav.support_sessions'), icon: 'support', keys: 'G S', to: '/support', needs: 'support.access' },
   ] },
-  { name: 'Product', items: [
-    { id: 'mod', label: 'Plans and modules', icon: 'modules', keys: 'G M', to: '/modules', tabs: [{ key: 'schools', label: 'Schools' }, { key: 'plans', label: 'Plans' }, { key: 'planned', label: 'Planned' }] },
-    { id: 'bp', label: 'Blueprints', icon: 'blueprints', keys: 'G P', to: '/blueprints' },
-    { id: 'flag', label: 'Flags', icon: 'flags', keys: 'G L', to: '/flags' },
+  { name: tr('console.nav.product'), items: [
+    { id: 'mod', label: tr('console.nav.plans_and_modules'), icon: 'modules', keys: 'G M', to: '/modules', tabs: [{ key: 'schools', label: tr('console.nav.schools') }, { key: 'plans', label: tr('console.nav.plans') }, { key: 'planned', label: tr('console.nav.planned') }] },
+    { id: 'bp', label: tr('console.nav.blueprints'), icon: 'blueprints', keys: 'G P', to: '/blueprints' },
+    { id: 'flag', label: tr('console.nav.flags'), icon: 'flags', keys: 'G L', to: '/flags' },
   ] },
-  { name: 'Platform', items: [
-    { id: 'rel', label: 'Releases', icon: 'releases', keys: 'G R', to: '/releases', tabs: [{ key: 'releases', label: 'Releases' }, { key: 'rules', label: 'Rollout rules' }, { key: 'database', label: 'Database changes' }] },
-    { id: 'app', label: 'Mobile builds', icon: 'builds', keys: 'G B', to: '/builds' },
-    { id: 'int', label: 'Integrations', icon: 'integrations', keys: 'G I', to: '/integrations', needs: 'integrations.read', tabs: [
-      { key: 'connections', label: 'Connections' }, { key: 'routing', label: 'Routing' }, { key: 'templates', label: 'Approved templates' },
-      { key: 'activity', label: 'Activity' }, { key: 'webhooks', label: 'Webhooks' }, { key: 'inbox', label: 'Test inbox', needs: 'sandbox.read' },
+  { name: tr('console.nav.platform'), items: [
+    { id: 'rel', label: tr('console.nav.releases'), icon: 'releases', keys: 'G R', to: '/releases', tabs: [{ key: 'releases', label: tr('console.nav.releases') }, { key: 'rules', label: tr('console.nav.rollout_rules') }, { key: 'database', label: tr('console.nav.database_changes') }] },
+    { id: 'app', label: tr('console.nav.mobile_builds'), icon: 'builds', keys: 'G B', to: '/builds' },
+    { id: 'int', label: tr('console.nav.integrations'), icon: 'integrations', keys: 'G I', to: '/integrations', needs: 'integrations.read', tabs: [
+      { key: 'connections', label: tr('console.nav.connections') }, { key: 'routing', label: tr('console.nav.routing') }, { key: 'templates', label: tr('console.nav.approved_templates') },
+      { key: 'activity', label: tr('console.nav.activity') }, { key: 'webhooks', label: tr('console.nav.webhooks') }, { key: 'inbox', label: tr('console.nav.test_inbox'), needs: 'sandbox.read' },
     ] },
-    { id: 'cells', label: 'Cells', icon: 'cells', keys: 'G C', to: '/cells' },
-    { id: 'health', label: 'Health', icon: 'health', keys: 'G H', to: '/health' },
+    { id: 'cells', label: tr('console.nav.cells'), icon: 'cells', keys: 'G C', to: '/cells' },
+    { id: 'health', label: tr('console.nav.health'), icon: 'health', keys: 'G H', to: '/health' },
+    { id: 'lang', label: tr('console.nav.languages'), icon: 'languages', keys: 'G W', to: '/languages' },
   ] },
-  { name: 'Business', items: [
-    { id: 'bill', label: 'Billing', icon: 'billing', keys: 'G $', to: '/billing', needs: 'billing.read' },
-    { id: 'comp', label: 'Compliance', icon: 'compliance', keys: 'G Y', to: '/compliance', tabs: [{ key: 'agreements', label: 'Agreements' }, { key: 'breaches', label: 'Breaches' }, { key: 'processors', label: 'Sub-processors' }, { key: 'requests', label: 'Data requests' }] },
+  { name: tr('console.nav.business'), items: [
+    { id: 'bill', label: tr('console.nav.billing'), icon: 'billing', keys: 'G $', to: '/billing', needs: 'billing.read' },
+    { id: 'comp', label: tr('console.nav.compliance'), icon: 'compliance', keys: 'G Y', to: '/compliance', tabs: [{ key: 'agreements', label: tr('console.nav.agreements') }, { key: 'breaches', label: tr('console.nav.breaches') }, { key: 'processors', label: tr('console.nav.sub_processors') }, { key: 'requests', label: tr('console.nav.data_requests') }] },
   ] },
-  { name: 'Console', items: [
-    { id: 'appr', label: 'Approvals', icon: 'approvals', keys: 'G A', to: '/approvals' },
-    { id: 'team', label: 'Team', icon: 'team', keys: 'G T', to: '/team' },
-    { id: 'set', label: 'Console settings', icon: 'setup', keys: 'G ,', to: '/settings', tabs: [{ key: 'rules', label: 'Rules for risky changes' }] },
+  { name: tr('console.nav.console'), items: [
+    { id: 'appr', label: tr('console.nav.approvals'), icon: 'approvals', keys: 'G A', to: '/approvals' },
+    { id: 'team', label: tr('console.nav.team'), icon: 'team', keys: 'G T', to: '/team' },
+    { id: 'set', label: tr('console.nav.console_settings'), icon: 'setup', keys: 'G ,', to: '/settings', tabs: [{ key: 'rules', label: tr('console.nav.rules_for_risky_changes') }] },
   ] },
 ];
 
 /** A school's page: its tabs, each with its own address (`/schools/<id>/roles`), docs/product-map.md §4.2. */
 export const SCHOOL_TABS: Tab[] = [
-  { key: 'overview', label: 'Overview' }, { key: 'plan', label: 'Plan and modules' }, { key: 'configuration', label: 'Configuration', needs: 'schools.configure' },
-  { key: 'roles', label: 'Roles', needs: 'schools.configure' }, { key: 'data', label: 'Data' }, { key: 'messaging', label: 'Messaging', needs: 'integrations.read' },
-  { key: 'technical', label: 'Technical' }, { key: 'audit', label: 'Audit', needs: 'audit.read' },
+  { key: 'overview', label: tr('console.nav.overview') }, { key: 'plan', label: tr('console.nav.plan_and_modules') }, { key: 'configuration', label: tr('console.nav.configuration'), needs: 'schools.configure' },
+  { key: 'roles', label: tr('console.nav.roles'), needs: 'schools.configure' }, { key: 'data', label: tr('console.nav.data') }, { key: 'messaging', label: tr('console.nav.messaging'), needs: 'integrations.read' },
+  { key: 'technical', label: tr('console.nav.technical') }, { key: 'audit', label: tr('console.nav.audit'), needs: 'audit.read' },
 ];
 
 /** Every page and its tabs, for the router: a page with tabs also answers at `<page>/<tab>`. */

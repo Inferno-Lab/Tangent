@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ensureDatabase, startDevPostgres, type DevPostgres } from '../dev.js';
 import { migrate } from '../migrate.js';
 import { seedSchool } from '../seed/greenfield.js';
-import { IMPORT_KINDS } from '@tangent/contracts';
+import { IMPORT_KINDS, setLocaleSource } from '@tangent/contracts';
 import { commitImport, exportAll, listBatches, previewImport, templateXlsx, undoBatch } from './engine.js';
 import { parseCsv, readTable, readXlsx } from './files.js';
 import { classKey, isoDay } from './kinds.js';
@@ -19,7 +19,9 @@ const school = sampleSchool(300);
 const n = async (sql: string) => Number((await pool.query<{ n: string }>(sql)).rows[0]!.n);
 
 beforeAll(async () => {
-  server = await startDevPostgres({ dataDir: path.join(mkdtempSync(path.join(tmpdir(), 'tangent-import-')), 'data'), fresh: true });
+  // The school's own country, as the API and console give it: local phone numbers are read as Indian ones.
+  setLocaleSource(() => ({ country: 'IN', locale: 'en-IN', currency: 'INR' }));
+  server = await startDevPostgres({ dataDir: path.join(mkdtempSync(path.join(tmpdir(), 'tangent-import-')), 'data'), fresh: true, throwaway: true });
   pool = new pg.Pool({ connectionString: await ensureDatabase(server.url, 'school_import'), max: 4 });
   await migrate(pool, 'school');
   // An empty school: settings, roles and the first admin, nothing else, the way a school starts before it moves in.
@@ -135,8 +137,8 @@ describe('moving a school in', () => {
   it('exports everything in the same templates, and the export imports back cleanly', async () => {
     const zip = await exportAll(pool);
     expect(zip.subarray(0, 2).toString()).toBe('PK');
-    expect(zip.toString('latin1')).toContain('08-students.csv');
-    const start = zip.indexOf('08-students.csv') + '08-students.csv'.length;
+    expect(zip.toString('latin1')).toContain('09-students.csv');
+    const start = zip.indexOf('09-students.csv') + '09-students.csv'.length;
     const csv = zip.subarray(start, zip.indexOf('PK', start)).toString('utf8');
     const p = await previewImport(pool, { kind: 'students', csv, fileName: 'export.csv' });
     expect(p.rows.filter((r) => r.errors.length)).toEqual([]);
@@ -148,9 +150,15 @@ describe('moving a school in', () => {
     const first = await commitImport(pool, { kind: 'students', csv, fileName: 'new.csv' }, 'Office');
     expect(first.created).toBe(1);
     const no = (await pool.query<{ admission_no: string }>("select admission_no from students where name = 'New Child'")).rows[0]!.admission_no;
-    expect(no).toMatch(/^\d{4}\/0501$/);
+    expect(no).toMatch(/^\d{4}\/0001$/);
     const again = await previewImport(pool, { kind: 'students', csv, fileName: 'new.csv' });
     expect(again.counts).toMatchObject({ create: 0, update: 1 });
+    // The school's own series, as the office set it.
+    await pool.query(`insert into settings (key, value) values ('people.admissionNumber', '"ADM-{yy}-{seq:3}"'), ('people.admissionStart', '40')`);
+    try {
+      await commitImport(pool, { kind: 'students', csv: 'name,class,dob,guardian\nOther Child,4 A,19/04/2017,Ravi Other\n', fileName: 'other.csv' }, 'Office');
+      expect((await pool.query<{ admission_no: string }>("select admission_no from students where name = 'Other Child'")).rows[0]!.admission_no).toMatch(/^ADM-\d{2}-040$/);
+    } finally { await pool.query("delete from settings where key in ('people.admissionNumber', 'people.admissionStart')"); }
   }, 60_000);
 
   it('gives every kind an Excel template that reads back as itself, with a dropdown wherever the values are fixed', async () => {
@@ -193,8 +201,8 @@ describe('moving a school in', () => {
     expect(p.counts).toMatchObject({ create: 2, update: 1, skip: 1 });
     const b = await commitImport(pool, { kind: 'contacts', csv: list, fileName: 'whatsapp.csv' }, 'Migration team');
     const phone = async (child: string) => (await pool.query<{ phone: string | null }>('select g.phone from guardians g join student_guardians sg on sg.guardian_id = g.id join students s on s.id = sg.student_id where s.name = $1', [child])).rows[0]!.phone;
-    expect(await phone('Mira Qadri')).toBe('9811177001');
-    expect(await phone('Devansh Zed')).toBe('9811177003');
+    expect(await phone('Mira Qadri')).toBe('+919811177001');
+    expect(await phone('Devansh Zed')).toBe('+919811177003');
     expect(await phone('Isha Zed')).toBeNull();
     await undoBatch(pool, b.id);
     expect(await phone('Mira Qadri')).toBeNull();
@@ -218,3 +226,23 @@ function deflatedZip(files: Record<string, string>): Buffer {
   end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(dir.length / 2, 8); end.writeUInt16LE(dir.length / 2, 10); end.writeUInt32LE(d.length, 12); end.writeUInt32LE(offset, 16);
   return Buffer.concat([...parts, d, end]);
 }
+
+describe('value mapping', () => {
+  it('reads a file’s values through the mapping, reports values no choice matches, and remembers the mapping', async () => {
+    const csv = 'Subject,Periods\nValue map check,six\nValue map extra,7\n';
+    const first = await previewImport(pool, { kind: 'subjects', csv, fileName: 'subjects.csv' });
+    expect(first.values).toEqual({});
+    const values = { per_week: { ' SIX ': '6' } };
+    const mapped = await previewImport(pool, { kind: 'subjects', csv, fileName: 'subjects.csv', values });
+    expect(mapped.rows[0]!.values.per_week).toBe('6');
+    await commitImport(pool, { kind: 'subjects', csv, fileName: 'subjects.csv', values }, 'Migration team');
+    // The same file's columns next term: the values are read the same way without asking.
+    expect((await previewImport(pool, { kind: 'subjects', csv, fileName: 'subjects.csv' })).rows[0]!.values.per_week).toBe('6');
+    // A value that is none of a column's choices is listed to map; mapped, it is not.
+    const students = 'Admission number,Name,Class,Status\nVM/1,Val Map,5 A,Current\n';
+    expect((await previewImport(pool, { kind: 'students', csv: students, fileName: 's.csv' })).unmatched).toEqual({ status: ['Current'] });
+    const fixed = await previewImport(pool, { kind: 'students', csv: students, fileName: 's.csv', values: { status: { current: 'active' } } });
+    expect(fixed.unmatched).toEqual({});
+    expect(fixed.rows[0]!.values.status).toBe('active');
+  });
+});

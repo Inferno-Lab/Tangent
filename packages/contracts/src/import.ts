@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { MoneyOrZero } from './locale.js';
+import { localized } from './i18n.js';
 
 /** One column of an import: the template header, what people see, and an example for the template's second row. */
 export interface ImportColumn {
@@ -10,10 +12,11 @@ export interface ImportColumn {
   aliases?: string[];
   /** The only values it takes: the template offers them as a dropdown, and the importer accepts them (and its own variants). */
   options?: readonly string[];
+  /** A school list (§3.6.5) the column's values come from: the school's own template offers that list instead of `options`. */
+  list?: 'lists.genders' | 'lists.bloodGroups' | 'lists.relationships' | 'fees.categories' | 'library.itemTypes';
 }
 
 export const PERIOD_KINDS = ['period', 'break', 'lunch', 'recess', 'assembly'] as const;
-export const ADMISSION_STAGES = ['enquiry', 'applied', 'test', 'offer', 'enrolled', 'declined'] as const;
 export const PAY_METHODS = ['cash', 'upi', 'card', 'netbanking', 'cheque'] as const;
 export const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
 
@@ -32,11 +35,13 @@ export interface ImportKind {
 const c = (key: string, label: string, example: string, extra: Partial<ImportColumn> = {}): ImportColumn => ({ key, label, example, ...extra });
 const req = (key: string, label: string, example: string, aliases: string[] = []): ImportColumn => ({ key, label, example, required: true, aliases });
 
-export const IMPORT_KINDS: ImportKind[] = [
+export const IMPORT_KINDS: ImportKind[] = localized([
   { key: 'years', label: 'Academic years', blurb: 'The year the school is in, and earlier ones for history.', module: 'core', matchOn: ['label'],
     columns: [req('label', 'Year', '2026-27', ['academic year', 'session']), req('starts_on', 'Starts on', '2026-04-01', ['start date', 'from']), req('ends_on', 'Ends on', '2027-03-31', ['end date', 'to']), c('current', 'Current year', 'yes', { aliases: ['is current', 'active'], options: ['yes', 'no'] })] },
   { key: 'terms', label: 'Terms', blurb: 'Terms or semesters inside a year.', module: 'core', matchOn: ['year', 'name'],
     columns: [req('year', 'Year', '2026-27', ['academic year', 'session']), req('name', 'Term', 'Term 1', ['term name', 'semester']), req('starts_on', 'Starts on', '2026-04-01', ['start date', 'from']), req('ends_on', 'Ends on', '2026-09-30', ['end date', 'to'])] },
+  { key: 'reporting_periods', label: 'Reporting periods', blurb: 'Stretches the school reports on (quarters, half terms), apart from its terms.', module: 'core', matchOn: ['year', 'name'],
+    columns: [req('year', 'Year', '2026-27', ['academic year', 'session']), req('name', 'Period', 'Quarter 1', ['period name', 'quarter', 'marking period']), req('starts_on', 'Starts on', '2026-04-01', ['start date', 'from']), req('ends_on', 'Ends on', '2026-06-30', ['end date', 'to'])] },
   { key: 'holidays', label: 'Holidays', blurb: 'Days the school is closed.', module: 'core', matchOn: ['name', 'starts_on'],
     columns: [req('name', 'Holiday', 'Diwali break', ['holiday', 'occasion', 'title']), req('starts_on', 'From', '2026-11-08', ['date', 'start date', 'from date']), c('ends_on', 'To', '2026-11-12', { aliases: ['end date', 'to date'] })] },
   { key: 'subjects', label: 'Subjects', blurb: 'Subjects taught, with periods a week.', module: 'core', matchOn: ['name'],
@@ -48,16 +53,16 @@ export const IMPORT_KINDS: ImportKind[] = [
   { key: 'classes', label: 'Classes and sections', blurb: 'Every class and section, with its class teacher.', module: 'core', matchOn: ['class'],
     columns: [req('class', 'Class', '8 A', ['class name', 'class-section', 'batch', 'standard division']), c('grade', 'Grade', '8', { aliases: ['standard', 'std'] }), c('section', 'Section', 'A', { aliases: ['division', 'div'] }), c('class_teacher', 'Class teacher email', 'kavita@school.in', { aliases: ['class teacher', 'teacher email'] })] },
   { key: 'students', label: 'Students and families', blurb: 'Students with their guardians; brothers and sisters are joined by the guardian’s phone.', module: 'core', matchOn: ['admission_no'],
-    columns: [c('admission_no', 'Admission number', '2019/0412', { aliases: ['admission no', 'admn no', 'adm no', 'sr no', 'scholar no', 'gr no'] }), req('name', 'Student name', 'Aarav Sharma', ['student name', 'full name', 'name of student']), req('class', 'Class', '8 A', ['class name', 'class-section', 'batch', 'standard division']), c('roll_no', 'Roll number', '12', { aliases: ['roll', 'roll no'] }), req('dob', 'Date of birth', '2012-04-18', ['date of birth', 'birth date', 'd.o.b']),
-      c('blood_group', 'Blood group', 'B+'), c('house', 'House', 'Emerald'), c('address', 'Address', '42 Baner Road, Pune'), c('admitted_on', 'Admitted on', '2019-06-10', { aliases: ['admission date', 'date of admission', 'doa'] }), c('status', 'Status', 'active', { options: ['active', 'inactive', 'left', 'transferred'] }),
-      req('guardian_name', 'Guardian name', 'Priya Sharma', ['father name', "father's name", 'parent name', 'mother name', 'guardian']), c('guardian_phone', 'Guardian phone', '9822011002', { aliases: ['father mobile', 'parent mobile', 'mobile', 'phone', 'contact no', 'sms mobile'] }), c('guardian_email', 'Guardian email', 'priya@example.com', { aliases: ['parent email', 'father email', 'email'] }), c('relation', 'Relation', 'Mother'),
-      c('guardian2_name', 'Second guardian', 'Rohan Sharma', { aliases: ['mother name', "mother's name"] }), c('guardian2_phone', 'Second guardian phone', '9822011003', { aliases: ['mother mobile'] }), c('guardian2_relation', 'Second relation', 'Father'), c('gender', 'Gender', 'female', { aliases: ['sex'], options: ['female', 'male', 'other'] })] },
+    columns: [c('admission_no', 'Admission number', '2019/0412', { aliases: ['admission no', 'admn no', 'adm no', 'sr no', 'scholar no', 'gr no'] }), c('name', 'Student name', 'Aarav Sharma', { aliases: ['student name', 'full name', 'name of student'] }), req('class', 'Class', '8 A', ['class name', 'class-section', 'batch', 'standard division']), c('roll_no', 'Roll number', '12', { aliases: ['roll', 'roll no'] }), req('dob', 'Date of birth', '2012-04-18', ['date of birth', 'birth date', 'd.o.b']),
+      c('blood_group', 'Blood group', 'B+', { list: 'lists.bloodGroups' }), c('house', 'House', 'Emerald'), c('address', 'Address', '42 Baner Road, Pune'), c('admitted_on', 'Admitted on', '2019-06-10', { aliases: ['admission date', 'date of admission', 'doa'] }), c('status', 'Status', 'active', { options: ['active', 'left', 'transferred', 'graduated'] }),
+      req('guardian_name', 'Guardian name', 'Priya Sharma', ['father name', "father's name", 'parent name', 'mother name', 'guardian']), c('guardian_phone', 'Guardian phone', '9822011002', { aliases: ['father mobile', 'parent mobile', 'mobile', 'phone', 'contact no', 'sms mobile'] }), c('guardian_email', 'Guardian email', 'priya@example.com', { aliases: ['parent email', 'father email', 'email'] }), c('relation', 'Relation', 'Mother', { list: 'lists.relationships' }),
+      c('guardian2_name', 'Second guardian', 'Rohan Sharma', { aliases: ['mother name', "mother's name"] }), c('guardian2_phone', 'Second guardian phone', '9822011003', { aliases: ['mother mobile'] }), c('guardian2_relation', 'Second relation', 'Father'), c('gender', 'Gender', 'Female', { aliases: ['sex'], options: ['Female', 'Male', 'Another gender', 'Prefer not to say'], list: 'lists.genders' }), c('given_name', 'Given name', 'Aarav'), c('family_name', 'Family name', 'Sharma'), c('name_local', 'Name in a second script', 'لينا حداد', { aliases: ['local name', 'name in arabic', 'name in hindi'] }), c('fee_category', 'Fee category', '', { aliases: ['fee group'], list: 'fees.categories' })] },
   { key: 'admissions', label: 'Admissions in progress', blurb: 'Open enquiries and applications, so the pipeline does not restart.', module: 'people.admissions', matchOn: ['child_name', 'phone'],
-    columns: [req('child_name', 'Child', 'Ira Rao', ['student name', 'child name', 'applicant']), req('grade_sought', 'Grade', '3', ['class', 'grade applied', 'class sought']), req('guardian_name', 'Guardian', 'Meera Rao', ['parent name', 'father name']), c('phone', 'Phone', '9822011010', { aliases: ['mobile', 'contact'] }), c('email', 'Email', 'meera@example.com'), c('source', 'Source', 'website'), c('stage', 'Stage', 'applied', { aliases: ['status'], options: ADMISSION_STAGES }), c('test_on', 'Test on', '2026-12-02'), c('note', 'Note', 'Sibling in 6 B')] },
+    columns: [req('child_name', 'Child', 'Ira Rao', ['student name', 'child name', 'applicant']), req('grade_sought', 'Grade', '3', ['class', 'grade applied', 'class sought']), req('guardian_name', 'Guardian', 'Meera Rao', ['parent name', 'father name']), c('phone', 'Phone', '9822011010', { aliases: ['mobile', 'contact'] }), c('email', 'Email', 'meera@example.com'), c('source', 'Source', 'website'), c('stage', 'Stage', 'Applied', { aliases: ['status'] }), c('test_on', 'Stage day', '2026-12-02', { aliases: ['test on', 'test date', 'interview date'] }), c('note', 'Note', 'Sibling in 6 B')] },
   { key: 'fee_heads', label: 'Fee heads', blurb: 'The kinds of fee the school charges (tuition, transport…), in the order they are shown, and which take concessions.', module: 'fees', matchOn: ['name'],
     columns: [req('name', 'Fee head', 'Tuition', ['head', 'fee type', 'category']), c('order', 'Order', '1', { aliases: ['sort', 'position'] }), c('concession', 'Concessions apply', 'yes', { aliases: ['waivable', 'concession'], options: ['yes', 'no'] })] },
   { key: 'fee_structures', label: 'Fee structures', blurb: 'What each grade pays, per fee head and due date.', module: 'fees', matchOn: ['grade', 'title'],
-    columns: [c('grade', 'Grade (blank for all)', '8'), req('head', 'Fee head', 'tuition', ['fee head', 'fee type', 'category']), req('title', 'Fee', 'Term 2 tuition', ['fee name', 'particular', 'description']), req('amount', 'Amount', '18500', ['fee amount', 'amount (rs)']), req('due_on', 'Due on', '2026-11-10', ['due date', 'last date'])] },
+    columns: [c('grade', 'Grade (blank for all)', '8'), req('head', 'Fee head', 'tuition', ['fee head', 'fee type', 'category']), req('title', 'Fee', 'Term 2 tuition', ['fee name', 'particular', 'description']), req('amount', 'Amount', '18500', ['fee amount', 'amount (rs)']), req('due_on', 'Due on', '2026-11-10', ['due date', 'last date']), c('fee_category', 'Fee category (blank for everyone)', '', { aliases: ['fee group'], list: 'fees.categories' })] },
   { key: 'fee_dues', label: 'Opening dues', blurb: 'What each student owes on day one, reconciled to the rupee against the old system.', module: 'fees', matchOn: ['admission_no', 'title'],
     columns: [req('admission_no', 'Admission number', '2019/0412', ['admission no', 'admn no', 'adm no']), req('head', 'Fee head', 'tuition', ['fee head', 'fee type', 'category']), req('title', 'Fee', 'Term 2 tuition', ['fee name', 'particular', 'description']), req('amount', 'Amount', '18500', ['fee amount', 'due amount', 'balance']), req('due_on', 'Due on', '2026-11-10', ['due date', 'last date']), c('waived', 'Waived', '0', { aliases: ['concession', 'discount'] })] },
   { key: 'payments', label: 'Payment history', blurb: 'Past payments with the school’s own receipt numbers.', module: 'fees', matchOn: ['receipt_no'],
@@ -72,13 +77,20 @@ export const IMPORT_KINDS: ImportKind[] = [
     columns: [req('admission_no', 'Admission number', '2019/0412', ['admission no', 'admn no', 'adm no']), req('title', 'Book', 'Wings of Fire', ['book title', 'book name']), req('due_on', 'Due on', '2026-11-20', ['due date', 'return by']), c('returned_on', 'Returned on', '')] },
   { key: 'library_books', label: 'Library catalogue', blurb: 'Every title the library has, with its copies and shelf.', module: 'library', matchOn: ['title', 'author'],
     columns: [req('title', 'Title', 'Wings of Fire', ['book title', 'book name', 'name']), c('author', 'Author', 'A. P. J. Abdul Kalam', { aliases: ['writer', 'author name'] }), c('isbn', 'ISBN', '9788173711466'),
-      c('category', 'Category', 'Biography', { aliases: ['subject', 'genre'] }), c('shelf', 'Shelf', 'B-3', { aliases: ['rack', 'location'] }), c('copies', 'Copies', '3', { aliases: ['quantity', 'qty', 'no of copies'] })] },
+      c('category', 'Category', 'Biography', { aliases: ['subject', 'genre'] }), c('shelf', 'Shelf', 'B-3', { aliases: ['rack', 'location'] }), c('copies', 'Copies', '3', { aliases: ['quantity', 'qty', 'no of copies'] }),
+      c('item_type', 'Item type', 'Book', { aliases: ['type', 'item'], list: 'library.itemTypes' }), c('barcode', 'Barcode', '', { aliases: ['accession no', 'accession number', 'label'] })] },
   { key: 'contacts', label: 'Family phone numbers', blurb: 'A contact list (a phone’s, or a class WhatsApp group’s): each name is matched to a family that has no phone yet, so it can sign in.', module: 'core', matchOn: ['phone'],
     columns: [req('name', 'Name', 'Priya Sharma', ['contact name', 'display name', 'parent name', 'guardian name', 'first name']), req('phone', 'Phone', '9822011002', ['mobile', 'mobile phone', 'phone 1 - value', 'number', 'contact']),
       c('student', 'Child', 'Aarav Sharma', { aliases: ['child', 'student name', 'ward'] }), c('class', 'Class', '8 A', { aliases: ['class name', 'section'] })] },
   { key: 'transport', label: 'Bus routes', blurb: 'Which route each student takes.', module: 'transport', matchOn: ['admission_no'],
     columns: [req('admission_no', 'Admission number', '2019/0412', ['admission no', 'admn no', 'adm no']), req('route', 'Route', 'Route 4 · Baner', ['route name', 'bus route', 'route no'])] },
-];
+  { key: 'leave_balances', label: 'Staff leave balances', blurb: 'Leave each member of staff has left from the old system, added to this year’s balance.', module: 'staffAttendance', matchOn: ['email', 'type', 'year'],
+    columns: [req('email', 'Staff email', 'sam.lee@school.org', ['email', 'teacher email', 'staff']), req('type', 'Leave type', 'Casual leave', ['leave', 'leave type']),
+      req('days', 'Days', '4.5', ['balance', 'days left', 'opening balance']), c('year', 'Leave year', '', { aliases: ['session', 'academic year'] }), c('note', 'Note', 'From the old system')] },
+  { key: 'pickup_people', label: 'Who may collect each child', blurb: 'The people each family named to collect their child, from the old register.', module: 'visitors', matchOn: ['admission_no', 'name'],
+    columns: [req('admission_no', 'Admission number', '2019/0412', ['admission no', 'admn no', 'adm no']), req('name', 'Name', 'Alex Morgan', ['pickup person', 'collector']),
+      req('relation', 'Relation', 'Uncle', ['relationship', 'who']), c('phone', 'Phone', '', { aliases: ['mobile', 'contact'] })] },
+]);
 
 export function importKind(key: string): ImportKind | undefined {
   return IMPORT_KINDS.find((k) => k.key === key);
@@ -93,6 +105,8 @@ export const ImportInput = z.object({
   rows: z.array(z.record(z.string(), z.string().max(2000))).max(20_000).optional(),
   /** File column name -> import column key (or '' to leave it out). Missing: matched automatically or remembered. */
   mapping: z.record(z.string(), z.string()).optional(),
+  /** Per import column: a value in the file -> what it means ("M" -> "Male"); matched ignoring case and spaces at the ends. */
+  values: z.record(z.string(), z.record(z.string().max(200), z.string().max(200))).optional(),
   fileName: z.string().max(200).default(''),
   /** The school's upload this came from, if any. */
   uploadId: z.string().max(60).optional(),
@@ -112,12 +126,18 @@ export interface ImportPreview {
   source: string;
   headers: string[];
   mapping: Record<string, string>;
+  /** The value mapping in use (sent, remembered, or none). */
+  values: Record<string, Record<string, string>>;
+  /** Per column with fixed choices: values in the file that are none of them (at most 30 a column), to map. */
+  unmatched: Record<string, string[]>;
   /** Required columns nothing maps to: the import cannot go ahead until each has a column. */
   missing: string[];
   rows: ImportRowCheck[];
   counts: { create: number; update: number; skip: number; total: number };
-  /** Totals to check against the old system: rows per class, rupees per fee head, and so on. */
+  /** Totals to check against the old system: rows per class, money per fee head, and so on. */
   totals: { label: string; value: string }[];
+  /** The kind's columns as this school has them: its lists and its own fields (§3.6.3). */
+  columns: ImportColumn[];
 }
 
 export interface ImportBatchRow {
@@ -147,11 +167,11 @@ export type UploadCreate = z.infer<typeof UploadCreate>;
 export interface UploadRow { id: string; fileName: string; note: string; rows: number; uploadedBy: string; at: string; status: 'new' | 'imported' | 'set_aside'; batchId: string | null; setAsideReason: string }
 
 /** What the school edits itself in Classes and calendar: the same kinds and columns as the importers, behind a console lock each. */
-export const SETUP_KINDS = [
-  { key: 'years', lock: 'calendar.schoolEdits' }, { key: 'terms', lock: 'calendar.schoolEdits' }, { key: 'holidays', lock: 'calendar.schoolEdits' },
+export const SETUP_KINDS = localized([
+  { key: 'years', lock: 'calendar.schoolEdits' }, { key: 'terms', lock: 'calendar.schoolEdits' }, { key: 'reporting_periods', lock: 'calendar.schoolEdits' }, { key: 'holidays', lock: 'calendar.schoolEdits' },
   { key: 'classes', lock: 'classes.schoolEdits' }, { key: 'subjects', lock: 'classes.schoolEdits' }, { key: 'periods', lock: 'classes.schoolEdits' },
   { key: 'fee_structures', lock: 'feeStructures.schoolEdits' },
-] as const;
+] as const);
 
 /** One kind's rows in the template's columns, plus the row id for removing it. */
 export interface SetupSection { kind: string; label: string; locked: boolean; columns: ImportColumn[]; rows: (Record<string, string> & { id: string })[] }
@@ -169,7 +189,7 @@ export interface Activation {
 /** Tangent's team ticks a go-live item that cannot be counted, or types the old system's total dues to reconcile against. */
 export const ReadinessMark = z.union([
   z.object({ key: z.enum(['config_reviewed', 'staff_trained']), done: z.boolean() }),
-  z.object({ key: z.literal('old_dues'), amount: z.number().int().min(0).max(10_000_000_000).nullable() }),
+  z.object({ key: z.literal('old_dues'), amount: MoneyOrZero().nullable() }),
 ]);
 export type ReadinessMark = z.infer<typeof ReadinessMark>;
 
@@ -179,9 +199,14 @@ export type FamilyInvite = z.infer<typeof FamilyInvite>;
 export interface LetterRow { studentId: string; student: string; admissionNo: string; className: string; guardian: string; phoneEnd: string }
 
 /** The console's Migration workspace for one school: what can be imported, what was, what the school sent, and how ready it is to go live. */
+/** A big import running in the background: its state, and once done, what it did (or why it failed). */
+export interface ImportRunRow { id: string; kind: string; fileName: string; rows: number; status: 'running' | 'done' | 'failed'; created: number | null; updated: number | null; skipped: number | null; error: string | null; by: string; startedAt: string; doneAt: string | null }
+
 export interface MigrationView {
   kinds: ImportKind[];
   batches: ImportBatchRow[];
+  /** Big imports in the background, newest first. */
+  runs: ImportRunRow[];
   uploads: UploadRow[];
   /** Worked out from the school's data; `manual` items are ticked by Tangent's team; `fees` compares with the old system's total. */
   readiness: { key: string; label: string; done: boolean; detail: string; manual?: boolean }[];

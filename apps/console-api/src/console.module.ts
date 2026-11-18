@@ -22,6 +22,7 @@ import { ErrorBook, ErrorsController } from './errors.js';
 import { Integrations, IntegrationsController } from './integrations.js';
 import { PlatformHub } from './platform-hub.js';
 import { SchoolData, SchoolDataController } from './school-data.js';
+import { Languages, LanguagesController } from './languages.js';
 
 const OWNS = Symbol('OWNS');
 
@@ -48,10 +49,10 @@ export class ConsoleModule {
     const pools = shared?.pools ?? new PoolManager({ maxPools: env.TENANT_MAX_POOLS, perPool: env.TENANT_PER_POOL });
     return {
       module: ConsoleModule,
-      controllers: [AuthController, SandboxController, SchoolsController, WizardController, ActionsController, ReleasesController, PolicyController, RoleTemplatesController, OpsController, ComplianceController, ErrorsController, BackupsController, DrillsController, ConfigController, MigrationController, IntegrationsController, SchoolDataController],
+      controllers: [AuthController, SandboxController, SchoolsController, WizardController, ActionsController, ReleasesController, PolicyController, RoleTemplatesController, OpsController, ComplianceController, ErrorsController, BackupsController, DrillsController, ConfigController, MigrationController, IntegrationsController, SchoolDataController, LanguagesController],
       providers: [
         { provide: ENV, useValue: env }, { provide: REGISTRY, useValue: registry }, { provide: POOLS, useValue: pools }, { provide: OWNS, useValue: !shared }, Shutdown,
-        Db, Sandbox, ConsoleAuth, Policy, RoleTemplates, Blueprints, Provisioner, Schools, Wizard, Builds, Actions, Releases, Health, Support, Admin, Bootstrap, Compliance, ErrorBook, Backups, ConfigService, Migration, PlatformHub, Integrations, SchoolData,
+        Db, Sandbox, ConsoleAuth, Policy, RoleTemplates, Blueprints, Provisioner, Schools, Wizard, Builds, Actions, Releases, Health, Support, Admin, Bootstrap, Compliance, ErrorBook, Backups, ConfigService, Migration, PlatformHub, Integrations, SchoolData, Languages,
         { provide: APP_GUARD, useClass: ConsoleAuthGuard },
         { provide: APP_FILTER, useClass: ApiExceptionFilter },
       ],

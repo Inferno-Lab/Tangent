@@ -20,6 +20,8 @@ import 'package:tangent/data/models/student.dart';
 import 'package:tangent/features/dashboard/views/dashboard_view.dart' show PeriodStrip, greeting, todayLine;
 import 'package:tangent/features/shell/shell_controller.dart';
 import 'package:tangent/features/teacher_tools/controllers/teacher_controller.dart';
+import 'package:tangent/features/school_life/views/staff_time_view.dart';
+import 'package:tangent/core/services/school_config.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:tangent/core/utils/clock.dart';
@@ -171,6 +173,11 @@ class _Body extends StatelessWidget {
       children: [
         Rise(child: Text(line, style: context.type.s)),
         const SizedBox(height: 16),
+        // Today's check-in, where the school keeps staff attendance and puts it on staff's Home (console: The app).
+        if (SchoolConfig.has('staffAttendance') && SchoolConfig.home.contains('checkIn')) ...[
+          const Rise(index: 1, child: CheckInCard(onHome: true)),
+          const SizedBox(height: 16),
+        ],
         Rise(
           index: 2,
           child: Row(
@@ -463,7 +470,7 @@ class _ClassCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.app;
     final mine = cls.id == controller.own?.id;
-    final subject = controller.teacher?.subject ?? 'maths';
+    final subject = controller.teacher?.subject ?? '';
     final periods = controller.today.where((p) => p.schoolClass?.id == cls.id).toList();
     final now = nowMinutes();
     final live = periods.where((p) => minutesOf(p.slot.start) <= now && minutesOf(p.slot.end) > now).firstOrNull;
@@ -497,6 +504,7 @@ class _ClassCard extends StatelessWidget {
       if (mine) ('teacher.attendance', () => Get.toNamed<void>(_attendanceRoute(cls.id))),
       ('teacher.marks', () => Get.toNamed<void>(_marksRoute(cls.id))),
       ('teacher.homework', () => Get.toNamed<void>(AppRoutes.teacherAssign, arguments: {'classId': cls.id})),
+      ('teacher.roster', () => Get.toNamed<void>(AppRoutes.teacherRoster.replaceFirst(':classId', cls.id))),
     ];
     return EduCard(
       ring: mine ? context.app.brand : null,

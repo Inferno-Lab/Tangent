@@ -366,7 +366,7 @@ class _SearchBarState extends State<_SearchBar> {
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
-                hintText: 'library.search'.trp({'n': NumberFormat.decimalPattern('en_IN').format(widget.count)}),
+                hintText: 'library.search'.trp({'n': Formatters.count(widget.count)}),
                 hintStyle: AppText.b(color: c.ink3),
               ),
             ),

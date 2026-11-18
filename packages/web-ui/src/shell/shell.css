@@ -18,9 +18,9 @@
 .nest .drw,.nest .bulk,.nest .save,.nest .sbar,.nest .glow{position:fixed!important}
 .nest .glow{border-radius:0!important}
 .nest .popm{overflow:auto;background:var(--s1);border:1px solid var(--line);border-radius:18px;box-shadow:var(--sh3);padding:8px;display:flex;flex-direction:column;gap:2px}
-.nest .popm button{display:flex;align-items:center;gap:10px;height:40px;padding:0 12px;border:0;border-radius:14px;background:none;color:var(--ink);font:700 14px var(--fb);cursor:pointer;text-align:left;transition:background var(--t1)}
+.nest .popm button{display:flex;align-items:center;gap:10px;height:40px;padding:0 12px;border:0;border-radius:14px;background:none;color:var(--ink);font:700 14px var(--fb);cursor:pointer;text-align:start;transition:background var(--t1)}
 .nest .popm button:hover,.nest .popm button:focus-visible,.nest .popm button.on{background:var(--s2);color:var(--ink)}
-.nest .popm button small{margin-left:auto;font:700 12px var(--fb);opacity:.6}
+.nest .popm button small{margin-inline-start:auto;font:700 12px var(--fb);opacity:.6}
 .nest .popm hr{border:0;border-top:1px solid var(--line);margin:4px 0;width:100%}
 /* The dock and its "more" sheet exist only on a phone. */
 .nest .dock{display:none}
@@ -29,10 +29,10 @@
   .nest .dock button{position:relative;width:56px;height:52px;border-radius:999px;border:0;background:none;color:color-mix(in srgb,var(--on-deep) 72%,transparent);display:grid;place-items:center;cursor:pointer;transition:color var(--t3),width var(--t3) var(--e),background var(--t3)}
   .nest .dock button.on{width:112px;background:var(--s1);color:var(--ink)}
   .nest .dock button svg{width:22px;height:22px;grid-area:1/1}
-  .nest .dock button span{grid-area:1/1;font:700 13px var(--fb);margin-left:32px;opacity:0;max-width:0;overflow:hidden;white-space:nowrap;transition:opacity var(--t3)}
+  .nest .dock button span{grid-area:1/1;font:700 13px var(--fb);margin-inline-start:32px;opacity:0;max-width:0;overflow:hidden;white-space:nowrap;transition:opacity var(--t3)}
   .nest .dock button.on span{opacity:1;max-width:64px}
-  .nest .dock button.on svg{margin-right:48px}
-  .nest .sheet{position:fixed;left:0;right:0;bottom:0;z-index:70;max-height:82dvh;overflow:auto;background:var(--s1);border-radius:28px 28px 0 0;padding:10px 20px calc(24px + env(safe-area-inset-bottom));box-shadow:var(--sh3);animation:nSheet var(--t3) var(--e) both}
+  .nest .dock button.on svg{margin-inline-end:48px}
+  .nest .sheet{position:fixed;inset-inline-start:0;inset-inline-end:0;bottom:0;z-index:70;max-height:82dvh;overflow:auto;background:var(--s1);border-radius:28px 28px 0 0;padding:10px 20px calc(24px + env(safe-area-inset-bottom));box-shadow:var(--sh3);animation:nSheet var(--t3) var(--e) both}
   .nest .sheet[data-leaving]{animation:nSheetO var(--t2) var(--ei) forwards}
   .nest .sheet .grab{width:44px;height:5px;border-radius:2px;background:var(--line2);margin:0 auto 12px}
   .nest .sheet a.nvm{display:flex;align-items:center;gap:12px;min-height:48px;padding:0 6px;border-radius:14px;color:var(--ink);text-decoration:none;font:700 15px var(--fb)}
@@ -42,14 +42,14 @@
   .nest .sheet .sl{margin:10px 6px 2px}
 }
 @media (max-width:900px){
-  .nest .bulk{left:12px;right:12px;bottom:calc(88px + env(safe-area-inset-bottom));width:auto;overflow-x:auto;border-radius:28px;transform:translateY(160%) scale(.96)}
+  .nest .bulk{inset-inline-start:12px;inset-inline-end:12px;bottom:calc(88px + env(safe-area-inset-bottom));width:auto;overflow-x:auto;border-radius:28px;transform:translateY(160%) scale(.96)}
   .nest .bulk.on{transform:none}
   .nest .bulk>*{flex:none}
 }
 @keyframes nSheet{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
 @keyframes nSheetO{to{transform:translateY(40px);opacity:0}}
 
-.nest .mebtn{display:flex;align-items:center;gap:12px;width:100%;padding:6px;margin:-6px;border:0;border-radius:14px;background:none;color:inherit;text-align:left;cursor:pointer;font:inherit;transition:background var(--t2)}
+.nest .mebtn{display:flex;align-items:center;gap:12px;width:100%;padding:6px;margin:-6px;border:0;border-radius:14px;background:none;color:inherit;text-align:start;cursor:pointer;font:inherit;transition:background var(--t2)}
 .nest .mebtn:hover,.nest .mebtn[aria-expanded=true]{background:var(--s2)}
 .nest .sb.col .mebtn{width:auto}
 /* The menu stays in view while a long page scrolls, and scrolls itself on a short window. `clip` keeps the rounded frame without making it a scroll container. */

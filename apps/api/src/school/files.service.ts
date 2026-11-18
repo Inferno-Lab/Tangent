@@ -6,6 +6,7 @@ import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import type { AuthedUser, TenantCtx } from '../tenancy/tenant.js';
 import { HubService } from './hub.service.js';
 import { SettingsService } from './support.js';
+import { tx } from '@tangent/contracts';
 
 const IMAGES = ['image/jpeg', 'image/png', 'image/webp'];
 const DOCS = [...IMAGES, 'application/pdf'];
@@ -18,16 +19,25 @@ const RULES: Record<FileKind, { mimes: string[]; max: number; module: string; wr
   notice_attachment: { mimes: DOCS, max: 15 * MB, module: 'notices', write: 'notices.write' },
   chat: { mimes: DOCS, max: 10 * MB, module: 'chat', write: 'participant' },
   student_photo: { mimes: IMAGES, max: 5 * MB, module: 'people', write: 'students.write' },
+  // Many students' photos at once, named by admission number (Moving in).
+  photo_zip: { mimes: ['application/zip'], max: 300 * MB, module: 'people', write: 'students.write' },
   student_document: { mimes: DOCS, max: 15 * MB, module: 'people', write: 'students.write' },
   logo: { mimes: ['image/png', 'image/jpeg'], max: 2 * MB, module: 'people', write: 'console' },
   gallery: { mimes: IMAGES, max: 15 * MB, module: 'gallery', write: 'gallery.write' },
   receipt: { mimes: ['application/pdf'], max: 2 * MB, module: 'fees', write: 'console' },
   report_card: { mimes: ['application/pdf'], max: 5 * MB, module: 'exams', write: 'console' },
+  staff_photo: { mimes: IMAGES, max: 5 * MB, module: 'people', write: 'staff.write' },
+  visitor_photo: { mimes: IMAGES, max: 5 * MB, module: 'visitors', write: 'visitors.manage' },
+  // A photo of someone who collects a child: the family adds it (owner "pickup:<student>"), or the front desk.
+  pickup_photo: { mimes: IMAGES, max: 5 * MB, module: 'visitors', write: 'family' },
+  // Owned by the class the entry is for (it is attached before the entry is saved).
+  diary_attachment: { mimes: DOCS, max: 15 * MB, module: 'diary', write: 'diary.write' },
 };
 
 /** The first bytes of each type we accept: a file must be what it says it is. */
 function sniff(b: Buffer): string | null {
   if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (b.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]))) return 'application/zip';
   if (b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
   if (b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP') return 'image/webp';
   if (b.subarray(0, 5).toString('latin1') === '%PDF-') return 'application/pdf';
@@ -96,6 +106,7 @@ export class FilesService implements OnModuleInit {
       if (!(await this.children(t, user.id)).includes(ownerId.slice(8))) throw forbidden('You can send a photo only of your own child.');
       return;
     }
+    if (kind === 'pickup_photo' && user.permissions.includes('visitors.manage') && (await this.isStaff(t, user.id))) return;
     if (rule.write === 'family') {
       const [, studentId] = ownerId.split(':');
       if (!studentId || !(await this.children(t, user.id)).includes(studentId)) throw forbidden('You can hand in work only for your own children.');
@@ -112,9 +123,12 @@ export class FilesService implements OnModuleInit {
   }
 
   /** Whether this person may read a file. */
-  private async mayRead(t: TenantCtx, user: AuthedUser, f: { kind: FileKind; owner_id: string | null }): Promise<void> {
+  private async mayRead(t: TenantCtx, user: AuthedUser, f: { id: string; kind: FileKind; owner_id: string | null }): Promise<void> {
     if (await this.isStaff(t, user.id)) {
-      const need: Partial<Record<FileKind, string>> = { student_photo: 'students.read', student_document: 'students.read', homework_submission: 'homework.read', gallery: 'gallery.read', chat: 'messages.read' };
+      const need: Partial<Record<FileKind, string>> = {
+        student_photo: 'students.read', student_document: 'students.read', homework_submission: 'homework.read', gallery: 'gallery.read', chat: 'messages.read',
+        visitor_photo: 'visitors.read', pickup_photo: 'visitors.read',
+      };
       const p = need[f.kind];
       if (!p || user.permissions.includes(p)) return;
       throw forbidden('You do not have access to this file.');
@@ -123,7 +137,8 @@ export class FilesService implements OnModuleInit {
     const owner = f.owner_id ?? '';
     const ok = await (async () => {
       switch (f.kind) {
-        case 'homework_submission': return kids.includes(owner.split(':')[1] ?? '');
+        case 'homework_submission': case 'pickup_photo': return kids.includes(owner.split(':')[1] ?? '');
+        case 'diary_attachment': return (await t.pool.query('select 1 from diary_entries e join students s on s.class_id = e.class_id where e.file_ids ? $1 and s.id = any($2)', [f.id, kids])).rowCount! > 0;
         case 'student_photo': case 'student_document': return kids.includes(owner);
         case 'homework_attachment': return (await t.pool.query('select 1 from homework h join students s on s.class_id = h.class_id where h.id = $1 and s.id = any($2)', [owner, kids])).rowCount! > 0;
         case 'notice_attachment': return (await t.pool.query("select 1 from notices where id = $1 and status = 'published'", [owner])).rowCount! > 0;
@@ -143,8 +158,8 @@ export class FilesService implements OnModuleInit {
 
   async start(t: TenantCtx, user: AuthedUser, b: FileStart): Promise<FileUpload> {
     const rule = RULES[b.kind];
-    if (!rule.mimes.includes(b.mime)) throw new ApiError('validation', `That kind of file is not accepted here. Use ${rule.mimes.map((m) => m.split('/')[1]!.toUpperCase()).join(', ')}.`, { fields: { file: 'This type is not accepted.' } });
-    if (b.bytes > rule.max) throw new ApiError('validation', `The file is too large: at most ${rule.max / MB} MB.`, { fields: { file: 'Too large.' } });
+    if (!rule.mimes.includes(b.mime)) throw new ApiError('validation', tx('That kind of file is not accepted here. Use {p0}.', { p0: rule.mimes.map((m) => m.split('/')[1]!.toUpperCase()).join(', ') }), { fields: { file: 'This type is not accepted.' } });
+    if (b.bytes > rule.max) throw new ApiError('validation', tx('The file is too large: at most {p0} MB.', { p0: rule.max / MB }), { fields: { file: 'Too large.' } });
     await this.mayWrite(t, user, b.kind, b.ownerId);
     return this.reserve(t, user.id, b);
   }
@@ -152,7 +167,7 @@ export class FilesService implements OnModuleInit {
   /** Records an upload and returns its address. Also used by the console for the school's logo. */
   async reserve(t: TenantCtx, userId: string | null, b: FileStart): Promise<FileUpload> {
     const limitGb = t.info.entitlement.limits.storageGb;
-    if (limitGb > 0 && (await this.usage(t)) + b.bytes > limitGb * 1024 * MB) throw new ApiError('locked', `The school's ${limitGb} GB of storage is full. Tangent can raise the limit.`);
+    if (limitGb > 0 && (await this.usage(t)) + b.bytes > limitGb * 1024 * MB) throw new ApiError('locked', tx('The school\'s {limitGb} GB of storage is full. Tangent can raise the limit.', { limitGb }));
     const id = newId('fil');
     const key = `schools/${t.info.slug}/${b.kind}/${id}/${b.name.replace(/[^\w.-]+/g, '_').slice(-80)}`;
     const { s, ctx } = await this.storage(t);
@@ -211,11 +226,62 @@ export class FilesService implements OnModuleInit {
     return virus ? `Infected (${virus}): removed.` : 'Clean.';
   }
 
+  /**
+   * A photo's small copy, made where it was chosen (the browser or the phone; the server has no image tools): an image of at
+   * most 400 KB and 1024 px, checked and scanned like any upload, kept beside the photo and shown in lists instead of it.
+   */
+  async thumb(t: TenantCtx, user: AuthedUser, id: string, dataUrl: string): Promise<FileRow> {
+    const f = (await t.pool.query('select * from files where id = $1 and deleted_at is null', [id])).rows[0];
+    if (!f) throw notFound('That file');
+    if (f.created_by !== user.id) throw forbidden('That photo is not yours.');
+    if (!IMAGES.includes(f.mime)) throw new ApiError('validation', tx('Only a photo has a small copy.'));
+    const data = Buffer.from(dataUrl.replace(/^data:[^,]*,/, ''), 'base64');
+    const mime = sniff(data);
+    const dim = dimensions(data);
+    if (!mime || !IMAGES.includes(mime) || data.length > 400 * 1024 || (dim && Math.max(dim.width, dim.height) > 1024)) throw new ApiError('validation', tx('The small copy must be a photo of at most 400 KB and 1024 pixels.'));
+    const thumbId = newId('fil');
+    const key = `${f.storage_key.replace(/\/[^/]*$/, '')}/thumb-${thumbId}.${mime.split('/')[1]}`;
+    const { s, ctx } = await this.storage(t);
+    await s.put(ctx, key, data, mime);
+    // Owned by the photo, so it is never listed as a photo of its own.
+    await t.pool.query("insert into files (id, kind, owner_id, name, mime, bytes, storage_key, created_by, status, width, height) values ($1,$2,$3,$4,$5,$6,$7,$8,'pending',$9,$10)",
+      [thumbId, f.kind, `thumb:${id}`, `thumb-${f.name}`, mime, data.length, key, user.id, dim?.width ?? null, dim?.height ?? null]);
+    const old = (await t.pool.query<{ thumb_id: string | null }>('update files set thumb_id = $2 where id = $1 returning (select thumb_id from files where id = $1) thumb_id', [id, thumbId])).rows[0]?.thumb_id;
+    if (old) await t.pool.query('update files set deleted_at = now() where id = $1', [old]);
+    if (await this.hubs.hub.platform('scanning')) await enqueue(this.hubs.hub.o.pool as never, 'files.scan', t.info.id, { fileId: thumbId });
+    else await this.markScanned(t.pool, thumbId, null);
+    return this.row((await t.pool.query('select * from files where id = $1', [id])).rows[0]);
+  }
+
+  /** A link to a photo's small copy when it has a clean one, else to the photo. */
+  async thumbUrl(t: TenantCtx, user: AuthedUser | null, f: { id: string; thumbId?: string | null }): Promise<string> {
+    const full = await this.url(t, user, f.id);
+    // Whoever may see the photo may see its copy (checked on the photo above).
+    const th = f.thumbId ? (await t.pool.query<{ storage_key: string }>("select storage_key from files where id = $1 and status = 'clean' and deleted_at is null", [f.thumbId])).rows[0] : undefined;
+    if (!th) return full;
+    const { s, ctx } = await this.storage(t);
+    return s.presignGet(ctx, th.storage_key, 300);
+  }
+
   row(f: Record<string, any>): FileRow {
-    return { id: f.id, kind: f.kind, ownerId: f.owner_id, name: f.name, mime: f.mime, bytes: Number(f.bytes), status: f.status, width: f.width, height: f.height, createdAt: new Date(f.created_at).toISOString() };
+    return { id: f.id, kind: f.kind, ownerId: f.owner_id, thumbId: f.thumb_id ?? null, name: f.name, mime: f.mime, bytes: Number(f.bytes), status: f.status, width: f.width, height: f.height, createdAt: new Date(f.created_at).toISOString() };
   }
 
   /** A link to read the file, valid five minutes. */
+  /** A clean file's bytes (a photo printed on a card), or null when it is missing or cannot be read. */
+  async bytes(t: TenantCtx, id: string | null): Promise<Buffer | null> {
+    const f = id ? (await t.pool.query("select storage_key from files where id = $1 and deleted_at is null and status = 'clean'", [id])).rows[0] : null;
+    if (!f) return null;
+    const { s, ctx } = await this.storage(t);
+    return s.get(ctx, f.storage_key).catch(() => null);
+  }
+
+  /** A student's or member of staff's current photo, for their card. */
+  async photoOf(t: TenantCtx, kind: 'student_photo' | 'staff_photo', ownerId: string): Promise<Buffer | null> {
+    const f = (await t.pool.query<{ id: string }>("select id from files where kind = $1 and owner_id = $2 and deleted_at is null and status = 'clean' order by created_at desc limit 1", [kind, ownerId])).rows[0];
+    return this.bytes(t, f?.id ?? null);
+  }
+
   /** The school's logo image itself (for printed receipts and report cards), or null while it has only letters. */
   async logoBytes(t: TenantCtx): Promise<Buffer | null> {
     const id = await this.settings.value<string>(t, 'brand.logoFileId', '');

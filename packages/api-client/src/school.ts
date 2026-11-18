@@ -1,13 +1,15 @@
 import type {
-  ChangeRequestCreate, ChangeRequestRow, PasswordChange, ReportQuery, EventReply, InvoiceDetail, WaiverRequest, ReceiptCancel, SlotCreate, WeekOf, StudentPatch, GuardiansPut, GuardianRow, DataRequestCreate, DataRequestDecision, DataRequestRow, EnquiryCreate, EnquiryEnrol, EnquiryPatch, EnquiryRow, EventRow, EventSave, ExamCreate, ExamMarksPut, ExamMarksView, ExamResults, ExamRow,
-  HomeworkCreate, HomeworkDetail, HomeworkMarks, HomeworkRow, InvoiceListQuery, InvoiceListRow, InvoiceListSummary, ReceiptRow, ReportData, ReportInfo, RoleRow, StaffCreate, StaffPatch, StaffRow,
+  FormInput, FormRow, FormResponseRow, ChangeRequestCreate, ChangeRequestRow, PasswordChange, ReportQuery, EventReply, InvoiceDetail, WaiverRequest, ReceiptCancel, SlotCreate, WeekOf, StudentPatch, GuardiansPut, GuardianRow, DataRequestCreate, DataRequestDecision, DataRequestRow, EnquiryCreate, EnquiryEnrol, EnquiryPatch, EnquiryRow, EventRow, EventSave, ExamCreate, ExamMarksPut, ExamMarksView, ExamResults, ExamRow,
+  HomeworkCreate, HomeworkDetail, HomeworkMarks, HomeworkRow, InvoiceListQuery, InvoiceListRow, InvoiceListSummary, ReceiptRow, ReportData, ReportInfo, RoleDefSave, RoleRow, StudentLeaveInput, ApplyInfo, EnquiryApply, RegisterPart, RoomRow, RoomSave, RoomDay, RoomBookingCreate, PeriodTimesRow, PeriodTimesPut, ExamRemarksPut, StaffCreate, StaffPatch, StaffRow,
   ThreadCreate, ThreadDetail, ThreadPatch, ThreadReply, ThreadRow,
   AttendanceDayPut, PeriodMarksPut, PeriodRoll, GalleryReportRow, ApprovalDecision, ApprovalKind, ApprovalRow, AssignFee, AttendanceDay, AuditRow, ClassInfo, ContactReveal, CoverRequest, DashboardData, EffectiveConfig, FeeHead, FeeHeadsPut, FeeSummary, ImportResult, InvoiceRow,
-  LoginChallenge, LoginRequest, LoginResponse, MessageRequest, NoticeCreate, NoticeRow, Paged, PaymentCreate, SearchHit, SessionUser, SettingsResponse, ShellData, SlotPatch, StudentCreate, StudentDetail,
+  LoginChallenge, LoginRequest, LoginResponse, MessageRequest, NoticeCreate, NoticeRow, Paged, PaymentCreate, SearchHit, SchoolSettingsPatch, SchoolSettingsView, SessionUser, SettingsResponse, ShellData, SlotPatch, StudentCreate, StudentDetail,
   StudentRow, StudentSummary, StudentViews, TeacherLoad, TeacherOption, TimetableView, TokenPair, VerifyRequest,
   Activation, ImportBatchRow, SetupSection, UploadCreate, UploadRow,
   AlbumInput, AlbumRow, BookInput, BookRow, BusRouteInput, BusRouteRow, FileKind, FileRow, FileStart, FileUpload, GiveBack, IssueInput, LeaverInput, LibraryView, LoanRow, NewYearInput, OnlinePaymentRow, PhotoRow,
   PromotionInput, PromotionPreview, ReconRow, RefundRequest, RefundRow, RiderInput, SchoolChannels, TransportView, YearView,
+  StaffDayRow, StaffMarksPut, StaffMonthRow, StaffLeaveRow, StaffLeaveInput, LeaveBalance, LeaveAdjustInput, DiaryInput, DiaryRow, MeetingInput, MeetingRow, MeetingSlotRow, MeetingBookInput,
+  VisitorInput, VisitorRow, GatePassInput, GatePassRow, PickupInput, PickupPerson, PickupRecord, LateInput, RollCall, CertificateRequest, CertificateRow, CertificateType, CertificateCheck, IdCardsInput,
 } from '@tangent/contracts';
 import type { Http, Query } from './http';
 
@@ -45,6 +47,7 @@ export function schoolApi(h: Http) {
       appAccount: (id: string, b: { phone?: string; email?: string }) => h.post<{ sent: boolean }>(`/v1/students/${id}/app-account`, b),
       update: (id: string, b: StudentPatch) => h.patch<StudentDetail>(`/v1/students/${id}`, b),
       setGuardians: (id: string, b: GuardiansPut) => h.put<GuardianRow[]>(`/v1/students/${id}/guardians`, b),
+      recordLeave: (id: string, b: StudentLeaveInput) => h.post<{ id: string }>(`/v1/students/${id}/leave`, b),
       list: (q: StudentListQuery) => h.get<Paged<StudentRow>>('/v1/students', q as Query),
       summary: (q: Pick<StudentListQuery, 'classId' | 'house'>) => h.get<StudentSummary>('/v1/students/summary', q as Query),
       views: () => h.get<StudentViews>('/v1/students/views'),
@@ -59,7 +62,7 @@ export function schoolApi(h: Http) {
       invite: (ids: string[]) => h.post<{ sent: number }>('/v1/students/invite', { ids }),
     },
     attendance: {
-      day: (classId: string, date: string) => h.get<AttendanceDay>('/v1/attendance/day', { classId, date }),
+      day: (classId: string, date: string, part?: RegisterPart) => h.get<AttendanceDay>('/v1/attendance/day', part ? { classId, date, part } : { classId, date }),
       save: (b: AttendanceDayPut) => h.put<AttendanceDay>('/v1/attendance/day', b),
       remind: () => h.post<{ sent: number; classes: string[] }>('/v1/attendance/remind'),
       periods: (classId: string, date: string) => h.get<PeriodRoll>('/v1/attendance/periods', { classId, date }),
@@ -97,6 +100,15 @@ export function schoolApi(h: Http) {
       rooms: () => h.get<string[]>('/v1/timetable/rooms'),
       cover: (b: CoverRequest) => h.post<void>('/v1/timetable/cover', b),
       publish: () => h.post<{ families: number; teachers: number; version: number }>('/v1/timetable/publish'),
+      roomList: () => h.get<RoomRow[]>('/v1/timetable/room-list'),
+      addRoom: (b: RoomSave) => h.post<RoomRow[]>('/v1/timetable/room-list', b),
+      saveRoom: (id: string, b: RoomSave) => h.put<RoomRow[]>(`/v1/timetable/room-list/${id}`, b),
+      deleteRoom: (id: string) => h.del<RoomRow[]>(`/v1/timetable/room-list/${id}`),
+      roomDay: (id: string, date: string) => h.get<RoomDay>(`/v1/timetable/room-list/${id}/day`, { date }),
+      book: (b: RoomBookingCreate) => h.post<RoomDay>('/v1/timetable/bookings', b),
+      cancelBooking: (id: string) => h.del<void>(`/v1/timetable/bookings/${id}`),
+      times: () => h.get<PeriodTimesRow[]>('/v1/timetable/times'),
+      putTimes: (b: PeriodTimesPut) => h.put<PeriodTimesRow[]>('/v1/timetable/times', b),
     },
     subjects: () => h.get<{ id: string; name: string; color: string }[]>('/v1/subjects'),
     homework: {
@@ -114,6 +126,7 @@ export function schoolApi(h: Http) {
       reopen: (id: string, note: string) => h.post<ExamRow>(`/v1/exams/${id}/reopen`, { note }),
       marks: (id: string) => h.get<ExamMarksView>(`/v1/exams/${id}/marks`),
       putMarks: (id: string, b: ExamMarksPut) => h.put<ExamMarksView>(`/v1/exams/${id}/marks`, b),
+      putRemarks: (id: string, b: ExamRemarksPut) => h.put<ExamMarksView>(`/v1/exams/${id}/remarks`, b),
       results: (id: string) => h.get<ExamResults>(`/v1/exams/${id}/results`),
       publish: (id: string) => h.post<{ families: number; exam: ExamRow }>(`/v1/exams/${id}/publish`),
       remove: (id: string) => h.del<void>(`/v1/exams/${id}`),
@@ -133,8 +146,26 @@ export function schoolApi(h: Http) {
       patch: (id: string, b: EnquiryPatch) => h.patch<EnquiryRow>(`/v1/admissions/${id}`, b),
       enrol: (id: string, b: EnquiryEnrol) => h.post<StudentDetail>(`/v1/admissions/${id}/enrol`, b),
     },
+    // The school's application page, before anyone signs in.
+    forms: {
+      list: () => h.get<FormRow[]>('/v1/forms'),
+      add: (b: FormInput) => h.post<FormRow>('/v1/forms', b),
+      save: (id: string, b: FormInput) => h.put<FormRow>(`/v1/forms/${id}`, b),
+      remove: (id: string) => h.del<void>(`/v1/forms/${id}`),
+      responses: (id: string) => h.get<{ form: FormRow; rows: FormResponseRow[] }>(`/v1/forms/${id}/responses`),
+      csv: (id: string) => h.text(`/v1/forms/${id}/responses.csv`),
+      link: (token: string) => h.get<Pick<FormRow, 'title' | 'intro' | 'fields' | 'conditions'> & { open: boolean }>(`/v1/forms/link/${encodeURIComponent(token)}`),
+      answerLink: (token: string, b: { answers: Record<string, unknown>; website?: string }) => h.post<{ ok: true }>(`/v1/forms/link/${encodeURIComponent(token)}`, b),
+    },
+    apply: {
+      info: () => h.get<ApplyInfo>('/v1/apply'),
+      send: (b: EnquiryApply) => h.post<{ ok: true }>('/v1/apply', b),
+    },
     roles: {
       list: () => h.get<RoleRow[]>('/v1/roles'),
+      create: (b: RoleDefSave) => h.post<RoleRow[]>('/v1/roles', b),
+      save: (id: string, b: RoleDefSave) => h.put<RoleRow[]>(`/v1/roles/${id}`, b),
+      remove: (id: string) => h.del<RoleRow[]>(`/v1/roles/${id}`),
     },
     invoices: {
       list: (q: Partial<InvoiceListQuery>) => h.get<Paged<InvoiceListRow> & { summary: InvoiceListSummary }>('/v1/fees/invoice-list', q as Query),
@@ -146,6 +177,10 @@ export function schoolApi(h: Http) {
     },
     reports: {
       list: () => h.get<ReportInfo[]>('/v1/reports'),
+      periods: () => h.get<{ name: string; from: string; to: string; kind: 'term' | 'period' }[]>('/v1/reports/periods'),
+      schedules: () => h.get<ReportScheduleRow[]>('/v1/reports/schedules'),
+      schedule: (b: { reportId: string; classId: string | null; every: 'week' | 'month'; day: number; to: string[] }) => h.post<ReportScheduleRow[]>('/v1/reports/schedules', b),
+      unschedule: (id: string) => h.del<ReportScheduleRow[]>(`/v1/reports/schedules/${id}`),
       get: (id: string, q: ReportQuery = {}) => h.get<ReportData>(`/v1/reports/${id}`, q as Query),
       csv: (id: string, q: ReportQuery = {}) => h.text(`/v1/reports/${id}/csv`, q as Query),
     },
@@ -167,12 +202,15 @@ export function schoolApi(h: Http) {
     },
     setup: {
       sections: () => h.get<SetupSection[]>('/v1/setup'),
+      publicHolidays: () => h.get<{ date: string; name: string; have: boolean }[]>('/v1/setup/holidays/public'),
       save: (kind: string, row: Record<string, string>) => h.put<SetupSection[]>(`/v1/setup/${kind}`, { row }),
       remove: (kind: string, id: string) => h.del<SetupSection[]>(`/v1/setup/${kind}/${encodeURIComponent(id)}`),
       applyFee: (id: string) => h.post<{ created: number }>(`/v1/setup/fee_structures/${id}/apply`),
     },
     movingIn: {
       uploads: () => h.get<UploadRow[]>('/v1/moving-in/uploads'),
+      photos: () => h.get<PhotoImportRow[]>('/v1/moving-in/photos'),
+      readPhotos: (fileId: string) => h.post<PhotoImportRow[]>('/v1/moving-in/photos', { fileId }),
       batches: () => h.get<ImportBatchRow[]>('/v1/moving-in/batches'),
       upload: (b: UploadCreate) => h.post<UploadRow[]>('/v1/moving-in/uploads', b),
       activation: () => h.get<Activation>('/v1/moving-in/activation'),
@@ -186,6 +224,7 @@ export function schoolApi(h: Http) {
       requests: () => h.get<DataRequestRow[]>('/v1/privacy/requests'),
       create: (b: DataRequestCreate) => h.post<DataRequestRow>('/v1/privacy/requests', b),
       decide: (id: string, b: DataRequestDecision) => h.post<DataRequestRow>(`/v1/privacy/requests/${id}/decision`, b),
+      exportData: (id: string) => h.blob(`/v1/privacy/requests/${id}/export`),
     },
     /** The school asks Tangent to change its setup. */
     changeRequests: {
@@ -194,12 +233,17 @@ export function schoolApi(h: Http) {
     },
     settings: {
       get: () => h.get<SettingsResponse>('/v1/settings'),
+      edit: () => h.get<SchoolSettingsView>('/v1/settings/edit'),
+      change: (b: SchoolSettingsPatch) => h.patch<{ pending: true; approvalId: string } | { version: number }>('/v1/settings', b),
       audit: () => h.get<AuditRow[]>('/v1/settings/audit'),
       channels: () => h.get<SchoolChannels>('/v1/settings/channels'),
+      /** A printed document's template as it is being edited, as a PDF (§3.6.2). */
+      previewDocument: (kind: string, template: unknown) => h.postBlob('/v1/school/documents/preview', { kind, template }),
     },
     files: {
       start: (b: FileStart) => h.post<FileUpload>('/v1/files', b),
       done: (id: string) => h.post<FileRow>(`/v1/files/${id}/done`),
+      thumb: (id: string, data: string) => h.post<FileRow>(`/v1/files/${id}/thumb`, { data }),
       url: (id: string, download = false) => h.get<{ url: string }>(`/v1/files/${id}/url`, download ? { download: '1' } : undefined),
       list: (kind: FileKind, owner: string) => h.get<FileRow[]>('/v1/files', { kind, owner }),
       remove: (id: string) => h.del<void>(`/v1/files/${id}`),
@@ -216,6 +260,7 @@ export function schoolApi(h: Http) {
     },
     library: {
       view: () => h.get<LibraryView>('/v1/library'),
+      scan: (code: string) => h.get<BookRow>(`/v1/library/scan?code=${encodeURIComponent(code)}`),
       add: (b: BookInput) => h.post<BookRow>('/v1/library/books', b),
       save: (id: string, b: BookInput) => h.put<BookRow>(`/v1/library/books/${id}`, b),
       remove: (id: string) => h.del<void>(`/v1/library/books/${id}`),
@@ -223,6 +268,71 @@ export function schoolApi(h: Http) {
       giveBack: (id: string, b: GiveBack) => h.post<{ fine: number; billed: boolean }>(`/v1/library/loans/${id}/return`, b),
       renew: (id: string) => h.post<LoanRow>(`/v1/library/loans/${id}/renew`),
       cancel: (id: string, reason: string) => h.post<void>(`/v1/library/reservations/${id}/cancel`, { reason }),
+    },
+    staffTime: {
+      day: (date: string) => h.get<StaffDayRow[]>('/v1/staff-attendance', { date }),
+      today: () => h.get<{ total: number; in: number; late: number; leave: number; missing: number }>('/v1/staff-attendance/today'),
+      mark: (date: string, b: StaffMarksPut) => h.put<{ ok: true }>(`/v1/staff-attendance/${date}`, b),
+      month: (month: string) => h.get<StaffMonthRow[]>('/v1/staff-attendance/month', { month }),
+      monthCsv: (month: string) => h.text(`/v1/staff-attendance/month.csv?month=${encodeURIComponent(month)}`),
+      leave: (status?: string) => h.get<StaffLeaveRow[]>('/v1/staff-leave', status ? { status } : undefined),
+      record: (b: StaffLeaveInput) => h.post<StaffLeaveRow>('/v1/staff-leave', b),
+      cancel: (id: string, note: string) => h.post<{ ok: true }>(`/v1/staff-leave/${id}/cancel`, { note }),
+      balances: () => h.get<{ year: string; rows: { userId: string; name: string; balances: LeaveBalance[] }[] }>('/v1/staff-leave/balances'),
+      adjust: (b: LeaveAdjustInput) => h.post<{ ok: true }>('/v1/staff-leave/adjust', b),
+    },
+    diary: {
+      list: (q: { classId?: string; from?: string; to?: string }) => h.get<DiaryRow[]>('/v1/diary', q),
+      classes: () => h.get<{ classId: string; className: string; classTeacher: boolean; subjects: { id: string; name: string }[] }[]>('/v1/diary/classes'),
+      add: (b: DiaryInput) => h.post<DiaryRow>('/v1/diary', b),
+      save: (id: string, b: DiaryInput) => h.put<DiaryRow>(`/v1/diary/${id}`, b),
+      remove: (id: string) => h.del<void>(`/v1/diary/${id}`),
+      acks: (id: string) => h.get<{ studentId: string; name: string; at: string | null }[]>(`/v1/diary/${id}/acks`),
+    },
+    meetings: {
+      list: () => h.get<MeetingRow[]>('/v1/meetings'),
+      add: (b: MeetingInput) => h.post<MeetingRow>('/v1/meetings', b),
+      save: (id: string, b: MeetingInput) => h.put<MeetingRow>(`/v1/meetings/${id}`, b),
+      remove: (id: string) => h.del<void>(`/v1/meetings/${id}`),
+      slots: (id: string) => h.get<MeetingSlotRow[]>(`/v1/meetings/${id}/slots`),
+      cancel: (slotId: string) => h.post<{ ok: true }>(`/v1/meetings/slots/${slotId}/cancel`),
+      book: (b: MeetingBookInput) => h.post<MeetingSlotRow>('/v1/meetings/book', b),
+    },
+    visitors: {
+      list: (view: string, q = '') => h.get<VisitorRow[]>('/v1/visitors', { view, q }),
+      add: (b: VisitorInput) => h.post<VisitorRow>('/v1/visitors', b),
+      save: (id: string, b: VisitorInput) => h.put<VisitorRow>(`/v1/visitors/${id}`, b),
+      byCode: (code: string) => h.post<VisitorRow>('/v1/visitors/code', { code }),
+      signIn: (id: string) => h.post<VisitorRow>(`/v1/visitors/${id}/in`),
+      signOut: (id: string) => h.post<VisitorRow>(`/v1/visitors/${id}/out`),
+      cancel: (id: string) => h.post<VisitorRow>(`/v1/visitors/${id}/cancel`),
+      badge: (id: string) => h.blob(`/v1/visitors/${id}/badge.pdf`),
+      rollCall: () => h.get<RollCall>('/v1/visitors/roll-call'),
+      rollCallPdf: () => h.blob('/v1/visitors/roll-call.pdf'),
+      passes: (day: string) => h.get<GatePassRow[]>('/v1/gate-passes', { day }),
+      askPass: (b: GatePassInput) => h.post<GatePassRow>('/v1/gate-passes', b),
+      passOut: (id: string) => h.post<GatePassRow>(`/v1/gate-passes/${id}/out`),
+      cancelPass: (id: string) => h.post<GatePassRow>(`/v1/gate-passes/${id}/cancel`),
+      passPdf: (id: string) => h.blob(`/v1/gate-passes/${id}/pass.pdf`),
+      people: (studentId: string) => h.get<PickupPerson[]>('/v1/pickup/people', { studentId }),
+      addPerson: (b: PickupInput) => h.post<PickupPerson[]>('/v1/pickup/people', b),
+      removePerson: (id: string) => h.del<void>(`/v1/pickup/people/${id}`),
+      check: (code: string) => h.post<{ parent: string; students: { id: string; name: string; className: string }[]; people: PickupPerson[] }>('/v1/pickup/check', { code }),
+      pickup: (b: PickupRecord) => h.post<{ ok: true }>('/v1/pickup', b),
+      pickups: (day: string) => h.get<{ id: string; studentId: string; studentName: string; className: string; name: string; byCode: boolean; at: string }[]>('/v1/pickup', { day }),
+      late: (b: LateInput) => h.post<{ ok: true }>('/v1/late-arrivals', b),
+      lateList: (day: string) => h.get<{ id: string; studentId: string; studentName: string; className: string; at: string; reason: string }[]>('/v1/late-arrivals', { day }),
+    },
+    certificates: {
+      list: (q: { state?: string; studentId?: string; q?: string } = {}) => h.get<CertificateRow[]>('/v1/certificates', q),
+      types: () => h.get<CertificateType[]>('/v1/certificates/types'),
+      request: (b: CertificateRequest) => h.post<CertificateRow>('/v1/certificates', b),
+      cancel: (id: string) => h.post<CertificateRow>(`/v1/certificates/${id}/cancel`),
+      revoke: (id: string, note: string) => h.post<CertificateRow>(`/v1/certificates/${id}/revoke`, { note }),
+      pdf: (id: string) => h.blob(`/v1/certificates/${id}/certificate.pdf`),
+      register: () => h.blob('/v1/certificates/register.pdf'),
+      idCards: (b: IdCardsInput) => h.postBlob('/v1/certificates/id-cards', b),
+      verify: (token: string) => h.get<CertificateCheck>(`/v1/certificates/verify/${encodeURIComponent(token)}`),
     },
     transport: {
       view: () => h.get<TransportView>('/v1/transport'),
@@ -259,11 +369,33 @@ export function schoolApi(h: Http) {
   };
 }
 
+/** A report sent by itself every week or month to chosen staff. */
+export interface ReportScheduleRow { id: string; reportId: string; classId: string | null; every: 'week' | 'month'; day: number; to: string[]; title: string; toNames: string[]; lastSent: string | null }
+
+/** How far a zip of students' photos got (Moving in). */
+export interface PhotoImportRow { id: string; status: 'waiting' | 'running' | 'done' | 'failed'; total: number; done: number; matched: number; unmatched: string[]; error: string | null; by: string; createdAt: string; doneAt: string | null }
+
 /** Uploads a file straight to storage (the address comes from the API), then tells the API it arrived. */
 export async function uploadFile(api: ReturnType<typeof schoolApi>, kind: FileKind, ownerId: string, file: File): Promise<FileRow> {
   const { fileId, upload } = await api.files.start({ kind, ownerId, name: file.name, mime: file.type, bytes: file.size });
   const res = await fetch(upload.url, { method: upload.method, headers: upload.headers, body: file });
   if (!res.ok) throw new Error('The upload did not go through. Try again.');
-  return api.files.done(fileId);
+  const row = await api.files.done(fileId);
+  // A photo gets a small copy for lists, made here by the browser; without one, lists show the photo itself.
+  if (file.type.startsWith('image/') && typeof createImageBitmap === 'function') await smallCopy(file).then((data) => (data ? api.files.thumb(fileId, data) : null)).catch(() => undefined);
+  return row;
+}
+
+/** A photo at most 480 pixels on its long side, as a JPEG data URL (null when the browser cannot read it). */
+async function smallCopy(file: File): Promise<string | null> {
+  const img = await createImageBitmap(file);
+  const scale = Math.min(1, 480 / Math.max(img.width, img.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(img.width * scale));
+  canvas.height = Math.max(1, Math.round(img.height * scale));
+  canvas.getContext('2d')?.drawImage(img, 0, 0, canvas.width, canvas.height);
+  img.close();
+  const url = canvas.toDataURL('image/jpeg', 0.8);
+  return url.startsWith('data:image/jpeg') ? url : null;
 }
 

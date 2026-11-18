@@ -1,6 +1,7 @@
 import { Icon } from './Icon';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Presence, leavingProps, useLeaving } from './Presence';
+import { t as tr } from './i18n';
 
 export interface ToastProps {
   text: ReactNode;
@@ -43,7 +44,7 @@ export function Toast({ text, tone = 'ok', action, hold, close }: ToastProps) {
         </span>
         {text}
         {action && <button className="btn wht sm" onClick={action.onPress}>{action.label}</button>}
-        {tone === 'bad' && close && <button className="xb" onClick={close} aria-label="Close"><Icon name="close" size={16} /></button>}
+        {tone === 'bad' && close && <button className="xb" onClick={close} aria-label={tr('ui.toast.close')}><Icon name="close" size={16} /></button>}
       </div>
     </div>
   );

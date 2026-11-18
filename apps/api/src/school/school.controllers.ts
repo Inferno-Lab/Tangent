@@ -1,11 +1,12 @@
 import { Body, Controller, Delete, Get, Header, HttpCode, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import {
+  SchoolSettingsPatch, type SchoolSettingsView, StudentLeaveInput, REGISTER_PARTS, RoomSave, RoomBookingCreate, PeriodTimesPut, type RoomRow, type RoomDay, type PeriodTimesRow,
   ApprovalDecision, AssignFee, FeeHeadsPut, AttendanceDayPut, PeriodMarksPut, CoverRequest, SlotCreate, WaiverRequest, ReceiptCancel, IsoDate, MessageRequest, NoticeCreate, PaymentCreate, SlotPatch, StudentCreate, StudentImport, StudentPatch, GuardiansPut, StudentQuery,
   type ApprovalRow, type AttendanceDay, type AttendanceWeekPoint, type PeriodRoll, type AuditRow, type ClassInfo, type ContactReveal, type DashboardData, type FeeHead, type FeeSummary, type ImportResult, type InvoiceRow, type InvoiceDetail,
   type NoticeRow, type SearchHit, type SettingsResponse, type ShellData, type GuardianRow, type StudentDetail, type StudentRow, type StudentSummary, type StudentViews, type TeacherLoad, type TeacherOption, type TimetableView, type WeekOf, type Paged,
 } from '@tangent/contracts';
 import { MODULES, activeModules } from '@tangent/config-engine';
-import { templateXlsx } from '@tangent/db';
+import { ownKind, templateXlsx } from '@tangent/db';
 import { z } from 'zod';
 import { ZodPipe } from '@tangent/nest-kit';
 import { Core, CurrentUser, Require, RequireModule } from '../auth/guards.js';
@@ -19,10 +20,10 @@ import { NoticesService } from './notices.service.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
 import { TimetableService } from './timetable.service.js';
 
-const DayQuery = z.object({ classId: z.string().min(1), date: IsoDate });
+const DayQuery = z.object({ classId: z.string().min(1), date: IsoDate, part: z.enum(REGISTER_PARTS).optional() });
 const InvoiceQuery = z.object({ studentId: z.string().min(1) });
 const NoticeEdit = NoticeCreate.and(z.object({ tellAgain: z.boolean().default(false) }));
-const ListApprovals = z.object({ view: z.enum(['waiting', 'sent', 'decided']).default('waiting'), kind: z.enum(['leave', 'fee_waiver', 'admission', 'notice', 'attendance', 'photo', 'receipt_cancel']).optional() });
+const ListApprovals = z.object({ view: z.enum(['waiting', 'sent', 'decided']).default('waiting'), kind: z.enum(['leave', 'fee_waiver', 'admission', 'notice', 'attendance', 'photo', 'receipt_cancel', 'settings']).optional() });
 const ClassQuery = z.object({ classId: z.string().min(1) });
 const DashQuery = z.object({ days: z.coerce.number().int().min(1).max(30).default(6) });
 const SearchQuery = z.object({ q: z.string().max(80).default('') });
@@ -72,8 +73,8 @@ export class StudentsController {
 
   /** The students sheet to fill (the import engine's template: columns, an example row, dropdowns). */
   @Get('template') @Require('students.write') @Header('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-  template(): Buffer {
-    return templateXlsx('students');
+  async template(@Tenant() t: TenantCtx): Promise<Buffer> {
+    return templateXlsx((await ownKind(t.pool, 'students'))!);
   }
 
   @Post('import') @HttpCode(200) @Require('students.write')
@@ -94,6 +95,12 @@ export class StudentsController {
   @Put(':id/guardians') @Require('students.write')
   guardians(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(GuardiansPut)) body: GuardiansPut): Promise<GuardianRow[]> {
     return this.students.setGuardians(t, id, body, u);
+  }
+
+  // Leave the office records itself (approved at once; the roll call starts with it).
+  @Post(':id/leave') @Require('students.write')
+  recordLeave(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(StudentLeaveInput)) body: StudentLeaveInput): Promise<{ id: string }> {
+    return this.students.recordLeave(t, id, body, u);
   }
 
   @Post(':id/app-account') @HttpCode(200) @Require('students.write')
@@ -129,7 +136,7 @@ export class AttendanceController {
 
   @Get('day') @Require('attendance.read')
   day(@Tenant() t: TenantCtx, @Query(new ZodPipe(DayQuery)) q: z.infer<typeof DayQuery>): Promise<AttendanceDay> {
-    return this.attendance.day(t, q.classId, q.date);
+    return this.attendance.day(t, q.classId, q.date, q.part);
   }
 
   @Put('day') @Require('attendance.mark')
@@ -217,7 +224,7 @@ export class ApprovalsController {
 
   @Get('needs-you') @Require('approvals.read')
   needsYou(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser): Promise<ApprovalRow[]> {
-    return this.approvals.needsYou(t, u.permissions);
+    return this.approvals.needsYou(t, u);
   }
 
   @Get('approvals') @Require('approvals.read')
@@ -225,7 +232,8 @@ export class ApprovalsController {
     return this.approvals.list(t, u, q.view, q.kind);
   }
 
-  @Post('approvals/:id/decision') @HttpCode(200) @Require('approvals.decide')
+  // Who may take a request's step is the school's steps (ApprovalsService.takes): a step can name a role without approvals.decide.
+  @Post('approvals/:id/decision') @HttpCode(200) @Require('approvals.read')
   decide(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(ApprovalDecision)) body: ApprovalDecision): Promise<ApprovalRow> {
     return this.approvals.decide(t, u, id, body);
   }
@@ -294,6 +302,35 @@ export class TimetableController {
     return this.tt.rooms(t);
   }
 
+  // The school's rooms (Timetable → Rooms) and their bookings.
+  @Get('room-list') @Require('timetable.read')
+  roomList(@Tenant() t: TenantCtx): Promise<RoomRow[]> { return this.tt.roomList(t); }
+
+  @Post('room-list') @Require('timetable.edit')
+  addRoom(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(RoomSave)) b: RoomSave): Promise<RoomRow[]> { return this.tt.saveRoom(t, u, null, b); }
+
+  @Put('room-list/:id') @Require('timetable.edit')
+  saveRoom(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(RoomSave)) b: RoomSave): Promise<RoomRow[]> { return this.tt.saveRoom(t, u, id, b); }
+
+  @Delete('room-list/:id') @Require('timetable.edit')
+  deleteRoom(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string): Promise<RoomRow[]> { return this.tt.deleteRoom(t, u, id); }
+
+  @Get('room-list/:id/day') @Require('timetable.read')
+  roomDay(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Query(new ZodPipe(z.object({ date: IsoDate }))) q: { date: string }): Promise<RoomDay> { return this.tt.roomDay(t, u, id, q.date); }
+
+  // Anyone who can see the timetable may book a free room; the booking says who.
+  @Post('bookings') @Require('timetable.read')
+  book(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(RoomBookingCreate)) b: RoomBookingCreate): Promise<RoomDay> { return this.tt.book(t, u, b); }
+
+  @Delete('bookings/:id') @HttpCode(204) @Require('timetable.read')
+  cancelBooking(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string): Promise<void> { return this.tt.cancelBooking(t, u, id); }
+
+  @Get('times') @Require('timetable.read')
+  periodTimes(@Tenant() t: TenantCtx): Promise<PeriodTimesRow[]> { return this.tt.periodTimes(t); }
+
+  @Put('times') @Require('timetable.edit')
+  putPeriodTimes(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(PeriodTimesPut)) b: PeriodTimesPut): Promise<PeriodTimesRow[]> { return this.tt.putPeriodTimes(t, u, b); }
+
   @Post('slots') @Require('timetable.edit')
   place(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(SlotCreate)) body: SlotCreate): Promise<{ id: string }> {
     return this.tt.createSlot(t, u, body);
@@ -336,7 +373,7 @@ export class DashboardController {
   @Get('shell')
   async shell(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser): Promise<ShellData> {
     const cfg = await this.settings.effective(t, u.permissions);
-    return this.dash.shell(t, cfg.modules, cfg.features, u.permissions);
+    return this.dash.shell(t, cfg.modules, cfg.features, u);
   }
 
   @Get('search')
@@ -368,7 +405,17 @@ export class SettingsController {
     return { ...doc, usage, modules: MODULES.map((m) => ({ key: m.key, name: m.name, blurb: m.blurb, requires: m.requires, core: !!m.core, backend: m.backend, entitled: entitled.includes(m.key) })) };
   }
 
-  // No write route: a school's configuration changes only from the console (Tangent staff). See ConfigService in the console API.
+  /** The school's own settings as its admin edits them on each module's Settings tab; Tangent's and locked ones are read-only. */
+  @Get('edit') @Require('settings.read')
+  edit(@Tenant() t: TenantCtx): Promise<SchoolSettingsView> {
+    return this.settings.view(t);
+  }
+
+  /** A change the school makes itself (its own settings only); a risky one waits for a second person in Approvals. */
+  @Patch() @Require('settings.manage')
+  change(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(SchoolSettingsPatch)) b: SchoolSettingsPatch): ReturnType<SettingsService['change']> {
+    return this.settings.change(t, u, b);
+  }
 
   @Get('audit') @Require('audit.read')
   auditLog(@Tenant() t: TenantCtx): Promise<AuditRow[]> {

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/services/auth_service.dart';
+import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
 import 'package:tangent/core/theme/tokens.dart';
@@ -14,10 +15,11 @@ import 'package:tangent/core/widgets/glass.dart';
 import 'package:tangent/core/widgets/page.dart';
 import 'package:tangent/core/widgets/sheets.dart';
 import 'package:tangent/core/widgets/states.dart';
-import 'package:tangent/core/widgets/toast.dart';
+import 'package:tangent/core/utils/open_link.dart';
 import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/data/models/campus.dart';
 import 'package:tangent/data/models/student.dart';
+import 'package:tangent/data/models/user.dart';
 import 'package:tangent/features/chat/controllers/chat_controller.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -393,6 +395,15 @@ class ChatThreadView extends GetView<ChatThreadController> {
     final bottom = keyboard > 0 ? keyboard + 12 : 28 + inset.bottom;
     final side = (MediaQuery.sizeOf(context).width - 720) / 2;
     final gutter = side > 16 ? side : 16.0;
+    // The school's quick replies when it keeps some, else the app's own; families only see the office hours line.
+    final quick = SchoolConfig.quickReplies.isNotEmpty ? SchoolConfig.quickReplies : [for (final k in _quick) k.tr];
+    final hours = SchoolConfig.officeHours;
+    final now = Clock.now();
+    final hm = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final family = Get.find<AuthService>().user.value?.role != UserRole.teacher;
+    final afterHours = family && hours != null && (hm.compareTo(hours.from) < 0 || hm.compareTo(hours.to) >= 0)
+        ? 'chat.after_hours'.trp({'from': hours.from, 'to': hours.to})
+        : null;
     return Obx(() {
       controller.state.value;
       final thread = controller.thread;
@@ -448,7 +459,16 @@ class ChatThreadView extends GetView<ChatThreadController> {
                           child: Column(
                             crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                             children: [
-                              GestureDetector(onLongPress: () => unawaited(controller.onHold(m)), child: _Bubble(text: m.text, mine: mine)),
+                              if (m.text.isNotEmpty) GestureDetector(onLongPress: () => unawaited(controller.onHold(m)), child: _Bubble(text: m.text, mine: mine)),
+                              for (final f in m.files)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Pressable(
+                                    onTap: () => unawaited(openFile(f)),
+                                    label: 'chat.open_file'.tr,
+                                    child: Chip2('chat.attachment'.tr, icon: PhosphorIconsRegular.paperclip, background: c.paper, foreground: c.ink),
+                                  ),
+                                ),
                               if (endsRun)
                                 Padding(
                                   padding: const EdgeInsets.fromLTRB(6, 4, 6, 0),
@@ -527,6 +547,14 @@ class ChatThreadView extends GetView<ChatThreadController> {
               ),
             ),
             if (thread != null) ...[
+              // A family writing outside the hours teachers answer is told when to expect an answer.
+              if (afterHours != null)
+                Positioned(
+                  left: gutter,
+                  right: gutter,
+                  bottom: bottom + 56 + 12 + 36 + 8,
+                  child: Text(afterHours, textAlign: TextAlign.center, style: context.type.cap.copyWith(color: c.ink2)),
+                ),
               Positioned(
                 left: 0,
                 right: 0,
@@ -535,13 +563,13 @@ class ChatThreadView extends GetView<ChatThreadController> {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: EdgeInsets.symmetric(horizontal: gutter),
-                  itemCount: _quick.length,
+                  itemCount: quick.length,
                   separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemBuilder: (context, i) => Pressable(
                     onTap: () {
                       controller.text
-                        ..text = _quick[i].tr
-                        ..selection = TextSelection.collapsed(offset: _quick[i].tr.length);
+                        ..text = quick[i]
+                        ..selection = TextSelection.collapsed(offset: quick[i].length);
                     },
                     child: Container(
                       height: 36,
@@ -552,7 +580,7 @@ class ChatThreadView extends GetView<ChatThreadController> {
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: c.line2),
                       ),
-                      child: Text(_quick[i].tr, style: AppText.chip(color: c.ink, height: 1)),
+                      child: Text(quick[i], style: AppText.chip(color: c.ink, height: 1)),
                     ),
                   ),
                 ),
@@ -571,7 +599,7 @@ class ChatThreadView extends GetView<ChatThreadController> {
                         button: true,
                         label: 'chat.attach'.tr,
                         child: Pressable(
-                          onTap: () => ToastHelper.show('chat.attach_soon'),
+                          onTap: () => unawaited(controller.attach()),
                           child: Container(
                             width: 44,
                             height: 44,

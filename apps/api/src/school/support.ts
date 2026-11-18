@@ -1,9 +1,12 @@
-import { Injectable } from '@nestjs/common';
-import { newId } from '@tangent/db';
-import { resolveConfig } from '@tangent/config-engine';
-import { MESSAGE_EVENTS, SchoolSettingsSchema, gradeFor, istMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type SettingsDoc } from '@tangent/contracts';
-import type { TenantCtx } from '../tenancy/tenant.js';
+import { Inject, Injectable } from '@nestjs/common';
+import { StaleSettings, newId, recordSettingsVersion, writeSettings } from '@tangent/db';
+import { checkSchoolChanges, resolveConfig, validateSettingsChanges } from '@tangent/config-engine';
+import { ApiError } from '@tangent/nest-kit';
+import type { Registry } from '@tangent/tenancy';
+import { tx, TimetableCycle, slotDayOf, slotDays, slotKey, schoolToday, addDays, schoolZone, checkCustom, roundToCurrency, type CustomEntity, type CustomFieldsSetting, type CustomValues, rawOf, toE164, phoneProblem, MESSAGE_EVENTS, SETTINGS_META, schoolMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type GradingScheme, gradeIn, schemeFor, type SchoolSettingsPatch, type SchoolSettingsView, type SettingsDoc } from '@tangent/contracts';
+import { REGISTRY, type TenantCtx } from '../tenancy/tenant.js';
 import { HubService } from './hub.service.js';
+import { serverCatalogue } from '@tangent/tenancy';
 
 @Injectable()
 export class AuditService {
@@ -25,7 +28,60 @@ export class AuditService {
 export class SettingsService {
   private readonly cache = new Map<string, { at: number; doc: SettingsDoc }>();
 
-  // Read-only here: only the console writes a school's settings.
+  constructor(@Inject(REGISTRY) private readonly registry: Registry) {}
+
+  /** What the school's admin edits: every setting in force, Tangent's locks and the lists the editors pick from. */
+  async view(t: TenantCtx): Promise<SchoolSettingsView> {
+    const [cfg, doc, classes, heads, roles, staff, subjects] = await Promise.all([
+      this.effective(t), this.doc(t),
+      t.pool.query<{ id: string; name: string }>('select id, name from classes order by grade, section'),
+      t.pool.query<{ key: string; name: string }>('select key, name from fee_heads order by sort, name'),
+      t.pool.query<{ key: string; name: string }>('select key, name from roles order by name'),
+      t.pool.query<{ id: string; name: string }>("select u.id, u.name from users u join staff s on s.user_id = u.id where u.status = 'active' order by u.name"),
+      t.pool.query<{ id: string; name: string }>('select id, name from subjects order by name'),
+    ]);
+    const ent = t.info.entitlement;
+    return {
+      version: doc.version, values: cfg.settings, entitled: cfg.modules, features: cfg.features, classes: classes.rows, feeHeads: heads.rows, roles: roles.rows, staff: staff.rows, subjects: subjects.rows,
+      locks: (ent.locks ?? []).map((key) => ({ key, value: ent.overrides?.[key] ?? null, note: ent.lockNotes?.[key] ?? '' })),
+    };
+  }
+
+  /**
+   * A change the school makes to its own settings: checked against who owns each one, Tangent's locks and floors, the person's
+   * permissions and the schema. A risky one becomes a request for a second person; the rest apply at once.
+   */
+  async change(t: TenantCtx, user: { id: string; name: string; permissions: readonly string[] }, patch: SchoolSettingsPatch): Promise<{ pending: true; approvalId: string } | { version: number }> {
+    if (user.id.startsWith('support:')) throw new ApiError('forbidden', 'A support session cannot change the school’s settings.');
+    const ent = t.info.entitlement;
+    const own = checkSchoolChanges(patch.changes, { locks: ent.locks ?? [], overrides: ent.overrides ?? {} }, user.permissions);
+    if (own.length) throw new ApiError('validation', own[0]!.message, { fields: Object.fromEntries(own.map((p) => [p.key, p.message])) });
+    const sets = Object.fromEntries(Object.entries(patch.changes).filter(([, v]) => v !== null));
+    const checked = validateSettingsChanges(sets, []);
+    if (!checked.ok) throw new ApiError('validation', checked.problems[0]!.message, { fields: Object.fromEntries(checked.problems.map((p) => [p.key, p.message])) });
+    const changes = { ...checked.values, ...Object.fromEntries(Object.keys(patch.changes).filter((k) => patch.changes[k] === null).map((k) => [k, null])) };
+    const risky = Object.keys(changes).filter((k) => SETTINGS_META[k as keyof typeof SETTINGS_META]?.risky);
+    if (risky.length) {
+      const id = newId('apr');
+      const labels = risky.map((k) => SETTINGS_META[k as keyof typeof SETTINGS_META].label).join(', ');
+      await t.pool.query(
+        "insert into approvals (id, kind, title, subtitle, requester_name, requested_by, payload, status) values ($1,'settings',$2,$3,$4,$5,$6,'pending')",
+        [id, `Change a setting: ${labels}`, patch.note || 'A second person confirms this change before it applies.', user.name, user.id, JSON.stringify({ changes, note: patch.note, expectedVersion: patch.expectedVersion })]);
+      return { pending: true, approvalId: id };
+    }
+    return { version: (await this.apply(t, { id: user.id, name: user.name }, changes, patch.note, patch.expectedVersion)).version };
+  }
+
+  /** Writes checked changes (the school's, or an approved request): the school's audit log, the console's history, the apps told. */
+  async apply(t: TenantCtx, actor: { id: string; name: string }, changes: Record<string, unknown>, note: string, expectedVersion?: number): Promise<{ version: number }> {
+    const after = await writeSettings(t.pool, { changes, note, expectedVersion, actorId: actor.id, actorName: actor.name })
+      .catch((e) => { throw e instanceof StaleSettings ? new ApiError('conflict', e.message) : e; });
+    this.cache.delete(t.info.slug);
+    this.resolved.delete(t.info.slug);
+    await recordSettingsVersion(this.registry.pool, t.info.id, after, note, `${actor.name} (school)`);
+    this.registry.invalidate(t.info.slug);
+    return { version: after.version };
+  }
 
   async doc(t: TenantCtx): Promise<SettingsDoc> {
     const hit = this.cache.get(t.info.slug);
@@ -51,16 +107,110 @@ export class SettingsService {
     return names.map((n) => ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(n)).filter((i) => i >= 0);
   }
 
-  /** The school's grading scale and pass mark (console: Exams and results), with the function that turns a percentage into a grade. */
-  async grading(t: TenantCtx): Promise<{ pass: number; grade: (pct: number) => string }> {
-    const v = (await this.doc(t)).values;
-    const scale = (Array.isArray(v['grading.scale']) ? v['grading.scale'] : SchoolSettingsSchema.shape['grading.scale'].parse(undefined)) as GradingScale;
-    return { pass: typeof v['grading.passPct'] === 'number' ? v['grading.passPct'] : 33, grade: (pct) => gradeFor(pct, scale) };
+  /** How the school's timetable repeats (timetable.cycle), read through the setting's own rules. */
+  async cycle(t: TenantCtx): Promise<TimetableCycle> {
+    const read = TimetableCycle.safeParse(await this.value<unknown>(t, 'timetable.cycle', undefined));
+    return read.success ? read.data : { kind: 'week', length: 6 };
   }
 
+  /** Whether the school is closed on a date: a weekly off day or a holiday on its calendar. */
+  async closed(t: TenantCtx): Promise<(date: string) => boolean> {
+    const off = await this.offDays(t);
+    const { rows } = await t.pool.query<{ s: string; e: string }>(
+      "select (starts_at at time zone $1)::date::text s, (coalesce(ends_at, starts_at) at time zone $1)::date::text e from events where kind = 'holiday'", [schoolZone()]);
+    const holidays = new Set<string>();
+    for (const r of rows) for (let d = r.s; d <= r.e && holidays.size < 5000; d = addDays(d, 1)) holidays.add(d);
+    return (date) => off.includes(new Date(`${date}T00:00:00Z`).getUTCDay()) || holidays.has(date);
+  }
+
+  /** The timetable day a date uses (the weekday, week B's weekday + 7, or the day of a cycle), or null when the school is closed. */
+  async slotDay(t: TenantCtx, date: string): Promise<number | null> {
+    return slotDayOf(await this.cycle(t), date, await this.closed(t));
+  }
+
+  /** The school's grading scale and pass mark (console: Exams and results), with the function that turns a percentage into a grade. */
+  /**
+   * How a mark is graded (§3.6.6): the scheme for a subject and year group (`at`), else the school's scale. `grade` gives the
+   * grade; `of` the grade, points, descriptor and pass for a subject of its own.
+   */
+  async grading(t: TenantCtx, at: { grade?: number | null; subject?: string | null } = {}): Promise<{
+    pass: number; scheme: GradingScheme; grade: (pct: number) => string; of: (pct: number, subject?: string | null) => ReturnType<typeof gradeIn>;
+    schemeOf: (subject: string) => GradingScheme;
+  }> {
+    const v = await this.settingsOf(t);
+    const scale = v['grading.scale'] as GradingScale;
+    const fallback: GradingScheme = { key: 'school', name: 'Grades', kind: 'bands', passPct: v['grading.passPct'] as number, bands: scale };
+    const schemes = v['grading.schemes'] as GradingScheme[] | undefined;
+    const scheme = schemeFor(schemes, fallback, at);
+    return {
+      pass: scheme.passPct, scheme, grade: (pct) => gradeIn(scheme, pct).grade,
+      of: (pct, subject) => gradeIn(subject ? schemeFor(schemes, fallback, { ...at, subject }) : scheme, pct),
+      schemeOf: (subject) => schemeFor(schemes, fallback, { ...at, subject }),
+    };
+  }
+
+  private readonly resolved = new Map<string, { at: string; values: Record<string, unknown> }>();
+
+  /** Every setting as it applies: the platform default, the school's choice and Tangent's lock together (resolveConfig). */
+  async settingsOf(t: TenantCtx): Promise<Record<string, unknown>> {
+    const doc = await this.doc(t);
+    const at = `${doc.version}|${t.info.entitlement.version}|${JSON.stringify(t.info.entitlement.locks ?? [])}`;
+    const hit = this.resolved.get(t.info.slug);
+    if (hit?.at === at) return hit.values;
+    const values = resolveConfig({ settings: doc, entitlement: t.info.entitlement }).settings;
+    this.resolved.set(t.info.slug, { at, values });
+    return values;
+  }
+
+  /**
+   * A phone number as the school keeps every one: international form (E.164), a local number taking the school's country.
+   * Throws the field's problem when it cannot be a number there.
+   */
+  phone(t: TenantCtx, raw: string, field = 'phone'): string {
+    const e164 = toE164(raw, t.info.country);
+    if (!e164) throw new ApiError('validation', phoneProblem(raw, t.info.country)!, { fields: { [field]: phoneProblem(raw, t.info.country)! } });
+    return e164;
+  }
+
+  /** What a fee is billed at: with the tax added when the school's fees do not include it and the head carries tax (§3.4.2). */
+  async billed(t: TenantCtx, head: string, amount: number): Promise<number> {
+    const cfg = await this.effective(t);
+    const v = cfg.settings;
+    if (!cfg.features.includes('fees.taxReceipts') || v['tax.inclusive'] !== false || !v['tax.number'] || !((v['tax.heads'] as string[] | undefined) ?? []).includes(head)) return amount;
+    return amount + roundToCurrency((amount * Number(v['tax.ratePct'] ?? 0)) / 100);
+  }
+
+  /** A record's custom-field values checked against the school's fields (§3.6.3); `whole` for a new record (required ones needed). */
+  async custom(t: TenantCtx, entity: CustomEntity, input: Record<string, unknown>, whole: boolean): Promise<CustomValues> {
+    const defs = (await this.value<CustomFieldsSetting>(t, 'fields.custom', {}))[entity] ?? [];
+    const { values, errors } = checkCustom(defs, input, whole);
+    if (Object.keys(errors).length) {
+      throw new ApiError('validation', 'Check the school’s own fields.', { fields: Object.fromEntries(Object.entries(errors).map(([k, m]) => [`custom.${k}`, m])) });
+    }
+    return values;
+  }
+
+  /** One setting as it applies (a lock wins); the fallback only when the setting does not exist at all. */
   async value<T>(t: TenantCtx, key: string, fallback: T): Promise<T> {
-    const v = (await this.doc(t)).values[key];
+    const v = (await this.settingsOf(t))[key];
     return (v === undefined ? fallback : v) as T;
+  }
+
+  /**
+   * The timetable days the apps keep lessons under, in order, and (for A/B weeks and cycles of days, which a phone cannot work
+   * out alone: holidays move a cycle on) the day each date from two weeks back to two months ahead uses.
+   */
+  async timetableDays(t: TenantCtx): Promise<NonNullable<EffectiveConfig['timetable']>> {
+    const cycle = await this.cycle(t);
+    const keys = slotDays(cycle, (await this.offDays(t)).map((d) => d || 7)).map((d) => d.key);
+    if (cycle.kind === 'week') return { keys, dates: null };
+    const closed = await this.closed(t);
+    const dates: Record<string, string> = {};
+    for (let d = addDays(schoolToday(), -14); d <= addDays(schoolToday(), 60); d = addDays(d, 1)) {
+      const day = slotDayOf(cycle, d, closed);
+      if (day !== null) dates[d] = slotKey(cycle, day);
+    }
+    return { keys, dates };
   }
 
   async effective(t: TenantCtx, permissions?: string[]): Promise<EffectiveConfig> {
@@ -75,6 +225,18 @@ export interface OutMsg { channel: Channel; to: string; subject?: string; body: 
 const OPENS: Record<string, string> = Object.fromEntries(MESSAGE_EVENTS.filter((e) => e.opens).map((e) => [e.key, e.opens!]));
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+/**
+ * Refuses leave that overlaps leave already asked for or given (a family asking twice, the office recording what a parent
+ * already sent). Half days of the same date only clash when they are the same half.
+ */
+export async function checkLeaveClash(q: { query: TenantCtx['pool']['query'] }, studentId: string, from: string, to: string, halfDay: string | null | undefined): Promise<void> {
+  const r = await q.query(
+    `select 1 from approvals where kind = 'leave' and status in ('pending','approved') and payload->>'studentId' = $1
+       and (payload->>'from')::date <= $3::date and (payload->>'to')::date >= $2::date
+       and not ($4::text is not null and payload->>'halfDay' is not null and payload->>'halfDay' <> $4)`, [studentId, from, to, halfDay ?? null]);
+  if (r.rowCount) throw new ApiError('conflict', tx('There is already leave for some of these days.'), { fields: { from: tx('Overlaps other leave.') } });
+}
 
 /** One email layout for every school: its name across the top in its brand colour, the message, and who sent it. */
 export function emailHtml(school: string, color: string, body: string): string {
@@ -145,30 +307,54 @@ export class Messenger {
     }
     const doc = (await this.settings.doc(t)).values;
     const rule: { push: boolean; sms: boolean; email: boolean; whatsapp?: boolean } = ((doc['notify.rules'] as Record<string, { push: boolean; sms: boolean; email: boolean; whatsapp?: boolean }> | undefined) ?? {})[key] ?? ev.defaults;
-    const custom = ((doc['templates.messages'] as Record<string, string> | undefined) ?? {})[key];
-    const text = custom?.trim() ? custom : ev.text;
+    // Each person reads the message in their own language: the school's wording in it, else the usual wording translated, else
+    // the school's wording as written, else English.
+    const custom = ((doc['templates.messages'] as Record<string, string | Record<string, string>> | undefined) ?? {})[key];
+    const schoolLang = String(doc['school.language'] ?? 'en');
+    const english = rawOf(ev);
+    const textIn = (lang: string) => {
+      const own = typeof custom === 'string' ? (lang === schoolLang ? custom : '') : custom?.[lang] ?? '';
+      const anyOwn = typeof custom === 'string' ? custom : custom?.[schoolLang] ?? '';
+      return own.trim() || (lang !== 'en' && serverCatalogue(lang)[english.text]) || anyOwn.trim() || english.text;
+    };
     const [qf, qt] = [String(doc['notify.quietFrom'] ?? '21:00'), String(doc['notify.quietTo'] ?? '07:00')];
     const mins = (hm: string) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5));
-    const now = istMinutes();
+    const now = schoolMinutes();
     const quiet = !ev.urgent && (mins(qf) > mins(qt) ? now >= mins(qf) || now < mins(qt) : now >= mins(qf) && now < mins(qt));
     const school = String(doc['school.shortName'] ?? t.info.shortName);
     const sendAfter = quiet ? new Date(Date.now() + (((mins(qt) - now + 1440) % 1440) || 1440) * 60_000) : null;
     // A person who turned this message off in the app (Settings → Notifications) does not get it; urgent ones cannot be turned off.
     const off = ev.urgent || !who.length ? new Set<string>() : new Set((await t.pool.query<{ phone: string }>(
-      `select right(regexp_replace(u.phone, '\\D', '', 'g'), 10) phone from users u join user_prefs p on p.user_id = u.id and p.key = 'notify.off'
+      `select u.phone from users u join user_prefs p on p.user_id = u.id and p.key = 'notify.off'
        where p.value ? $1 and u.phone is not null`, [key])).rows.map((r) => r.phone));
-    const digits = (s: string) => s.replace(/\D/g, '').slice(-10);
+    // Phones are kept in international form, so the same number compares equal however it reached here.
+    const digits = (s: string) => toE164(s, t.info.country) ?? s;
+    const langs = !who.length ? new Map<string, string>() : new Map((await t.pool.query<{ phone: string; lang: string }>(
+      // The family's own choice in the app first, else what the office set on the guardian's record.
+      `select g.phone, coalesce(p.value #>> '{}', g.language) lang from guardians g left join user_prefs p on p.user_id = g.user_id and p.key = 'language'
+        where g.phone = any($1) and coalesce(p.value #>> '{}', g.language) is not null
+       union all select u.phone, p.value #>> '{}' from users u join user_prefs p on p.user_id = u.id and p.key = 'language' where u.phone = any($1)`,
+      [who.map((w) => digits(w.to))])).rows.map((r) => [r.phone, r.lang]));
+    // Channels a guardian asked the office not to use (urgent messages go on every channel the school chose).
+    const offChannels = ev.urgent || !who.length ? new Map<string, string[]>() : new Map((await t.pool.query<{ phone: string; off: string[] }>(
+      "select phone, channels_off off from guardians where phone = any($1) and jsonb_array_length(channels_off) > 0", [who.map((w) => digits(w.to))])).rows.map((r) => [r.phone, r.off]));
     let reached = 0;
     const out: OutMsg[] = [];
     for (const w of who.filter((x) => !off.has(digits(x.to)))) {
+      const lang = langs.get(digits(w.to)) ?? schoolLang;
       const vars = Object.fromEntries(Object.entries({ ...w.vars, school: w.vars.school ?? school }).map(([k, v]) => [k, String(v)]));
-      const body = text.replace(/\{(\w+)\}/g, (_, k: string) => vars[k] ?? '');
+      const body = textIn(lang).replace(/\{(\w+)\}/g, (_, k: string) => vars[k] ?? '');
       const m = { key, vars, body, sendAfter };
       const before = out.length;
-      if (rule.push) out.push({ ...m, channel: 'push', to: w.to, subject: school });
-      if (rule.sms) out.push({ ...m, channel: 'sms', to: w.to });
-      if (rule.whatsapp) out.push({ ...m, channel: 'whatsapp', to: w.to });
-      if (rule.email && w.email) out.push({ ...m, channel: 'email', to: w.email, subject: ev.label });
+      // What the school sends on, less what this person turned off; never nothing: then the school's first channel stays.
+      const school4 = (['push', 'sms', 'whatsapp', 'email'] as const).filter((c) => rule[c] && (c !== 'email' || !!w.email));
+      const off = offChannels.get(digits(w.to)) ?? [];
+      const use = school4.filter((c) => !off.includes(c));
+      const send = new Set(use.length ? use : school4.slice(0, 1));
+      if (send.has('push')) out.push({ ...m, channel: 'push', to: w.to, subject: school });
+      if (send.has('sms')) out.push({ ...m, channel: 'sms', to: w.to });
+      if (send.has('whatsapp')) out.push({ ...m, channel: 'whatsapp', to: w.to });
+      if (send.has('email') && w.email) out.push({ ...m, channel: 'email', to: w.email, subject: (lang !== 'en' && serverCatalogue(lang)[english.label]) || english.label });
       if (out.length > before) reached++;
     }
     await this.sendMany(t, out);

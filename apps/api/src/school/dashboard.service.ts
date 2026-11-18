@@ -1,8 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  DEFAULT_BRAND, addDays, dayLabel, hueOf, dayMonth, dayName, istMinutes, istNow, istToday, latestSchoolDay, schoolDaysEnding,
-  type DashboardData, type FeeSummary, type SearchHit, type ShellData,
-} from '@tangent/contracts';
+import { schoolZone, DEFAULT_BRAND, addDays, dayLabel, hueOf, dayMonth, dayName, schoolMinutes, schoolNow, schoolToday, latestSchoolDay, schoolDaysEnding, type DashboardData, type Vocabulary, type FeeSummary, type SearchHit, type ShellData } from '@tangent/contracts';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { ApprovalsService } from './approvals.service.js';
 import { AttendanceService } from './attendance.service.js';
@@ -30,11 +27,13 @@ export class DashboardService {
 
   async get(t: TenantCtx, user: { id: string; name: string; permissions: readonly string[] }, count = 6): Promise<DashboardData> {
     const OFF_DAYS = await this.settings.offDays(t);
-    const today = istToday();
+    const today = schoolToday();
     const last = latestSchoolDay(today, OFF_DAYS);
     const doc = await this.settings.doc(t);
     const v = doc.values;
-    const rollIds = ((v['dashboard.rollClasses'] as string[] | undefined) ?? []).slice(0, 6);
+    // The classes this person chose for the roll-call widget, else the school's choice (People → Academic year), else the first six.
+    const mine = (await t.pool.query<{ value: string[] }>("select value from user_prefs where user_id = $1 and key = 'dashboard.rollClasses'", [user.id])).rows[0]?.value;
+    const rollIds = ((mine?.length ? mine : (v['dashboard.rollClasses'] as string[] | undefined)) ?? []).slice(0, 6);
     // A module the school does not have, or one this person may not read (a teacher without "See fees" gets no fee totals),
     // is not queried at all, so its numbers never leave the server; the admin leaves out the widgets of what is not listed.
     const modules = (await this.settings.effective(t)).modules.filter((m) => !SEE[m] || user.permissions.includes(SEE[m]));
@@ -45,14 +44,14 @@ export class DashboardService {
       t.pool.query<{ name: string; role_name: string | null }>("select u.name, (select string_agg(r.name, ', ') from user_roles ur join roles r on r.id = ur.role_id where ur.user_id = u.id) role_name from users u where u.id = $1", [user.id]),
       on('attendance', () => this.attendance.week(t, count), []),
       on('fees', () => this.fees.summary(t, count), NO_FEES),
-      this.approvals.needsYou(t, user.permissions),
-      this.approvals.counts(t, user.permissions),
+      this.approvals.needsYou(t, user),
+      this.approvals.counts(t, user),
       on('attendance', () => this.attendance.unmarked(t), []),
-      on('attendance', () => t.pool.query<{ present: string }>("select count(*) filter (where m.status in ('present','late','half_day')) present from attendance_sessions s join attendance_marks m on m.session_id = s.id where s.date = $1", [last]), { rows: [{ present: '0' }] }),
+      on('attendance', () => t.pool.query<{ present: string }>("select count(*) filter (where d.status in ('present','late','half_day')) present from attendance_days d where d.date = $1", [last]), { rows: [{ present: '0' }] }),
       on('attendance', () => t.pool.query<{ pct: number | null }>("select avg(case when m.status in ('present','late','half_day') then 1.0 else 0.0 end) pct from attendance_sessions s join attendance_marks m on m.session_id = s.id where s.date = $1", [addDays(last, -7)]), { rows: [{ pct: null }] }),
       on('homework', () => this.homeworkWeek(t, last, count), Array.from({ length: count }, () => 0)),
       on('attendance', () => this.classRolls(t, last, rollIds), []),
-      on('events', () => t.pool.query<{ id: string; at: Date; title: string; note: string }>("select id, starts_at at, title, note from events where (starts_at at time zone 'Asia/Kolkata')::date = $1 order by starts_at", [last]), noRows),
+      on('events', () => t.pool.query<{ id: string; at: Date; title: string; note: string }>("select id, starts_at at, title, note from events where (starts_at at time zone $2)::date = $1 order by starts_at", [last, schoolZone()]), noRows),
       t.pool.query<{ n: string }>('select count(*) n from classes'),
       t.pool.query<{ n: string }>("select count(*) n from students where status = 'active'"),
     ]);
@@ -61,13 +60,13 @@ export class DashboardService {
     const lastWeekPct = prevPresent.rows[0]?.pct ?? null;
     const nowPct = total ? presentNow / total : 0;
     const term = await this.term(t, today, modules.includes('exams'));
-    const stamp = istNow();
+    const stamp = schoolNow();
     const clock = `${String(stamp.getUTCHours()).padStart(2, '0')}:${String(stamp.getUTCMinutes()).padStart(2, '0')}`;
     const timeline = events.rows.map((e) => {
-      const ist = new Date(e.at.getTime() + 5.5 * 3600_000);
+      const ist = schoolNow(e.at);
       return { id: e.id, minutes: ist.getUTCHours() * 60 + ist.getUTCMinutes(), time: `${String(ist.getUTCHours()).padStart(2, '0')}:${String(ist.getUTCMinutes()).padStart(2, '0')}`, title: e.title, subtitle: e.note };
     });
-    const mins = istMinutes();
+    const mins = schoolMinutes();
     const isToday = last === today;
     let nowIdx = -1;
     if (isToday) timeline.forEach((e, i) => { if (e.minutes <= mins) nowIdx = i; });
@@ -115,9 +114,9 @@ export class DashboardService {
   private async classRolls(t: TenantCtx, last: string, ids: string[]): Promise<DashboardData['classRolls']> {
     const { rows } = await t.pool.query<{ id: string; name: string; size: string; present: string; late: string; absent: string; marked: string }>(
       `select c.id, c.name, (select count(*) from students s where s.class_id = c.id) size,
-         count(m.status) filter (where m.status = 'present') present, count(m.status) filter (where m.status = 'late') late,
+         count(m.status) filter (where m.status in ('present','half_day')) present, count(m.status) filter (where m.status = 'late') late,
          count(m.status) filter (where m.status in ('absent','leave')) absent, count(m.status) marked
-       from classes c left join attendance_sessions ses on ses.class_id = c.id and ses.date = $2 left join attendance_marks m on m.session_id = ses.id
+       from classes c left join attendance_days m on m.class_id = c.id and m.date = $2
        where ($1::text[] is null or cardinality($1::text[]) = 0 or c.id = any($1)) group by c.id, c.name, c.grade, c.section order by c.grade, c.section limit 6`, [ids.length ? ids : null, last]);
     return rows.map((r) => {
       const size = Number(r.size);
@@ -143,18 +142,21 @@ export class DashboardService {
   }
 
   /** The small slice every page needs for the menu. */
-  async shell(t: TenantCtx, modules: string[], features: string[], perms: readonly string[]): Promise<ShellData> {
+  async shell(t: TenantCtx, modules: string[], features: string[], user: { id: string; name: string; permissions: readonly string[] }): Promise<ShellData> {
+    const perms = user.permissions;
     const v = (await this.settings.doc(t)).values;
-    const [unmarked, counts] = await Promise.all([modules.includes('attendance') && perms.includes('attendance.read') ? this.attendance.unmarked(t) : Promise.resolve([]), this.approvals.counts(t, perms)]);
-    const term = await this.term(t, istToday(), modules.includes('exams'));
+    const [unmarked, counts] = await Promise.all([modules.includes('attendance') && perms.includes('attendance.read') ? this.attendance.unmarked(t) : Promise.resolve([]), this.approvals.counts(t, user)]);
+    const term = await this.term(t, schoolToday(), modules.includes('exams'));
     return {
       school: { name: String(v['school.name'] ?? t.info.name), shortName: String(v['school.shortName'] ?? t.info.shortName), logoText: String(v['brand.logoText'] ?? '') || String(v['school.shortName'] ?? t.info.shortName).slice(0, 1).toUpperCase(), logoUrl: await this.files.logoUrl(t), place: String(v['school.place'] ?? ''),
-        color: String(v['brand.color'] ?? ''), address: String(v['school.address'] ?? ''), phone: String(v['school.phone'] ?? ''), receiptNote: String(v['fees.receiptNote'] ?? ''), studentWord: String(v['vocab.student'] ?? '').trim() || 'Student', classWord: String(v['vocab.class'] ?? '').trim() || 'Class',
-        paymentMethods: Array.isArray(v['fees.paymentMethods']) ? (v['fees.paymentMethods'] as string[]) : ['cash', 'upi', 'card', 'netbanking', 'cheque'] },
+        color: String(v['brand.color'] ?? ''), address: String(v['school.address'] ?? ''), phone: String(v['school.phone'] ?? ''), receiptNote: String(v['fees.receiptNote'] ?? ''),
+        paymentMethods: (await this.settings.effective(t)).settings['fees.paymentMethods'] as { key: string; name: string; kind: string }[] },
       term,
       badges: { attendance: unmarked.length, admissions: counts.admissions, messages: counts.messages }, modules, features,
       menu: (await this.settings.effective(t, [...perms])).menu,
       hue: hueOf(String(v['brand.color'] ?? '') || DEFAULT_BRAND),
+      locale: { country: String(v['school.country'] ?? t.info.country), zone: String(v['school.timezone'] ?? t.info.timezone), locale: String(v['school.locale'] ?? t.info.locale), currency: String(v['school.currency'] ?? t.info.currency),
+        language: String(v['school.language'] ?? 'en'), vocab: (v['vocab.words'] ?? {}) as Vocabulary },
     };
   }
 

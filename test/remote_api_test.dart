@@ -71,7 +71,7 @@ class _Fake {
         'receipts': [{'id': 'pay1', 'installmentId': 'inv1', 'title': 'Term 1 tuition', 'amount': 18500, 'paidOn': '2026-04-22', 'method': 'upi', 'reference': 'UPI123'}],
       }),
       '/v1/f/attendance/today' => send(200, {'stu_aarav': 'late', 'stu_diya': 'absent'}),
-      '/v1/f/classes/cls_8a/marks' => send(200, {'stu_aarav': 44}),
+      '/v1/f/classes/cls_8a/marks' => send(200, {'marks': {'stu_aarav': 44}, 'maxMarks': 50}),
       '/v1/f/students/stu_aarav/transport' => send(200, null),
       '/v1/f/library/books/b1/reserve' => send(409, {'code': 'conflict', 'message': 'The library catalogue is not online yet.'}),
       '/v1/f/attendance' => send(200, {'ok': true}),
@@ -191,7 +191,9 @@ void main() {
     });
 
     test('the marks draft, and no transport as nothing rather than a crash', () async {
-      expect(await RemoteExamRepository(RemoteDataSource(client)).marksDraft('cls_8a', 'maths'), {'stu_aarav': 44});
+      final draft = await RemoteExamRepository(RemoteDataSource(client)).marksDraft('cls_8a', 'maths');
+      expect(draft.marks, {'stu_aarav': 44});
+      expect(draft.maxMarks, 50);
       expect(await RemoteTransportRepository(RemoteDataSource(client)).forStudent('stu_aarav'), isNull);
     });
   });

@@ -79,8 +79,8 @@
 .sc .gx{--f:scaleX(0);transform-origin:left center}
 .sc .gy{--f:scaleY(0);transform-origin:center bottom}
 .sc .pop{--f:scale(.6)}
-.sc .fl{--f:translateX(-32px)}
-.sc .fr{--f:translateX(32px)}
+.sc .fl{--f:translateX(calc(-32px * var(--dir,1)))}
+.sc .fr{--f:translateX(calc(32px * var(--dir,1)))}
 .sc .fd{--f:translateY(-18px)}
 .sc .fu{--f:translateY(24px)}
 .sc .tilt{--f:rotate(-8deg) scale(.9)}

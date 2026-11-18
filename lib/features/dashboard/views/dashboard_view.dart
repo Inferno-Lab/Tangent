@@ -199,7 +199,7 @@ class _ProfileCapsule extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = Get.find<AuthService>().user.value;
     final name = data?.student.name ?? user?.name ?? '';
-    final cls = data == null ? '' : '${data!.schoolClass.name} ${data!.schoolClass.section}';
+    final cls = data == null ? '' : data!.schoolClass.label;
     return GlassPress(
       onTap: () => Get.toNamed<void>(AppRoutes.profile),
       child: Semantics(
@@ -331,7 +331,7 @@ class _ParentBody extends StatelessWidget {
             parent: true,
             due: [
               SectionLabel(
-                'home.due_across'.trp({'amount': Formatters.inr(data.dueTotal)}),
+                'home.due_across'.trp({'amount': Formatters.money(data.dueTotal)}),
                 action: 'nav.fees',
                 onAction: () => Get.toNamed<void>(AppRoutes.fees),
               ),
@@ -624,7 +624,8 @@ class StatsRow extends StatelessWidget {
           if (exam)
           Expanded(
             child: EduCard(
-              onTap: () => Get.toNamed<void>(AppRoutes.results),
+              // The next exam opens its timetable; with none coming, the results.
+              onTap: () => Get.toNamed<void>(next == null ? AppRoutes.results : AppRoutes.examTimetable),
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

@@ -1,15 +1,15 @@
-import { Body, Controller, Delete, Get, Header, HttpCode, Param, Patch, Post, Put, Query, Res } from '@nestjs/common';
-import type { FastifyReply } from 'fastify';
+import { Body, Controller, Delete, Get, Header, HttpCode, Param, Patch, Post, Put, Query, Req, Res } from '@nestjs/common';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import {
   DataRequestCreate, DataRequestDecision, EnquiryCreate, EnquiryEnrol, EnquiryPatch, EventSave, ExamCreate, ExamMarksPut, HomeworkCreate, HomeworkMarks, InvoiceListQuery, StaffCreate, StaffPatch,
-  ThreadCreate, ThreadPatch, ThreadReply, ReportQuery, StudentImport, istToday,
+  ThreadCreate, ThreadPatch, ThreadReply, ReportQuery, StudentImport, schoolToday,
   type DataRequestRow, type EnquiryRow, type EventReply, type EventRow, type ExamMarksView, type ImportResult, type ExamResults, type ExamRow, type HomeworkDetail, type HomeworkRow, type InvoiceListRow, type InvoiceListSummary, type Paged,
-  type ReceiptRow, type ReportData, type ReportInfo, type RoleRow, type StaffRow, type StudentDetail, type ThreadDetail, type ThreadRow,
+  type ReceiptRow, type ReportData, type ReportInfo, RoleDefSave, type RoleRow, type StaffRow, EnquiryApply, type ApplyInfo, ExamRemarksPut, type StudentDetail, type ThreadDetail, type ThreadRow,
 } from '@tangent/contracts';
 import { z } from 'zod';
 import { ZodPipe } from '@tangent/nest-kit';
-import { templateXlsx } from '@tangent/db';
-import { Core, CurrentUser, Require, RequireModule } from '../auth/guards.js';
+import { ownKind, templateXlsx } from '@tangent/db';
+import { Core, CurrentUser, Public, Require, RequireModule } from '../auth/guards.js';
 import { Tenant, type AuthedUser, type TenantCtx } from '../tenancy/tenant.js';
 import { LearningService } from './learning.service.js';
 import { OfficeService } from './office.service.js';
@@ -90,6 +90,11 @@ export class LearningController {
     return this.learning.putMarks(t, u, id, b);
   }
 
+  @Put('exams/:id/remarks') @RequireModule('exams') @Require('exams.write')
+  putRemarks(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(ExamRemarksPut)) b: ExamRemarksPut): Promise<ExamMarksView> {
+    return this.learning.putRemarks(t, u, id, b);
+  }
+
   @Get('exams/:id/results') @RequireModule('exams') @Require('exams.read')
   results(@Tenant() t: TenantCtx, @Param('id') id: string): Promise<ExamResults> {
     return this.learning.results(t, id);
@@ -122,8 +127,8 @@ export class PeopleController {
   }
 
   @Get('staff/template') @Require('staff.write') @Header('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-  staffTemplate(): Buffer {
-    return templateXlsx('staff');
+  async staffTemplate(@Tenant() t: TenantCtx): Promise<Buffer> {
+    return templateXlsx((await ownKind(t.pool, 'staff'))!);
   }
 
   @Post('staff/import') @HttpCode(200) @Require('staff.write')
@@ -166,12 +171,37 @@ export class PeopleController {
     return this.people.enrol(t, u, id, b);
   }
 
+  // The school's own application page, before anyone signs in (the service checks the school takes applications online).
+  @Public() @Core() @Get('apply')
+  applyInfo(@Tenant() t: TenantCtx): Promise<ApplyInfo> {
+    return this.people.applyInfo(t);
+  }
+
+  @Public() @Core() @Post('apply') @HttpCode(200)
+  apply(@Tenant() t: TenantCtx, @Req() req: FastifyRequest, @Body(new ZodPipe(EnquiryApply)) b: EnquiryApply): Promise<{ ok: true }> {
+    return this.people.apply(t, b, req.ip);
+  }
+
   @Get('roles') @Require('staff.read')
   roles(@Tenant() t: TenantCtx): Promise<RoleRow[]> {
     return this.people.roles(t);
   }
 
-  // Roles are made and changed only from the console (Tangent); the school sees them and, if allowed, puts its staff into them.
+  // The school makes and changes its own roles (D4) unless Tangent holds them (roles.schoolEdits), within its plan's permissions.
+  @Post('roles') @Require('settings.manage')
+  createRole(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(RoleDefSave)) b: RoleDefSave): Promise<RoleRow[]> {
+    return this.people.saveRole(t, u, null, b);
+  }
+
+  @Put('roles/:id') @Require('settings.manage')
+  saveRole(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(RoleDefSave)) b: RoleDefSave): Promise<RoleRow[]> {
+    return this.people.saveRole(t, u, id, b);
+  }
+
+  @Delete('roles/:id') @Require('settings.manage')
+  deleteRole(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string): Promise<RoleRow[]> {
+    return this.people.deleteRole(t, u, id);
+  }
 }
 
 @Controller('v1')
@@ -207,6 +237,12 @@ export class OfficeController {
     return this.office.reportList(t);
   }
 
+  /** The current year's terms and reporting periods: the dates a report can cover in one pick. */
+  @Get('reports/periods') @Require('reports.read')
+  reportPeriods(@Tenant() t: TenantCtx): Promise<{ name: string; from: string; to: string; kind: 'term' | 'period' }[]> {
+    return this.office.reportPeriods(t);
+  }
+
   @Get('reports/:id') @Require('reports.read')
   report(@Tenant() t: TenantCtx, @Param('id') id: string, @Query(new ZodPipe(ReportQuery)) q: ReportQuery): Promise<ReportData> {
     return this.office.report(t, id, q);
@@ -216,7 +252,7 @@ export class OfficeController {
   async reportCsv(@Tenant() t: TenantCtx, @Param('id') id: string, @Query(new ZodPipe(ReportQuery)) q: ReportQuery, @Res({ passthrough: true }) reply: FastifyReply): Promise<string> {
     const r = await this.office.report(t, id, q);
     // Named after the report, what it covers and the day: "Low attendance - Class 8 A - 2026-11-11.csv".
-    const name = `${r.title} - ${r.scope} - ${istToday()}.csv`.replace(/[^\w ,.-]+/g, ' ');
+    const name = `${r.title} - ${r.scope} - ${schoolToday()}.csv`.replace(/[^\w ,.-]+/g, ' ');
     reply.header('content-disposition', `attachment; filename="${name}"`);
     return this.office.csv(r);
   }
@@ -284,6 +320,14 @@ export class OfficeController {
   @Post('privacy/requests') @Require('privacy.manage')
   createDataRequest(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(DataRequestCreate)) b: DataRequestCreate): Promise<DataRequestRow> {
     return this.office.createDataRequest(t, u, b);
+  }
+
+  /** The copy of a family's data an access request is answered with (a zip of spreadsheets). */
+  @Get('privacy/requests/:id/export') @Require('privacy.manage')
+  async exportData(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Res({ passthrough: true }) reply: FastifyReply): Promise<Buffer> {
+    const r = await this.office.dataExport(t, u, id);
+    reply.header('content-type', 'application/zip').header('content-disposition', `attachment; filename="${r.name}"`);
+    return r.zip;
   }
 
   @Post('privacy/requests/:id/decision') @HttpCode(200) @Require('privacy.manage')

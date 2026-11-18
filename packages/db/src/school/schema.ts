@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   boolean,
   doublePrecision,
+  numeric,
   date,
   index,
   integer,
@@ -192,8 +193,10 @@ export const attendanceSessions = pgTable(
     date: date('date').notNull(),
     markedBy: text('marked_by').references(() => users.id, { onDelete: 'set null' }),
     submittedAt: timestamp('submitted_at', { withTimezone: true }),
+    // 'day', or 'am' / 'pm' where the school keeps a morning and an afternoon register (attendance.registers).
+    part: text('part').notNull().default('day'),
   },
-  (t) => [uniqueIndex('attendance_sessions_uq').on(t.classId, t.date)],
+  (t) => [uniqueIndex('attendance_sessions_part_uq').on(t.classId, t.date, t.part)],
 );
 
 /** Attendance every period (feature attendance.periodWise), beside the day's roll call (migration 0020). */
@@ -228,9 +231,9 @@ export const feeInvoices = pgTable(
     studentId: text('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
     head: text('head').notNull().default('tuition'), // tuition | transport | activities | lab
     title: text('title').notNull(),
-    amount: integer('amount').notNull(),
+    amount: numeric('amount', { precision: 16, scale: 3, mode: 'number' }).notNull(),
     dueOn: date('due_on').notNull(),
-    waivedAmount: integer('waived_amount').notNull().default(0),
+    waivedAmount: numeric('waived_amount', { precision: 16, scale: 3, mode: 'number' }).notNull().default(0),
     createdAt: at('created_at'),
   },
   (t) => [index('fee_invoices_student_idx').on(t.studentId), index('fee_invoices_student_due_idx').on(t.studentId, t.dueOn)],
@@ -241,7 +244,7 @@ export const payments = pgTable(
   {
     id: text('id').primaryKey(),
     invoiceId: text('invoice_id').notNull().references(() => feeInvoices.id, { onDelete: 'cascade' }),
-    amount: integer('amount').notNull(),
+    amount: numeric('amount', { precision: 16, scale: 3, mode: 'number' }).notNull(),
     method: text('method').notNull(),
     reference: text('reference'),
     receiptNo: text('receipt_no').notNull().unique(),

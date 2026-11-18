@@ -1,4 +1,4 @@
-import { PERMISSIONS, ROLE_TEMPLATES, addDays, type RoleTemplate, istToday, latestSchoolDay, schoolDaysEnding } from '@tangent/contracts';
+import { toE164, packSettings, PERMISSIONS, ROLE_TEMPLATES, addDays, type RoleTemplate, schoolToday, latestSchoolDay, schoolDaysEnding } from '@tangent/contracts';
 import type { Pool, PoolClient } from 'pg';
 import { newId } from '../ids.js';
 import { bulkInsert } from './bulk.js';
@@ -17,6 +17,11 @@ export interface SeedInput {
     color: string;
     logoText: string;
     language: 'en' | 'hi' | 'mr';
+    /** Where the school is (ISO country, IANA zone, BCP 47 locale, ISO currency); India when not given. */
+    country?: string;
+    timezone?: string;
+    locale?: string;
+    currency?: string;
   };
   admin: { name: string; email: string; phone: string; passwordHash: string };
   modules: string[];
@@ -24,6 +29,8 @@ export interface SeedInput {
   data: 'empty' | 'demo';
   /** Hash used for every demo staff and guardian login. Needed for `demo`. */
   demoPasswordHash?: string;
+  /** The curriculum the school starts from (packs.ts); its country comes from `school.country`. India and CBSE when not given. */
+  curriculum?: string;
   /** The starting roles the console keeps (Blueprints → Starting roles); the built-in ones when not given. */
   roleTemplates?: RoleTemplate[];
   today?: string;
@@ -103,6 +110,15 @@ export async function seedSchool(pool: Pool, input: SeedInput): Promise<SeedRepo
   try {
     await client.query('begin');
     const report = await run(client, input);
+    // Every phone in international form, as the school keeps them (a local number takes the school's country).
+    const country = input.school.country ?? 'IN';
+    for (const [table, col] of [['users', 'phone'], ['guardians', 'phone'], ['enquiries', 'phone'], ['transport_routes', 'attendant_phone'], ['transport_routes', 'driver_phone']] as const) {
+      const rows = (await client.query<{ id: string; v: string }>(`select id, ${col} v from ${table} where ${col} is not null and ${col} <> ''`)).rows;
+      for (const r of rows) {
+        const e = toE164(r.v, country);
+        if (e && e !== r.v) await client.query(`update ${table} set ${col} = $2 where id = $1`, [r.id, e]);
+      }
+    }
     await client.query('commit');
     return { ...report, ms: Date.now() - started };
   } catch (err) {
@@ -114,7 +130,8 @@ export async function seedSchool(pool: Pool, input: SeedInput): Promise<SeedRepo
 }
 
 async function run(db: PoolClient, input: SeedInput): Promise<Omit<SeedReport, 'ms'>> {
-  const today = input.today ?? istToday();
+  // Today on the school's own clock, as the API reckons it (near midnight in its zone, UTC is a day behind or ahead).
+  const today = input.today ?? schoolToday(new Date(), input.school.timezone ?? 'Asia/Kolkata'); // india-pack: the demo school's zone
   const last = latestSchoolDay(today, OFF_DAYS);
   const r = rng(20261014);
   const year = Number(last.slice(0, 4));
@@ -144,11 +161,14 @@ async function run(db: PoolClient, input: SeedInput): Promise<Omit<SeedReport, '
     ['school.name', s.name], ['school.shortName', s.shortName], ['school.tagline', s.tagline], ['school.place', s.place ?? ''], ['school.phone', s.phone],
     ['school.email', s.email], ['school.address', s.address], ['school.language', s.language], ['brand.color', s.color],
     ['brand.logoText', s.logoText],
+    ['school.country', s.country ?? 'IN'], ['school.timezone', s.timezone ?? 'Asia/Kolkata'], ['school.locale', s.locale ?? 'en-IN'], ['school.currency', s.currency ?? 'INR'],
     ['approvals.notice', 'required'], ['attendance.notifyParents', true], ['attendance.lockAfterDays', 2],
     ['fees.lateFeePct', 0], ['fees.remindDaysBefore', 3], ['fees.dailyTarget', 150000], ['attendance.goalPct', 95],
     ['homework.goalPct', 85], ['dashboard.rollClasses', ['cls_8a', 'cls_8b', 'cls_9a', 'cls_9b', 'cls_10a', 'cls_10b']], ['security.twoFactor', true],
-    ['vocab.student', 'Student'], ['vocab.class', 'Class'],
   ];
+  // Its country's and curriculum's starter pack, so a new school has nothing to set up (docs/one-shot-plan.md §3.2).
+  const seen = new Set(settings.map(([k]) => k));
+  for (const [k, v] of Object.entries(packSettings(s.country ?? 'IN', input.curriculum ?? 'CBSE'))) if (!seen.has(k)) settings.push([k, v]);
   await bulkInsert(db, 'settings', ['key', 'value', 'updated_by'], settings.map(([k, v]) => [k, JSON.stringify(v), 'system']));
   await bulkInsert(db, 'meta', ['key', 'value'], [
     ['settings.version', JSON.stringify(1)], ['timetable.version', JSON.stringify(1)],
@@ -538,10 +558,10 @@ async function seedOffice(ctx: Ctx, classes: ClassRow[], students: StudentRow[],
   ];
   await bulkInsert(db, 'notices', ['id', 'title', 'body', 'audience', 'class_id', 'status', 'author_id', 'published_at'], noticeRows);
   const leaveFrom = addDays(last, 2);
-  await bulkInsert(db, 'approvals', ['id', 'kind', 'title', 'subtitle', 'requester_name', 'subject_ref', 'payload'], [
-    ['apr_leave_kavita', 'leave', 'Kavita Iyer asked for leave', '16–17 Oct · Maths, Class 8 A', 'Kavita Iyer', kavita.id, JSON.stringify({ from: leaveFrom, to: addDays(leaveFrom, 1) })],
-    ['apr_waiver_kabir', 'fee_waiver', 'Concession for Kabir Singh', '25% sibling · ₹4,625 a term', 'Kabir Singh', kabir.id, JSON.stringify({ percent: 25, amountPerTerm: 4625 })],
-    ['apr_notice_ptm', 'notice', 'PTM notice, Class 5', 'Drafted by Meera Nair', 'Meera Nair', 'ntc_ptm', JSON.stringify({ noticeId: 'ntc_ptm' })],
+  await bulkInsert(db, 'approvals', ['id', 'kind', 'title', 'subtitle', 'requester_name', 'requested_by', 'subject_ref', 'payload'], [
+    ['apr_leave_kavita', 'staff_leave', 'Kavita Iyer: Casual leave', `${leaveFrom} – ${addDays(leaveFrom, 1)} · 2 days`, 'Kavita Iyer', kavita.id, kavita.id, JSON.stringify({ type: 'casual', from: leaveFrom, to: addDays(leaveFrom, 1), halfDay: null, days: 2, reason: 'A family wedding' })],
+    ['apr_waiver_kabir', 'fee_waiver', 'Concession for Kabir Singh', '25% sibling · ₹4,625 a term', 'Kabir Singh', '', kabir.id, JSON.stringify({ percent: 25, amountPerTerm: 4625 })],
+    ['apr_notice_ptm', 'notice', 'PTM notice, Class 5', 'Drafted by Meera Nair', 'Meera Nair', '', 'ntc_ptm', JSON.stringify({ noticeId: 'ntc_ptm' })],
   ]);
   await bulkInsert(db, 'events', ['id', 'title', 'starts_at', 'kind', 'note'], [
     ['evt_assembly', 'Assembly', `${last}T02:20:00Z`, 'routine', 'Main ground'],

@@ -1,5 +1,6 @@
 import { HttpException } from '@nestjs/common';
 import type { ApiErrorBody, ErrorCode } from '@tangent/contracts';
+import { tx } from '@tangent/contracts';
 
 const STATUS: Record<ErrorCode, number> = {
   validation: 400,
@@ -20,6 +21,6 @@ export class ApiError extends HttpException {
   }
 }
 
-export const notFound = (what: string) => new ApiError('not_found', `${what} was not found.`);
+export const notFound = (what: string) => new ApiError('not_found', tx('{what} was not found.', { what }));
 export const forbidden = (message = 'You do not have access to this.') => new ApiError('forbidden', message);
 export const invalid = (message: string, fields?: Record<string, string>) => new ApiError('validation', message, { fields });

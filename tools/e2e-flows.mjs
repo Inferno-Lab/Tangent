@@ -160,11 +160,18 @@ await flow('admin: fees page lists overdue families and opens a payment', { stor
   await p.keyboard.press('Escape');
 });
 
-await flow('admin: school setup is read-only, and a change is asked of Tangent', { storage: adminStore }, async (p) => {
+await flow('admin: the school edits its own profile, sees what Tangent sets, and asks Tangent for the rest', { storage: adminStore }, async (p) => {
   await p.goto(`${ADMIN}/s/${slug}/profile`, { waitUntil: 'networkidle' });
   await expectVisible(p.getByRole('heading', { name: 'School profile' }), 'the School profile page');
-  if (await p.getByRole('button', { name: 'Save changes' }).count()) throw new Error('the school can still save settings');
-  if (await p.locator('main input:not([type=search])').count()) throw new Error('the profile has fields the school can edit');
+  // The school's own setting: changed, saved with a note, and still there after a reload.
+  const tagline = `Learning together, ${Date.now() % 1000}`;
+  await p.getByLabel('Tagline').fill(tagline);
+  await p.getByRole('button', { name: 'Save', exact: true }).click();
+  await expectVisible(p.getByText(/^Saved\. The admin and the app follow/), 'the saved toast');
+  await p.reload({ waitUntil: 'networkidle' });
+  if ((await p.getByLabel('Tagline').inputValue()) !== tagline) throw new Error('the tagline was not kept');
+  // What Tangent keeps (the brand colour, the country) is shown with its reason, not as a field to change.
+  await expectVisible(p.getByText('Set by Tangent for your school. Ask Tangent to change it.').first(), 'a Tangent-owned setting');
   await p.getByRole('button', { name: 'Ask Tangent to change this' }).click();
   await p.getByRole('button', { name: 'Send to Tangent' }).click();
   await expectVisible(p.getByText('Say what you would like changed.'), 'the empty-request error');
@@ -393,11 +400,15 @@ await flow('admin: an enquiry moves along the admissions board', { storage: admi
   await p.getByRole('button', { name: 'Add enquiry' }).click();
   await expectVisible(p.getByText('Enquiry added.'), 'the added toast');
   const card = p.locator('.admk', { hasText: 'E2E Child' });
-  await card.getByRole('button', { name: 'Mark applied' }).click();
+  await card.getByRole('button', { name: 'Move to Applied' }).click();
   await expectVisible(p.getByText(/E2E Child moved to Applied/), 'the moved toast');
-  await p.locator('.admk', { hasText: 'E2E Child' }).getByRole('button', { name: 'Book test' }).click();
-  await p.getByRole('dialog').getByRole('button', { name: 'Book the test' }).click();
-  await expectVisible(p.getByText(/E2E Child moved to Test/), 'the test toast');
+  // A stage that happens on a day asks for the day.
+  await p.locator('.admk', { hasText: 'E2E Child' }).getByRole('button', { name: 'Move to Entrance test' }).click();
+  await p.getByRole('dialog').getByRole('button', { name: 'Move on that day' }).click();
+  await expectVisible(p.getByText(/E2E Child moved to Entrance test/), 'the test toast');
+  // The application page says it is closed until the school turns it on.
+  await p.goto(A('/apply'), { waitUntil: 'networkidle' });
+  await expectVisible(p.getByText('The school is not taking applications online'), 'the closed application page');
 });
 
 await flow('admin: invoices filter, receipts open and print', { storage: adminStore }, async (p) => {
@@ -444,19 +455,13 @@ await flow('admin: an event is added, shown on the calendar and removed', { stor
   await expectVisible(p.getByText(/E2E open house was removed/), 'the removed toast');
 });
 
-await flow('admin: the school profile is read-only with a way to ask Tangent, and data requests are answered', { storage: adminStore }, async (p) => {
+await flow('admin: the school sets up its roles, app and messages from its profile, and data requests are answered', { storage: adminStore }, async (p) => {
   await p.goto(A('/profile/roles'), { waitUntil: 'networkidle' });
   await expectVisible(p.getByRole('tab', { name: /Office staff/ }), 'the role list');
-  for (const name of ['New role', 'Save role', 'Delete role']) if (await p.getByRole('button', { name }).count()) throw new Error(`the school still has "${name}"`);
-  if (await p.getByRole('checkbox').count()) throw new Error('the profile should have nothing to tick');
   await p.goto(A('/profile/messages'), { waitUntil: 'networkidle' });
-  await expectVisible(p.getByText('Child marked absent or late'), 'the messages');
+  await expectVisible(p.getByText('Child marked absent or late').first(), 'the messages');
   await p.goto(A('/profile/app'), { waitUntil: 'networkidle' });
-  await expectVisible(p.getByText('Tabs along the bottom').first(), 'the layout');
-  await p.getByRole('button', { name: 'Ask Tangent to change this' }).click();
-  await p.getByRole('dialog').getByRole('button', { name: 'Send to Tangent' }).click();
-  await expectVisible(p.getByText('Say what you would like changed.'), 'the ask error');
-  await p.keyboard.press('Escape');
+  await expectVisible(p.getByText(/Tabs along the bottom|bottom tabs/i).first(), 'the app layout');
   await p.goto(A('/privacy'), { waitUntil: 'networkidle' });
   await p.getByRole('button', { name: 'Log a request' }).click();
   await p.getByRole('dialog').getByRole('button', { name: 'Log request' }).click();
@@ -509,7 +514,8 @@ await flow('console: a cell is added and managed, a school can be moved', { stor
 
 await flow('console: compliance logs a breach and shows the notice before it is sent', { storage: consoleStore }, async (p) => {
   await p.goto(`${CONSOLE}/compliance/breaches`, { waitUntil: 'networkidle' });
-  await p.getByRole('button', { name: 'Log a breach' }).click();
+  // With no breach yet, the empty page offers the same button as the page's own.
+  await p.getByRole('button', { name: 'Log a breach' }).first().click();
   await p.getByRole('dialog').getByRole('button', { name: 'Log breach' }).click();
   await expectVisible(p.getByText('Choose a school.'), 'the school error');
   await pick(p, p.getByRole('dialog'), 'School', 1);
@@ -670,7 +676,7 @@ await flow('admin: academic year adds a holiday, refuses a bad one, and fees bil
 await flow('admin: moving in sends a file to Tangent; Students → On the app invites a class and prints its letters', { storage: adminStore }, async (p) => {
   await p.goto(A('/moving-in'), { waitUntil: 'networkidle' });
   await expectVisible(p.getByRole('heading', { name: 'Send us your files' }), 'the files card');
-  await p.locator('input[type=file]').setInputFiles({ name: 'e2e-subjects.csv', mimeType: 'text/csv', buffer: Buffer.from('Subject,Periods a week\nE2E Robotics,2\nE2E Dance,x\n') });
+  await p.locator('input[type=file]:not([accept*="zip"])').setInputFiles({ name: 'e2e-subjects.csv', mimeType: 'text/csv', buffer: Buffer.from('Subject,Periods a week\nE2E Robotics,2\nE2E Dance,x\n') });
   await p.getByLabel('What is in it (optional)').fill('Two new subjects');
   await p.getByRole('button', { name: 'Send to Tangent' }).click();
   await expectVisible(p.getByText('Sent it to Tangent. The team will import it and tell you.'), 'the sent toast');
@@ -709,8 +715,9 @@ await flow('console: go-live reconciles the dues with the old system, and a rest
   await p.goto(`${CONSOLE}/schools/${school.id}`, { waitUntil: 'networkidle' });
   const owed = p.getByText(/owed here; type the old system’s total to compare/);
   await expectVisible(owed, 'the dues waiting for the old system’s total');
-  const total = (await owed.first().textContent()).match(/₹([\d,]+)/)[1].replace(/,/g, '');
-  await p.getByLabel('The old system’s total dues (₹)').fill(total);
+  // The amount in the school's own currency and grouping: its digits are what the old system's total is typed as.
+  const total = (await owed.first().textContent()).match(/(\d[\d,.\s]*)/)[1].replace(/[,\s]/g, '');
+  await p.getByLabel('The old system’s total dues').fill(total);
   await p.getByRole('button', { name: 'Compare' }).click();
   await expectVisible(p.getByText(/the same as the old system/), 'the dues reconciled');
   const tick = p.locator('.rw', { hasText: 'The school’s staff are trained' });
@@ -922,6 +929,54 @@ await flow('admin: year-end drafts the next year and previews promotion', { stor
   await p.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
   await p.goto(A('/fees/online'), { waitUntil: 'networkidle' });
   await expectVisible(p.getByRole('tab', { name: 'Refunds' }), 'online payments');
+});
+
+// ── the five modules of the one shot ────────────────────────────────────
+await flow('admin: staff attendance takes a mark and saves it', { storage: adminStore }, async (p) => {
+  await p.goto(A('/staff-attendance'), { waitUntil: 'networkidle' });
+  await p.getByLabel(/^Mark for /).first().click();
+  await p.getByRole('option', { name: /^On duty elsewhere/ }).click();
+  await p.getByRole('button', { name: /^Save 1 mark/ }).click();
+  await expectVisible(p.getByText('The marks are saved.'), 'the saved toast');
+  await p.goto(A('/staff-attendance/balances'), { waitUntil: 'networkidle' });
+  await expectVisible(p.getByText(/^Leave year /), 'the balances');
+});
+
+await flow('admin: the diary takes an entry', { storage: adminStore }, async (p) => {
+  await p.goto(A('/diary'), { waitUntil: 'networkidle' });
+  await p.getByRole('button', { name: 'Write an entry' }).first().click();
+  await p.getByRole('dialog').getByLabel('Entry').fill('E2E: bring your atlas tomorrow.');
+  await p.getByRole('dialog').getByRole('button', { name: 'Save' }).click();
+  await expectVisible(p.getByText('E2E: bring your atlas tomorrow.'), 'the entry in the list');
+});
+
+await flow('admin: a parent-teacher meeting is planned with its times', { storage: adminStore }, async (p) => {
+  await p.goto(A('/meetings'), { waitUntil: 'networkidle' });
+  await p.getByRole('button', { name: 'Plan a meeting' }).first().click();
+  await p.getByRole('dialog').getByLabel('Title').fill('E2E meeting');
+  await p.getByRole('dialog').getByRole('checkbox').first().click();
+  await p.getByRole('dialog').getByRole('button', { name: 'Save' }).click();
+  await expectVisible(p.getByText('E2E meeting'), 'the meeting in the list');
+  await p.getByRole('button', { name: /booked$/ }).first().click();
+  await expectVisible(p.getByRole('dialog'), 'the times');
+  await p.keyboard.press('Escape');
+});
+
+await flow('admin: a visitor is signed in with a badge and shows on the roll call', { storage: adminStore }, async (p) => {
+  await p.goto(A('/visitors'), { waitUntil: 'networkidle' });
+  await p.getByRole('button', { name: 'Sign someone in' }).first().click();
+  await p.getByRole('dialog').getByLabel('Name', { exact: true }).fill('E2E Visitor');
+  await p.getByRole('dialog').getByRole('button', { name: 'Sign in' }).click();
+  await expectVisible(p.getByText(/E2E Visitor is signed in with badge VIS-/), 'the badge number');
+  await p.goto(A('/visitors/roll'), { waitUntil: 'networkidle' });
+  await expectVisible(p.getByText('E2E Visitor'), 'the visitor on the roll call');
+});
+
+await flow('admin: certificates show the waiting request and the register', { storage: adminStore }, async (p) => {
+  await p.goto(A('/certificates'), { waitUntil: 'networkidle' });
+  await expectVisible(p.getByText(/^Character certificate · /), 'the waiting request');
+  await p.goto(A('/certificates/register'), { waitUntil: 'networkidle' });
+  await expectVisible(p.getByText(/^CERT-\d{4}-0001/), 'the issued certificate');
 });
 
 await browser.close();

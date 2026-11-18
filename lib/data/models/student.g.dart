@@ -19,6 +19,13 @@ Student _$StudentFromJson(Map<String, dynamic> json) => Student(
   guardianPhone: json['guardianPhone'] as String,
   address: json['address'] as String,
   userId: json['userId'] as String?,
+  fields:
+      (json['fields'] as Map<String, dynamic>?)?.map(
+        (k, e) => MapEntry(k, e as String),
+      ) ??
+      {},
+  admissionNo: json['admissionNo'] as String? ?? '',
+  nameLocal: json['nameLocal'] as String? ?? '',
 );
 
 Map<String, dynamic> _$StudentToJson(Student instance) => <String, dynamic>{
@@ -34,6 +41,9 @@ Map<String, dynamic> _$StudentToJson(Student instance) => <String, dynamic>{
   'guardianName': instance.guardianName,
   'guardianPhone': instance.guardianPhone,
   'address': instance.address,
+  'fields': instance.fields,
+  'admissionNo': instance.admissionNo,
+  'nameLocal': instance.nameLocal,
 };
 
 SchoolClass _$SchoolClassFromJson(Map<String, dynamic> json) => SchoolClass(
@@ -92,6 +102,7 @@ SchoolInfo _$SchoolInfoFromJson(Map<String, dynamic> json) => SchoolInfo(
   founded: (json['founded'] as num).toInt(),
   officeHours: json['officeHours'] as String,
   about: json['about'] as String,
+  termStart: json['termStart'] as String? ?? '',
 );
 
 Map<String, dynamic> _$SchoolInfoToJson(SchoolInfo instance) =>
@@ -106,4 +117,5 @@ Map<String, dynamic> _$SchoolInfoToJson(SchoolInfo instance) =>
       'founded': instance.founded,
       'officeHours': instance.officeHours,
       'about': instance.about,
+      'termStart': instance.termStart,
     };

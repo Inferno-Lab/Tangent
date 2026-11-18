@@ -9,6 +9,7 @@ import { Actions } from './actions.js';
 import { Db, Me, Needs, type ConsoleUser, type reg } from './core.js';
 import { ENV, type Env } from './env.js';
 import { Policy } from './policy.js';
+import { tx } from '@tangent/contracts';
 
 type ReleaseRecord = typeof reg.releases.$inferSelect;
 type SchoolRecord = typeof reg.schools.$inferSelect;
@@ -63,7 +64,7 @@ export class Releases implements OnApplicationBootstrap {
   async create(user: string, version: string, notes: string): Promise<ReleaseRow> {
     if (!/^\d{4}\.\d{1,2}\.\d{1,3}$/.test(version)) throw new ApiError('validation', 'Name the release like 2026.10.3.', { fields: { version: 'Use year.month.number, like 2026.10.3.' } });
     const dupe = await this.db.pool.query('select 1 from releases where version = $1', [version]);
-    if (dupe.rowCount) throw new ApiError('conflict', `Release ${version} already exists.`);
+    if (dupe.rowCount) throw new ApiError('conflict', tx('Release {version} already exists.', { version }));
     const id = newId('rel');
     await this.db.pool.query("insert into releases (id, version, notes, status, waves, created_by) values ($1,$2,$3,'draft','[]',$4)", [id, version, notes, user]);
     await this.db.audit(user, 'release.created', 'release', id, { version });
@@ -90,7 +91,7 @@ export class Releases implements OnApplicationBootstrap {
     const pol = await this.policy.get();
     if (pol.freeze) throw new ApiError('locked', 'Changes are frozen. A super admin can lift the freeze under Console settings.');
     const other = await this.current();
-    if (other) throw new ApiError('conflict', `Release ${other.version} is still ${other.status}. Finish or roll it back first.`);
+    if (other) throw new ApiError('conflict', tx('Release {version} is still {status}. Finish or roll it back first.', { version: other.version, status: other.status }));
     const { rows } = await this.db.query<SchoolRecord>("select * from schools where status = 'live' and deleted_at is null order by created_at");
     const waves = this.plan(rows, pol);
     if (!waves.length) throw new ApiError('conflict', 'There are no live schools to release to.');

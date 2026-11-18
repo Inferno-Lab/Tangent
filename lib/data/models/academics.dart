@@ -13,6 +13,15 @@ enum AttendanceStatus {
   holiday,
 }
 
+/// What a day's mark means, from the server's meaning: a half day counts as attended and authorised leave as away, as the
+/// school's figures count them; anything new reads as not there rather than failing to load.
+AttendanceStatus attendanceStatusOf(Object? v) => switch (v) {
+  'present' || 'half_day' => AttendanceStatus.present,
+  'late' => AttendanceStatus.lateArrival,
+  'holiday' => AttendanceStatus.holiday,
+  _ => AttendanceStatus.absent,
+};
+
 enum PeriodKind {
   @JsonValue('class')
   klass,
@@ -56,6 +65,7 @@ class AttendanceDay {
     required this.studentId,
     required this.date,
     required this.status,
+    this.label,
   });
 
   factory AttendanceDay.fromJson(Map<String, dynamic> json) =>
@@ -63,7 +73,11 @@ class AttendanceDay {
 
   final String studentId;
   final DateTime date;
+  @JsonKey(fromJson: attendanceStatusOf)
   final AttendanceStatus status;
+
+  /// The school's own name for the mark ("Half day", "Medical"), when it has one.
+  final String? label;
 
   Map<String, dynamic> toJson() => _$AttendanceDayToJson(this);
 }
@@ -175,6 +189,7 @@ class Homework {
     required this.teacherId,
     required this.maxMarks,
     required this.attachments,
+    this.files = const [],
     required this.submissions,
   });
 
@@ -190,6 +205,13 @@ class Homework {
   final String teacherId;
   final int maxMarks;
   final List<String> attachments;
+
+  /// The attached files with their ids (to open them); empty in sample data, which has names only.
+  @JsonKey(defaultValue: <Map<String, dynamic>>[])
+  final List<Map<String, dynamic>> files;
+
+  /// The id of the attached file called [name], when the school's server sent it.
+  String? fileId(String name) => files.where((f) => f['name'] == name).map((f) => '${f['id']}').firstOrNull;
   final List<HomeworkSubmission> submissions;
 
   HomeworkSubmission? forStudent(String studentId) {
@@ -210,6 +232,7 @@ class Homework {
     teacherId: teacherId,
     maxMarks: maxMarks,
     attachments: attachments,
+    files: files,
     submissions: submissions ?? this.submissions,
   );
 
@@ -248,14 +271,16 @@ class Exam {
 
 @JsonSerializable()
 class ExamPaper {
-  const ExamPaper({required this.subject, required this.date, this.subjectName = '', this.startsAt = '', this.endsAt = '', this.room = '', this.maxMarks = 0});
+  const ExamPaper({required this.subject, this.date, this.subjectName = '', this.startsAt = '', this.endsAt = '', this.room = '', this.maxMarks = 0});
 
   factory ExamPaper.fromJson(Map<String, dynamic> json) => _$ExamPaperFromJson(json);
 
   final String subject;
   @JsonKey(defaultValue: '')
   final String subjectName;
-  final DateTime date;
+
+  /// Null while the school has not set the paper's day.
+  final DateTime? date;
   @JsonKey(defaultValue: '')
   final String startsAt;
   @JsonKey(defaultValue: '')

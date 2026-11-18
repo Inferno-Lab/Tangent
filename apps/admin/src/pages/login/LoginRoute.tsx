@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useRouteContext } from '@tanstack/react-router';
 import { HttpError } from '@tangent/api-client';
-import { EmptyCard, LoginPage, useHue } from '@tangent/web-ui';
+import { EmptyCard, LoginPage, useHue, t as tr } from '@tangent/web-ui';
 import { session } from '../../app/client';
 
 /** Signs in to the school named in the address: password first, then the code. */
@@ -19,7 +19,7 @@ export function LoginRoute() {
   return (
     <LoginPage
       controller={{
-        product: 'admin', schoolName: b?.name ?? 'Tangent', shortName: b?.shortName ?? 'school', color: b?.color, logoText: b?.logoText, logoUrl: b?.logoUrl, privacy: b?.privacy, demoMode: !!b?.demoMode, goName: 'the dashboard',
+        product: 'admin', schoolName: b?.name ?? tr('admin.login_route.tangent'), shortName: b?.shortName ?? 'school', color: b?.color, logoText: b?.logoText, logoUrl: b?.logoUrl, privacy: b?.privacy, demoMode: !!b?.demoMode, goName: tr('admin.login_route.the_dashboard'),
         initialEmail: (() => { try { return localStorage.getItem(`tangent.admin.${slug}.email`) ?? ''; } catch { return ''; } })(),
         submitCredentials: async (email, password) => {
           const res = await client.api.login({ identifier: email, password });
@@ -49,8 +49,8 @@ function NoSchool({ error, retry, busy }: { error: Error; retry: () => void; bus
     <div className="nest" style={{ minHeight: '100dvh', padding: 12, display: 'grid', placeItems: 'center' }}>
       <div style={{ maxWidth: 440, width: '100%' }}>
         {missing
-          ? <EmptyCard error title="Sign in" chip={{ text: 'Not found', tone: 'c' }} icon="search" heading="We couldn’t find that school" body={error.message} actions={<a className="btn pri" href="/">Try another address</a>} />
-          : <EmptyCard error title="Sign in" chip={{ text: 'Not answering', tone: 'a' }} icon="warning" heading="The school isn’t answering yet" body={error instanceof HttpError ? error.message : 'Check your connection, then try again.'} actions={<button className="btn pri" disabled={busy} onClick={retry}>{busy ? 'Trying…' : 'Try again'}</button>} />}
+          ? <EmptyCard error title={tr('admin.login_route.sign_in')} chip={{ text: tr('admin.login_route.not_found'), tone: 'c' }} icon="search" heading={tr('admin.login_route.we_couldn_t_find_that')} body={error.message} actions={<a className="btn pri" href="/">{tr('admin.login_route.try_another_address')}</a>} />
+          : <EmptyCard error title={tr('admin.login_route.sign_in')} chip={{ text: tr('admin.login_route.not_answering'), tone: 'a' }} icon="warning" heading={tr('admin.login_route.the_school_isn_t_answering')} body={error instanceof HttpError ? error.message : tr('admin.login_route.check_your_connection_then_try')} actions={<button className="btn pri" disabled={busy} onClick={retry}>{busy ? tr('admin.login_route.trying') : tr('admin.login_route.try_again')}</button>} />}
       </div>
     </div>
   );

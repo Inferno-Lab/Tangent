@@ -214,6 +214,7 @@ abstract class ChatRepository {
     required String threadId,
     required String senderId,
     required String text,
+    List<String> fileIds = const [],
   });
 
   Future<void> markRead({required String threadId, required String userId});
@@ -270,6 +271,7 @@ class MockChatRepository implements ChatRepository {
     required String threadId,
     required String senderId,
     required String text,
+    List<String> fileIds = const [],
   }) => _ds.guard(
     () => _ds.sendMessage(threadId: threadId, senderId: senderId, text: text),
   );
@@ -320,9 +322,11 @@ class RemoteChatRepository implements ChatRepository {
     required String threadId,
     required String senderId,
     required String text,
+    List<String> fileIds = const [],
   }) => _remote.post('/threads/$threadId/messages', {
     'senderId': senderId,
     'text': text,
+    if (fileIds.isNotEmpty) 'fileIds': fileIds,
   });
 
   @override

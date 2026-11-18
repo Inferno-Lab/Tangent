@@ -1,8 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
-import { ATTENDANCE_MARKS, MESSAGE_EVENTS, addDays, istToday, type AttendanceStatus, type NoticeCreate, type PeriodMarksPut } from '@tangent/contracts';
+import { tx, schoolNow, slotDayOf, slotKey, hasReachedAge, customText, listKey, listLabel, listOptions, SchoolSettingsSchema, DEFAULT_LEAVE_REASONS, type ListItem, type CustomFieldsSetting, type CustomValues, type FieldDef, type AttendanceMarkDef, MESSAGE_EVENTS, addDays, schoolToday, type AttendanceStatus, type NoticeCreate, type PeriodMarksPut } from '@tangent/contracts';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
-import type { Registry } from '@tangent/tenancy';
+import { schoolContext, type Registry } from '@tangent/tenancy';
 import { REGISTRY, type AuthedUser, type TenantCtx } from '../tenancy/tenant.js';
 import { AttendanceService } from './attendance.service.js';
 import { ApprovalsService } from './approvals.service.js';
@@ -12,10 +12,9 @@ import { LearningService } from './learning.service.js';
 import { LibraryService } from './library.service.js';
 import { ChatService, type ChatSender } from './chat.service.js';
 import { NoticesService } from './notices.service.js';
-import { AuditService, Messenger, SettingsService } from './support.js';
-import { TransportService } from './transport.service.js';
+import { AuditService, Messenger, SettingsService, checkLeaveClash } from './support.js';
+import { BUS_CREW_SQL, TransportService } from './transport.service.js';
 
-const DAYS = ['', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const key = (subjectId: string) => subjectId.replace(/^sub_/, '');
 
 /** What a teacher sends to set or change homework from the app. */
@@ -72,7 +71,7 @@ export class FamilyService {
     if (guardianIds.length) {
       children = (await t.pool.query<{ student_id: string }>('select distinct student_id from student_guardians where guardian_id = any($1)', [guardianIds])).rows.map((r) => r.student_id);
     }
-    const drives = u.kind === 'staff' && !!(await t.pool.query('select 1 from transport_routes where driver_user_id = $1 limit 1', [u.id])).rowCount;
+    const drives = u.kind === 'staff' && !!(await t.pool.query(BUS_CREW_SQL, [u.id])).rowCount;
     return { id: u.id, kind: u.kind, role: u.kind === 'guardian' ? 'parent' : drives ? 'driver' : 'teacher', name: u.name, phone: u.phone, email: u.email, children, guardianIds, perms: user.permissions };
   }
 
@@ -87,7 +86,7 @@ export class FamilyService {
     if (w.kind === 'staff' && w.perms.includes('students.read')) return;
     if (w.kind === 'staff' && (await t.pool.query(
       `select 1 from students s where s.id = $1 and (s.class_id in (select id from classes where class_teacher_id = $2 union select class_id from timetable_slots where teacher_id = $2)
-         or s.id in (select a.student_id from transport_assignments a join transport_routes r on r.id = a.route_id where r.driver_user_id = $2))`, [studentId, w.id])).rowCount) return;
+         or s.id in (select a.student_id from transport_assignments a join transport_routes r on r.id = a.route_id where r.driver_user_id = $2 or r.attendant_user_id = $2))`, [studentId, w.id])).rowCount) return;
     throw forbidden('That student is not yours to look at.');
   }
 
@@ -102,7 +101,10 @@ export class FamilyService {
   async me(t: TenantCtx, user: AuthedUser): Promise<Record<string, unknown>> {
     const w = await this.who(t, user);
     const c = (await t.pool.query<{ consented_at: Date | null; photo_consent: boolean | null }>('select consented_at, photo_consent from users where id = $1', [user.id])).rows[0];
+    // A student agrees for themself from the country's age of consent; a younger one is covered by their family (§3.7).
+    const consentFor = w.kind === 'student' ? ((await this.ofConsentAge(t, w.children[0])) ? 'self' : 'guardian') : 'self';
     return {
+      consentFor,
       id: w.id, role: w.role, name: w.name, email: w.email ?? '', phone: w.phone ?? '', avatarUrl: '', password: '',
       childIds: w.kind === 'guardian' ? w.children : [], ...(w.kind === 'student' ? { studentId: w.children[0] ?? null } : {}), ...(w.kind === 'staff' ? { teacherId: w.id } : {}),
       consentedAt: c?.consented_at?.toISOString() ?? null, photoConsent: c?.photo_consent ?? null,
@@ -110,7 +112,17 @@ export class FamilyService {
   }
 
   /** A family agrees to the school's privacy notice (once), and says whether the school may share photos of the child. */
+  /** Whether a student is old enough to agree to the privacy notice for themself (privacy.consentAge, from their birth date). */
+  private async ofConsentAge(t: TenantCtx, studentId: string | undefined): Promise<boolean> {
+    if (!studentId) return false;
+    const age = await this.settings.value<number>(t, 'privacy.consentAge', 16);
+    const dob = (await t.pool.query<{ dob: string | null }>('select dob::text from students where id = $1', [studentId])).rows[0]?.dob;
+    return !!dob && hasReachedAge(dob, schoolToday(), age);
+  }
+
   async consent(t: TenantCtx, user: AuthedUser, photos: boolean | undefined): Promise<{ consentedAt: string; photoConsent: boolean | null }> {
+    const w = await this.who(t, user);
+    if (w.kind === 'student' && !(await this.ofConsentAge(t, w.children[0]))) throw forbidden('Your parent or guardian agrees to this for you.');
     // The photo answer can be changed at any time (Settings → Privacy); the consent itself is given once.
     const { rows } = await t.pool.query<{ consented_at: Date; photo_consent: boolean | null }>(
       'update users set consented_at = coalesce(consented_at, now()), photo_consent = case when $2::boolean is null then photo_consent else $2 end where id = $1 returning consented_at, photo_consent', [user.id, photos ?? null]);
@@ -163,11 +175,55 @@ export class FamilyService {
     const v = (await this.settings.doc(t)).values;
     const s = (k: string) => (typeof v[k] === 'string' ? (v[k] as string) : '');
     const principal = (await t.pool.query<{ name: string }>("select u.name from staff st join users u on u.id = st.user_id where st.designation = 'Principal' limit 1")).rows[0]?.name ?? '';
+    // The term the school is in, as its calendar says (terms start any month; none: empty).
+    const term = (await t.pool.query<{ s: string }>('select starts_on::text s from terms where starts_on <= $1 and ends_on >= $1 order by starts_on desc limit 1', [schoolToday()])).rows[0]?.s ?? '';
     return {
+      termStart: term,
       // The school's own facts only: the year it was founded and its office hours are not recorded, so they are left empty.
       name: s('school.name') || t.info.name, tagline: s('school.tagline'), address: s('school.address'), phone: s('school.phone'), email: s('school.email'), website: '', principal, founded: 0,
       officeHours: '', about: s('school.tagline'),
     };
+  }
+
+  /**
+   * Whose week of lessons a calendar link gives (§5.1.2): a class this person may see (a family's child's, a teacher's), or the
+   * teacher's own when no class is named. The lessons repeat weekly until the term (else the year) ends.
+   */
+  async lessonsOf(t: TenantCtx, user: AuthedUser, classId?: string): Promise<{ classId?: string; teacherId?: string }> {
+    const w = await this.who(t, user);
+    if (classId) { await this.mayClass(t, w, classId); return { classId }; }
+    if (w.kind !== 'staff') throw new ApiError('validation', 'Say which class.');
+    return { teacherId: w.id };
+  }
+
+  /** The lessons of `lessonsOf`, built when the calendar link is opened. */
+  async lessonEvents(t: TenantCtx, by: { classId?: string; teacherId?: string }): Promise<{ title: string; start: string; end: string; place?: string; weeklyUntil?: string }[]> {
+    const classId = by.classId;
+    const today = schoolToday();
+    const until = (await t.pool.query<{ e: string }>(
+      "select ends_on::text e from terms where starts_on <= $1 and ends_on >= $1 union all select ends_on::text from academic_years where current limit 1", [today])).rows[0]?.e ?? addDays(today, 120);
+    const { rows } = await t.pool.query<{ day: number; subject: string; room: string | null; starts_at: string; ends_at: string; class_name: string }>(
+      `select ts.day, coalesce(sub.name, ts.subject_id) subject, ts.room, st.starts_at, st.ends_at, c.name class_name from timetable_slots ts join slot_times st on st.slot_id = ts.id
+         join classes c on c.id = ts.class_id left join subjects sub on sub.id = ts.subject_id
+       where ${classId ? 'ts.class_id = $1' : 'coalesce(ts.cover_teacher_id, ts.teacher_id) = $1'} order by ts.day, st.starts_at`, [classId ?? by.teacherId]);
+    const title = (r: (typeof rows)[number]) => (classId ? r.subject : `${r.subject} · ${r.class_name}`);
+    const cycle = await this.settings.cycle(t);
+    if (cycle.kind === 'week') {
+      // Each lesson starts on its weekday's next date from today (ISO weekday 1 is Monday, as timetable_slots counts) and repeats weekly.
+      const iso = (d: string) => { const n = new Date(`${d}T00:00:00Z`).getUTCDay(); return n === 0 ? 7 : n; };
+      const first = (dayNo: number) => addDays(today, (dayNo - iso(today) + 7) % 7);
+      return rows.map((r) => ({ title: title(r), start: `${first(r.day)}T${r.starts_at}`, end: `${first(r.day)}T${r.ends_at}`, ...(r.room ? { place: r.room } : {}), weeklyUntil: until }));
+    }
+    // A/B weeks and cycles of days do not repeat weekly: every lesson on every school day until the term ends.
+    // ponytail: dated events up to the term's end (a few thousand at most), a cycle-aware recurrence if calendars ever need less.
+    const closed = await this.settings.closed(t);
+    const out: { title: string; start: string; end: string; place?: string }[] = [];
+    for (let d = today; d <= until && out.length < 5000; d = addDays(d, 1)) {
+      const day = slotDayOf(cycle, d, closed);
+      if (day === null) continue;
+      for (const r of rows.filter((x) => x.day === day)) out.push({ title: title(r), start: `${d}T${r.starts_at}`, end: `${d}T${r.ends_at}`, ...(r.room ? { place: r.room } : {}) });
+    }
+    return out;
   }
 
   async userName(t: TenantCtx, id: string): Promise<{ id: string; name: string }> {
@@ -177,15 +233,23 @@ export class FamilyService {
   }
 
   /** Guardian contact, birth date and address go to the family and to staff whose role reads students; never to the rest. */
-  private studentJson(w: Who, r: { id: string; user_id: string | null; name: string; class_id: string; roll_no: string; dob: string; blood_group: string | null; house: string | null; address: string | null; g_name: string | null; g_phone: string | null; photo: string | null }) {
+  private studentJson(w: Who, r: { id: string; user_id: string | null; name: string; name_local?: string | null; class_id: string; roll_no: string; admission_no: string | null; dob: string; blood_group: string | null; house: string | null; address: string | null; g_name: string | null; g_phone: string | null; photo: string | null; custom: CustomValues | null }, own: FieldDef[]) {
     const full = w.children.includes(r.id) || (w.kind === 'staff' && w.perms.includes('students.read'));
+    // The school's own fields it shows in the app (§3.6.3), named and written in the reader's language; only to those who see the full record.
+    const lang = schoolContext.getStore()?.lang ?? 'en';
+    const fields = full ? Object.fromEntries(own.map((f) => [f.names?.[lang] || f.label, customText(f, r.custom?.[f.key], lang)]).filter(([, v]) => v)) : {};
     return {
+      fields, admissionNo: r.admission_no ?? '', nameLocal: r.name_local ?? '',
       id: r.id, userId: r.user_id, name: r.name, classId: r.class_id, rollNo: r.roll_no, dob: full ? r.dob : '', bloodGroup: r.blood_group ?? '', house: r.house ?? '', avatarUrl: '',
       photoFileId: r.photo, guardianName: full ? r.g_name ?? '' : '', guardianPhone: full ? r.g_phone ?? '' : '', address: full ? r.address ?? '' : '',
     };
   }
 
-  private readonly studentSql = `select s.id, s.user_id, s.name, s.class_id, s.roll_no, s.dob::text, s.blood_group, s.house, s.address, g.name g_name, g.phone g_phone,
+  private async appFields(t: TenantCtx): Promise<FieldDef[]> {
+    return ((await this.settings.value<CustomFieldsSetting>(t, 'fields.custom', {})).student ?? []).filter((f) => f.app);
+  }
+
+  private readonly studentSql = `select s.id, s.user_id, s.name, s.name_local, s.class_id, s.roll_no, s.admission_no, s.dob::text, s.blood_group, s.house, s.address, s.custom, g.name g_name, g.phone g_phone,
       (select f.id from files f where f.kind = 'student_photo' and f.owner_id = s.id and f.status = 'clean' and f.deleted_at is null order by f.created_at desc limit 1) photo
     from students s left join student_guardians sg on sg.student_id = s.id and sg.is_primary left join guardians g on g.id = sg.guardian_id`;
 
@@ -194,7 +258,7 @@ export class FamilyService {
     await this.mayStudent(w, id, t);
     const r = (await t.pool.query(`${this.studentSql} where s.id = $1`, [id])).rows[0];
     if (!r) throw notFound('That student');
-    return this.studentJson(w, r);
+    return this.studentJson(w, r, await this.appFields(t));
   }
 
   /**
@@ -209,9 +273,10 @@ export class FamilyService {
       throw forbidden('That class is not yours to look at.');
     }
     const { rows } = await t.pool.query(`${this.studentSql} where s.class_id = $1 and s.status = 'active' order by s.roll_no, s.name`, [classId]);
-    const list = rows.map((r) => this.studentJson(w, r));
+    const own = await this.appFields(t);
+    const list = rows.map((r) => this.studentJson(w, r, own));
     if (w.kind !== 'staff') return list;
-    const today = istToday();
+    const today = schoolToday();
     const from = (await t.pool.query<{ d: string }>('select starts_on::text d from terms where starts_on <= $1 order by starts_on desc limit 1', [today])).rows[0]?.d ?? addDays(today, -120);
     const [att, res] = await Promise.all([
       t.pool.query<{ student_id: string; days: string; present: string; absent_today: boolean }>(
@@ -230,11 +295,12 @@ export class FamilyService {
   }
 
   private async classJson(t: TenantCtx, id: string) {
-    const c = (await t.pool.query<{ id: string; grade: number; section: string; class_teacher_id: string | null; room: string | null }>(
-      `select c.id, c.grade, c.section, c.class_teacher_id, (select room from timetable_slots ts where ts.class_id = c.id and room is not null limit 1) room from classes c where c.id = $1`, [id])).rows[0];
+    const c = (await t.pool.query<{ id: string; name: string; grade: number; section: string; class_teacher_id: string | null; room: string | null }>(
+      `select c.id, c.name, c.grade, c.section, c.class_teacher_id, (select room from timetable_slots ts where ts.class_id = c.id and room is not null limit 1) room from classes c where c.id = $1`, [id])).rows[0];
     if (!c) throw notFound('That class');
     const ids = (await t.pool.query<{ id: string }>("select id from students where class_id = $1 and status = 'active' order by roll_no", [id])).rows.map((r) => r.id);
-    return { id: c.id, name: `Class ${c.grade}`, section: c.section, classTeacherId: c.class_teacher_id ?? '', room: c.room ?? '', studentIds: ids };
+    // The school's own name for the class ("8 A", "Year 7 Blue"); the app adds the section only when the name lacks it.
+    return { id: c.id, name: c.name, section: c.section, classTeacherId: c.class_teacher_id ?? '', room: c.room ?? '', studentIds: ids };
   }
 
   async schoolClass(t: TenantCtx, user: AuthedUser, id: string) {
@@ -271,16 +337,19 @@ export class FamilyService {
 
   async attendanceOf(t: TenantCtx, user: AuthedUser, studentId: string) {
     await this.mayStudent(await this.who(t, user), studentId, t);
-    const { rows } = await t.pool.query<{ date: string; status: AttendanceStatus }>(
-      `select x.date::text date, m.status from attendance_marks m join attendance_sessions x on x.id = m.session_id where m.student_id = $1 and x.date >= $2 order by x.date`, [studentId, addDays(istToday(), -120)]);
-    return rows.map((r) => ({ studentId, date: r.date, status: r.status === 'leave' ? 'absent' : r.status }));
+    const { rows } = await t.pool.query<{ date: string; status: AttendanceStatus; code: string | null }>(
+      `select d.date::text date, d.status, d.code from attendance_days d where d.student_id = $1 and d.date >= $2 order by d.date`, [studentId, addDays(schoolToday(), -120)]);
+    // The app draws each day by what the mark means and names it the school's way.
+    const used = await this.settings.value<AttendanceMarkDef[]>(t, 'attendance.statuses', []);
+    const name = (r: { status: string; code: string | null }) => used.find((m) => m.key === (r.code ?? r.status))?.name ?? used.find((m) => m.meaning === r.status)?.name ?? '';
+    return rows.map((r) => ({ studentId, date: r.date, status: r.status, label: name(r) }));
   }
 
   async today(t: TenantCtx, user: AuthedUser, students: string[]) {
     const w = await this.who(t, user);
     if (w.kind !== 'staff') students = students.filter((s) => w.children.includes(s));
     const { rows } = await t.pool.query<{ student_id: string; status: string }>(
-      `select m.student_id, m.status from attendance_marks m join attendance_sessions x on x.id = m.session_id where x.date = $1 and m.student_id = any($2)`, [istToday(), students]);
+      `select d.student_id, d.status from attendance_days d where d.date = $1 and d.student_id = any($2)`, [schoolToday(), students]);
     return Object.fromEntries(rows.map((r) => [r.student_id, r.status === 'leave' ? 'absent' : r.status]));
   }
 
@@ -302,19 +371,20 @@ export class FamilyService {
   }
 
   /** Marks a day (today unless said): any mark the school uses; a day past the correction window is refused by AttendanceService. */
-  async markToday(t: TenantCtx, user: AuthedUser, byStudent: Record<string, string>, date = istToday()) {
+  async markToday(t: TenantCtx, user: AuthedUser, byStudent: Record<string, string>, date = schoolToday()) {
     if (!user.permissions.includes('attendance.mark')) throw forbidden('You are not allowed to mark attendance.');
     const ids = Object.keys(byStudent);
     const { rows } = await t.pool.query<{ id: string; class_id: string }>('select id, class_id from students where id = any($1)', [ids]);
+    const { part } = await this.attendance.partOf(t, undefined, date);
     for (const cls of new Set(rows.map((r) => r.class_id))) {
-      const existing = await t.pool.query<{ student_id: string; status: AttendanceStatus }>(
-        'select m.student_id, m.status from attendance_marks m join attendance_sessions x on x.id = m.session_id where x.class_id = $1 and x.date = $2', [cls, date]);
+      const existing = await t.pool.query<{ student_id: string; status: string }>(
+        'select m.student_id, coalesce(m.code, m.status) status from attendance_marks m join attendance_sessions x on x.id = m.session_id where x.class_id = $1 and x.date = $2 and x.part = $3', [cls, date, part]);
       const merged = new Map(existing.rows.map((e) => [e.student_id, e.status]));
       for (const r of rows.filter((x) => x.class_id === cls)) {
-        const s = byStudent[r.id] as AttendanceStatus;
-        if (ATTENDANCE_MARKS.includes(s)) merged.set(r.id, s);
+        // Any mark the school uses, by its key or by its meaning (the app sends present, late or absent).
+        if (byStudent[r.id]) merged.set(r.id, byStudent[r.id]!);
       }
-      await this.attendance.put(t, user, { classId: cls, date, marks: [...merged].map(([studentId, status]) => ({ studentId, status })) });
+      await this.attendance.put(t, user, { classId: cls, date, part, marks: [...merged].map(([studentId, status]) => ({ studentId, status })) });
     }
     return { ok: true };
   }
@@ -323,19 +393,27 @@ export class FamilyService {
 
   async timetable(t: TenantCtx, user: AuthedUser, classId: string) {
     await this.mayClass(t, await this.who(t, user), classId);
-    const [slots, periods] = await Promise.all([
+    const [slots, periods, own] = await Promise.all([
       t.pool.query<{ day: number; period: number; subject_id: string; teacher_id: string; room: string | null; starts_at: string; ends_at: string }>(
-        `select ts.day, ts.period, ts.subject_id, coalesce(ts.cover_teacher_id, ts.teacher_id) teacher_id, ts.room, p.starts_at, p.ends_at from timetable_slots ts join periods p on p.idx = ts.period where ts.class_id = $1`, [classId]),
+        `select ts.day, ts.period, ts.subject_id, coalesce(ts.cover_teacher_id, ts.teacher_id) teacher_id, ts.room, st.starts_at, st.ends_at from timetable_slots ts join slot_times st on st.slot_id = ts.id where ts.class_id = $1`, [classId]),
       t.pool.query<{ idx: number; kind: string; starts_at: string; ends_at: string }>("select idx, kind, starts_at, ends_at from periods where kind <> 'period'"),
+      // A break's own times on a day (the class's first, then the school's).
+      t.pool.query<{ day: number; period: number; starts_at: string; ends_at: string }>('select day, period, starts_at, ends_at from period_times where class_id is null or class_id = $1 order by class_id nulls first', [classId]),
     ]);
-    const days = [...new Set(slots.rows.map((s) => s.day))].sort();
-    return days.map((d) => ({
-      classId, day: DAYS[d],
-      periods: [
-        ...slots.rows.filter((s) => s.day === d).map((s) => ({ id: `${classId}-${DAYS[d]}-${s.period}`, subject: key(s.subject_id), teacherId: s.teacher_id, start: s.starts_at, end: s.ends_at, room: s.room ?? '', kind: 'class' })),
-        ...periods.rows.map((p) => ({ id: `${classId}-${DAYS[d]}-b${p.idx}`, subject: 'break', start: p.starts_at, end: p.ends_at, room: '', kind: p.kind === 'lunch' ? 'recess' : 'break' })),
-      ].sort((a, b) => a.start.localeCompare(b.start)),
-    }));
+    // Keyed by the school's cycle: mon…sun for a week, mon-a…sun-b for A/B weeks, d1…dN for a cycle of days.
+    const cycle = await this.settings.cycle(t);
+    const times = new Map(own.rows.map((r) => [`${r.day}|${r.period}`, r]));
+    const days = [...new Set(slots.rows.map((s) => s.day))].sort((a, b) => a - b);
+    return days.map((d) => {
+      const k = slotKey(cycle, d);
+      return {
+        classId, day: k,
+        periods: [
+          ...slots.rows.filter((s) => s.day === d).map((s) => ({ id: `${classId}-${k}-${s.period}`, subject: key(s.subject_id), teacherId: s.teacher_id, start: s.starts_at, end: s.ends_at, room: s.room ?? '', kind: 'class' })),
+          ...periods.rows.map((p) => { const o = times.get(`${d}|${p.idx}`); return { id: `${classId}-${k}-b${p.idx}`, subject: 'break', start: o?.starts_at ?? p.starts_at, end: o?.ends_at ?? p.ends_at, room: '', kind: p.kind === 'lunch' ? 'recess' : 'break' }; }),
+        ].sort((a, b) => a.start.localeCompare(b.start)),
+      };
+    });
   }
 
   // Homework
@@ -410,7 +488,7 @@ export class FamilyService {
     for (const f of fileIds) await this.files.done(t, user.id, f);
     await t.pool.query(
       `insert into homework_submissions (homework_id, student_id, handed_at, on_time) values ($1,$2,now(),$3)
-       on conflict (homework_id, student_id) do update set handed_at = now(), on_time = homework_submissions.on_time or excluded.on_time`, [id, studentId, istToday() <= h.due_on]);
+       on conflict (homework_id, student_id) do update set handed_at = now(), on_time = homework_submissions.on_time or excluded.on_time`, [id, studentId, schoolToday() <= h.due_on]);
     return { ok: true };
   }
 
@@ -428,9 +506,10 @@ export class FamilyService {
   async gradeHomework(t: TenantCtx, user: AuthedUser, id: string, b: { studentId: string; marks: number | null; feedback?: string }) {
     if (!user.permissions.includes('homework.write')) throw forbidden('You are not allowed to grade homework.');
     await this.learning.markHomework(t, user, id, { marks: [{ studentId: b.studentId, handed: true, score: b.marks, feedback: b.feedback ?? '' }] });
-    const h = (await t.pool.query<{ title: string; subject: string; max_marks: number }>('select h.title, s.name subject, h.max_marks from homework h join subjects s on s.id = h.subject_id where h.id = $1', [id])).rows[0]!;
-    const fam = (await t.pool.query<{ phone: string | null; name: string }>('select g.phone, st.name from students st join student_guardians sg on sg.student_id = st.id and sg.is_primary join guardians g on g.id = sg.guardian_id where st.id = $1', [b.studentId])).rows;
-    const grade = b.marks == null ? 'checked' : (await this.settings.grading(t)).grade(Math.round((b.marks / h.max_marks) * 100)) || `${b.marks}/${h.max_marks}`;
+    const h = (await t.pool.query<{ title: string; subject: string; subject_id: string; yr: number | null; max_marks: number }>(
+      'select h.title, s.name subject, h.subject_id, c.grade yr, h.max_marks from homework h join subjects s on s.id = h.subject_id left join classes c on c.id = h.class_id where h.id = $1', [id])).rows[0]!;
+    const fam = (await t.pool.query<{ phone: string | null; name: string }>('select g.phone, st.name from students st join student_guardians sg on sg.student_id = st.id and sg.gets_messages join guardians g on g.id = sg.guardian_id where st.id = $1', [b.studentId])).rows;
+    const grade = b.marks == null ? tx('checked') : (await this.settings.grading(t, { grade: h.yr, subject: h.subject_id })).grade(Math.round((b.marks / h.max_marks) * 100)) || `${b.marks}/${h.max_marks}`;
     await this.messenger.notify(t, 'homework.graded', fam.filter((f) => f.phone).map((f) => ({ to: f.phone!, vars: { student: f.name, subject: h.subject, title: h.title, grade } })));
     return { ok: true };
   }
@@ -495,12 +574,13 @@ export class FamilyService {
     const marks = await t.pool.query<{ subject_id: string; score: string | null; max_marks: number }>(
       'select m.subject_id, m.score, x.max_marks from exam_marks m join exam_subjects x on x.exam_id = m.exam_id and x.subject_id = m.subject_id where m.exam_id = $1 and m.student_id = $2', [examId, studentId]);
     const trend = await t.pool.query<{ exam: string; pct: number }>('select exam, pct from exam_results where student_id = $1 order by exam limit 6', [studentId]);
-    const grading = await this.settings.grading(t);
+    const year = (await t.pool.query<{ grade: number }>('select c.grade from students s join classes c on c.id = s.class_id where s.id = $1', [studentId])).rows[0]?.grade ?? null;
+    const grading = await this.settings.grading(t, { grade: year });
     // The class rank reaches families only when the console says so (results.showRank).
     const rank = (await this.settings.value<boolean>(t, 'results.showRank', false)) ? { rank: row.rank, totalStudents: res.rows.length } : { rank: 0, totalStudents: 0 };
     return {
-      id: `res_${studentId}_${examId}`, examId, studentId, overallPercent: row.pct, grade: row.grade, ...rank,
-      subjects: marks.rows.map((m) => ({ subject: key(m.subject_id), marks: Math.round(Number(m.score ?? 0)), maxMarks: m.max_marks, grade: grading.grade(Math.round((Number(m.score ?? 0) / m.max_marks) * 100)) })),
+      id: `res_${studentId}_${examId}`, examId, studentId, overallPercent: row.pct, grade: row.grade, gpa: row.gpa, ...rank,
+      subjects: marks.rows.map((m) => ({ subject: key(m.subject_id), marks: Math.round(Number(m.score ?? 0)), maxMarks: m.max_marks, grade: grading.of(Math.round((Number(m.score ?? 0) / m.max_marks) * 100), m.subject_id).grade })),
       trend: trend.rows.map((x) => ({ label: x.exam, percent: x.pct })),
     };
   }
@@ -520,22 +600,35 @@ export class FamilyService {
 
   private async openExam(t: TenantCtx, classId: string, subject: string) {
     return (await t.pool.query<{ id: string }>(
-      `select e.id from exams e join exam_subjects x on x.exam_id = e.id where e.class_id = $1 and x.subject_id = $2 and e.status in ('upcoming','marking') order by e.starts_on limit 1`, [classId, `sub_${subject}`])).rows[0];
+      `select e.id, x.max_marks from exams e join exam_subjects x on x.exam_id = e.id where e.class_id = $1 and x.subject_id = $2 and e.status in ('upcoming','marking') order by e.starts_on limit 1`, [classId, `sub_${subject}`])).rows[0] as { id: string; max_marks: number } | undefined;
   }
 
   async marksDraft(t: TenantCtx, user: AuthedUser, classId: string, subject: string) {
     if (!user.permissions.includes('exams.read')) throw forbidden('You are not allowed to see marks.');
+    // The marks so far, and what the open exam marks this subject out of (the school's default before there is one).
     const e = await this.openExam(t, classId, subject);
-    if (!e) return {};
-    const { rows } = await t.pool.query<{ student_id: string; score: string }>('select student_id, score from exam_marks where exam_id = $1 and subject_id = $2 and score is not null', [e.id, `sub_${subject}`]);
-    return Object.fromEntries(rows.map((r) => [r.student_id, Math.round(Number(r.score))]));
+    if (!e) return { marks: {}, maxMarks: await this.settings.value<number>(t, 'exams.defaultMaxMarks', 100), grades: [], gradeMarks: {} };
+    const { rows } = await t.pool.query<{ student_id: string; score: string | null; absent: boolean; grade: string | null }>(
+      'select student_id, score, absent, grade from exam_marks where exam_id = $1 and subject_id = $2', [e.id, `sub_${subject}`]);
+    // A subject the school grades without marks sends its grades to pick from; an absent student is -1, as the app keeps it.
+    const grades = (await this.learning.examSubjects(t, e.id)).find((s) => s.subjectId === `sub_${subject}`)?.grades ?? [];
+    return {
+      marks: Object.fromEntries(rows.filter((r) => r.absent || r.score !== null).map((r) => [r.student_id, r.absent ? -1 : Math.round(Number(r.score))])),
+      maxMarks: e.max_marks, grades,
+      gradeMarks: Object.fromEntries(rows.filter((r) => r.grade).map((r) => [r.student_id, r.grade!])),
+    };
   }
 
-  async saveMarks(t: TenantCtx, user: AuthedUser, classId: string, b: { subject: string; values: Record<string, number> }) {
+  async saveMarks(t: TenantCtx, user: AuthedUser, classId: string, b: { subject: string; values: Record<string, number>; grades?: Record<string, string> }) {
     if (!user.permissions.includes('exams.write')) throw forbidden('You are not allowed to enter marks.');
     const e = await this.openExam(t, classId, b.subject);
     if (!e) throw new ApiError('conflict', 'No exam is open for marks in this subject. Add one under Exams in the admin.');
-    const marks = Object.entries(b.values).map(([studentId, score]) => ({ studentId, subjectId: `sub_${b.subject}`, score, absent: false }));
+    const subjectId = `sub_${b.subject}`;
+    // The app keeps whole marks: one that comes back as the rounded mark already kept (45.5 shown as 46) is not a change.
+    const kept = new Map((await t.pool.query<{ student_id: string; score: string | null }>('select student_id, score from exam_marks where exam_id = $1 and subject_id = $2', [e.id, subjectId])).rows.map((r) => [r.student_id, r.score]));
+    const marks = Object.entries(b.values).filter(([studentId, score]) => { const k = kept.get(studentId); return !(k != null && score >= 0 && Math.round(Number(k)) === score && Number(k) !== score); })
+      .map(([studentId, score]) => (score < 0 ? { studentId, subjectId, score: null, absent: true } : { studentId, subjectId, score, absent: false }));
+    for (const [studentId, grade] of Object.entries(b.grades ?? {})) marks.push({ studentId, subjectId, score: null, absent: false, grade } as (typeof marks)[number]);
     if (marks.length) await this.learning.putMarks(t, user, e.id, { marks });
     return { ok: true };
   }
@@ -551,13 +644,13 @@ export class FamilyService {
          (select paid_on::text from payments p where p.invoice_id = i.id order by paid_on desc limit 1) last, (select method from payments p where p.invoice_id = i.id order by paid_on desc limit 1) method,
          (select coalesce(reference, receipt_no) from payments p where p.invoice_id = i.id order by paid_on desc limit 1) reference
        from fee_invoices i where i.student_id = $1 order by i.due_on, i.id`, [studentId]);
-    const pay = await t.pool.query<{ id: string; invoice_id: string; title: string; amount: number; paid_on: string; method: string; reference: string }>(
-      `select p.id, p.invoice_id, i.title, p.amount, p.paid_on::text, p.method, coalesce(p.reference, p.receipt_no) reference from payments p join fee_invoices i on i.id = p.invoice_id where i.student_id = $1 order by p.paid_on desc, p.id`, [studentId]);
+    const pay = await t.pool.query<{ id: string; invoice_id: string; title: string; amount: number; paid_on: string; method: string; reference: string; receipt_no: string }>(
+      `select p.id, p.invoice_id, i.title, p.amount, p.paid_on::text, p.method, coalesce(p.reference, p.receipt_no) reference, p.receipt_no from payments p join fee_invoices i on i.id = p.invoice_id where i.student_id = $1 order by p.paid_on desc, p.id`, [studentId]);
     const year = (await t.pool.query<{ label: string }>('select label from academic_years where current limit 1')).rows[0]?.label ?? '';
     return {
       studentId, academicYear: year,
       installments: inv.rows.map((i) => { const due = i.amount - i.waived_amount; const paid = Number(i.paid) >= due; return { id: i.id, title: i.title, amount: due, dueDate: i.due_on, paid, ...(paid && i.last ? { paidOn: i.last, method: i.method, reference: i.reference } : {}) }; }),
-      receipts: pay.rows.map((p) => ({ id: p.id, installmentId: p.invoice_id, title: p.title, amount: p.amount, paidOn: p.paid_on, method: p.method, reference: p.reference })),
+      receipts: pay.rows.map((p) => ({ id: p.id, number: p.receipt_no, installmentId: p.invoice_id, title: p.title, amount: p.amount, paidOn: p.paid_on, method: p.method, reference: p.reference })),
     };
   }
 
@@ -572,8 +665,7 @@ export class FamilyService {
   /** The notices this person reads: their own audience and their children's classes; pinned first; read and acknowledged marked. */
   async notices(t: TenantCtx, user: AuthedUser) {
     const w = await this.who(t, user);
-    const classIds = w.children.length ? (await t.pool.query<{ class_id: string }>('select distinct class_id from students where id = any($1)', [w.children])).rows.map((r) => r.class_id) : [];
-    const list = await this.noticesSvc.forReader(t, w.id, classIds, w.kind);
+    const list = await this.noticesSvc.forReader(t, w.id, w.children, w.kind);
     return list.map((n) => ({
       id: n.id, title: n.title, body: n.body, category: n.category, audience: n.audience === 'staff' ? 'teachers' : n.audience, pinned: n.pinned,
       date: (n.publishedAt ?? n.createdAt).slice(0, 10), publishedAt: n.publishedAt, editedAt: n.editedAt, author: n.author,
@@ -615,20 +707,21 @@ export class FamilyService {
   async events(t: TenantCtx, user: AuthedUser) {
     const w = await this.who(t, user);
     const showGoing = await this.settings.value<boolean>(t, 'events.showGoing', false);
-    const { rows } = await t.pool.query<{ id: string; title: string; starts_at: Date; ends_at: Date | null; kind: string; venue: string; note: string; audience: string; category: string; needs_rsvp: boolean; lat: number | null; lng: number | null; going: string; class_id: string | null }>(
-      `select e.id, e.title, e.starts_at, e.ends_at, e.kind, e.venue, e.note, e.audience, e.category, e.needs_rsvp, e.lat, e.lng, e.class_id,
+    const { rows } = await t.pool.query<{ id: string; title: string; starts_at: Date; ends_at: Date | null; kind: string; venue: string; note: string; audience: string; category: string; needs_rsvp: boolean; lat: number | null; lng: number | null; going: string; class_id: string | null; rsvp_by: string | null }>(
+      `select e.id, e.title, e.starts_at, e.ends_at, e.kind, e.venue, e.note, e.audience, e.category, e.needs_rsvp, e.lat, e.lng, e.class_id, e.rsvp_by::text,
          (select count(*) from event_rsvps r where r.event_id = e.id and r.status = 'going') going
        from events e where e.kind not in ('routine','cover') order by e.starts_at limit 150`);
     // A class's own event reaches only the families (and students) of that class.
     const classes = w.children.length ? (await t.pool.query<{ class_id: string }>('select distinct class_id from students where id = any($1)', [w.children])).rows.map((r) => r.class_id) : [];
     const mine = w.children.length ? await t.pool.query<{ event_id: string; student_id: string; status: string; adults: number }>('select event_id, student_id, status, adults from event_rsvps where student_id = any($1)', [w.children]) : { rows: [] as { event_id: string; student_id: string; status: string; adults: number }[] };
-    const ist = (d: Date) => new Date(d.getTime() + 330 * 60_000).toISOString();
+    // The event's day and time on the school's clock.
+    const ist = (d: Date) => schoolNow(d).toISOString();
     return rows.filter((e) => w.kind === 'staff' || (e.audience !== 'staff' && (e.audience !== 'class' || classes.includes(e.class_id ?? '')))).map((e) => {
-      const replies = mine.rows.filter((m) => m.event_id === e.id);
+      const replies = mine.rows.filter((m) => m.event_id === e.id).sort((x, y) => w.children.indexOf(x.student_id) - w.children.indexOf(y.student_id));
       return {
         id: e.id, title: e.title, description: e.note, date: ist(e.starts_at).slice(0, 10), time: ist(e.starts_at).slice(11, 16), endTime: e.ends_at ? ist(e.ends_at).slice(11, 16) : null,
         endDate: e.ends_at ? ist(e.ends_at).slice(0, 10) : null, venue: e.venue, lat: e.lat, lng: e.lng, kind: e.kind, category: e.category || e.kind, imageUrl: '',
-        needsRsvp: e.needs_rsvp && w.kind !== 'staff', going: showGoing ? Number(e.going) : null,
+        needsRsvp: e.needs_rsvp && w.kind !== 'staff', rsvpBy: e.rsvp_by, going: showGoing ? Number(e.going) : null,
         rsvps: replies.map((r) => ({ userId: w.id, studentId: r.student_id, status: r.status, adults: r.adults })),
       };
     });
@@ -638,11 +731,47 @@ export class FamilyService {
   async rsvp(t: TenantCtx, user: AuthedUser, eventId: string, status: string, studentIds?: string[], adults = 0) {
     const w = await this.who(t, user);
     if (!['going', 'maybe', 'cant'].includes(status)) throw new ApiError('validation', 'Choose going, maybe or cannot come.');
-    const e = (await t.pool.query<{ needs_rsvp: boolean }>('select needs_rsvp from events where id = $1', [eventId])).rows[0];
-    if (!e) throw notFound('That event');
-    if (!e.needs_rsvp) throw new ApiError('conflict', 'This event does not ask for a reply.');
-    const who = studentIds?.length ? studentIds.filter((s) => w.children.includes(s)) : w.children;
-    for (const s of who) await t.pool.query('insert into event_rsvps (event_id, student_id, status, adults) values ($1,$2,$3,$4) on conflict (event_id, student_id) do update set status = excluded.status, adults = excluded.adults', [eventId, s, status, status === 'going' ? adults : 0]);
+    if (!Number.isInteger(adults) || adults < 0) throw new ApiError('validation', tx('Say how many grown-ups are coming.'));
+    const client = await t.pool.connect();
+    try {
+      await client.query('begin');
+      // Locked, so two families taking the last places cannot both get in.
+      const e = (await client.query<{ needs_rsvp: boolean; starts_at: Date; audience: string; class_id: string | null; rsvp_by: string | null; max_adults: number | null; capacity: number | null }>(
+        "select needs_rsvp, starts_at, audience, class_id, rsvp_by::text, max_adults, capacity from events where id = $1 and kind not in ('routine','cover') for update", [eventId])).rows[0];
+      if (!e) throw notFound('That event');
+      if (!e.needs_rsvp || e.audience === 'staff') throw new ApiError('conflict', tx('This event does not ask for a reply.'));
+      // Only the family's own children, and for a class's event only those in that class.
+      const mine = studentIds?.length ? studentIds.filter((s) => w.children.includes(s)) : w.children;
+      const who = e.class_id ? (await client.query<{ id: string }>('select id from students where id = any($1) and class_id = $2', [mine, e.class_id])).rows.map((r) => r.id) : mine;
+      if (!who.length) throw new ApiError('forbidden', tx('This event is not for your children.'));
+      const today = schoolToday();
+      if (schoolToday(e.starts_at) < today || (e.rsvp_by && e.rsvp_by < today)) throw new ApiError('conflict', tx('Replies for this event have closed.'));
+      if (status === 'going' && e.max_adults !== null && adults > e.max_adults) {
+        throw new ApiError('validation', tx('Up to {n} grown-ups can come with each family.', { n: e.max_adults }), { fields: { adults: tx('Up to {n}.', { n: e.max_adults }) } });
+      }
+      if (status === 'going' && e.capacity !== null) {
+        // The places others hold; this family's own replies are being replaced.
+        const others = Number((await client.query<{ n: string }>("select count(*) n from event_rsvps where event_id = $1 and status = 'going' and not (student_id = any($2))", [eventId, who])).rows[0]!.n);
+        if (others + who.length > e.capacity) {
+          const left = Math.max(0, e.capacity - others);
+          throw new ApiError('conflict', left ? tx('Only {n} places are left.', { n: left }) : tx('This event is full.'));
+        }
+      }
+      for (const s of who) {
+        await client.query('insert into event_rsvps (event_id, student_id, status, adults) values ($1,$2,$3,0) on conflict (event_id, student_id) do update set status = excluded.status, adults = 0', [eventId, s, status]);
+      }
+      // Grown-ups are per family, not per child: kept on one going child so the event's total counts them once.
+      if (status === 'going') {
+        await client.query('update event_rsvps set adults = 0 where event_id = $1 and student_id = any($2)', [eventId, w.children]);
+        await client.query('update event_rsvps set adults = $3 where event_id = $1 and student_id = $2', [eventId, who[0], adults]);
+      }
+      await client.query('commit');
+    } catch (err) {
+      await client.query('rollback').catch(() => undefined);
+      throw err;
+    } finally {
+      client.release();
+    }
     return { ok: true };
   }
 
@@ -747,7 +876,10 @@ export class FamilyService {
        join users u on u.kind = 'staff' and u.status = 'active' and (u.id = c.class_teacher_id or u.id in (select tt.teacher_id from timetable_slots tt where tt.class_id = c.id))
        left join timetable_slots tts on tts.class_id = c.id and tts.teacher_id = u.id left join subjects sub on sub.id = tts.subject_id
        where s.id = any($1) group by u.id, u.name order by bool_or(c.class_teacher_id = u.id) desc, u.name`, [w.children.length ? w.children : ['none']]);
-    return rows.map((r) => ({ id: r.id, name: r.name, subject: r.subject ?? '', classTeacher: r.class_teacher }));
+    // The school's rule for who families (or students) may write to: class teachers, subject teachers, or both.
+    const may = await this.settings.value<string[]>(t, w.kind === 'student' ? 'chat.studentsWriteTo' : 'chat.familiesWriteTo', ['classTeacher', 'subjectTeachers']);
+    return rows.filter((r) => (r.class_teacher && may.includes('classTeacher')) || (!!r.subject && may.includes('subjectTeachers')))
+      .map((r) => ({ id: r.id, name: r.name, subject: r.subject ?? '', classTeacher: r.class_teacher }));
   }
 
   async startThread(t: TenantCtx, user: AuthedUser, teacherId: string) {
@@ -784,10 +916,10 @@ export class FamilyService {
       const mine = open.find((l) => l.bookId === b.id);
       return {
         id: b.id, title: b.title, author: b.author, category: b.category, isbn: b.isbn, available: b.copies - b.out > 0, waiting: b.waiting, coverUrl: '',
-        ...(mine ? { borrowedBy: mine.studentId ?? w.id, dueDate: mine.dueOn, loanId: mine.id, fine: mine.fine, overdueDays: mine.overdueDays, renewalsLeft: Math.max(0, rules.maxRenewals - mine.renewals) } : {}),
+        ...(mine ? { borrowedBy: mine.studentId ?? w.id, dueDate: mine.dueOn, loanId: mine.id, fine: mine.fine, overdueDays: mine.overdueDays, renewalsLeft: Math.max(0, mine.maxRenewals - mine.renewals) } : {}),
       };
     });
-    const legacy = open.filter((l) => !l.bookId).map((l) => ({ id: l.id, title: l.title, author: '', category: 'Library', isbn: '', available: false, waiting: 0, coverUrl: '', borrowedBy: l.studentId ?? w.id, dueDate: l.dueOn, loanId: l.id, fine: l.fine, overdueDays: l.overdueDays, renewalsLeft: Math.max(0, rules.maxRenewals - l.renewals) }));
+    const legacy = open.filter((l) => !l.bookId).map((l) => ({ id: l.id, title: l.title, author: '', category: 'Library', isbn: '', available: false, waiting: 0, coverUrl: '', borrowedBy: l.studentId ?? w.id, dueDate: l.dueOn, loanId: l.id, fine: l.fine, overdueDays: l.overdueDays, renewalsLeft: Math.max(0, l.maxRenewals - l.renewals) }));
     const reservations = w.children.length ? await this.library.reservations(t, w.children) : [];
     return {
       books: [...legacy, ...catalogue],
@@ -820,25 +952,35 @@ export class FamilyService {
     const classes = w.kind === 'staff' ? undefined : (await t.pool.query<{ class_id: string }>('select distinct class_id from students where id = any($1)', [w.children])).rows.map((r) => r.class_id);
     const albums = (await this.gallerySvc.albums(t, classes)).filter((a) => a.published);
     const cfg = await this.settings.effective(t);
+    // Each album under the school's own academic year (they start in any month).
+    const years = (await t.pool.query<{ label: string; s: string; e: string }>('select label, starts_on::text s, ends_on::text e from academic_years')).rows;
     const out = [];
     for (const a of albums) {
       const photos = await this.gallerySvc.photos(t, a.id, w.kind !== 'staff');
       const shown = [];
-      for (const p of photos) shown.push({ id: p.id, url: await this.files.url(t, user, p.id).catch(() => ''), caption: p.name.replace(/\.[^.]+$/, ''), tagged: p.students.map((s) => s.id) });
-      out.push({ id: a.id, title: a.title, date: a.createdAt, blurb: a.className ?? 'Whole school', photos: shown.filter((p) => p.url), downloads: cfg.features.includes('gallery.downloads') });
+      for (const p of photos) shown.push({ id: p.id, url: await this.files.url(t, user, p.id).catch(() => ''), thumbUrl: await this.files.thumbUrl(t, user, p).catch(() => ''), caption: p.name.replace(/\.[^.]+$/, ''), tagged: p.students.map((s) => s.id) });
+      const day = a.createdAt.slice(0, 10);
+      out.push({ id: a.id, title: a.title, date: a.createdAt, blurb: a.className ?? tx('Whole school'), photos: shown.filter((p) => p.url), downloads: cfg.features.includes('gallery.downloads'),
+        yearLabel: years.find((y) => y.s <= day && day <= y.e)?.label ?? '' });
     }
     return out.filter((a) => a.photos.length);
   }
 
-  private leaveJson(r: { id: string; status: string; payload: Record<string, unknown>; created_at: Date; subject_ref: string | null }) {
+  private async leaveReasons(t: TenantCtx): Promise<ListItem[]> {
+    const read = SchoolSettingsSchema.shape['leave.reasons'].safeParse(await this.settings.value<unknown>(t, 'leave.reasons', undefined));
+    return read.success ? read.data : DEFAULT_LEAVE_REASONS;
+  }
+
+  private leaveJson(r: { id: string; status: string; payload: Record<string, unknown>; created_at: Date; subject_ref: string | null }, reasons: ListItem[] = []) {
     const p = r.payload;
-    return { id: r.id, studentId: String(p.studentId ?? r.subject_ref ?? ''), from: String(p.from ?? ''), to: String(p.to ?? ''), reason: String(p.reason ?? ''), status: r.status, appliedOn: r.created_at.toISOString().slice(0, 10), ...(p.reviewer ? { reviewedBy: String(p.reviewer) } : {}), ...(p.reviewNote ? { reviewNote: String(p.reviewNote) } : {}) };
+    return { id: r.id, studentId: String(p.studentId ?? r.subject_ref ?? ''), from: String(p.from ?? ''), to: String(p.to ?? ''), reason: listLabel(reasons, String(p.reason ?? ''), schoolContext.getStore()?.lang ?? 'en'), status: r.status, appliedOn: r.created_at.toISOString().slice(0, 10), ...(p.reviewer ? { reviewedBy: String(p.reviewer) } : {}), ...(p.reviewNote ? { reviewNote: String(p.reviewNote) } : {}) };
   }
 
   async leave(t: TenantCtx, user: AuthedUser, studentId: string) {
     await this.mayStudent(await this.who(t, user), studentId, t);
     const { rows } = await t.pool.query("select id, status, payload, created_at, subject_ref from approvals where kind = 'leave' and payload->>'studentLeave' = 'true' and payload->>'studentId' = $1 order by created_at desc", [studentId]);
-    return rows.map((r) => this.leaveJson(r));
+    const reasons = await this.leaveReasons(t);
+    return rows.map((r) => this.leaveJson(r, reasons));
   }
 
   /** A parent asks for leave for one child: whole days, or half of one day. It goes to the class teacher and the approvals queue. */
@@ -849,6 +991,7 @@ export class FamilyService {
     const s = (await t.pool.query<{ name: string }>('select name from students where id = $1', [b.studentId])).rows[0];
     if (!s) throw notFound('That student');
     const leave = await this.checkLeave(t, b);
+    await checkLeaveClash(t.pool, b.studentId, leave.from, leave.to, b.halfDay);
     const id = newId('apr');
     await t.pool.query("insert into approvals (id, kind, title, subtitle, requester_name, requested_by, subject_ref, payload) values ($1,'leave',$2,$3,$4,$5,$6,$7)",
       [id, `Leave for ${s.name}`, leave.subtitle, user.name, user.id, b.studentId, JSON.stringify({ studentLeave: true, studentId: b.studentId, from: leave.from, to: leave.to, halfDay: b.halfDay ?? null, reason: b.reason, note: b.note ?? '', fileIds: b.fileIds ?? [] })]);
@@ -860,10 +1003,13 @@ export class FamilyService {
     const from = b.from.slice(0, 10);
     const to = b.halfDay ? from : b.to.slice(0, 10);
     if (to < from) throw new ApiError('validation', 'The last day cannot be before the first day.');
-    const reasons = await this.settings.value<string[]>(t, 'leave.reasons', []);
-    if (reasons.length && !reasons.includes(b.reason)) throw new ApiError('validation', 'Choose one of the school’s reasons.', { fields: { reason: 'Choose one of the reasons.' } });
+    // A reason is one of the school's, by its key or its name in any language; it is kept by its key.
+    const reasons = await this.leaveReasons(t);
+    const key = listKey(listOptions(reasons), b.reason);
+    if (reasons.length && !key) throw new ApiError('validation', tx('Choose one of the school’s reasons.'), { fields: { reason: tx('Choose one of the reasons.') } });
+    if (key) b.reason = key;
     const when = b.halfDay ? `${from}, ${b.halfDay === 'am' ? 'morning' : 'afternoon'} only` : from === to ? from : `${from} to ${to}`;
-    return { from, to, subtitle: `${when} · ${b.reason.slice(0, 60)}` };
+    return { from, to, subtitle: `${when} · ${listLabel(reasons, b.reason).slice(0, 60)}` };
   }
 
   /** A request still waiting can be corrected or withdrawn by the parent who sent it; once answered it is the school's record. */
@@ -892,11 +1038,10 @@ export class FamilyService {
   async reviewLeave(t: TenantCtx, user: AuthedUser, id: string, b: { status: string; note?: string }) {
     const row = (await t.pool.query<{ payload: Record<string, unknown>; subject_ref: string | null; status: string }>("select payload, subject_ref, status from approvals where id = $1 and kind = 'leave' and payload->>'studentLeave' = 'true'", [id])).rows[0];
     if (!row) throw notFound('That request');
-    const isClassTeacher = (await t.pool.query('select 1 from students s join classes c on c.id = s.class_id where s.id = $1 and c.class_teacher_id = $2', [row.subject_ref, user.id])).rowCount;
-    if (!isClassTeacher && !user.permissions.includes('approvals.decide')) throw forbidden('Only the class teacher can decide this.');
     if (b.status !== 'approved' && b.status !== 'rejected') throw new ApiError('validation', 'Choose approved or rejected.');
-    await t.pool.query('update approvals set status = $2, decided_by = $3, decided_at = now(), payload = $4 where id = $1', [id, b.status, user.id, JSON.stringify({ ...row.payload, reviewer: user.name, reviewNote: b.note ?? '' })]);
-    await this.approvals.tellLeave(t, row, b.status);
+    // The school's steps decide who takes it (ApprovalsService.takes: the class teacher may decide a child's leave by default).
+    const r = await this.approvals.decide(t, user, id, { decision: b.status === 'approved' ? 'approve' : 'reject', note: b.note });
+    if (r.status !== 'pending') await t.pool.query('update approvals set payload = payload || $2 where id = $1', [id, JSON.stringify({ reviewer: user.name, reviewNote: b.note ?? '' })]);
     return { ok: true };
   }
 
