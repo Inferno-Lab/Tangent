@@ -4,6 +4,12 @@ import 'package:get_storage/get_storage.dart';
 
 abstract final class StorageKeys {
   static const themeMode = 'themeMode';
+  /// The school's name, look and privacy notice from its last answer, for a start without a connection.
+  static const schoolProfile = 'schoolProfile';
+
+  /// Crash reports that could not be sent yet (at most twenty), sent with the next one that can.
+  static const errorQueue = 'errorQueue';
+
   static const palette = 'palette';
   static const textScale = 'textScale';
   static const welcomeSeen = 'welcomeSeen';
