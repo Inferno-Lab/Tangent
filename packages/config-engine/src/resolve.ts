@@ -50,9 +50,9 @@ export function resolveConfig({ settings, entitlement, audience, flags, live = t
   }
 
   const entitled = activeModules(entitlement);
-  // A console kill switch (`kill.<module>`) takes a module away from every app until it is lifted.
+  // A console kill switch (`kill.<module>` or `kill.<feature>`) takes it away from every app until it is lifted.
   const enabled = entitled.filter((k) => flags?.[`kill.${k}`] !== true);
-  const features = activeFeatures(entitlement, enabled);
+  const features = activeFeatures(entitlement, enabled).filter((k) => flags?.[`kill.${k}`] !== true);
   const has = { modules: enabled, features };
   const str = (k: string, fallback = '') => (typeof merged[k] === 'string' ? (merged[k] as string) : fallback);
   const lang = str('school.language', 'en');

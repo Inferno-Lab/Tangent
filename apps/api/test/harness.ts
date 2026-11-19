@@ -36,6 +36,8 @@ export async function startHarness(port?: number): Promise<Harness> {
   const regUrl = await ensureDatabase(server.url, 'registry');
   const registry = new pg.Pool({ connectionString: regUrl, max: 4 });
   await migrate(registry, 'registry');
+  // The tests exercise every module, so the fleet pauses a migration ships with are lifted here.
+  await registry.query("delete from flags where key like 'kill.%'");
   await registry.query("insert into cells (key, target, region, max_schools) values ('local-1','local','local',50)");
   for (const p of DEFAULT_PLANS) await registry.query('insert into plans (key, name, per_student_year, modules, limits) values ($1,$2,$3,$4,$5)', [p.key, p.name, p.perStudentYear, JSON.stringify(p.modules), JSON.stringify(p.limits)]);
   const demoHash = await hashPassword('nest2026');

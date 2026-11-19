@@ -103,7 +103,7 @@ function Schools({ say }: { say: Say }) { const app = useApp();
   const [find, setFind] = useState('');
   const [plan, setPlan] = useState('');
   const [focus, setFocus] = useState('');
-  const [pausing, setPausing] = useState<Mod | null>(null);
+  const [pausing, setPausing] = useState<Pick<Mod, 'key' | 'name'> | null>(null);
   const can = app.can('schools.write');
   const mods = (cat.data?.modules ?? []).filter((m) => m.state !== 'planned' && !m.core);
   const focused = mods.find((m) => m.key === focus);
@@ -181,7 +181,10 @@ function Schools({ say }: { say: Say }) { const app = useApp();
               {cols.length === 0 && <span role="columnheader" className="help" style={{ margin: 0, padding: 16 }}>{t('console.modules_page.no_features_to_choose')}</span>}
               {cols.map((c) => (
                 <span key={c.key} role="columnheader" style={{ padding: '10px 4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {c.feature ? <span className="help" style={{ margin: 0, fontWeight: 700, textAlign: 'center', lineHeight: 1.25 }}>{c.name}</span>
+                  {c.feature ? <span className="vc" style={{ alignItems: 'center', gap: 4 }}>
+                      <span className="help" style={{ margin: 0, fontWeight: 700, textAlign: 'center', lineHeight: 1.25, color: paused(c.key) ? 'var(--bad-i)' : undefined }}>{c.name}{paused(c.key) ? t('console.modules_page.paused') : ''}</span>
+                      {app.can('flags.write') && (paused(c.key) ? <button className="btn sm" disabled={lift.isPending} onClick={() => lift.mutate(c.key)}>{t('console.modules_page.lift_the_pause')}</button> : <button className="btn sm dng" onClick={() => setPausing({ key: c.key, name: c.name })}>{t('console.modules_page.pause')}</button>)}
+                    </span>
                     : <button className="vc" style={{ alignItems: 'center', gap: 6, font: '600 12px/16px var(--fb)', color: paused(c.key) ? 'var(--bad-i)' : 'var(--ink2)', textAlign: 'center' }} data-tip={paused(c.key) ? t('console.modules_page.paused_for_every_school_open') : t('console.modules_page.open_its_features')} onClick={() => setFocus(c.key)}><Icon name={modIcon(c.key)} className="i" />{c.name}{paused(c.key) ? t('console.modules_page.paused') : ''}</button>}
                 </span>
               ))}
@@ -195,7 +198,7 @@ function Schools({ say }: { say: Say }) { const app = useApp();
                   <a href={url(`/schools/${r.id}/plan`)} onClick={(e) => { e.preventDefault(); app.go(`/schools/${r.id}/plan`); }} style={{ font: '700 14px var(--fb)', color: 'inherit', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</a>
                   <small style={{ color: 'var(--ink3)' }}>{r.plan}{r.trialUntil ? t('console.modules_page.trial_until', { trialUntil: r.trialUntil }) : ''}</small>
                 </span>
-                {cols.map((c) => <span key={c.key} role="cell" style={{ padding: '12px 4px', borderTop: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{dot(has(r, c.key, c.feature), c.feature ? undefined : r.dates[c.key]?.until, !c.feature && paused(c.key, r.id))}</span>)}
+                {cols.map((c) => <span key={c.key} role="cell" style={{ padding: '12px 4px', borderTop: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{dot(has(r, c.key, c.feature), c.feature ? undefined : r.dates[c.key]?.until, paused(c.key, r.id))}</span>)}
               </div>
             ))}
           </div>
@@ -207,7 +210,7 @@ function Schools({ say }: { say: Say }) { const app = useApp();
 }
 
 /** A pause takes a module away from the apps and refuses its requests within seconds, for every school or one; the data is kept. */
-function PauseDialog({ mod, onClose, onDone }: { mod: Mod; onClose: () => void; onDone: (m: string) => void }) { const app = useApp();
+function PauseDialog({ mod, onClose, onDone }: { mod: Pick<Mod, 'key' | 'name'>; onClose: () => void; onDone: (m: string) => void }) { const app = useApp();
   const schools = useQuery({ queryKey: ['schools'], queryFn: () => app.api.schools() });
   const [school, setSchool] = useState('');
   const go = useMutation({ mutationFn: () => app.api.flags.set(`kill.${mod.key}`, { enabled: true, schoolId: school || null, label: t('console.modules_page.paused_2', { name: mod.name }) }),

@@ -79,7 +79,7 @@ export class PermissionsGuard implements CanActivate {
       if (!feature && !moduleByKey(mod)) throw new Error(`Unknown module or feature ${mod}`);
       // The same resolved configuration the admin and the app read: plan, dates, the console's choice and kill switches.
       const cfg = await this.settings.effective(req.tenant);
-      if (req.tenant.info.flags[`kill.${module}`] === true) throw new ApiError('locked', 'Tangent has paused this feature for now. It will be back shortly.');
+      if (req.tenant.info.flags[`kill.${module}`] === true || (feature && req.tenant.info.flags[`kill.${mod}`] === true)) throw new ApiError('locked', 'Tangent has paused this feature for now. It will be back shortly.');
       if (!cfg.modules.includes(module) || (feature && !cfg.features.includes(mod))) throw new ApiError('locked', 'This feature is not part of your school’s plan.');
     }
     if (needed?.length) {
