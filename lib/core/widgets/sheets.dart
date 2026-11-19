@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:tangent/core/theme/app_colors.dart';
@@ -21,7 +23,7 @@ Future<T?> showSheet<T>(Widget child, {bool dismissible = true}) {
   );
 }
 
-class SheetBody extends StatelessWidget {
+class SheetBody extends StatefulWidget {
   const SheetBody({required this.child, this.padding = const EdgeInsets.fromLTRB(20, 0, 20, 0), this.footer, super.key});
 
   final Widget child;
@@ -30,35 +32,71 @@ class SheetBody extends StatelessWidget {
   /// Stays in view under the scrolling [child] (the actions of a step the person must answer).
   final Widget? footer;
 
+  static final _open = <GlobalKey<FormState>>[];
+
+  /// Checks every field of the sheet on top (each shows what is wrong under it): call before sending what it holds.
+  static bool valid() => _open.isEmpty || (_open.last.currentState?.validate() ?? true);
+
+  @override
+  State<SheetBody> createState() => _SheetBodyState();
+}
+
+class _SheetBodyState extends State<SheetBody> {
+  // Each sheet is a form, so its fields' validators run and show their message, and stay checked as they change.
+  final _form = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    super.initState();
+    SheetBody._open.add(_form);
+  }
+
+  @override
+  void dispose() {
+    SheetBody._open.remove(_form);
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final child = widget.child;
+    final padding = widget.padding;
+    final footer = widget.footer;
     final inset = MediaQuery.viewInsetsOf(context).bottom;
     final safe = MediaQuery.paddingOf(context).bottom;
     return Padding(
       padding: EdgeInsets.only(bottom: inset),
       child: Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .9),
+        // Above the keyboard the sheet keeps below the status bar and scrolls its fields, instead of growing past the
+        // top of the screen and being cut off.
+        constraints: BoxConstraints(
+          maxHeight: math.min(MediaQuery.sizeOf(context).height * .9, MediaQuery.sizeOf(context).height - inset - MediaQuery.paddingOf(context).top - 16),
+        ),
         decoration: BoxDecoration(
           color: context.app.paper,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
           boxShadow: [BoxShadow(color: AppColors.light.ink.withValues(alpha: 0.2), blurRadius: 40, offset: const Offset(0, -12))],
         ),
-        child: SafeArea(
-          top: false,
-          minimum: EdgeInsets.only(bottom: safe > 0 ? 0 : 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Grab(),
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: padding,
-                  child: child,
+        child: Form(
+          key: _form,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
+          child: SafeArea(
+            top: false,
+            minimum: EdgeInsets.only(bottom: safe > 0 ? 0 : 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Grab(),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: padding,
+                    child: child,
+                  ),
                 ),
-              ),
-              if (footer != null) Padding(padding: const EdgeInsets.fromLTRB(24, 12, 24, 16), child: footer),
-            ],
+                if (footer != null) Padding(padding: const EdgeInsets.fromLTRB(24, 12, 24, 16), child: footer),
+              ],
+            ),
           ),
         ),
       ),

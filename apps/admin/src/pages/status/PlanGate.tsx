@@ -19,6 +19,8 @@ export function PlanGate({ children }: { children: ReactNode }) {
   const page = pageForPath(path);
   const shell = useQuery({ queryKey: ['shell'], queryFn: app.api.shell, staleTime: 30_000, enabled: !!page });
   const d = shell.data;
+  // Until the menu is known a page is not drawn: a module paused or taken away would otherwise ask the server first.
+  if (page && !d && !shell.isError) return <main className="mn"><div className="skc" style={{ height: 320, borderRadius: 24 }} /></main>;
   if (!page || !d || d.menu.some((g) => g.pages.some((x) => x.id === page.id))) return <>{children}</>;
   const need = moduleForPath(path);
   if (need && !d.modules.includes(need) && !d.features.includes(need)) return <NotInPlan area={page.label} />;

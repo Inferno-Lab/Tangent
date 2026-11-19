@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -111,7 +112,25 @@ class _DashboardViewState extends State<DashboardView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const OfflineCapsule(),
-                        if (hasDay) Padding(padding: const EdgeInsets.only(bottom: 16), child: PeriodStrip(periods: data.periods)),
+                        if (hasDay)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: PeriodStrip(
+                              periods: data.periods,
+                              picked: _scrub == null ? null : data.periods.firstWhereOrNull((p) => minutesOf(p.start) <= _scrub! && _scrub! < minutesOf(p.end)),
+                              // A child's lesson opens the timetable; a student's own shows in the Now card (again
+                              // on the lesson on now, to come back to now).
+                              onPick: parent || wide
+                                  ? (_) => Get.toNamed<void>(AppRoutes.timetable)
+                                  : (p) => setState(() {
+                                      final a = minutesOf(p.start);
+                                      final on = nowMinutes() >= a && nowMinutes() < minutesOf(p.end);
+                                      // A few minutes in: the Now card reads the minute right after a lesson as the one before.
+                                      final at = math.min(a + 3, minutesOf(p.end) - 1);
+                                      _scrub = on || _scrub == at ? null : at;
+                                    }),
+                            ),
+                          ),
                         ViewStateView(
                           state: controller.state.value,
                           onRetry: controller.load,
@@ -139,55 +158,142 @@ class _DashboardViewState extends State<DashboardView> {
   }
 }
 
-/// Today's lessons as a strip of subject cards in their spectrum colours, the one on now outlined (the ParentHome board).
-class PeriodStrip extends StatelessWidget {
-  const PeriodStrip({required this.periods, this.label, super.key});
+/// Today's lessons on a time line (the old day ribbon's idea in Hue's cards): each lesson a block as long as it lasts, in
+/// its subject's colour, breaks as quiet gaps, a line at now, the times beneath. It scrolls to now on its own; tapping a
+/// lesson calls [onPick].
+class PeriodStrip extends StatefulWidget {
+  const PeriodStrip({required this.periods, this.label, this.onPick, this.picked, super.key});
 
   final List<PeriodSlot> periods;
 
-  /// What a card says: the subject by default, a class for a teacher.
+  /// What a block says: the subject by default, a class for a teacher.
   final String Function(PeriodSlot)? label;
+  final ValueChanged<PeriodSlot>? onPick;
+
+  /// The lesson the person is looking at, when it is not the one on now.
+  final PeriodSlot? picked;
+
+  @override
+  State<PeriodStrip> createState() => _PeriodStripState();
+}
+
+class _PeriodStripState extends State<PeriodStrip> {
+  final _scroll = ScrollController();
+
+  // Long enough that a 30-minute lesson holds a subject name on two lines.
+  static const _perMinute = 3.0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _toNow());
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _toNow() {
+    if (!mounted || !_scroll.hasClients || widget.periods.isEmpty) return;
+    final at = (nowMinutes() - minutesOf(widget.periods.first.start)) * _perMinute - 48;
+    _scroll.jumpTo(at.clamp(0, _scroll.position.maxScrollExtent));
+  }
 
   @override
   Widget build(BuildContext context) {
+    final c = context.app;
+    final periods = widget.periods;
+    if (periods.every((p) => p.kind != PeriodKind.klass)) return const SizedBox.shrink();
     final now = nowMinutes();
-    final lessons = periods.where((p) => p.kind == PeriodKind.klass).toList();
+    final start = minutesOf(periods.first.start);
+    final end = minutesOf(periods.last.end);
+    double x(int minute) => (minute - start) * _perMinute;
+    final onNow = now >= start && now < end;
     return SizedBox(
-      height: 64,
-      child: ListView.separated(
+      height: 92,
+      child: SingleChildScrollView(
+        controller: _scroll,
         scrollDirection: Axis.horizontal,
-        itemCount: lessons.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          final p = lessons[i];
-          final col = context.app.subjectFor(p.subject);
-          final on = now >= minutesOf(p.start) && now < minutesOf(p.end);
-          return Container(
-            width: 112,
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-            decoration: BoxDecoration(color: col.soft, borderRadius: BorderRadius.circular(AppRadius.md)),
-            // The outline of the lesson on now is drawn over the card, so it never changes the card's size.
-            foregroundDecoration: on
-                ? BoxDecoration(borderRadius: BorderRadius.circular(AppRadius.md), border: Border.all(color: col.ink, width: 2))
-                : null,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label?.call(p) ?? subjectName(p.subject), maxLines: 1, overflow: TextOverflow.ellipsis, style: context.type.ts.copyWith(color: col.ink)),
-                const SizedBox(height: 2),
-                Text(
-                  on ? '${'home.now'.tr} · ${clockOf(minutesOf(p.start))}' : clockOf(minutesOf(p.start)),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.type.cap.copyWith(color: col.ink),
+        physics: const BouncingScrollPhysics(),
+        child: SizedBox(
+          width: x(end),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              for (final p in periods)
+                Positioned(
+                  left: x(minutesOf(p.start)),
+                  width: math.max(0, x(minutesOf(p.end)) - x(minutesOf(p.start)) - 4),
+                  top: 0,
+                  height: 64,
+                  child: p.kind == PeriodKind.klass ? _lesson(context, p, now) : _gap(context),
                 ),
-              ],
-            ),
-          );
-        },
+              for (final p in periods)
+                if (p.kind == PeriodKind.klass)
+                  Positioned(
+                    left: x(minutesOf(p.start)),
+                    top: 70,
+                    // Clear of the now mark when it sits on this lesson's start.
+                    child: Padding(
+                      padding: EdgeInsets.only(left: onNow && (now - minutesOf(p.start)).abs() * _perMinute < 12 ? 14 : 0),
+                      child: Text(clockOf(minutesOf(p.start)), style: context.type.cap.copyWith(color: c.ink3)),
+                    ),
+                  ),
+              // Now is marked on the time scale, under the blocks, so it never runs through a lesson's name.
+              if (onNow)
+                Positioned(
+                  left: x(now) - 5,
+                  top: 64,
+                  width: 10,
+                  height: 26,
+                  child: IgnorePointer(
+                    child: Column(
+                      children: [
+                        Container(width: 2, height: 14, color: c.ink),
+                        Container(width: 10, height: 10, decoration: BoxDecoration(color: c.ink, shape: BoxShape.circle)),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
+
+  Widget _lesson(BuildContext context, PeriodSlot p, int now) {
+    final col = context.app.subjectFor(p.subject);
+    final a = minutesOf(p.start);
+    final b = minutesOf(p.end);
+    final on = widget.picked == null ? now >= a && now < b : widget.picked!.id == p.id;
+    final past = now >= b && !on;
+    final name = widget.label?.call(p) ?? subjectName(p.subject);
+    return Pressable(
+      onTap: widget.onPick == null ? null : () => widget.onPick!(p),
+      label: '$name · ${clockOf(a)} – ${clockOf(b)}',
+      child: Opacity(
+        opacity: past ? .55 : 1,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+          decoration: BoxDecoration(color: col.soft, borderRadius: BorderRadius.circular(AppRadius.md)),
+          // The outline of the lesson on now is drawn over the block, so it never changes its size.
+          foregroundDecoration: on
+              ? BoxDecoration(borderRadius: BorderRadius.circular(AppRadius.md), border: Border.all(color: col.ink, width: 2))
+              : null,
+          alignment: Alignment.topLeft,
+          child: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: context.type.ts.copyWith(color: col.ink, height: 1.2)),
+        ),
+      ),
+    );
+  }
+
+  Widget _gap(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(color: context.app.paper2, borderRadius: BorderRadius.circular(AppRadius.md)),
+    child: Center(child: Icon(PhosphorIconsRegular.coffee, size: 16, color: context.app.ink3)),
+  );
 }
 
 class _ProfileCapsule extends StatelessWidget {
@@ -298,6 +404,7 @@ class _StudentBody extends StatelessWidget {
           ),
           for (final (i, w) in homeSections(data).indexed) Rise(index: 3 + i, child: w),
         ],
+        const Rise(index: 8, child: SchoolLinks('school', title: 'home.around_school')),
       ],
     );
   }
@@ -349,6 +456,7 @@ class _ParentBody extends StatelessWidget {
             ],
           ).indexed)
             Rise(index: 3 + i, child: w),
+        const Rise(index: 8, child: SchoolLinks('school', title: 'home.around_school')),
       ],
     );
   }

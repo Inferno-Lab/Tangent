@@ -257,6 +257,7 @@ class MarkAttendanceController extends GetxController with Loadable {
 }
 
 class AssignHomeworkController extends GetxController {
+  final form = GlobalKey<FormState>();
   final title = TextEditingController();
   final body = TextEditingController();
   final classId = RxnString();
@@ -343,6 +344,7 @@ class AssignHomeworkController extends GetxController {
     final teacherId = Get.find<AuthService>().user.value?.teacherId;
     final id = classId.value;
     final date = due.value;
+    if (!(form.currentState?.validate() ?? true)) return;
     if (title.text.trim().isEmpty) {
       ToastHelper.show('teacher.need_title', kind: ToastKind.error);
       return;
@@ -614,6 +616,8 @@ class PostNoticeController extends GetxController {
   static const audiences = ['parents', 'students', 'school'];
   static const categories = ['academic', 'exams', 'events', 'holiday', 'fees'];
 
+  final form = GlobalKey<FormState>();
+
   final title = TextEditingController();
   final body = TextEditingController();
   final audience = 'parents'.obs;
@@ -664,6 +668,7 @@ class PostNoticeController extends GetxController {
   Future<void> submit() async {
     if (!SchoolConfig.allows('notices.teacherPosts')) return;
     if (saving.value) return;
+    if (!(form.currentState?.validate() ?? true)) return;
     if (title.text.trim().isEmpty) {
       ToastHelper.show('teacher.need_title', kind: ToastKind.error);
       return;

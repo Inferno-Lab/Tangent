@@ -44,6 +44,8 @@ class ChatListController extends GetxController with Loadable, LiveListen {
     super.onInit();
     // A new message or a read receipt changes the list and its unread counts.
     listenLive('chat.', (_) => unawaited(load()));
+    // The console can switch chat on or off while the app runs (or pause it for every school).
+    ever(SchoolConfig.modules, (_) => unawaited(load()));
   }
 
   List<ChatThread> threads = [];
@@ -80,7 +82,13 @@ class ChatListController extends GetxController with Loadable, LiveListen {
   @override
   Future<void> load() => run(() async {
     final user = Get.find<AuthService>().user.value;
-    if (user == null) return;
+    // Without chat at the school there is nothing to ask for (the server would refuse), and no unread badge.
+    if (user == null || !SchoolConfig.has('chat')) {
+      threads = [];
+      suggested = [];
+      unread.value = 0;
+      return;
+    }
     final bundle = await Get.find<ChatRepository>().inbox(user.id);
     threads = [for (final t in bundle.threads) await threadForMe(t, user)];
     previews.clear();

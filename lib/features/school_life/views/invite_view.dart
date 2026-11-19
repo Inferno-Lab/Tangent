@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/utils/validators.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:tangent/core/utils/clock.dart';
@@ -104,7 +105,7 @@ class _InviteSheetState extends State<_InviteSheet> {
   Widget build(BuildContext context) => SheetBody(
     padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
     footer: Obx(() => Btn('visitors.send_pass', expand: true, loading: _c.busy.value, onPressed: () async {
-      if (_name.text.trim().length < 2) return;
+      if (!SheetBody.valid()) return;
       final ok = await _c.invite(name: _name.text.trim(), phone: _phone.text.trim(), purpose: _purpose, on: _on);
       if (ok) Get.back<void>();
     })),
@@ -116,9 +117,9 @@ class _InviteSheetState extends State<_InviteSheet> {
         const SizedBox(height: 6),
         Text('visitors.invite_body'.tr, style: context.type.s),
         const SizedBox(height: 12),
-        Field(controller: _name, label: 'visitors.name'.tr),
+        Field(controller: _name, label: 'visitors.name'.tr, maxLength: 80, validator: Validators.name),
         const SizedBox(height: 8),
-        Field(controller: _phone, label: 'visitors.phone'.tr, keyboard: TextInputType.phone),
+        Field(controller: _phone, label: 'visitors.phone'.tr, keyboard: TextInputType.phone, maxLength: 24, validator: (v) => Validators.phone(v, optional: true)),
         const SizedBox(height: 12),
         Wrap(spacing: 8, runSpacing: 8, children: [for (final p in _c.purposes) Chip2(p.name, on: p.key == _purpose, onTap: () => setState(() => _purpose = p.key))]),
         const SizedBox(height: 12),

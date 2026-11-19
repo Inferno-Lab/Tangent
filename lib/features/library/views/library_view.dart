@@ -347,7 +347,6 @@ class _SearchBarState extends State<_SearchBar> {
     return Glass(
       height: 56,
       radius: 999,
-      tint: c.dark ? null : AppColors.light.paper.withValues(alpha: 0.3),
       padding: const EdgeInsets.only(left: 20, right: 6),
       child: Row(
         children: [

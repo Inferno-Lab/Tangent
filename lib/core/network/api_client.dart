@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/services/connectivity_service.dart';
+import 'package:tangent/core/services/session_bus.dart';
 import 'package:tangent/core/services/storage_service.dart';
 import 'package:tangent/core/utils/app_exception.dart';
 import 'package:tangent/core/utils/clock.dart';
@@ -120,6 +121,8 @@ class ApiClient {
     return id;
   }
 
+  static final _quiet = RegExp(r'^/v1/auth/|/(position|typing|read|link|calendar-link|order|devices)$|/devices/');
+
   Future<dynamic> get(String path, {Map<String, dynamic>? query}) => _send('GET', path, query: query);
 
   Future<dynamic> post(String path, Map<String, dynamic> body) => _send('POST', path, body: body);
@@ -203,6 +206,9 @@ class ApiClient {
           unawaited(_storage.writeCache(uri.toString(), jsonEncode({'at': Clock.now().toIso8601String(), 'body': text})));
         }
         if (Get.isRegistered<ConnectivityService>()) Get.find<ConnectivityService>().lastSynced.value = null;
+        // A change on the server: every open screen reloads, as after a write to the sample data. Not for sign-in, the
+        // bus's position, typing, read receipts or share links, which change nothing on screen.
+        if (method != 'GET' && !_quiet.hasMatch(uri.path) && Get.isRegistered<SessionBus>()) Get.find<SessionBus>().bump();
         return json;
       }
       if (res.statusCode == 401 && !open && !retried && await _renew()) {

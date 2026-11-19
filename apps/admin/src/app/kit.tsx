@@ -102,6 +102,9 @@ export function useSchoolConfig() {
   return useQuery({ queryKey: ['config'], queryFn: api.config, staleTime: 60_000 }).data;
 }
 
+/** The school's country (ISO 3166-1), for phone numbers typed without their country code. */
+export const useCountry = (): string => useSetting<string>('school.country', '');
+
 /** A setting's value from the school's configuration, or the fallback while it loads. */
 export function useSetting<T>(key: string, fallback: T): T {
   const cfg = useSchoolConfig();

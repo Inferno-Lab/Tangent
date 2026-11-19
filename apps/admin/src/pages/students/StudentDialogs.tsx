@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
 import { currencySymbol, readAmount, schoolToday, type ClassInfo, type AddressParts, type CustomValues } from '@tangent/contracts';
-import { DateField, Dialog, ErrorLine, Field, FilePick, SelectField, useShake, t as tr } from '@tangent/web-ui';
+import { DateField, Dialog, ErrorLine, Field, FilePick, PhoneField, SelectField, useShake, t as tr } from '@tangent/web-ui';
 import { DialogActions as Actions, fieldsOf, messageOf, useFeeHeads } from '../../app/kit';
 import { useApp } from '../../app/context';
 import { NameFields, RecordFields, checkNames, emptyRec } from './StudentRecord';
-import { useSetting } from '../../app/kit';
+import { useCountry, useSetting } from '../../app/kit';
 
 type Done = (message: string, openId?: string) => void;
 
 export function AddStudentDialog({ classes, defaultClass, onClose, onDone }: { classes: ClassInfo[]; defaultClass?: string; onClose: () => void; onDone: Done }) { const { api } = useApp();
   const shake = useShake();
   const order = useSetting<string>('people.nameOrder', 'given-family');
+  const country = useCountry();
   const [f, setF] = useState({ name: '', givenName: '', familyName: '', nameLocal: '', classId: defaultClass ?? classes[0]?.id ?? '', rollNo: '', dob: '', guardianName: '', guardianPhone: '', ...emptyRec });
   // Opened before the classes arrived: take the first one when they do, as if it had been there.
   useEffect(() => { if (classes[0]) setF((s) => (s.classId ? s : { ...s, classId: classes[0]!.id })); }, [classes]);
@@ -48,7 +49,7 @@ export function AddStudentDialog({ classes, defaultClass, onClose, onDone }: { c
         </div>
         <RecordFields f={f} set={set} err={err} adding custom={custom} onCustom={setCustom} address={address} onAddress={setAddress} />
         <Field label={tr('admin.student_dialogs.guardian')} value={f.guardianName} onChange={set('guardianName')} error={err.guardianName} />
-        <Field label={tr('admin.student_dialogs.guardian_s_phone')} value={f.guardianPhone} onChange={set('guardianPhone')} error={err.guardianPhone} type="tel" hint={tr('admin.student_dialogs.they_sign_in_to_the')} />
+        <PhoneField country={country} label={tr('admin.student_dialogs.guardian_s_phone')} value={f.guardianPhone} onChange={set('guardianPhone')} error={err.guardianPhone} hint={tr('admin.student_dialogs.they_sign_in_to_the')} />
         {general && <ErrorLine>{general}</ErrorLine>}
         <Actions onClose={onClose} busy={busy} label={tr('admin.student_dialogs.add_student')} />
       </form>

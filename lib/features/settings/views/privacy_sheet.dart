@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/utils/validators.dart';
 import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/services/school_config.dart';
@@ -84,14 +85,16 @@ class _PrivacySheetState extends State<PrivacySheet> {
     final send = await showSheet<bool>(
       SheetBody(
         padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-        footer: Btn('privacy.send_request', expand: true, onPressed: () => Get.back<bool>(result: true)),
+        footer: Btn('privacy.send_request', expand: true, onPressed: () {
+          if (SheetBody.valid()) Get.back<bool>(result: true);
+        }),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('privacy.ask_$kind'.tr, style: context.type.h2),
             const SizedBox(height: 12),
-            Field(controller: note, label: 'privacy.what_you_need'.tr, maxLines: 4),
+            Field(controller: note, label: 'privacy.what_you_need'.tr, maxLines: 4, maxLength: 400, validator: Validators.text(min: 3, max: 400)),
           ],
         ),
       ),

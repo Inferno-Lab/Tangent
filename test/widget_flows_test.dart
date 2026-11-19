@@ -94,12 +94,13 @@ void main() {
     expect(find.textContaining('tuition'), findsWidgets);
   });
 
-  testWidgets('settings theme chip switches to dark', (tester) async {
+  testWidgets('settings theme chip switches to AMOLED', (tester) async {
     await tester.pumpWidget(testApp(home: const SettingsView()));
     await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.text('Blackboard'));
+    expect(find.text('Blackboard'), findsNothing);
+    await tester.tap(find.text('AMOLED'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    expect(Get.find<ThemeService>().mode.value, AppThemeMode.dark);
+    expect(Get.find<ThemeService>().mode.value, AppThemeMode.amoled);
   });
 }

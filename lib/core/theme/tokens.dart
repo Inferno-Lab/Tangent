@@ -50,9 +50,15 @@ abstract final class AppMotion {
   /// The whole opening sequence.
   static const intro = Duration(milliseconds: 2400);
 
-  /// How long a toast stays; one with an action stays longer.
-  static const toastHold = Duration(milliseconds: 3200);
-  static const toastAction = Duration(milliseconds: 5000);
+  /// How long a toast stays: a moment to notice it, a little per word, more for an error, within min and max.
+  static const toastBase = Duration(milliseconds: 1200);
+  static const toastPerWord = Duration(milliseconds: 260);
+  static const toastError = Duration(milliseconds: 800);
+  static const toastMin = Duration(milliseconds: 2200);
+  static const toastMax = Duration(milliseconds: 6000);
+
+  /// An error is not replaced by a success or a note before it has been up this long.
+  static const toastErrorFloor = Duration(milliseconds: 1500);
 }
 
 abstract final class AppBreakpoints {

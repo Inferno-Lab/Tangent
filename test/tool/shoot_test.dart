@@ -119,7 +119,7 @@ void main() {
           translations: AppTranslations(),
           locale: const Locale('en'),
           fallbackLocale: const Locale('en'),
-          theme: AppTheme.resolve(mode: _dark ? AppThemeMode.dark : AppThemeMode.light, platformBrightness: Brightness.light),
+          theme: AppTheme.resolve(mode: _dark ? AppThemeMode.amoled : AppThemeMode.light, platformBrightness: Brightness.light),
           initialRoute: guest ? AppRoutes.login : AppRoutes.shell,
           getPages: AppPages.pages,
           builder: (context, child) => ToastHost(child: child ?? const SizedBox.shrink()),

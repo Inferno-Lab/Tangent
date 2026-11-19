@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:get/get.dart';
+import 'package:tangent/core/services/push_service.dart';
 import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/services/live_stream.dart';
@@ -60,6 +61,7 @@ class AuthService extends GetxService {
   /// the session once the old screens have left, so none rebuild with no user.
   Future<void> signOut() async {
     if (Get.isRegistered<LiveStream>()) Get.find<LiveStream>().stop();
+    if (Get.isRegistered<PushService>()) unawaited(Get.find<PushService>().stop());
     await _storage.remove(StorageKeys.sessionUser);
     await _storage.remove(StorageKeys.activeStudent);
     await _storage.remove(StorageKeys.accessToken);

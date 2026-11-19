@@ -9,12 +9,14 @@ import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
+import 'package:tangent/core/theme/tokens.dart';
 import 'package:tangent/core/utils/extensions.dart';
 import 'package:tangent/core/widgets/glass.dart';
 import 'package:tangent/core/widgets/page.dart';
 import 'package:tangent/core/widgets/states.dart';
 import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/data/models/user.dart';
+import 'package:tangent/features/dashboard/widgets/home_cards.dart' show QuickGrid;
 import 'package:tangent/features/profile/controllers/profile_controller.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -108,8 +110,19 @@ class ProfileView extends GetView<ProfileController> {
                       onPhoto: () => unawaited(controller.editPhoto()),
                     ),
                   ),
-                Rise(index: 1, child: SectionLabel('profile.around'.tr, top: 20)),
-                Rise(index: 2, child: _Tiles(teacher: role == UserRole.teacher)),
+                // Profile keeps to the person; the school's pages live on Home, Academics and My classes.
+                if (role == UserRole.teacher && SchoolConfig.has('staffAttendance')) ...[
+                  Rise(index: 1, child: SectionLabel('profile.mine'.tr, top: 20)),
+                  Rise(
+                    index: 2,
+                    child: QuickGrid(
+                      items: [
+                        (PhosphorIconsRegular.clockUser, 'menu.my_attendance', () => Get.toNamed<void>(AppRoutes.staffMe)),
+                        (PhosphorIconsRegular.bell, 'menu.notifications', () => Get.toNamed<void>(AppRoutes.notifications)),
+                      ],
+                    ),
+                  ),
+                ],
                 if (student != null) ...[
                   const SizedBox(height: 12),
                   Rise(
@@ -287,11 +300,12 @@ class _IdCard extends StatelessWidget {
                       onTap: onPhoto,
                       child: Semantics(
                         button: true,
-                        child: Glass(
+                        // A wash of the card's own ink, so it reads on any card colour in any theme (a theme-coloured
+                        // pill was black on black in dark mode). It sits on the card, so it is not glass.
+                        child: Container(
                           height: 36,
                           width: 120,
-                          radius: 18,
-                          onPigment: on == AppColors.white,
+                          decoration: BoxDecoration(color: on.withValues(alpha: .16), borderRadius: BorderRadius.circular(AppRadius.pill)),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -316,92 +330,6 @@ class _IdCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _Tiles extends StatelessWidget {
-  const _Tiles({required this.teacher});
-
-  final bool teacher;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.app;
-    SubjectColor s(String id) => AppColors.subject(id);
-    // A tile only for a module the school has (console: Modules).
-    const has = SchoolConfig.has;
-    final tiles = <(IconData, String, String, Color, Color)>[
-      if (!teacher && has('notices'))
-        (PhosphorIconsRegular.megaphone, 'menu.notices', AppRoutes.notices, c.mariSoft, c.mariText),
-      if (has('events'))
-        (PhosphorIconsRegular.calendarBlank, 'menu.events', AppRoutes.events, s('science').fill, s('science').on),
-      if (!teacher && has('transport'))
-        (PhosphorIconsRegular.bus, 'menu.transport', AppRoutes.transport, s('social').fill, s('social').on),
-      if (!teacher && has('library'))
-        (PhosphorIconsRegular.bookOpen, 'menu.library', AppRoutes.library, s('computer').fill, s('computer').on),
-      if (has('gallery')) (PhosphorIconsRegular.image, 'menu.gallery', AppRoutes.gallery, s('hindi').fill, s('hindi').on),
-      if (!teacher)
-        (PhosphorIconsRegular.calendarCheck, 'menu.leave', AppRoutes.leave, s('english').fill, s('english').on),
-      if (teacher) (PhosphorIconsRegular.bell, 'menu.notifications', AppRoutes.notifications, c.mariSoft, c.mariText),
-      if (teacher && has('staffAttendance')) (PhosphorIconsRegular.clockUser, 'menu.my_attendance', AppRoutes.staffMe, s('english').fill, s('english').on),
-      if (has('diary')) (PhosphorIconsRegular.notePencil, 'menu.diary', teacher ? AppRoutes.teacherDiary : AppRoutes.diary, s('science').fill, s('science').on),
-      if (has('ptm') && Get.find<AuthService>().role != UserRole.student)
-        (PhosphorIconsRegular.calendarPlus, 'menu.meetings', teacher ? AppRoutes.teacherMeetings : AppRoutes.meetings, s('social').fill, s('social').on),
-      if (has('visitors') && teacher) (PhosphorIconsRegular.userPlus, 'menu.invite_visitor', AppRoutes.inviteVisitor, s('computer').fill, s('computer').on),
-      if (has('visitors') && Get.find<AuthService>().role == UserRole.parent) (PhosphorIconsRegular.doorOpen, 'menu.gate_pass', AppRoutes.gatePass, s('hindi').fill, s('hindi').on),
-      if (has('certificates') && Get.find<AuthService>().role == UserRole.parent) (PhosphorIconsRegular.certificate, 'menu.certificates', AppRoutes.certificates, s('maths').fill, s('maths').on),
-      // The school's forms to answer (consent, surveys); a student has none of their own.
-      if (Get.find<AuthService>().role != UserRole.student) (PhosphorIconsRegular.clipboardText, 'menu.forms', AppRoutes.forms, s('maths').fill, s('maths').on),
-    ];
-    return LayoutBuilder(
-      builder: (context, box) {
-        final w = (box.maxWidth - 16) / 3;
-        return Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final t in tiles)
-              SizedBox(
-                width: w,
-                child: Semantics(
-                  button: true,
-                  label: t.$2.tr,
-                  excludeSemantics: true,
-                  child: Pressable(
-                    onTap: () => Get.toNamed<void>(t.$3),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: c.paper,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: c.line),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 34,
-                            height: 34,
-                            decoration: BoxDecoration(color: t.$4, borderRadius: BorderRadius.circular(10)),
-                            child: Icon(t.$1, size: 18, color: t.$5),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            t.$2.tr,
-                            style: context.type.chip,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        );
-      },
     );
   }
 }

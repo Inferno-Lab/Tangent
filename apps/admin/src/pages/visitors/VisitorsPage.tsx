@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DEFAULT_ID_TYPES, DEFAULT_VISITOR_PURPOSES, listOptions, schoolInstant, schoolToday, type CustomFieldsSetting, type CustomValues, type GatePassRow, type ListItem, type VisitorInput, type VisitorRow } from '@tangent/contracts';
 import { uploadFile } from '@tangent/api-client';
-import { CustomFieldInputs, DateField, Dialog, EmptyNote, Field, FilePick, SelectField, TimeField, useShake, t } from '@tangent/web-ui';
+import { CustomFieldInputs, DateField, Dialog, EmptyNote, Field, FilePick, PhoneField, SelectField, TimeField, useShake, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
-import { AddBtn, StudentPick, dateLabel, openPdf, problem, stamp, useSetting } from '../../app/kit';
+import { AddBtn, StudentPick, dateLabel, openPdf, problem, stamp, useCountry, useSetting } from '../../app/kit';
 import { usePageTabs } from '../../app/tabs';
 
 type Tab = 'today' | 'expected' | 'passes' | 'pickup' | 'late' | 'roll';
@@ -89,6 +89,7 @@ function VisitorDialog({ invite, onClose, onDone }: { invite: boolean; onClose: 
   const purposes = listOptions(useSetting<ListItem[]>('visitors.purposes', DEFAULT_VISITOR_PURPOSES));
   const ids = listOptions(useSetting<ListItem[]>('visitors.idTypes', DEFAULT_ID_TYPES));
   const defs = useSetting<CustomFieldsSetting>('fields.custom', {}).visitor ?? [];
+  const country = useCountry();
   const staff = useQuery({ queryKey: ['staff'], queryFn: () => app.api.staff.list() });
   const [f, setF] = useState<VisitorInput>({ name: '', phone: '', purpose: purposes[0]?.key ?? '', hostId: null, idType: '', idNumber: '', photoFileId: null, vehicle: '', note: '', custom: {}, expectedOn: invite ? schoolToday() : null });
   const [photo, setPhoto] = useState<File | null>(null);
@@ -104,7 +105,7 @@ function VisitorDialog({ invite, onClose, onDone }: { invite: boolean; onClose: 
       <div className="stack">
         <div className="two">
           <Field label={t('admin.visitors.name')} value={f.name} error={err.name} maxLength={80} onChange={(v) => put({ name: v })} />
-          <Field label={t('admin.visitors.phone_optional')} value={f.phone} error={err.phone} maxLength={20} onChange={(v) => put({ phone: v })} />
+          <PhoneField country={country} label={t('admin.visitors.phone_optional')} value={f.phone} error={err.phone} onChange={(v) => put({ phone: v })} />
         </div>
         <div className="two">
           <SelectField label={t('admin.visitors.why')} value={f.purpose} error={err.purpose} onChange={(v) => put({ purpose: v })} options={purposes.map((p) => ({ value: p.key, label: p.name }))} />
@@ -302,7 +303,7 @@ function Roll({ say }: { say: Say }) { const app = useApp();
       ].map((g) => (
         <div key={g.title} className="card s4 rise">
           <div className="ch"><h2>{g.title}</h2></div>
-          {g.note && <small className="help" style={{ marginTop: 0 }}>{g.note}</small>}
+          {g.note && <small className="help">{g.note}</small>}
           <div style={{ maxHeight: 360, overflow: 'auto' }} data-even-scroll>{g.items.map((x, i) => <div key={i} style={{ padding: '4px 0' }}>{x}</div>)}</div>
         </div>
       ))}

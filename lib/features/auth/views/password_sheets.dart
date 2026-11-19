@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/services/school_config.dart';
+import 'package:tangent/core/utils/validators.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/services/auth_service.dart';
@@ -64,6 +66,7 @@ class _ForgotSheetState extends State<_ForgotSheet> {
   var _busy = false;
 
   Future<void> _start() async {
+    if (!SheetBody.valid()) return;
     setState(() => _busy = true);
     await _send('/v1/auth/reset/start', {'identifier': _who.text.trim()}, then: (json) {
       final m = Map<String, dynamic>.from(json as Map);
@@ -74,6 +77,7 @@ class _ForgotSheetState extends State<_ForgotSheet> {
   }
 
   Future<void> _finish() async {
+    if (!SheetBody.valid()) return;
     setState(() => _busy = true);
     final ok = await _send('/v1/auth/reset/finish', {'challengeId': _challenge, 'code': _code.text.trim(), 'password': _password.text});
     if (!mounted) return;
@@ -97,11 +101,11 @@ class _ForgotSheetState extends State<_ForgotSheet> {
       Text(_challenge == null ? 'auth.forgot_body'.tr : 'auth.code_sent_to'.trp({'to': _sentTo}), style: context.type.s),
       const SizedBox(height: 16),
       if (_challenge == null)
-        Field(controller: _who, label: 'auth.email_or_phone'.tr, icon: PhosphorIconsRegular.at, keyboard: TextInputType.emailAddress)
+        Field(controller: _who, label: 'auth.email_or_phone'.tr, icon: PhosphorIconsRegular.at, keyboard: TextInputType.emailAddress, maxLength: 254, validator: Validators.emailOrPhone)
       else ...[
-        Field(controller: _code, label: 'auth.code'.tr, icon: PhosphorIconsRegular.hash, keyboard: TextInputType.number),
+        Field(controller: _code, label: 'auth.code'.tr, icon: PhosphorIconsRegular.hash, keyboard: TextInputType.number, maxLength: 6, validator: Validators.otp),
         const SizedBox(height: 12),
-        Field(controller: _password, label: 'auth.new_password'.tr, icon: PhosphorIconsRegular.lockSimple, obscure: true),
+        Field(controller: _password, label: 'auth.new_password'.tr, icon: PhosphorIconsRegular.lockSimple, obscure: true, validator: Validators.newPassword),
       ],
       ],
     ),
@@ -121,6 +125,7 @@ class _ChangeSheetState extends State<_ChangeSheet> {
   var _busy = false;
 
   Future<void> _save() async {
+    if (!SheetBody.valid()) return;
     setState(() => _busy = true);
     final ok = await _send('/v1/auth/password', {'current': _current.text, 'next': _next.text});
     if (!mounted) return;
@@ -141,11 +146,11 @@ class _ChangeSheetState extends State<_ChangeSheet> {
       children: [
       Text('auth.change_password'.tr, style: context.type.h2),
       const SizedBox(height: 16),
-      Field(controller: _current, label: 'auth.current_password'.tr, icon: PhosphorIconsRegular.lockSimple, obscure: true),
+      Field(controller: _current, label: 'auth.current_password'.tr, icon: PhosphorIconsRegular.lockSimple, obscure: true, validator: Validators.password),
       const SizedBox(height: 12),
-      Field(controller: _next, label: 'auth.new_password'.tr, icon: PhosphorIconsRegular.lockSimpleOpen, obscure: true),
+      Field(controller: _next, label: 'auth.new_password'.tr, icon: PhosphorIconsRegular.lockSimpleOpen, obscure: true, validator: (v) => Validators.newPassword(v) ?? (v == _current.text ? 'validation.password_same' : null)),
       const SizedBox(height: 8),
-      Text('auth.password_rule'.tr, style: context.type.cap),
+      Text('auth.password_rule'.trp({'n': '${SchoolConfig.passwordMinLength}'}), style: context.type.cap),
       ],
     ),
   );

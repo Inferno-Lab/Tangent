@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/utils/validators.dart';
 import 'package:tangent/core/theme/app_typography.dart';
 import 'package:tangent/core/theme/tokens.dart';
 import 'package:tangent/core/utils/extensions.dart';
@@ -28,6 +29,7 @@ class AssignHomeworkView extends GetView<AssignHomeworkController> {
       final clash = due == null ? const <String>[] : controller.dueByDay[DateUtils.dateOnly(due)] ?? const <String>[];
       final cls = controller.classes.where((x) => x.id == classId).firstOrNull;
       return PageFrame(
+        formKey: controller.form,
         leading: const BackGlass(close: true),
         actions: [
           AnimatedOpacity(
@@ -70,6 +72,8 @@ class AssignHomeworkView extends GetView<AssignHomeworkController> {
             label: 'teacher.title',
             hint: 'teacher.title_hint',
             textInputAction: TextInputAction.next,
+            maxLength: 120,
+            validator: Validators.text(min: 3, max: 120),
           ),
           const SizedBox(height: 12),
           Field(
@@ -79,6 +83,8 @@ class AssignHomeworkView extends GetView<AssignHomeworkController> {
             maxLines: 4,
             minHeight: 70,
             keyboard: TextInputType.multiline,
+            maxLength: 1000,
+            validator: Validators.text(max: 1000, optional: true),
           ),
           const SizedBox(height: 12),
           Padding(

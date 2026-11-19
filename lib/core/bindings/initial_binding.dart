@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/services/push_service.dart';
 import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/network/api_client.dart';
 import 'package:tangent/core/services/auth_service.dart';
@@ -74,7 +75,9 @@ class InitialBinding extends Bindings {
       RemoteDataSource(ApiClient(onSignedOut: () => unawaited(Get.find<AuthService>().signOut()), onLocked: () => unawaited(SchoolConfig.load()))),
       permanent: true,
     );
-    Get.put(LiveStream(), permanent: true);
+    Get
+      ..put(LiveStream(), permanent: true)
+      ..put(PushService(remote), permanent: true);
     // Attendance marked without a signal is sent as soon as the phone is back online.
     if (Get.isRegistered<ConnectivityService>()) {
       Get.find<ConnectivityService>().onBackOnline.add(() async { await remote.client.flushOutbox(); });

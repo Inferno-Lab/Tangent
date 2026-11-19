@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
@@ -142,8 +143,12 @@ class Field extends StatefulWidget {
     this.inputFormatters,
     this.fill,
     this.borderless = false,
+    this.maxLength,
     super.key,
   });
+
+  /// The most characters it takes (typing stops there): every free-text field has a bound.
+  final int? maxLength;
 
   final TextEditingController? controller;
   final String? label;
@@ -237,7 +242,7 @@ class _FieldState extends State<Field> {
                       textInputAction: widget.textInputAction,
                       autofillHints: widget.autofillHints,
                       onSubmitted: widget.onSubmitted,
-                      inputFormatters: widget.inputFormatters?.cast(),
+                      inputFormatters: [...?widget.inputFormatters?.cast<TextInputFormatter>(), if (widget.maxLength != null) LengthLimitingTextInputFormatter(widget.maxLength)],
                       onChanged: (value) {
                         state.didChange(value);
                         widget.onChanged?.call(value);

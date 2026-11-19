@@ -269,7 +269,6 @@ class _ThemeTile extends StatelessWidget {
     final c = context.app;
     final (bg, bar, name) = switch (mode) {
       AppThemeMode.light => (AppColors.light.chalk, AppColors.light.paper, 'settings.theme_chalk'),
-      AppThemeMode.dark => (AppColors.blackboard.chalk, AppColors.blackboard.paper, 'settings.theme_blackboard'),
       AppThemeMode.amoled => (AppColors.amoled.chalk, AppColors.amoled.paper, 'settings.theme_amoled'),
       AppThemeMode.system => (null, context.app.brand, 'settings.theme_auto'),
     };
@@ -294,7 +293,7 @@ class _ThemeTile extends StatelessWidget {
                   color: bg,
                   gradient: bg == null
                       ? LinearGradient(
-                          colors: [AppColors.light.chalk, AppColors.light.chalk, AppColors.blackboard.chalk, AppColors.blackboard.chalk],
+                          colors: [AppColors.light.chalk, AppColors.light.chalk, AppColors.amoled.chalk, AppColors.amoled.chalk],
                           stops: const [0, .5, .5, 1],
                         )
                       : null,
@@ -621,7 +620,9 @@ class _HelpViewState extends State<HelpView> {
         SectionLabel('help.talk'.tr, top: 20),
         Row(
           children: [
+            // Only the ways the school can be reached: chat where it has chat, a phone and an email it has given.
             for (final (i, t) in [
+              if (SchoolConfig.has('chat'))
               (
                 PhosphorIconsRegular.chatCircle,
                 'help.chat_office',
@@ -629,6 +630,7 @@ class _HelpViewState extends State<HelpView> {
                 c.chalk,
                 _chatOffice,
               ),
+              if (s == null || s.phone.isNotEmpty)
               (
                 PhosphorIconsRegular.phone,
                 'help.call',
@@ -636,6 +638,7 @@ class _HelpViewState extends State<HelpView> {
                 AppColors.white,
                 () => s == null ? null : _launch(Uri(scheme: 'tel', path: s.phone)),
               ),
+              if (s == null || s.email.isNotEmpty)
               (
                 PhosphorIconsRegular.envelopeSimple,
                 'help.email',

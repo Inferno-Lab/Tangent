@@ -2,5 +2,6 @@
 <resources>
     <color name="tangent_chalk">#EEF0EC</color>
     <color name="tangent_ink">#0B3B36</color>
-    <color name="tangent_blackboard">#0D1814</color>
+    <!-- The dark theme is AMOLED black. -->
+    <color name="tangent_night">#000000</color>
 </resources>

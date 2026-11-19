@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/utils/validators.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:tangent/core/routes/app_routes.dart';
@@ -132,6 +133,8 @@ class CheckInCard extends StatelessWidget {
           ? 'staff.in_at'.trp({'time': _time(d.checkIn)}) + (d.checkOut != null ? ' · ${'staff.out_at'.trp({'time': _time(d.checkOut)})}' : '') + (d.late ? ' · ${'staff.late'.tr}' : '')
           : d.why.isNotEmpty
           ? d.why.tr
+          : d.needsPlace
+          ? 'staff.window_place'.trp({'from': d.opens, 'until': d.closes})
           : 'staff.window'.trp({'from': d.opens, 'until': d.closes});
       return EduCard(
         onTap: onHome ? () => Get.toNamed<void>(AppRoutes.staffMe) : null,
@@ -212,7 +215,7 @@ class _LeaveSheetState extends State<_LeaveSheet> {
     return SheetBody(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
       footer: Obx(() => Btn('staff.send', expand: true, loading: _c.busy.value, onPressed: () async {
-        if (_to.isBefore(_from) && _half == 0) return;
+        if ((_to.isBefore(_from) && _half == 0) || !SheetBody.valid()) return;
         final ok = await _c.askLeave(type: _type.key, from: _from, to: _to, halfDay: halves && _half > 0 ? (_half == 1 ? 'am' : 'pm') : null, reason: _reason.text.trim());
         if (ok) Get.back<void>();
       })),
@@ -238,7 +241,7 @@ class _LeaveSheetState extends State<_LeaveSheet> {
           }),
           if (!halves || _half == 0) ...[const SizedBox(height: 8), _date('staff.to', _to, (d) => _to = d, first: _from)],
           const SizedBox(height: 12),
-          Field(controller: _reason, label: 'staff.reason_optional'.tr, maxLines: 2),
+          Field(controller: _reason, label: 'staff.reason_optional'.tr, maxLines: 2, maxLength: 500, validator: Validators.text(max: 500, optional: true)),
         ],
       ),
     );

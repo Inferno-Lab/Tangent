@@ -301,7 +301,7 @@ export class PeopleService {
 
   async applyInfo(t: TenantCtx): Promise<ApplyInfo> {
     const classes = (await t.pool.query<{ grade: number; name: string; section: string }>('select grade, name, section from classes c join academic_years y on y.id = c.year_id and y.current')).rows;
-    return { open: await this.applyOpen(t), school: (await this.settings.effective(t)).school.name, grades: gradeChoices(classes).map((g) => ({ value: g.value, label: g.name })) };
+    return { open: await this.applyOpen(t), school: (await this.settings.effective(t)).school.name, country: t.info.country ?? '', grades: gradeChoices(classes).map((g) => ({ value: g.value, label: g.name })) };
   }
 
   /**

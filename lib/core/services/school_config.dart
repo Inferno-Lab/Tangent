@@ -189,6 +189,9 @@ abstract final class SchoolConfig {
   /// Who hands homework in from the app: `parent`, `student` or `either`.
   static String get handedInBy => _s('homework.handedInBy', 'either');
 
+  /// The school's own rule for a new password (console: Security), as the server checks it.
+  static int get passwordMinLength => _s<num>('security.passwordMinLength', 8).toInt();
+
   static int get libraryMaxLoans => _s<num>('library.maxLoans', 3).toInt();
   static int get defaultMaxMarks => _s<num>('exams.defaultMaxMarks', 100).toInt();
   static int get libraryMaxRenewals => _s<num>('library.maxRenewals', 1).toInt();

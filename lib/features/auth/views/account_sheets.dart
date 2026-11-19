@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/utils/validators.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:tangent/core/config/app_config.dart';
@@ -49,7 +50,7 @@ class _ContactSheetState extends State<_ContactSheet> {
   var _busy = false;
 
   Future<void> _start() async {
-    if (_value.text.trim().isEmpty) return;
+    if (!SheetBody.valid()) return;
     setState(() => _busy = true);
     final json = await _call((r) => r.post('/v1/f/me/contact', {_email ? 'email' : 'phone': _value.text.trim()}));
     if (!mounted) return;
@@ -63,6 +64,7 @@ class _ContactSheetState extends State<_ContactSheet> {
   }
 
   Future<void> _finish() async {
+    if (!SheetBody.valid()) return;
     setState(() => _busy = true);
     final ok = await _call((r) => r.post('/v1/f/me/contact/confirm', {'challengeId': _challenge, 'code': _code.text.trim()}));
     if (!mounted) return;
@@ -108,9 +110,13 @@ class _ContactSheetState extends State<_ContactSheet> {
             label: (_email ? 'account.new_email' : 'account.new_phone').tr,
             icon: _email ? PhosphorIconsRegular.at : PhosphorIconsRegular.phone,
             keyboard: _email ? TextInputType.emailAddress : TextInputType.phone,
+            maxLength: _email ? 254 : 24,
+            // The key changes with the kind, so switching clears the other kind's message.
+            key: ValueKey(_email),
+            validator: _email ? Validators.email : Validators.phone,
           ),
         ] else
-          Field(controller: _code, label: 'auth.code'.tr, icon: PhosphorIconsRegular.hash, keyboard: TextInputType.number),
+          Field(controller: _code, label: 'auth.code'.tr, icon: PhosphorIconsRegular.hash, keyboard: TextInputType.number, maxLength: 6, validator: Validators.otp),
       ],
     ),
   );

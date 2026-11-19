@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DEFAULT_TRIP_SESSIONS, type BusRouteRow, type RiderRow, type StopInput, type TripSession } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, Field, NumberField, Select, SelectField, TimeField, useShake, EmptyState, EmptyNote, t as tr } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, Field, NumberField, PhoneField, Select, SelectField, TimeField, useShake, EmptyState, EmptyNote, t as tr } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
-import { AddBtn, Ico, problem, stamp, useSetting } from '../../app/kit';
+import { AddBtn, Ico, problem, stamp, useCountry, useSetting } from '../../app/kit';
 import { usePageTabs } from '../../app/tabs';
 import { useShellChrome } from '../../app/Layout';
 import { currencySymbol, fmtMoney } from '@tangent/contracts';
@@ -62,7 +62,7 @@ export function TransportPage() {
                 <div className="kv">{tr('admin.transport_page.driver')}<b>{r.driverName ? `${r.driverName}${r.driverPhone ? ` · ${r.driverPhone}` : ''}` : '–'}</b></div>
                 <div className="kv">{tr('admin.transport_page.route_fee')}<b style={{ display: 'flex', gap: 6, alignItems: 'center' }}>{r.fee ? tr('admin.transport_page.a_term', { amount: fmtMoney(r.fee) }) : tr('admin.transport_page.none')}{canBill && r.fee > 0 && r.riders > 0 && <button className="btn sm" onClick={() => setBilling(r)}>{tr('admin.transport_page.bill_riders')}</button>}</b></div>
                 <div className="kv">{tr('admin.transport_page.riders')}<b>{r.riders}</b></div>
-                <div className="lbl" style={{ margin: '12px 0 4px' }}>{tr('admin.transport_page.stops_2')}</div>
+                <div className="lbl" style={{ margin: '16px 0 8px' }}>{tr('admin.transport_page.stops_2')}</div>
                 <div className="lscroll" data-even-scroll="" style={{ maxHeight: 240 }}>
                   {!r.stops.length && <EmptyNote icon="route" title={tr('admin.transport_page.no_stops_yet')} body={tr('admin.transport_page.add_the_stops_in_the')} />}
                   {r.stops.map((s) => (
@@ -126,6 +126,7 @@ function RouteDialog({ route, onClose, onDone }: { route: BusRouteRow | null; on
   const [f, setF] = useState({ name: route?.name ?? '', vehicle: route?.vehicle ?? '', driverUserId: route?.driverUserId ?? '', attendantName: route?.attendantName ?? '', attendantPhone: route?.attendantPhone ?? '', trackerId: route?.trackerId ?? '', fee: String(route?.fee ?? 0),
     attendantUserId: route?.attendantUserId ?? '' });
   const sessions = useSetting<TripSession[]>('transport.sessions', DEFAULT_TRIP_SESSIONS);
+  const country = useCountry();
   // The trips this route runs; none ticked: all of them.
   const [runs, setRuns] = useState<string[]>(route?.sessions ?? []);
   const staff = useQuery({ queryKey: ['staff'], queryFn: () => app.api.staff.list() });
@@ -163,7 +164,7 @@ function RouteDialog({ route, onClose, onDone }: { route: BusRouteRow | null; on
             {err.sessions ? <div className="emsg" role="alert">{err.sessions}</div> : <div className="help">{tr('admin.transport_page.none_ticked_all_trips')}</div>}
           </div>
         )}
-        <div className="two"><Field label={tr('admin.transport_page.attendant')} value={f.attendantName} onChange={set('attendantName')} placeholder={tr('admin.transport_page.meena_kale')} /><Field label={tr('admin.transport_page.attendant_s_phone')} type="tel" value={f.attendantPhone} onChange={set('attendantPhone')} hint={tr('admin.transport_page.families_call_the_attendant_or')} /></div>
+        <div className="two"><Field label={tr('admin.transport_page.attendant')} value={f.attendantName} onChange={set('attendantName')} placeholder={tr('admin.transport_page.meena_kale')} /><PhoneField country={country} label={tr('admin.transport_page.attendant_s_phone')} value={f.attendantPhone} onChange={set('attendantPhone')} hint={tr('admin.transport_page.families_call_the_attendant_or')} /></div>
         <Field label={tr('admin.transport_page.gps_tracker_number_optional')} value={f.trackerId} onChange={set('trackerId')} hint={tr('admin.transport_page.if_the_bus_has_a')} />
         <NumberField label={tr('admin.transport_page.route_fee_for_a_term', { currencySymbol: currencySymbol() })} value={f.fee} onChange={set('fee')} min={0} decimals />
         <div>

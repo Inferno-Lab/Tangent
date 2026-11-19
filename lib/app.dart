@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:get/get.dart';
 import 'package:tangent/core/bindings/initial_binding.dart';
@@ -40,15 +41,27 @@ class TangentApp extends StatelessWidget {
             mode: theme.mode.value,
             platformBrightness: MediaQuery.platformBrightnessOf(context),
           );
-          return AnimatedTheme(
-            data: data,
-            duration: theme.reduceMotion.value ? Duration.zero : AppMotion.t3,
-            curve: kEase,
-            child: MediaQuery(
-              data: MediaQuery.of(context).copyWith(
-                textScaler: TextScaler.linear(theme.textScale.value),
+          final dark = data.brightness == Brightness.dark;
+          final ground = data.extension<AppColors>()!.chalk;
+          // The status bar's clock and icons follow the theme: with no app bar nothing set them, so they stayed dark on
+          // the dark and AMOLED grounds and the top of the screen read as empty.
+          final bars = (dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark).copyWith(
+            statusBarColor: Colors.transparent,
+            systemNavigationBarColor: ground,
+            systemNavigationBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+          );
+          return AnnotatedRegion<SystemUiOverlayStyle>(
+            value: bars,
+            child: AnimatedTheme(
+              data: data,
+              duration: theme.reduceMotion.value ? Duration.zero : AppMotion.t3,
+              curve: kEase,
+              child: MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: TextScaler.linear(theme.textScale.value),
+                ),
+                child: ToastHost(child: child ?? const SizedBox.shrink()),
               ),
-              child: ToastHost(child: child ?? const SizedBox.shrink()),
             ),
           );
         }),

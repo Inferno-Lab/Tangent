@@ -17,18 +17,61 @@ class _Toast {
   final ToastKind kind;
   final String? body;
   final key = UniqueKey();
+  final shownAt = DateTime.now();
+
+  bool same(_Toast o) => o.message == message && o.body == body && o.kind == kind;
 }
 
-/// Glass toasts that drop from the top. [ToastHost] sits above the navigator.
+/// One toast at a time, dropping from the top. [ToastHost] sits above the navigator.
+///
+/// - A newer toast replaces the one showing (they never pile up or overlap); the same message again only keeps it up.
+/// - An error stays readable: a success or a note that comes right after it waits its turn instead of hiding it.
+/// - How long it stays follows how much there is to read, errors a little longer; a tap or an upward swipe closes it.
 abstract final class ToastHelper {
-  static final _items = <_Toast>[].obs;
+  static final _current = Rxn<_Toast>();
+  static _Toast? _next;
+  static Timer? _timer;
 
   static void show(String messageKey, {ToastKind kind = ToastKind.info, String? body}) {
     if (Get.testMode) return;
     final toast = _Toast(messageKey, kind, body);
-    _items.add(toast);
-    if (_items.length > 2) _items.removeAt(0);
-    Timer(AppMotion.toastHold, () => _items.remove(toast));
+    final now = _current.value;
+    if (now != null && now.same(toast)) return _hold(now);
+    if (now != null && now.kind == ToastKind.error && kind != ToastKind.error && DateTime.now().difference(now.shownAt) < AppMotion.toastErrorFloor) {
+      _next = toast;
+      return;
+    }
+    _next = null;
+    _current.value = toast;
+    _hold(toast);
+  }
+
+  /// Closes the toast showing (and any waiting), e.g. on sign-out.
+  static void clear() {
+    _timer?.cancel();
+    _next = null;
+    _current.value = null;
+  }
+
+  static void _dismiss() {
+    _timer?.cancel();
+    final next = _next;
+    _next = null;
+    _current.value = next;
+    if (next != null) _hold(next);
+  }
+
+  static void _hold(_Toast toast) {
+    _timer?.cancel();
+    _timer = Timer(holdFor(toast.message.tr, toast.body?.tr, error: toast.kind == ToastKind.error), _dismiss);
+  }
+
+  /// A moment to notice it and a little per word to read it (AppMotion.toast*).
+  @visibleForTesting
+  static Duration holdFor(String message, String? body, {bool error = false}) {
+    final words = '$message ${body ?? ''}'.trim().split(RegExp(r'\s+')).length;
+    final d = AppMotion.toastBase + AppMotion.toastPerWord * words + (error ? AppMotion.toastError : Duration.zero);
+    return d < AppMotion.toastMin ? AppMotion.toastMin : (d > AppMotion.toastMax ? AppMotion.toastMax : d);
   }
 }
 
@@ -47,19 +90,23 @@ class ToastHost extends StatelessWidget {
           right: 0,
           top: MediaQuery.paddingOf(context).top + 6,
           // Above the Navigator there is no Material, so text would get the debug double underline.
-          child: Material(type: MaterialType.transparency, child: Obx(() {
-            final items = ToastHelper._items.toList();
-            return Column(
-              children: [
-                for (final toast in items)
-                  Padding(
-                    key: toast.key,
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _ToastCard(toast: toast),
-                  ),
-              ],
-            );
-          })),
+          child: Material(
+            type: MaterialType.transparency,
+            child: Obx(() {
+              final toast = ToastHelper._current.value;
+              return AnimatedSwitcher(
+                duration: context.reduceMotion ? Duration.zero : AppMotion.t3,
+                switchInCurve: kEase,
+                switchOutCurve: kEaseIn,
+                layoutBuilder: (current, previous) => Stack(alignment: Alignment.topCenter, children: [...previous, ?current]),
+                transitionBuilder: (child, t) => FadeTransition(
+                  opacity: t,
+                  child: SlideTransition(position: Tween(begin: const Offset(0, -.6), end: Offset.zero).animate(t), child: child),
+                ),
+                child: toast == null ? const SizedBox.shrink() : _ToastCard(key: toast.key, toast: toast),
+              );
+            }),
+          ),
         ),
       ],
     );
@@ -67,7 +114,7 @@ class ToastHost extends StatelessWidget {
 }
 
 class _ToastCard extends StatelessWidget {
-  const _ToastCard({required this.toast});
+  const _ToastCard({required this.toast, super.key});
 
   final _Toast toast;
 
@@ -79,71 +126,50 @@ class _ToastCard extends StatelessWidget {
       ToastKind.error => (AppColors.bad, PhosphorIconsBold.exclamationMark),
       ToastKind.info => (c.ink, PhosphorIconsBold.info),
     };
-    final card = Center(
+    return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Semantics(
             liveRegion: true,
-            child: Glass(
-              height: 56,
-              radius: 999,
-              tint: c.paper.withValues(alpha: .97),
-              padding: const EdgeInsets.only(left: 10, right: 16),
-              child: Row(
-                children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
+            // Tap or swipe up to close it early.
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: ToastHelper._dismiss,
+              onVerticalDragEnd: (d) {
+                if ((d.primaryVelocity ?? 0) < -100) ToastHelper._dismiss();
+              },
+              child: Glass(
+                radius: AppRadius.sheet,
+                tint: c.paper,
+                padding: const EdgeInsets.fromLTRB(10, 10, 16, 10),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                      child: Icon(icon, size: 18, color: toast.kind == ToastKind.info ? c.chalk : AppColors.white),
                     ),
-                    child: Icon(icon, size: 18, color: toast.kind == ToastKind.info ? c.chalk : AppColors.white),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          toast.message.tr,
-                          maxLines: toast.body == null ? 2 : 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: context.type.ts,
-                        ),
-                        if (toast.body != null)
-                          Text(
-                            toast.body!.tr,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: context.type.cap,
-                          ),
-                      ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(toast.message.tr, maxLines: 3, overflow: TextOverflow.ellipsis, style: context.type.ts),
+                          if (toast.body != null) Text(toast.body!.tr, maxLines: 2, overflow: TextOverflow.ellipsis, style: context.type.cap),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         ),
       ),
-    );
-    if (context.reduceMotion) return card;
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: AppMotion.t4,
-      curve: kEase,
-      builder: (context, t, child) => Opacity(
-        opacity: t.clamp(0, 1),
-        child: Transform.translate(
-          offset: Offset(0, -70 * (1 - t)),
-          child: Transform.scale(scale: .9 + .1 * t, child: child),
-        ),
-      ),
-      child: card,
     );
   }
 }
