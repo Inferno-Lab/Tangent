@@ -92,7 +92,7 @@ class TeacherHomeView extends GetView<TeacherHomeController> {
           ),
           if (hasDay)
             Padding(
-              padding: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.only(top: 20, bottom: 16),
               child: PeriodStrip(
                 periods: periods,
                 label: (p) => classOf[p.id] == null ? subjectName(p.subject) : classLabel(classOf[p.id]!),

@@ -235,16 +235,26 @@ class _PeriodStripState extends State<PeriodStrip> {
                   Positioned(
                     left: x(minutesOf(p.start)),
                     top: 70,
-                    child: Text(clockOf(minutesOf(p.start)), style: context.type.cap.copyWith(color: c.ink3)),
+                    // Clear of the now mark when it sits on this lesson's start.
+                    child: Padding(
+                      padding: EdgeInsets.only(left: onNow && (now - minutesOf(p.start)).abs() * _perMinute < 12 ? 14 : 0),
+                      child: Text(clockOf(minutesOf(p.start)), style: context.type.cap.copyWith(color: c.ink3)),
+                    ),
                   ),
+              // Now is marked on the time scale, under the blocks, so it never runs through a lesson's name.
               if (onNow)
                 Positioned(
-                  left: x(now) - 1,
-                  top: -4,
-                  width: 2,
-                  height: 72,
+                  left: x(now) - 5,
+                  top: 64,
+                  width: 10,
+                  height: 26,
                   child: IgnorePointer(
-                    child: DecoratedBox(decoration: BoxDecoration(color: c.ink, borderRadius: BorderRadius.circular(AppRadius.hair))),
+                    child: Column(
+                      children: [
+                        Container(width: 2, height: 14, color: c.ink),
+                        Container(width: 10, height: 10, decoration: BoxDecoration(color: c.ink, shape: BoxShape.circle)),
+                      ],
+                    ),
                   ),
                 ),
             ],
