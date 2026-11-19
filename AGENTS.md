@@ -2,7 +2,7 @@
 
 Tangent is a school platform: a TypeScript backend, a school admin, a console and the Flutter school app (parents, teachers, and students and bus drivers where the school turns them on from the console) in one design system, **Tangent Hue** (`design/hue/`). Admin and console wear it in the **Nest look** (the owner's choice, 14 November 2026): Hue's layouts, parts, icons and empty states, with Nest's warm neutral surfaces, Manrope and Bricolage Grotesque, pill controls, 24px cards, spot illustrations and motion. The Flutter app runs on local JSON mock data by default; built with `SCHOOL` and `API_BASE_URL` it signs in and reads the school's real data through the family API (`/v1/f/*`, see `docs/HANDOFF.md` section 9.3 and `docs/API_CONTRACT.md`). Read this file first. It is the single source of truth: `CLAUDE.md` only points here.
 
-Branch work happens on feature branches off `main`; the Render test deployment builds from `main`, so a change reaches `https://tangent.onrender.com` only after it is merged (or pushed) to `main`. Tangent Hue replaced the older Chalk & Glass (app) and Nest (admin, console) looks; `redesign/chalk-glass` and `apple_glass` remain on GitHub as history.
+Work reaches `main` only through a pull request whose CI is green (see **How work ships** below); the Render test deployment builds from `main`, so a change reaches `https://tangent.onrender.com` only after it is merged. Tangent Hue replaced the older Chalk & Glass (app) and Nest (admin, console) looks; `redesign/chalk-glass` and `apple_glass` remain on GitHub as history.
 
 ## The platform (admin, console, backend) lives next to the app
 
@@ -11,23 +11,24 @@ This repository is also a TypeScript monorepo: `apps/admin` (school admin), `app
 Platform commands (Node 24, pnpm 10):
 
 ```bash
-pnpm install && pnpm build          # once
-pnpm typecheck && pnpm test         # types and tests (API tests start a real PostgreSQL)
+pnpm install && pnpm build          # once (also turns on the pre-push hook)
+pnpm check                          # what a push runs: the checks for what changed since main (tools/pre-push.mjs)
+pnpm typecheck && pnpm test         # every package (API tests share one PostgreSQL and copy ready-made databases)
 bash tools/dev-reset.sh &           # local PostgreSQL + server + Greenfield demo school (run in the background)
 pnpm --filter @tangent/admin dev    # http://localhost:5173/s/greenfield
 pnpm --filter @tangent/console dev  # http://localhost:5174
-node tools/audit-ui.mjs             # every page, 4 widths, light/dark: errors, overflow, clipping
-node tools/e2e-flows.mjs            # 50 browser flows (re-run dev-reset first; it changes data)
-node tools/scan-gaps.mjs            # columns ending unevenly; also scan-fit.mjs (tabs, pills) and scan-scroll.mjs (scroll areas)
+node tools/check-pages.mjs          # every page at 390 and 1440, in parallel: errors, overflow, clipping (--changed: what changed;
+                                    #   --full: 4 widths × light/dark, as CI; --scans all: gaps, fit, cutoff, scroll, tight)
+node tools/e2e-flows.mjs            # 60 browser flows (re-run dev-reset first; it changes data; ONLY="text" runs some)
 ```
 
-Platform rules that have bitten us: **schools configure nothing** (every setting and role is changed from the console; the school's own data such as its timetable stays with the school behind a console switch like `timetable.schoolEdits`; a new setting goes into `SchoolSettingsSchema` and `SETTINGS_META`, never a school-side write route, and is marked `notUsedYet` until something uses it); every school API route declares its module or feature with `@RequireModule('fees')` / `@RequireModule('fees.onlinePayment')` or says `@Core()` (default deny; `apps/api/test/plan.test.ts` fails otherwise), and a new module or feature goes into `MODULES` in `config-engine` first; a module's data comes in through the one import engine (add its kind to `IMPORT_KINDS` and an `Impl` in `packages/db/src/import/kinds.ts`, HANDOFF §15), never a separate importer, and a column with fixed values lists them in `options` (the template's dropdown) and checks against the same constant; never edit an applied SQL migration (add a new file, CI checks); declare build-time env in `turbo.json`; `apps/server` imports the API packages from `dist/` (rebuild after changing them); the menu, search and dock are mounted once by each app's signed-in layout (`app/Layout.tsx`): a page renders in `PageScope` and reads the shell with `useShellChrome()`, never `Shell` or `useChrome`; check new CSS class names against `nest.css`; keep `tools/audit-ui.mjs` and `tools/e2e-flows.mjs` green before every push and run `node tools/scan-cutoff.mjs` for text that is cut off; a table row (`.rw`) has a fixed height, so a wrapping row needs `height:auto`; shared controls belong in `packages/web-ui/src/blocks.css` (`pages.css` only loads on pages built with `Page`); the owner reviews design, so pages without a canvas board must be built only from `packages/web-ui` pieces; build from `@tangent/web-ui` parts only: `Select` (never a bare `<select>`), `Menu`/`MenuButton`/`Pop` for anything that opens from a button, `Dialog`, `Panel`, `ToastSlot`, `Segmented`, the fields (`DateField`, `TimeField`, `MonthField`, `NumberField`, `ColourField`, `Checkbox`, `FilePick`: no browser widgets), `data-tip` for every tooltip (never `title=`), and `data-even`/`data-even-scroll` on side-by-side columns (`EvenRows`); wrap a conditionally shown overlay in `<Presence>` so it fades out; time every motion with `--t1/2/3` (120/200/300 ms), never a literal duration; **every colour is a token the console can change** (no hex, `rgb()` or `white` in a page: `var(--ink)`, `var(--on-deep)`, `color-mix(in srgb,var(--on-deep) 14%,transparent)`…; every colour comes from the school's one hue through `packages/contracts/src/hue.ts`; after changing it run `node tools/gen-hue.mjs`); type, radii and spacing come from the Hue scales (`design/hue/base.css`); boarded pages render the board's parts (`hue-parts.css`, inside `.hb`), icons come from `<Icon>` and empty pages from `<EmptyState scene>`; toasts are timed by `useToast()`; `packages/web-ui/src/rules.test.ts` fails on each of these; never stretch a card to fill space. **Every third party goes through the Integrations Hub** (`packages/integrations`, `docs/integrations.md`): send messages with `Messenger.send`/`notify` (never insert into `sandbox_messages` or call a provider directly), reach storage, payments and maps with `hub.resolve(capability, schoolId, slug)`, and add a provider as a `ProviderDef` plus an adapter; background work per school is a `job_queue` kind (`enqueue`, a handler registered with `HubService.handle`).
+Platform rules that have bitten us: **schools configure nothing** (every setting and role is changed from the console; the school's own data such as its timetable stays with the school behind a console switch like `timetable.schoolEdits`; a new setting goes into `SchoolSettingsSchema` and `SETTINGS_META`, never a school-side write route, and is marked `notUsedYet` until something uses it); every school API route declares its module or feature with `@RequireModule('fees')` / `@RequireModule('fees.onlinePayment')` or says `@Core()` (default deny; `apps/api/test/plan.test.ts` fails otherwise), and a new module or feature goes into `MODULES` in `config-engine` first; a module's data comes in through the one import engine (add its kind to `IMPORT_KINDS` and an `Impl` in `packages/db/src/import/kinds.ts`, HANDOFF §15), never a separate importer, and a column with fixed values lists them in `options` (the template's dropdown) and checks against the same constant; never edit an applied SQL migration (add a new file, CI checks); declare build-time env in `turbo.json`; `apps/server` imports the API packages from `dist/` (rebuild after changing them); the menu, search and dock are mounted once by each app's signed-in layout (`app/Layout.tsx`): a page renders in `PageScope` and reads the shell with `useShellChrome()`, never `Shell` or `useChrome`; check new CSS class names against `nest.css`; check the pages a change reaches (`node tools/check-pages.mjs --changed`, with `--scans cutoff` for text that is cut off) and the flows it touches; a table row (`.rw`) has a fixed height, so a wrapping row needs `height:auto`; shared controls belong in `packages/web-ui/src/blocks.css` (`pages.css` only loads on pages built with `Page`); the owner reviews design, so pages without a canvas board must be built only from `packages/web-ui` pieces; build from `@tangent/web-ui` parts only: `Select` (never a bare `<select>`), `Menu`/`MenuButton`/`Pop` for anything that opens from a button, `Dialog`, `Panel`, `ToastSlot`, `Segmented`, the fields (`DateField`, `TimeField`, `MonthField`, `NumberField`, `ColourField`, `Checkbox`, `FilePick`: no browser widgets), `data-tip` for every tooltip (never `title=`), and `data-even`/`data-even-scroll` on side-by-side columns (`EvenRows`); wrap a conditionally shown overlay in `<Presence>` so it fades out; time every motion with `--t1/2/3` (120/200/300 ms), never a literal duration; **every colour is a token the console can change** (no hex, `rgb()` or `white` in a page: `var(--ink)`, `var(--on-deep)`, `color-mix(in srgb,var(--on-deep) 14%,transparent)`…; every colour comes from the school's one hue through `packages/contracts/src/hue.ts`; after changing it run `node tools/gen-hue.mjs`); type, radii and spacing come from the Hue scales (`design/hue/base.css`); boarded pages render the board's parts (`hue-parts.css`, inside `.hb`), icons come from `<Icon>` and empty pages from `<EmptyState scene>`; toasts are timed by `useToast()`; `packages/web-ui/src/rules.test.ts` fails on each of these; never stretch a card to fill space. **Every third party goes through the Integrations Hub** (`packages/integrations`, `docs/integrations.md`): send messages with `Messenger.send`/`notify` (never insert into `sandbox_messages` or call a provider directly), reach storage, payments and maps with `hub.resolve(capability, schoolId, slug)`, and add a provider as a `ProviderDef` plus an adapter; background work per school is a `job_queue` kind (`enqueue`, a handler registered with `HubService.handle`).
 
 ## Commands
 
 ```bash
 flutter pub get
-tool/verify.sh                     # analyze + all tests. Run before every commit.
+tool/verify.sh                     # analyze + every app test (pnpm check runs them when the app changed)
 flutter test test/some_test.dart   # one file
 flutter run                        # mock data, no backend needed
 flutter run --dart-define=EMPTY_DATA=true   # brand-new school with no content: check every empty state
@@ -86,7 +87,6 @@ Details: `docs/architecture.md`. How to add a screen, a repository, or an AI fea
 - Dart: `very_good_analysis` (see `analysis_options.yaml`). `dart analyze lib test` must show no errors or warnings. Prefer small, focused files; a view file over ~500 lines should be split by screen or sheet.
 - Controllers live in `controllers/`, never inside a view file. Shared helpers that two files need become public and move next to the controller or into `core/utils`.
 - Comments say *why*, one line. Mark a deliberate limit with `// shortcut: <the limit>, <when to upgrade>`.
-- Commits are atomic and use Conventional Commits (`fix(glass): …`, `refactor(fees): …`). Keep refactors separate from behaviour changes.
 - Visual changes: look at them (headless shot at minimum; emulator for glass). Light, dark, AMOLED; small phone (360×640), phone (390×844), tablet (≥ 840 wide).
 - Demo accounts: password `demo123`, OTP `123456` on demo content; `nest2026` and code `424242` on a school build against the demo school. Parent Priya, teacher Kavita (see `README.md`). Students and drivers sign in only when the console turns their role on (`app.roles`); the admin invites them (Students → On the app; a staff member set as a route's driver).
 
@@ -103,6 +103,32 @@ Details: `docs/architecture.md`. How to add a screen, a repository, or an AI fea
 | change the frame (deep header, sheet) | `core/widgets/page.dart` (`PageFrame`), `dock.dart` |
 | make an empty state | `core/widgets/states.dart`, `empty_kit.dart` |
 | see all the building blocks | design-system screen (Settings → About → long-press the version row) |
+
+## How work ships (every agent and every developer)
+
+These rules are checked by tools, not by memory: `tools/check-git.mjs` and `tools/pre-push.mjs` before a push, CI on the pull
+request, and GitHub's branch rule on `main`.
+
+- **One branch per piece of work**, cut from the latest `main`, named `<type>/<topic>`: the type is a Conventional Commits type
+  (`feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore`, `ci`, `build`, `style`, `revert`); the topic is two to six lowercase
+  words that say what changes: `fix/leave-sheet-keyboard`, `feat/staff-leave-balances`, `ci/parallel-page-checks`. Never a
+  session, a person, a round or a number (`one-shot`, `polish-pass`, `owner-review-17`, `design/alive`). Delete it once merged.
+- **Commit atomically and regularly**: each self-contained step (a fix, a refactor, a test, a doc) is committed as soon as it
+  works, not saved up for one commit at the end. A commit is a Conventional Commit, `<type>(<area>): <what changed>` in the
+  imperative, under 100 characters, with the why in its body. Refactors apart from behaviour changes. A generated file (the text
+  catalogues, `assets/i18n/en.json`) goes in the same commit as the source that changes it.
+- **Checks come in three tiers.** While working: the narrowest check for what you touched (one test file, `ONLY="…"` flows,
+  `node tools/check-pages.mjs --changed`). Before every push: `pnpm check`, which the pre-push hook runs; it checks only what the
+  change reaches (minutes, not the hour the full suite used to take). On the pull request: CI runs everything, five jobs side
+  by side. CI confirms; it is not where you find out whether something works.
+- **Push only what passed `pnpm check`.** `git push --no-verify` is for a docs-only change when the checks cannot run, never to
+  get a red change out. Nothing is pushed to `main`: every change is a pull request.
+- **Merge only on a green `CI passed`**, never while a check is red or still running. When `main` turns red, fixing it comes
+  before any other work.
+- **A flaky check is a bug**, fixed or removed the day it shows, never retried until it passes. Flows find an element by role
+  with `exact: true` or inside its dialog; tests never depend on row order or on today's date and time.
+- **Do the work you report.** Say what you checked and what you did not (a real device, other roles, other themes), with the
+  numbers the tools printed.
 
 ## Working with agents on this repo
 

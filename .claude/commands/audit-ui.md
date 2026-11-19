@@ -1,4 +1,4 @@
 ---
-description: Run the browser audit and flows for admin and console
+description: Check the admin and console pages and run the browser flows
 ---
-With the server (4000), admin (5173) and console (5174) running on fresh demo data (`bash tools/dev-reset.sh` in the background), run `node tools/audit-ui.mjs` (add `--quick` for two widths) and `node tools/e2e-flows.mjs` (use `ONLY="text"` for one flow). Fix the cause of every failure (a flow that only fails because data was already changed by an earlier run is not a bug: reset and re-run). Report what is green and what the scripts cannot judge (real devices, the owner's taste).
+With the server running on fresh demo data (`bash tools/dev-reset.sh` in the background), run `node tools/check-pages.mjs --changed` for the pages your change reaches (`--full` for every page at four widths in light and dark, as CI does; `--scans all` adds the layout scans) and `ONLY="text" node tools/e2e-flows.mjs` for the flows it touches. Point `ADMIN=http://127.0.0.1:4000 CONSOLE=http://127.0.0.1:4000/console` at the server's built apps (after `pnpm build`) to check them as Render serves them. Fix the cause of every failure (a flow that only fails because an earlier run changed the data is not a bug: reset and re-run). Report what is green and what the scripts cannot judge (real devices, the owner's taste).
