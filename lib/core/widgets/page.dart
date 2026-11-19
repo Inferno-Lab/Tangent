@@ -215,7 +215,7 @@ class PageTitle extends StatelessWidget {
       Text(title.tr, style: small ? context.type.h2 : context.type.h1),
       if (subtitle != null)
         Padding(
-          padding: const EdgeInsets.only(top: 6),
+          padding: const EdgeInsets.only(top: 8),
           child: Text(subtitle!.tr, style: context.type.s),
         ),
     ],
@@ -233,7 +233,7 @@ class SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.only(top: top, bottom: 10),
+    padding: EdgeInsets.only(top: top, bottom: 12),
     child: Row(
       children: [
         Expanded(
