@@ -2,6 +2,7 @@
 // Scrolls every box that scrolls on its own and checks two things: its column titles stay in view, and each frame of
 // scrolling is quick (worst and 90th-percentile frame time). Usage: node tools/scan-scroll.mjs [--only admin|console] [--sizes 1440x900,390x844]
 import { chromium } from '@playwright/test';
+import * as scans from './lib/scans.mjs';
 import { adminPaths, consolePaths } from './lib/pages.mjs';
 
 const args = process.argv.slice(2);
@@ -29,31 +30,7 @@ if (only !== 'admin') {
   for (const p of consolePaths('').filter((p) => !p.startsWith('/schools/'))) jobs.push({ name: `console${p}`, url: `${CONSOLE}${p}`, key });
 }
 
-const run = async () => {
-  const out = [];
-  const nm = (el) => `${el.tagName.toLowerCase()}.${String(el.className).trim().split(/\s+/).slice(0, 2).join('.')}`;
-  const boxes = [...document.querySelectorAll('.mn *')].filter((e) => { const cs = getComputedStyle(e); return /auto|scroll/.test(cs.overflowY) && e.scrollHeight > e.clientHeight + 20 && e.clientHeight > 80; });
-  for (const box of boxes) {
-    const times = [];
-    let last = performance.now();
-    const steps = 40;
-    for (let i = 1; i <= steps; i++) {
-      box.scrollTop = ((box.scrollHeight - box.clientHeight) * i) / steps;
-      await new Promise((r) => requestAnimationFrame(r));
-      const now = performance.now(); times.push(now - last); last = now;
-    }
-    times.sort((x, y) => x - y);
-    const p90 = times[Math.floor(times.length * 0.9)], worst = times[times.length - 1];
-    if (p90 > 25 || worst > 60) out.push(`slow scroll in ${nm(box)}: p90 ${p90.toFixed(0)} ms, worst ${worst.toFixed(0)} ms`);
-    const th = box.querySelector('.grd.th');
-    if (th && th.offsetParent) {
-      const b = box.getBoundingClientRect(), r = th.getBoundingClientRect();
-      if (r.top < b.top - 1 || r.bottom > b.bottom + 1) out.push(`column titles scroll away in ${nm(box)}`);
-    }
-    box.scrollTop = 0;
-  }
-  return out;
-};
+const run = scans.scroll;
 
 const browser = await chromium.launch();
 let n = 0;

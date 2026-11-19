@@ -105,7 +105,7 @@ Commands are in the README. Practical notes learned the hard way:
 
 - `bash tools/dev-reset.sh` **hangs in the foreground of some shells**: run it in the background and poll `/tmp/reset.log` for "Greenfield is live".
 - The dev server (`tsx src/main.ts`) imports `@tangent/api` and `@tangent/console-api` **from their `dist/`**. After changing either, run `pnpm --filter @tangent/api build` (or `console-api`) and restart, or you are testing old code.
-- Editing frontend files while `audit-ui.mjs` runs triggers Vite hot reload and produces false "hook order" errors. Finish edits, then audit.
+- Editing frontend files while the page checks run against Vite triggers hot reload and false "hook order" errors. Finish edits, then check; or check the built apps the server serves (`ADMIN=http://127.0.0.1:4000 CONSOLE=http://127.0.0.1:4000/console`), as CI does.
 - `e2e-flows.mjs` changes demo data (approves, publishes, adds a student). Re-run `dev-reset.sh` before the next full run; `ONLY="text"` runs matching flows.
 - Git Bash rewrites values starting with `/` (`CONSOLE_BASE=/console/` becomes a Windows path): prefix `MSYS_NO_PATHCONV=1`. Large quote-heavy heredocs in some tool shells fail: write files with an editor tool.
 - Running a second server against the **same dev PostgreSQL** with a new registry and `SEED_DEMO=true` re-creates the role `school_greenfield_app` with a new password and breaks the local demo school. Use `dev-reset.sh` afterwards.
@@ -115,9 +115,9 @@ Commands are in the README. Practical notes learned the hard way:
 ## 7. Testing strategy
 
 - Unit: contracts, config engine (layers, locks, contrast), security, db (migrator, seed invariants), api-client (refresh, sign-out), web-ui helpers, registry.
-- API: `apps/api/test/{api,modules,family}.test.ts` (57) and `apps/console-api/test` (29) run against a real PostgreSQL started by the tests; schools are really provisioned and signed in to.
-- Layout scans (section 13): `tools/scan-gaps.mjs`, `scan-fit.mjs`, `scan-scroll.mjs`, `scan-cutoff.mjs`.
-- UI audit and flows as above; CI runs build, typecheck, tests and Flutter analyze/test on every push (`.github/workflows/ci.yml`; the browser scripts need running servers, so they are run by hand, ideally before every deploy).
+- API: `apps/api/test` (21 files) and `apps/console-api/test` run against a real PostgreSQL. The API tests start one for the run (`test/global-setup.ts`); each file copies ready-made registry and school databases (`ensureTemplate`/`cloneDatabase` in `packages/db/src/dev.ts`), so files run four at a time and none migrates or seeds a school from nothing.
+- Pages: `tools/check-pages.mjs` loads each admin and console page once per size and theme, several at a time, and runs the audit and, with `--scans`, the layout scans of section 13 (`tools/lib/scans.mjs`; `scan-*.mjs` still run one alone). `--changed` checks only the pages a change reaches.
+- When they run (AGENTS.md, How work ships): the narrowest check while working; `pnpm check` before every push (the pre-push hook: only what the change reaches); everything on the pull request in CI (`.github/workflows/ci.yml`: rules, platform, Flutter, flows and every page, side by side, the browser jobs against the built apps the server serves, as on Render). `main` merges only on a green `CI passed`.
 - **Not covered:** pixel comparison against the canvas (pages show real data, boards show sample data), real devices, iOS, screen readers beyond labels and roles, load.
 
 ## 8. The deployment
@@ -169,7 +169,7 @@ Built on 2026-10-18: homework, exams (marks grid, ranks, publish), staff, admiss
 2. **Migration:** a new SQL file (kind header; never edit an applied file), the Drizzle table in `schema.ts`, and demo content in `seed/modules.ts` (guarded so it can run twice).
 3. **Service + controller** with `@RequireModule`, `@Require`, `ZodPipe`, audit entries; tests in `apps/api/test/modules.test.ts`.
 4. **api-client** method, then the page (copy `HomeworkPage.tsx` or `InvoicesPage.tsx`: `Page`, shared blocks, `EmptyCard`, `Dialog`, `Segmented`, kit helpers in `app/kit.tsx`), route in `router.tsx`, menu entry in `app/nav.ts`, module manifest in `config-engine/src/modules.ts`.
-5. Add the route to `tools/audit-ui.mjs` and a flow to `tools/e2e-flows.mjs`. Pages without a canvas board still need the owner's design review (none of the pages above has had one).
+5. Add the route to `tools/lib/pages.mjs` (the page checks) and a flow to `tools/e2e-flows.mjs`. Pages without a canvas board still need the owner's design review (none of the pages above has had one).
 6. Messages sent by the school go through `Messenger.notify(key, …)` so Notifications and Message templates apply; add the message to `MESSAGE_EVENTS` in `contracts/src/modules.ts`.
 
 ### 9.2 Settings tabs

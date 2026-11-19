@@ -1,12 +1,12 @@
 import { Body, Controller, Delete, Get, Header, HttpCode, Inject, Injectable, Logger, Param, Post, Put, Query, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
-import { POOLS } from './tokens.js';
+import { POOLS, REGISTRY } from './tokens.js';
 import { MODULES, PRICE_CURRENCY, activeModules, closeModules, moduleByKey } from '@tangent/config-engine';
 import { fmtMoney, roundToCurrency, type SchoolContract, CellCreate, CellPatch, CONSOLE_PERMISSIONS, DEPLOY_TARGET_LABELS, InvoicePaid, auditLabel, CONSOLE_ROLES, WizardPayload, type AuditRow, type DeployTarget, type ConsoleRole, type FleetSummary, type ConsoleUserRow, type FlagRow, type EntitlementDoc, type EntitlementRow, type InvoiceRowC, type SupportSessionRow, type SupportToken, tx } from '@tangent/contracts';
 import { migrate, newId, pg, scheduleJob } from '@tangent/db';
 import { topUpDemo } from '@tangent/db/seed';
 import { ApiError, ZodPipe, alert, notFound } from '@tangent/nest-kit';
 import { hashPassword, randomToken, sha256, signJwt, unseal } from '@tangent/security';
-import type { PoolManager } from '@tangent/tenancy';
+import type { PoolManager, Registry } from '@tangent/tenancy';
 import { Db, Me, Needs, type ConsoleUser, type reg } from './core.js';
 import { ENV, demosAllowed, type Env } from './env.js';
 import { adminUrlFor } from './provisioning/drivers.js';
@@ -121,7 +121,7 @@ const dueFor = (period: string) => { const [y, m] = period.split('-').map(Number
 
 @Injectable()
 export class Admin {
-  constructor(private readonly db: Db) {}
+  constructor(private readonly db: Db, @Inject(REGISTRY) private readonly registry: Registry) {}
 
   async flags(): Promise<FlagRow[]> {
     const { rows } = await this.db.pool.query<{ key: string; school_id: string; label: string; enabled: boolean; updated_by: string; updated_at: Date }>('select * from flags order by key, school_id');
@@ -134,6 +134,8 @@ export class Admin {
       `insert into flags (key, school_id, label, enabled, updated_by) values ($1,$2,$3,$4,$5)
        on conflict (key, school_id) do update set enabled = excluded.enabled, updated_by = excluded.updated_by, updated_at = now()`, [key, schoolId ?? '*', label ?? key, enabled, user]);
     await this.db.audit(user, 'flag.set', 'flag', key, { schoolId, enabled });
+    // Schools' cached records carry their flags: a pause or a lift takes effect at once, not after the cache runs out.
+    this.registry.invalidate();
   }
 
   /** A flag for one school is cleared (the fleet value applies again); a fleet flag goes with every school's value of it. */
@@ -141,6 +143,7 @@ export class Admin {
     const r = await this.db.pool.query(schoolId ? 'delete from flags where key = $1 and school_id = $2' : 'delete from flags where key = $1', schoolId ? [key, schoolId] : [key]);
     if (!r.rowCount) throw notFound('That flag');
     await this.db.audit(user, 'flag.removed', 'flag', key, { schoolId });
+    this.registry.invalidate();
   }
 
   async invoices(): Promise<InvoiceRowC[]> {

@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useRouterState } from '@tanstack/react-router';
+import { useRouter, useRouterState } from '@tanstack/react-router';
 import { EmptyCard, PageScope, Presence, t } from '@tangent/web-ui';
 import { AskTangent } from '../profile/AskTangent';
 import { useApp } from '../../app/context';
@@ -19,6 +19,9 @@ export function PlanGate({ children }: { children: ReactNode }) {
   const page = pageForPath(path);
   const shell = useQuery({ queryKey: ['shell'], queryFn: app.api.shell, staleTime: 30_000, enabled: !!page });
   const d = shell.data;
+  const router = useRouter();
+  // The page's code loads while the menu does, so waiting for the menu costs nothing on a first visit.
+  useEffect(() => { if (page && !d) void router.preloadRoute({ to: pathname as never }).catch(() => undefined); }, [page, d, pathname, router]);
   // Until the menu is known a page is not drawn: a module paused or taken away would otherwise ask the server first.
   if (page && !d && !shell.isError) return <main className="mn"><div className="skc" style={{ height: 320, borderRadius: 24 }} /></main>;
   if (!page || !d || d.menu.some((g) => g.pages.some((x) => x.id === page.id))) return <>{children}</>;

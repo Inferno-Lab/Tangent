@@ -10,10 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <style>html,body{margin:0;background:#E9E9E6}@media (prefers-color-scheme:dark){html,body{background:#0A0A0B}}</style>
-    <script>
-      // Set the theme before the first paint so there is no flash.
-      try { var t = localStorage.getItem('tangent.theme'); document.documentElement.dataset.theme = t || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); if (document.documentElement.dataset.theme === 'dark') document.documentElement.style.background = '#07060B'; } catch (e) {}
-    </script>
+    <script src="%BASE_URL%theme.js"></script>
   </head>
   <body>
     <div id="root"></div>

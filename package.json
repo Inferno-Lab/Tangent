@@ -12,7 +12,10 @@
     "test": "turbo run test",
     "dev:db": "pnpm --filter @tangent/db dev:db",
     "dev": "turbo run dev --parallel",
-    "verify": "pnpm typecheck && pnpm test"
+    "verify": "pnpm typecheck && pnpm test",
+    "check": "node tools/pre-push.mjs",
+    "check:pages": "node tools/check-pages.mjs",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

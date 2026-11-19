@@ -1,5 +1,4 @@
 import { pg } from '@tangent/db';
-import { ensureDatabase } from '@tangent/db/dev';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startHarness, type Harness } from './harness.js';
 
@@ -9,7 +8,7 @@ let db: pg.Pool;
 beforeAll(async () => {
   h = await startHarness();
   token = await h.login();
-  db = new pg.Pool({ connectionString: await ensureDatabase(h.server.url, 'school_greenfield'), max: 2 });
+  db = new pg.Pool({ connectionString: await h.schoolUrl(), max: 2 });
 }, 240_000);
 afterAll(async () => {
   await db?.end();

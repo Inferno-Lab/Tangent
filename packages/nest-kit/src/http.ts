@@ -17,10 +17,11 @@ export interface HttpEnv {
 const CSP = {
   defaultSrc: ["'self'"],
   scriptSrc: ["'self'"],
-  styleSrc: ["'self'", "'unsafe-inline'"],
+  // The admin's and the console's two typefaces come from Google Fonts: their stylesheet and the font files.
+  styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
   imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
   connectSrc: ["'self'"],
-  fontSrc: ["'self'", 'data:'],
+  fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
   objectSrc: ["'none'"],
   frameAncestors: ["'none'"],
   baseUri: ["'self'"],

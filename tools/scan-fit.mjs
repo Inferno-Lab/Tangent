@@ -3,6 +3,7 @@
 // whose children poke out of its box, or whose knob does not sit on the chosen tab.
 // Usage: node tools/scan-fit.mjs [--only admin|console] [--sizes 1100x800,1280x800] [--dark]
 import { chromium } from '@playwright/test';
+import * as scans from './lib/scans.mjs';
 import { adminPaths, consolePaths } from './lib/pages.mjs';
 
 const args = process.argv.slice(2);
@@ -38,56 +39,7 @@ if (only !== 'admin') {
   for (const p of consolePaths(c.school)) jobs.push({ name: `console${p}`, url: `${CONSOLE}${p}`, key: c.key });
 }
 
-const scan = () => {
-  const out = [];
-  const nm = (el) => `${el.tagName.toLowerCase()}${typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : ''} "${(el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 28)}"`;
-  const shown = (el) => { const cs = getComputedStyle(el); const r = el.getBoundingClientRect(); return cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 0 && r.height > 0; };
-  const lineHeight = (cs) => (cs.lineHeight === 'normal' ? parseFloat(cs.fontSize) * 1.25 : parseFloat(cs.lineHeight));
-  // 1. a short control whose text wraps
-  const sel = 'button,a.btn,.fp,.chip,.st,.tr,.wkp span,.sx,.mini,.ibtn,.kbd,.av,.lbl,.cb,[role=tab],.lgd span,.hws';
-  for (const el of document.querySelectorAll(sel)) {
-    if (!shown(el) || el.closest('.dock')) continue;
-    const r = el.getBoundingClientRect();
-    const cs = getComputedStyle(el);
-    if (r.height > 64 || el.matches('.rlb,.nv')) continue;
-    if (el.closest('.morph:not(.open)')) continue;
-    // any single piece of text inside the control that breaks onto a second line
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-    let wrapped = null;
-    for (let t = walker.nextNode(); t; t = walker.nextNode()) {
-      if (!t.textContent.trim()) continue;
-      const rg = document.createRange();
-      rg.selectNodeContents(t);
-      const rs = [...rg.getClientRects()].filter((x) => x.width > 1);
-      const lines = new Set(rs.map((x) => Math.round(x.top / 5))).size;
-      if (lines > 1 && getComputedStyle(t.parentElement).whiteSpace !== 'pre-wrap' && r.height <= 64 && parseFloat(cs.borderTopLeftRadius) >= 16) wrapped = t;
-      for (const x of rs) {
-        if (x.right > r.right + 2 || x.left < r.left - 2 || x.bottom > r.bottom + 2 || x.top < r.top - 2) { out.push(`contents outside the box: ${nm(el)} (${Math.round(r.width)}x${Math.round(r.height)})`); break; }
-      }
-    }
-    if (wrapped) out.push(`text wraps inside a short control: ${nm(el)} (${Math.round(r.width)}x${Math.round(r.height)})`);
-  }
-  // 3. a segmented control's knob must sit exactly on the chosen tab
-  for (const seg of document.querySelectorAll('.seg')) {
-    if (!shown(seg)) continue;
-    const kn = seg.querySelector('.kn');
-    const on = seg.querySelector('button.on,button[aria-selected=true]');
-    if (!kn || !on) continue;
-    const k = kn.getBoundingClientRect(), b = on.getBoundingClientRect();
-    if (Math.abs(k.left - b.left) > 2 || Math.abs(k.width - b.width) > 2) out.push(`knob off the tab: ${nm(seg)} knob ${Math.round(k.left)}+${Math.round(k.width)} tab ${Math.round(b.left)}+${Math.round(b.width)}`);
-    const s = seg.getBoundingClientRect();
-    if (seg.scrollWidth > seg.clientWidth + 2 && getComputedStyle(seg).overflowX === 'visible') out.push(`tabs wider than their track: ${nm(seg)}`);
-    for (const t of seg.querySelectorAll('button')) { const r = t.getBoundingClientRect(); if (r.right > s.right + 1 && getComputedStyle(seg).overflowX === 'visible') { out.push(`tab outside its track: ${nm(t)}`); break; } }
-  }
-  // 4. words that only appear when a value is missing
-  const tw = document.createTreeWalker(document.querySelector('.mn') ?? document.body, NodeFilter.SHOW_TEXT);
-  // The Languages page shows catalogue texts as written, and some start with a separator.
-  for (let t = location.pathname.endsWith('/languages') ? null : tw.nextNode(); t; t = tw.nextNode()) {
-    const s = t.parentElement.textContent.trim();
-    if (/undefined|NaN|\[object |null/.test(s) || /^·\s/.test(s)) out.push(`a missing value shows as text: "${s.slice(0, 40)}" in ${nm(t.parentElement)}`);
-  }
-  return [...new Set(out)].slice(0, 30);
-};
+const scan = scans.fit;
 
 const browser = await chromium.launch();
 let n = 0;

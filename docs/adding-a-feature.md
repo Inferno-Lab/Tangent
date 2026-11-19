@@ -1,6 +1,6 @@
 # Adding things
 
-Keep each change small and complete. Run `tool/verify.sh` at the end, then look at the screen (headless shot; emulator for glass).
+Keep each change small and complete, and commit each step that works (AGENTS.md, How work ships). Before pushing, `pnpm check`; then look at the screen (headless shot; emulator for glass).
 
 ## A screen
 
@@ -49,4 +49,4 @@ The steps and the reasons are in `docs/HANDOFF.md` section 9.1; in short:
 1. Contracts (`packages/contracts`), then a new SQL migration (`packages/db/migrations/school/`, never edit an applied one) and the schema, then the seed so the demo school has data on every weekday.
 2. Service + controller in `apps/api/src/school/` with `@RequireModule` and `@Require`, audit entries for writes, tests in `apps/api/test/modules.test.ts` (or `api.test.ts` for the core areas, `family.test.ts` for the app's API). Rebuild the package (`pnpm --filter @tangent/api build`) before the dev server sees it.
 3. Method in `packages/api-client`, then the page: copy `apps/admin/src/pages/fees/FeesPage.tsx` (or a console page such as `apps/console/src/pages/flags/FlagsPage.tsx`), use `Page`, the shared blocks and `EmptyCard`; give it loading, empty, error and read-only states. Route in `router.tsx`, menu entry in `app/nav.ts`.
-4. Look at it against `docs/DESIGN.md`, then add it to `tools/audit-ui.mjs` and a flow to `tools/e2e-flows.mjs`, and keep both green. Pages without a canvas board need the owner's design review.
+4. Look at it against `docs/DESIGN.md`, then add its address to `tools/lib/pages.mjs` (the page checks) and a flow to `tools/e2e-flows.mjs`. Pages without a canvas board need the owner's design review.
