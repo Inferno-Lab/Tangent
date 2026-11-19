@@ -30,6 +30,12 @@ export class SettingsService {
 
   constructor(@Inject(REGISTRY) private readonly registry: Registry) {}
 
+  /** Drops a school's cached settings (after a write that did not come through [apply], like the console's or a test's). */
+  forget(slug: string): void {
+    this.cache.delete(slug);
+    this.resolved.delete(slug);
+  }
+
   /** What the school's admin edits: every setting in force, Tangent's locks and the lists the editors pick from. */
   async view(t: TenantCtx): Promise<SchoolSettingsView> {
     const [cfg, doc, classes, heads, roles, staff, subjects] = await Promise.all([
