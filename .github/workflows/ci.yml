@@ -1,40 +1,34 @@
 name: CI
+# Once per change: on its pull request, and on main after the merge (a push to a branch alone runs nothing; open the PR).
+# Five jobs side by side; `CI passed` waits for all of them and is the one check main's branch rule requires.
 on:
-  push:
-    branches: [main, 'feat/**', 'fix/**', 'chore/**', 'redesign/**']
   pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  platform:
-    name: Platform (build, types, tests)
+  rules:
+    name: Rules (names, migrations, product name)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .node-version
-          cache: pnpm
+      - run: node tools/check-git.mjs --base origin/main
+        if: github.event_name == 'pull_request'
       - run: node tools/check-name.mjs
       - run: node tools/check-migrations.mjs origin/main
-      - run: pnpm install --frozen-lockfile
-      - run: CONSOLE_BASE=/console/ pnpm build
-      # Every shared English text (labels, errors, form checks) is in the catalogue languages are translated from.
-      - run: node tools/i18n-text.mjs --check
-      - run: pnpm typecheck
-      - run: pnpm test
 
-  browser:
-    name: Browser flows and page audit (admin, console)
+  platform:
+    name: Platform (build, types, tests)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -42,34 +36,22 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: pnpm exec playwright install --with-deps chromium
-      - name: Start the database, the server and the demo school
-        run: bash tools/dev-reset.sh
-      # The flows use the dev servers; this is how Render serves the built admin and console (a library update broke it once).
-      - name: The server serves the built admin and console
-        run: for u in / /s/greenfield /console/ /console/schools; do curl -sf -o /dev/null http://127.0.0.1:4000$u || { echo "GET $u failed"; tail -20 /tmp/server.log; exit 1; }; done
-      - name: Start the admin and the console
-        run: |
-          nohup pnpm --filter @tangent/admin dev --host 127.0.0.1 > /tmp/admin.log 2>&1 &
-          nohup pnpm --filter @tangent/console dev --host 127.0.0.1 > /tmp/console.log 2>&1 &
-          for i in $(seq 1 60); do curl -sf http://127.0.0.1:5173/ >/dev/null && curl -sf http://127.0.0.1:5174/ >/dev/null && exit 0; sleep 2; done; exit 1
-      - run: node tools/e2e-flows.mjs /tmp/e2e
-      - name: Page audit on fresh data
-        run: bash tools/dev-reset.sh && node tools/audit-ui.mjs
-      - if: failure()
-        uses: actions/upload-artifact@v4
+      # Turbo's cache: packages whose files did not change since the last run skip their build, typecheck and tests.
+      - uses: actions/cache@v4
         with:
-          name: browser-failures
-          path: |
-            /tmp/e2e
-            /tmp/*.log
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-
+      - run: pnpm install --frozen-lockfile
+      - run: CONSOLE_BASE=/console/ pnpm exec turbo run build --cache-dir=.turbo/cache
+      # Every shared English text (labels, errors, form checks) is in the catalogue languages are translated from.
+      - run: node tools/i18n-text.mjs --check
+      - run: pnpm exec turbo run typecheck test --cache-dir=.turbo/cache --output-logs=errors-only
 
   flutter:
     name: Flutter app (analyze, test)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -79,3 +61,71 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos lib test
       - run: flutter test
+
+  # The browser checks run against the built admin and console the server serves, as on Render (not Vite's dev servers,
+  # which compile each page on first visit and sent no Content-Security-Policy, so a blocked font never showed).
+  flows:
+    name: Browser flows (admin, console)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ADMIN: http://127.0.0.1:4000
+      CONSOLE: http://127.0.0.1:4000/console
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: CONSOLE_BASE=/console/ pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Start the database, the server and the demo school
+        run: bash tools/dev-reset.sh
+      - name: The server serves the built admin and console
+        run: for u in / /s/greenfield /console/ /console/schools /theme.js /console/theme.js; do curl -sf -o /dev/null http://127.0.0.1:4000$u || { echo "GET $u failed"; tail -20 /tmp/server.log; exit 1; }; done
+      - run: node tools/e2e-flows.mjs /tmp/e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flow-failures
+          path: |
+            /tmp/e2e
+            /tmp/*.log
+
+  pages:
+    name: Every page (four widths, light and dark)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ADMIN: http://127.0.0.1:4000
+      CONSOLE: http://127.0.0.1:4000/console
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: CONSOLE_BASE=/console/ pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Start the database, the server and the demo school
+        run: bash tools/dev-reset.sh
+      - run: node tools/check-pages.mjs --full --workers 4
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: page-failures
+          path: /tmp/*.log
+
+  passed:
+    name: CI passed
+    if: always()
+    needs: [rules, platform, flutter, flows, pages]
+    runs-on: ubuntu-latest
+    steps:
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: echo "A check failed or was cancelled; see the jobs above." && exit 1
+      - run: echo "Every check passed."
