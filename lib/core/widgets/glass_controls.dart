@@ -335,7 +335,6 @@ class _GlassSliderState extends State<GlassSlider> {
                       child: Glass(
                         kind: GlassKind.lens,
                         radius: 18,
-                        tint: AppColors.white.withValues(alpha: 0.5),
                         child: widget.thumbChild == null ? null : Center(child: widget.thumbChild),
                       ),
                     ),

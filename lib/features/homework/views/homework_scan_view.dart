@@ -250,7 +250,7 @@ class _HomeworkScanViewState extends State<HomeworkScanView> with WidgetsBinding
                         shape: BoxShape.circle,
                         border: Border.all(color: AppColors.white.withValues(alpha: 0.9), width: 4),
                       ),
-                      child: Glass(kind: GlassKind.lens, radius: 999, tint: AppColors.white.withValues(alpha: 0.1), shadow: false),
+                      child: const Glass(kind: GlassKind.lens, radius: 999, shadow: false),
                     ),
                   ),
                 ),

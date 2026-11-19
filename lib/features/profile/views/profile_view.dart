@@ -9,6 +9,7 @@ import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
+import 'package:tangent/core/theme/tokens.dart';
 import 'package:tangent/core/utils/extensions.dart';
 import 'package:tangent/core/widgets/glass.dart';
 import 'package:tangent/core/widgets/page.dart';
@@ -287,11 +288,12 @@ class _IdCard extends StatelessWidget {
                       onTap: onPhoto,
                       child: Semantics(
                         button: true,
-                        child: Glass(
+                        // A wash of the card's own ink, so it reads on any card colour in any theme (a theme-coloured
+                        // pill was black on black in dark mode). It sits on the card, so it is not glass.
+                        child: Container(
                           height: 36,
                           width: 120,
-                          radius: 18,
-                          onPigment: on == AppColors.white,
+                          decoration: BoxDecoration(color: on.withValues(alpha: .16), borderRadius: BorderRadius.circular(AppRadius.pill)),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [

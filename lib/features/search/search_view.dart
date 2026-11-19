@@ -309,7 +309,6 @@ class _SearchViewState extends State<SearchView> {
               child: Glass(
                 height: 56,
                 radius: 999,
-                tint: app.dark ? null : AppColors.light.paper.withValues(alpha: 0.5),
                 padding: const EdgeInsets.only(left: 20, right: 8),
                 child: Row(
                   children: [

@@ -329,7 +329,9 @@ class _BusBubbleState extends State<_BusBubble> with TickerProviderStateMixin {
         radius: 999,
         kind: GlassKind.lens,
         shadow: false,
-        tint: AppColors.white.withValues(alpha: 0.18),
+        // The map is drawn in light colours in every theme, so the bubble and its ink are the light theme's too (a
+        // theme-coloured bubble was black on black in dark mode).
+        tint: AppColors.light.paper,
         child: Icon(PhosphorIconsBold.bus, color: AppColors.light.ink, size: 24),
       ),
     ),

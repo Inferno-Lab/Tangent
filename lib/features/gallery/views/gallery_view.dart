@@ -79,18 +79,18 @@ class GalleryView extends GetView<GalleryController> {
                   height: 44,
                   width: 150,
                   onPigment: ready,
-                  tint: controller.onlyChild.value ? context.app.brand.withValues(alpha: 0.35) : null,
+                  tint: controller.onlyChild.value ? context.app.brand : null,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(PhosphorIconsRegular.user, size: 15, color: ready ? AppColors.white : context.app.ink),
+                      Icon(PhosphorIconsRegular.user, size: 15, color: controller.onlyChild.value ? context.app.onBrand : ready ? AppColors.white : context.app.ink),
                       const SizedBox(width: 6),
                       Flexible(
                         child: Text(
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           'gallery.only'.trp({'name': controller.childName!}),
-                          style: AppText.chip(color: ready ? AppColors.white : context.app.ink, height: 1),
+                          style: AppText.chip(color: controller.onlyChild.value ? context.app.onBrand : ready ? AppColors.white : context.app.ink, height: 1),
                         ),
                       ),
                     ],

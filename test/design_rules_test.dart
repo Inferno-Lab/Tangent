@@ -71,6 +71,13 @@ void main() {
         (m) => _off(m[1] ?? m[2]!, _space, max: 56)), isEmpty, reason: 'gaps up to 56 are $_space');
   });
 
+  test('glass is tinted with a solid colour or not at all', () {
+    // Glass is a solid fill: a see-through tint is ignored and the theme's paper shows instead, so content coloured for
+    // the tint (a light glass with dark ink) turned black on black in dark mode.
+    expect(_hits(_ui, RegExp(r'tint:[^,]*withValues\(alpha:\s*(0?\.\d+)'), (m) => double.parse(m[1]!) < .95), isEmpty,
+        reason: 'pass an opaque tint (context.app.brand, AppColors.light.paper) or none, and colour the content for that fill');
+  });
+
   test('screens take taps through Pressable', () {
     // Swipes and long presses keep their GestureDetector; a tap does not.
     final taps = <String>[
