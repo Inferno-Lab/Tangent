@@ -62,7 +62,7 @@ export function TransportPage() {
                 <div className="kv">{tr('admin.transport_page.driver')}<b>{r.driverName ? `${r.driverName}${r.driverPhone ? ` · ${r.driverPhone}` : ''}` : '–'}</b></div>
                 <div className="kv">{tr('admin.transport_page.route_fee')}<b style={{ display: 'flex', gap: 6, alignItems: 'center' }}>{r.fee ? tr('admin.transport_page.a_term', { amount: fmtMoney(r.fee) }) : tr('admin.transport_page.none')}{canBill && r.fee > 0 && r.riders > 0 && <button className="btn sm" onClick={() => setBilling(r)}>{tr('admin.transport_page.bill_riders')}</button>}</b></div>
                 <div className="kv">{tr('admin.transport_page.riders')}<b>{r.riders}</b></div>
-                <div className="lbl" style={{ margin: '12px 0 4px' }}>{tr('admin.transport_page.stops_2')}</div>
+                <div className="lbl" style={{ margin: '16px 0 8px' }}>{tr('admin.transport_page.stops_2')}</div>
                 <div className="lscroll" data-even-scroll="" style={{ maxHeight: 240 }}>
                   {!r.stops.length && <EmptyNote icon="route" title={tr('admin.transport_page.no_stops_yet')} body={tr('admin.transport_page.add_the_stops_in_the')} />}
                   {r.stops.map((s) => (

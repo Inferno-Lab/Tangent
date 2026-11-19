@@ -908,7 +908,7 @@ function TemplatesEditor({ value, school, languages, disabled, onChange }: { val
       {languages.length > 1 && <div style={{ maxWidth: 260 }}><SelectField label={tr('ui.settings.language')} value={lang} onChange={setLang} options={languages.map((l) => ({ value: l, label: languageLabel(l) }))} /></div>}
       {MESSAGE_EVENTS.map((e) => (
         <div key={e.key} style={{ marginTop: 10 }}>
-          <div className="help" style={{ margin: '0 0 4px' }}><b>{e.label}</b> {tr('ui.settings.placeholders')}{' '}{e.vars.map((x) => `{${x}}`).join(' ')}</div>
+          <div className="help" style={{ margin: '0 0 8px' }}><b>{e.label}</b> {tr('ui.settings.placeholders')}{' '}{e.vars.map((x) => `{${x}}`).join(' ')}</div>
           <div className="inp" style={{ height: 'auto' }}><textarea value={textOf(e.key)} placeholder={tx(rawOf(e).text)} maxLength={320} disabled={disabled} aria-label={tr('ui.settings.wording', { label: e.label })} style={{ ...ta, minHeight: 56 }}
             onChange={(x) => put(e.key, x.target.value)} /></div>
         </div>
