@@ -294,7 +294,7 @@ function Roll({ say }: { say: Say }) { const app = useApp();
       <button className="btn" onClick={() => void q.refetch()}>{t('admin.visitors.refresh')}</button>
       {r && <small className="help" style={{ margin: 0, alignSelf: 'center' }}>{t('admin.visitors.as_of', { time: time(r.at) })}</small>}
     </div>
-    {r && <section className="grid">
+    {r && <section className="grid" data-even="">
       {[
         { title: t('admin.visitors.students_n', { n: r.students.length }), note: r.marked.students ? t('admin.visitors.from_todays_marks') : t('admin.visitors.not_marked_everyone_expected'), items: r.students.map((s) => `${s.name} · ${s.className}`) },
         { title: t('admin.visitors.staff_n', { n: r.staff.length }), note: r.marked.staff ? t('admin.visitors.from_check_ins') : t('admin.visitors.not_marked_everyone_expected'), items: r.staff.map((s) => s.name) },
