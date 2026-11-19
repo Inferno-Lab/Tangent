@@ -34,7 +34,9 @@ if (any(/^packages\/db\/migrations\//)) run('migrations', 'node', ['tools/check-
 
 if (any(/^(apps|packages|tools)\/|^(package\.json|pnpm-lock\.yaml|turbo\.json|tsconfig[^/]*\.json)$/)) {
   // `...[base]`: the packages changed since main and every package that depends on them.
-  run('typecheck and tests of what changed', 'pnpm', ['exec', 'turbo', 'run', 'typecheck', 'test', `--filter=...[${base}]`, '--output-logs=errors-only']);
+  run('typecheck of what changed', 'pnpm', ['exec', 'turbo', 'run', 'typecheck', `--filter=...[${base}]`, '--output-logs=errors-only']);
+  // One package's tests at a time (each runs its own files in parallel): all at once overloaded the machine and timed out.
+  run('tests of what changed', 'pnpm', ['exec', 'turbo', 'run', 'test', `--filter=...[${base}]`, '--concurrency=1', '--output-logs=errors-only']);
   if (any(/^(packages|apps\/(admin|console)\/src)\//)) run('shared-text catalogue', 'node', ['tools/i18n-text.mjs', '--check']);
 }
 

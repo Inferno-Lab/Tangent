@@ -46,7 +46,9 @@ jobs:
       - run: CONSOLE_BASE=/console/ pnpm exec turbo run build --cache-dir=.turbo/cache
       # Every shared English text (labels, errors, form checks) is in the catalogue languages are translated from.
       - run: node tools/i18n-text.mjs --check
-      - run: pnpm exec turbo run typecheck test --cache-dir=.turbo/cache --output-logs=errors-only
+      - run: pnpm exec turbo run typecheck --cache-dir=.turbo/cache --output-logs=errors-only
+      # One package's tests at a time; each runs its own files in parallel (all at once timed tests out on four cores).
+      - run: pnpm exec turbo run test --cache-dir=.turbo/cache --concurrency=1 --output-logs=errors-only
 
   flutter:
     name: Flutter app (analyze, test)
