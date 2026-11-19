@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/utils/validators.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:tangent/core/utils/clock.dart';
@@ -186,7 +187,7 @@ class _AskSheetState extends State<_AskSheet> {
     return SheetBody(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
       footer: Obx(() => Btn('gate.ask', expand: true, loading: _c.busy.value, onPressed: () async {
-        if (_reason.text.trim().length < 3 || (_person == null && _collector.text.trim().isEmpty)) return;
+        if (!SheetBody.valid()) return;
         final ok = await _c.ask(studentId: _child, leaveAt: at, reason: _reason.text.trim(), pickupId: _person, collector: _collector.text.trim());
         if (ok) Get.back<void>();
       })),
@@ -215,7 +216,7 @@ class _AskSheetState extends State<_AskSheet> {
             ),
           ),
           const SizedBox(height: 12),
-          Field(controller: _reason, label: 'gate.reason'.tr, maxLines: 2),
+          Field(controller: _reason, label: 'gate.reason'.tr, maxLines: 2, maxLength: 300, validator: Validators.text(min: 3, max: 300)),
           const SizedBox(height: 12),
           Text('gate.who_collects'.tr, style: context.type.cap),
           const SizedBox(height: 6),
@@ -223,7 +224,7 @@ class _AskSheetState extends State<_AskSheet> {
             for (final p in people) Chip2(p.name, on: p.id == _person, onTap: () => setState(() => _person = p.id)),
             Chip2('gate.someone_else'.tr, on: _person == null, onTap: () => setState(() => _person = null)),
           ]),
-          if (_person == null) ...[const SizedBox(height: 8), Field(controller: _collector, label: 'gate.their_name'.tr)],
+          if (_person == null) ...[const SizedBox(height: 8), Field(controller: _collector, label: 'gate.their_name'.tr, maxLength: 80, validator: Validators.name)],
         ],
       ),
     );
@@ -256,7 +257,7 @@ class _PersonSheetState extends State<_PersonSheet> {
   Widget build(BuildContext context) => SheetBody(
     padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
     footer: Obx(() => Btn('gate.add_person', expand: true, loading: _c.busy.value, onPressed: () async {
-      if (_name.text.trim().length < 2 || _relation.text.trim().length < 2 || _for.isEmpty) return;
+      if (!SheetBody.valid() || _for.isEmpty) return;
       final ok = await _c.addPerson(studentIds: _for.toList(), name: _name.text.trim(), relation: _relation.text.trim(), phone: _phone.text.trim());
       if (ok) Get.back<void>();
     })),
@@ -274,11 +275,11 @@ class _PersonSheetState extends State<_PersonSheet> {
               Chip2((_c.names[id] ?? '').split(' ').first, on: _for.contains(id), onTap: () => setState(() => _for.contains(id) ? _for.remove(id) : _for.add(id))),
           ]),
         const SizedBox(height: 12),
-        Field(controller: _name, label: 'gate.their_name'.tr),
+        Field(controller: _name, label: 'gate.their_name'.tr, maxLength: 80, validator: Validators.name),
         const SizedBox(height: 8),
-        Field(controller: _relation, label: 'gate.relation'.tr, hint: 'gate.relation_hint'.tr),
+        Field(controller: _relation, label: 'gate.relation'.tr, hint: 'gate.relation_hint'.tr, maxLength: 40, validator: Validators.text(min: 2, max: 40)),
         const SizedBox(height: 8),
-        Field(controller: _phone, label: 'gate.phone_optional'.tr, keyboard: TextInputType.phone),
+        Field(controller: _phone, label: 'gate.phone_optional'.tr, keyboard: TextInputType.phone, maxLength: 24, validator: (v) => Validators.phone(v, optional: true)),
       ],
     ),
   );

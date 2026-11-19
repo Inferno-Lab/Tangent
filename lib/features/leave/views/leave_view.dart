@@ -371,6 +371,7 @@ class LeaveApplyView extends GetView<LeaveApplyController> {
             minHeight: 76,
             textInputAction: TextInputAction.newline,
             keyboard: TextInputType.multiline,
+            maxLength: 500,
           ),
           const SizedBox(height: 12),
           Align(

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/utils/validators.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:tangent/core/utils/extensions.dart';
@@ -218,7 +219,7 @@ class TeacherMeetingsView extends GetView<TeacherMeetingsController> {
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
       footer: Btn('meetings.save_link', expand: true, onPressed: () async {
         final v = ctl.text.trim();
-        if (v.isNotEmpty && !v.startsWith('https://')) return;
+        if (!SheetBody.valid()) return;
         Get.back<void>();
         await controller.setLink(s, v);
       }),
@@ -229,7 +230,7 @@ class TeacherMeetingsView extends GetView<TeacherMeetingsController> {
           children: [
             Text('meetings.link_for'.trp({'name': s.studentName ?? ''}), style: context.type.h2),
             const SizedBox(height: 12),
-            Field(controller: ctl, label: 'meetings.link'.tr, hint: 'https://', keyboard: TextInputType.url),
+            Field(controller: ctl, label: 'meetings.link'.tr, hint: 'https://', keyboard: TextInputType.url, maxLength: 500, validator: Validators.link),
           ],
         ),
       ),

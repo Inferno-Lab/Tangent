@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/utils/validators.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:tangent/core/utils/extensions.dart';
 import 'package:tangent/core/utils/formatters.dart';
@@ -112,7 +113,7 @@ class _AskSheetState extends State<_AskSheet> {
     return SheetBody(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
       footer: Obx(() => Btn('certificates.send', expand: true, loading: _c.busy.value, onPressed: () async {
-        if (_child == null) return;
+        if (_child == null || !SheetBody.valid()) return;
         final ok = await _c.request(type: _type, studentId: _child!, purpose: _purpose.text.trim());
         if (ok) Get.back<void>();
       })),
@@ -132,7 +133,7 @@ class _AskSheetState extends State<_AskSheet> {
             ]),
           ],
           const SizedBox(height: 12),
-          Field(controller: _purpose, label: 'certificates.purpose'.tr, hint: 'certificates.purpose_hint'.tr),
+          Field(controller: _purpose, label: 'certificates.purpose'.tr, hint: 'certificates.purpose_hint'.tr, maxLength: 200, validator: Validators.text(max: 200, optional: true)),
         ],
       ),
     );

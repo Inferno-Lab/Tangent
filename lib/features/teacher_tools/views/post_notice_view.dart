@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/utils/validators.dart';
 import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
@@ -32,6 +33,7 @@ class PostNoticeView extends GetView<PostNoticeController> {
         _ => c.mariText,
       };
       return PageFrame(
+        formKey: controller.form,
         leading: const BackGlass(close: true),
         actions: [Text('teacher.preview_live'.tr, style: AppText.capB(color: c.ink3))],
         topPadding: MediaQuery.paddingOf(context).top + 56,
@@ -77,7 +79,7 @@ class PostNoticeView extends GetView<PostNoticeController> {
             ],
           ),
           const SizedBox(height: 12),
-          Field(controller: controller.title, hint: 'teacher.notice_title', textInputAction: TextInputAction.next),
+          Field(controller: controller.title, hint: 'teacher.notice_title', textInputAction: TextInputAction.next, maxLength: 120, validator: Validators.text(min: 3, max: 120)),
           const SizedBox(height: 10),
           Field(
             controller: controller.body,
@@ -85,6 +87,8 @@ class PostNoticeView extends GetView<PostNoticeController> {
             maxLines: 5,
             minHeight: 66,
             keyboard: TextInputType.multiline,
+            maxLength: 4000,
+            validator: Validators.text(min: 3, max: 4000),
           ),
           const SizedBox(height: 12),
           Row(

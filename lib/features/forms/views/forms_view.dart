@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/utils/validators.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:tangent/core/utils/extensions.dart';
@@ -84,6 +85,7 @@ class _FormPageState extends State<_FormPage> {
   final _text = <String, TextEditingController>{};
   final _names = <String, String>{};
   late String? _child = widget.form.pending.firstOrNull;
+  final _form = GlobalKey<FormState>();
 
   FormsController get _c => Get.find<FormsController>();
 
@@ -120,6 +122,8 @@ class _FormPageState extends State<_FormPage> {
       final v = e.value.text.trim();
       _answers[e.key] = v.isEmpty ? null : v;
     }
+    // Typed answers first: each field says what is wrong under it (a number, a phone in the school's country, an email).
+    if (!(_form.currentState?.validate() ?? true)) return;
     final missing = widget.form.visible(_answers).where((q) => q.required && (_answers[q.key] == null || (_answers[q.key] is List && (_answers[q.key]! as List).isEmpty)));
     if (missing.isNotEmpty) {
       ToastHelper.show('forms.fill_in'.trp({'q': missing.first.label}), kind: ToastKind.error);
@@ -201,6 +205,17 @@ class _FormPageState extends State<_FormPage> {
             'email' => TextInputType.emailAddress,
             _ => TextInputType.text,
           },
+          maxLength: q.kind == 'longText' ? 2000 : 500,
+          validator: (v) {
+            final t = v?.trim() ?? '';
+            if (t.isEmpty) return q.required ? 'validation.required' : null;
+            return switch (q.kind) {
+              'number' => double.tryParse(t.replaceAll(',', '.')) == null ? 'validation.number_invalid' : null,
+              'phone' => Validators.phone(t),
+              'email' => Validators.email(t),
+              _ => null,
+            };
+          },
           onChanged: (_) => setState(() {}),
         );
     }
@@ -214,25 +229,29 @@ class _FormPageState extends State<_FormPage> {
       _answers[e.key] = v.isEmpty ? null : v;
     }
     final children = widget.form.pending.whereType<String>().toList();
-    return PageFrame(
-      leading: const BackGlass(),
-      bottomBarHeight: 56,
-      bottomBar: Obx(() => Btn('forms.send', expand: true, icon: PhosphorIconsRegular.paperPlaneTilt, loading: _c.sending.value, onPressed: () => unawaited(_send()))),
-      children: [
-        PageTitle(widget.form.title),
-        if (widget.form.intro.isNotEmpty) Text(widget.form.intro, style: context.type.b),
-        if (children.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Text('forms.for_child'.tr, style: context.type.cap),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 8,
-            children: [for (final id in children) Chip2(_names[id]?.isNotEmpty ?? false ? _names[id]! : '…', on: _child == id, onTap: () => setState(() => _child = id))],
-          ),
+    return Form(
+      key: _form,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      child: PageFrame(
+        leading: const BackGlass(),
+        bottomBarHeight: 56,
+        bottomBar: Obx(() => Btn('forms.send', expand: true, icon: PhosphorIconsRegular.paperPlaneTilt, loading: _c.sending.value, onPressed: () => unawaited(_send()))),
+        children: [
+          PageTitle(widget.form.title),
+          if (widget.form.intro.isNotEmpty) Text(widget.form.intro, style: context.type.b),
+          if (children.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text('forms.for_child'.tr, style: context.type.cap),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              children: [for (final id in children) Chip2(_names[id]?.isNotEmpty ?? false ? _names[id]! : '…', on: _child == id, onTap: () => setState(() => _child = id))],
+            ),
+          ],
+          for (final q in widget.form.visible(_answers)) ...[const SizedBox(height: 16), _question(q)],
+          const SizedBox(height: 80),
         ],
-        for (final q in widget.form.visible(_answers)) ...[const SizedBox(height: 16), _question(q)],
-        const SizedBox(height: 80),
-      ],
+      ),
     );
   }
 }

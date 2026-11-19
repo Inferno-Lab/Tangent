@@ -30,6 +30,7 @@ class PageFrame extends StatelessWidget {
     this.padContent = true,
     this.topFade = true,
     this.controller,
+    this.formKey,
     super.key,
   });
 
@@ -58,6 +59,9 @@ class PageFrame extends StatelessWidget {
   /// Thin status-bar scrim; off where art already fills the top edge.
   final bool topFade;
   final ScrollController? controller;
+
+  /// Makes the page a form: its fields' validators show under them, checked with `formKey.currentState!.validate()`.
+  final GlobalKey<FormState>? formKey;
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +96,7 @@ class PageFrame extends StatelessWidget {
         ...title == null ? children : children.skip(1),
       ],
     );
-    final body = title == null
+    final page = title == null
         ? list
         : Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -101,6 +105,7 @@ class PageFrame extends StatelessWidget {
               Expanded(child: list),
             ],
           );
+    final body = formKey == null ? page : Form(key: formKey, autovalidateMode: AutovalidateMode.onUserInteraction, child: page);
     return Scaffold(
       backgroundColor: background ?? c.chalk,
       resizeToAvoidBottomInset: false,

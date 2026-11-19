@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/utils/validators.dart';
 import 'package:tangent/core/utils/extensions.dart';
 import 'package:tangent/core/widgets/empty_kit.dart';
 import 'package:tangent/core/widgets/page.dart';
@@ -143,9 +144,11 @@ class _RouteCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            Field(controller: controller.reason, label: 'driver.late_reason', hint: 'driver.late_hint'),
+            Field(controller: controller.reason, label: 'driver.late_reason', hint: 'driver.late_hint', maxLength: 160, validator: Validators.text(max: 160, optional: true)),
             const SizedBox(height: 16),
-            Btn('driver.late_send', expand: true, onPressed: () => Get.back<bool>(result: true)),
+            Btn('driver.late_send', expand: true, onPressed: () {
+              if (SheetBody.valid()) Get.back<bool>(result: true);
+            }),
             const SizedBox(height: 16),
             ],
           ),

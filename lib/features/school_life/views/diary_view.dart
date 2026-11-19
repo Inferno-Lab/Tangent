@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/utils/validators.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:tangent/core/utils/clock.dart';
@@ -212,7 +213,7 @@ class _WriteSheetState extends State<_WriteSheet> {
     return SheetBody(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
       footer: Obx(() => Btn('diary.send', expand: true, loading: _c.busy.value, onPressed: () async {
-        if (_text.text.trim().length < 2) return;
+        if (!SheetBody.valid()) return;
         final ok = await _c.write(kind: _kind, subjectId: _subject, text: _text.text.trim(), date: Clock.now().add(Duration(days: _tomorrow)));
         if (ok) Get.back<void>();
       })),
@@ -230,7 +231,7 @@ class _WriteSheetState extends State<_WriteSheet> {
             Wrap(spacing: 8, runSpacing: 8, children: [for (final s in cls.subjects) Chip2(s.name, on: s.key == _subject, onTap: () => setState(() => _subject = s.key))]),
           ],
           const SizedBox(height: 12),
-          Field(controller: _text, label: 'diary.entry'.tr, maxLines: 5),
+          Field(controller: _text, label: 'diary.entry'.tr, maxLines: 5, maxLength: 2000, validator: Validators.text(min: 2, max: 2000)),
         ],
       ),
     );

@@ -50,7 +50,7 @@ const enRedesign = <String, String>{
   'auth.password_reset_done': 'Password saved. Sign in with it now.',
   'auth.change_password': 'Change password',
   'auth.password_changed': 'Password changed. Your other devices were signed out.',
-  'auth.password_rule': 'At least 8 characters.',
+  'auth.password_rule': 'At least @n characters.',
   'auth.sign_out_everywhere': 'Sign out on every device',
   'auth.hide_password': 'Hide password',
   'auth.show_password': 'Show password',
