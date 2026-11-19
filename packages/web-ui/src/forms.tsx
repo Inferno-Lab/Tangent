@@ -2,6 +2,8 @@ import type { IconName } from './Icon';
 import { Icon } from './Icon';
 import { useId, useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import { Select } from './Select';
+import { toE164 } from '@tangent/contracts';
+import { t as tr } from './i18n';
 
 /** A counter that flips between two classes, so the same error can vibrate again each time it is hit. */
 export function useShake(): { cls: string; hit: () => void } {
@@ -43,6 +45,22 @@ export function Field({ label, value, onChange, error, hint, icon, ...rest }: Fi
       </div>
       {error ? <div id={`${id}-m`}><ErrorLine>{error}</ErrorLine></div> : hint ? <div id={`${id}-m`} className="help">{hint}</div> : null}
     </div>
+  );
+}
+
+/**
+ * A phone number, checked when the person leaves the field the way the server checks it: a local number in the school's
+ * `country`, or any number written with its country code. The hint shows the form it is saved in.
+ */
+export function PhoneField({ country, value, onChange, error, hint, ...rest }: Omit<FieldProps, 'type'> & { country: string }) {
+  const [left, setLeft] = useState(false);
+  const typed = value.trim();
+  const e164 = typed ? toE164(typed, country) : null;
+  const own = left && typed && !e164 ? (country ? tr('ui.forms.phone_invalid') : tr('ui.forms.phone_needs_code')) : '';
+  return (
+    <Field type="tel" inputMode="tel" autoComplete="tel" maxLength={24} value={value} onBlur={() => setLeft(true)}
+      onChange={(v) => { setLeft(false); onChange(v); }} error={error || own || undefined}
+      hint={e164 && e164 !== typed.replace(/[\s()-]/g, '') ? tr('ui.forms.phone_saved_as', { n: e164 }) : hint} {...rest} />
   );
 }
 

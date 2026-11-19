@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { StudentDetail } from '@tangent/contracts';
-import { Field, t, listOf } from '@tangent/web-ui';
+import { Field, PhoneField, t, listOf } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
-import { problem, stamp, useSchoolConfig } from '../../app/kit';
+import { problem, stamp, useCountry, useSchoolConfig } from '../../app/kit';
 
 /**
  * A student's own app account, when Tangent has the school use the app for students: signed in with the student's own phone or
@@ -13,6 +13,7 @@ export function StudentAccount({ s, say }: { s: StudentDetail; say: (m: string) 
   const app = useApp();
   const qc = useQueryClient();
   const cfg = useSchoolConfig();
+  const country = useCountry();
   const [open, setOpen] = useState(false);
   const [f, setF] = useState({ phone: '', email: '' });
   const [err, setErr] = useState<Record<string, string>>({});
@@ -34,7 +35,7 @@ export function StudentAccount({ s, say }: { s: StudentDetail; say: (m: string) 
       {open && (
         <div className="stack" style={{ marginTop: 8 }}>
           <div className="two">
-            <Field label={t('admin.student_account.their_own_phone')} value={f.phone} onChange={(phone) => { setF({ ...f, phone }); setErr({}); }} error={err.phone} maxLength={20} />
+            <PhoneField country={country} label={t('admin.student_account.their_own_phone')} value={f.phone} onChange={(phone) => { setF({ ...f, phone }); setErr({}); }} error={err.phone} />
             <Field label={t('admin.student_account.or_their_email')} type="email" value={f.email} onChange={(email) => { setF({ ...f, email }); setErr({}); }} error={err.email} maxLength={120} />
           </div>
           {err._ && <div className="emsg" role="alert">{err._}</div>}

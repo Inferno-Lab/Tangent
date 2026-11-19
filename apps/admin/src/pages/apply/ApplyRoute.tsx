@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouteContext } from '@tanstack/react-router';
 import { schoolToday } from '@tangent/contracts';
-import { Checkbox, DateField, EmptyCard, ErrorLine, Field, SelectField, useHue, useShake, t } from '@tangent/web-ui';
+import { Checkbox, DateField, EmptyCard, ErrorLine, Field, PhoneField, SelectField, useHue, useShake, t } from '@tangent/web-ui';
 import { AreaField, fieldsOf, messageOf } from '../../app/kit';
 
 /**
@@ -72,7 +72,7 @@ export function ApplyRoute() {
         <DateField label={t('admin.apply.date_of_birth_optional')} value={f.dob} onChange={set('dob')} error={err.dob} max={schoolToday()} />
         <Field label={t('admin.apply.your_name')} value={f.guardianName} onChange={set('guardianName')} error={err.guardianName} maxLength={80} autoComplete="name" />
         <div className="two">
-          <Field label={t('admin.apply.phone')} type="tel" value={f.phone} onChange={set('phone')} error={err.phone} autoComplete="tel" />
+          <PhoneField country={info.data?.country ?? ''} label={t('admin.apply.phone')} value={f.phone} onChange={set('phone')} error={err.phone} />
           <Field label={t('admin.apply.email_optional')} type="email" value={f.email} onChange={set('email')} error={err.email} autoComplete="email" />
         </div>
         <AreaField label={t('admin.apply.anything_the_school_should_know')} value={f.note} onChange={set('note')} rows={3} maxLength={400} />

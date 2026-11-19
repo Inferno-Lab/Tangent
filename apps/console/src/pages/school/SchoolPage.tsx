@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
 import { HttpError } from '@tangent/api-client';
 import { CURRICULA, SchoolDetailsPatch, STEP_LABELS, auditLabel, type ActionKey, type ProvisionRunRow, type SchoolDetail } from '@tangent/contracts';
-import { DateField, Dialog, EmptyCard, Field, NumberField, PageScope, Select, SelectField, useShake, useToast, EmptyNote, t as tr } from '@tangent/web-ui';
+import { DateField, Dialog, EmptyCard, Field, NumberField, PageScope, PhoneField, Select, SelectField, useShake, useToast, EmptyNote, t as tr } from '@tangent/web-ui';
 import { PRICE_CURRENCY } from '@tangent/config-engine';
 import { useApp } from '../../app/context';
 import { url } from '../../app/base';
@@ -390,7 +390,7 @@ function DetailsDialog({ d, onClose, onDone }: { d: SchoolDetail; onClose: () =>
         <div className="help" style={{ marginTop: 0 }}>{tr('console.school_page.tangent_s_contact_at_the')}</div>
         <Field label={tr('console.school_page.contact_name')} value={f.name} onChange={set('name')} error={err.name} maxLength={80} />
         <div className="two">
-          <Field label={tr('console.school_page.phone')} type="tel" value={f.phone} onChange={set('phone')} error={err.phone} />
+          <PhoneField country={d.country} label={tr('console.school_page.phone')} value={f.phone} onChange={set('phone')} error={err.phone} />
           <Field label={tr('console.school_page.email')} type="email" value={f.email} onChange={set('email')} error={err.email} />
         </div>
         <div className="two">

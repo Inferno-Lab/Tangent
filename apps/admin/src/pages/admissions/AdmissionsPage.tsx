@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AdmissionStages, DEFAULT_ADMISSION_STAGES, addDays, schoolToday, stageName, type AdmissionStage, type EnquiryPatch, type EnquiryRow, type EnquiryStage } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, Field, SelectField, currentLanguage, useShake, EmptyState, t } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, Field, PhoneField, SelectField, currentLanguage, useShake, EmptyState, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
-import { AddBtn, AreaField, Avatar, dateLabel, problem, useGrades, useSetting } from '../../app/kit';
+import { AddBtn, AreaField, Avatar, dateLabel, problem, useCountry, useGrades, useSetting } from '../../app/kit';
 import { usePageTabs } from '../../app/tabs';
 
 type Column = { stage: EnquiryStage; label: string; hint: string; def?: AdmissionStage };
@@ -118,6 +118,7 @@ function NewEnquiry({ onClose, onDone }: { onClose: () => void; onDone: () => vo
   const app = useApp();
   const grades = useGrades();
   const sources = useSetting<string[]>('admissions.sources', [t('admin.admissions_page.walk_in')]);
+  const country = useCountry();
   const [f, setF] = useState({ childName: '', gradeSought: '', guardianName: '', phone: '', email: '', source: '', note: '' });
   const [err, setErr] = useState<Record<string, string>>({});
   const shake = useShake();
@@ -144,7 +145,7 @@ function NewEnquiry({ onClose, onDone }: { onClose: () => void; onDone: () => vo
         </div>
         <Field label={t('admin.admissions_page.guardian_s_name')} value={f.guardianName} onChange={set('guardianName')} error={err.guardianName} maxLength={80} />
         <div className="two">
-          <Field label={t('admin.admissions_page.phone')} value={f.phone} onChange={set('phone')} error={err.phone} />
+          <PhoneField country={country} label={t('admin.admissions_page.phone')} value={f.phone} onChange={set('phone')} error={err.phone} />
           <Field label={t('admin.admissions_page.email_optional')} type="email" value={f.email} onChange={set('email')} error={err.email} />
         </div>
         <SelectField label={t('admin.admissions_page.how_they_found_us')} value={f.source || sources[0] || ''} onChange={set('source')} options={sources.map((s) => ({ value: s, label: s }))} />
@@ -218,6 +219,7 @@ function Details({ row, stages, canWrite, back, onClose, onMove, onSaved }: { ro
   const [docs, setDocs] = useState<Record<string, boolean>>(Object.fromEntries(asked.map((d) => [d, !!row.docs[d]])));
   const grades = useGrades();
   const sources = useSetting<string[]>('admissions.sources', [t('admin.admissions_page.walk_in')]);
+  const country = useCountry();
   const locked = row.stage === 'enrolled' || !canWrite;
   const [f, setF] = useState({ childName: row.childName, gradeSought: String(row.gradeSought), guardianName: row.guardianName, phone: row.phone, email: row.email ?? '', source: row.source, note: row.note });
   const [err, setErr] = useState<Record<string, string>>({});
@@ -274,7 +276,7 @@ function Details({ row, stages, canWrite, back, onClose, onMove, onSaved }: { ro
           </div>
           <Field label={t('admin.admissions_page.guardian_s_name')} value={f.guardianName} onChange={set('guardianName')} error={err.guardianName} maxLength={80} />
           <div className="two">
-            <Field label={t('admin.admissions_page.phone')} value={f.phone} onChange={set('phone')} error={err.phone} />
+            <PhoneField country={country} label={t('admin.admissions_page.phone')} value={f.phone} onChange={set('phone')} error={err.phone} />
             <Field label={t('admin.admissions_page.email_optional')} type="email" value={f.email} onChange={set('email')} error={err.email} />
           </div>
           <SelectField label={t('admin.admissions_page.how_they_found_us')} value={f.source} onChange={set('source')} options={sourceOptions} />

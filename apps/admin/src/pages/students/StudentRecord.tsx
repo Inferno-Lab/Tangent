@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { CONTACT_CHANNELS, LEAVING_KINDS, LEAVING_KIND_LABELS, composeName, languageLabel, LANGUAGE_LIST, listKey, listLabel, listOptions, schoolToday, type ContactChannel, type LeavingKind, DEFAULT_ADDRESS_FORMAT, type AddressFormat, type AddressParts, type CustomFieldsSetting, type CustomValues, type ListItem, type ClassInfo, type GuardianRow, type StudentDetail } from '@tangent/contracts';
-import { AddressFields, Checkbox, CustomFieldInputs, DateField, Dialog, ErrorLine, Field, SelectField, currentLanguage, useShake, t } from '@tangent/web-ui';
+import { AddressFields, Checkbox, CustomFieldInputs, DateField, Dialog, ErrorLine, Field, PhoneField, SelectField, currentLanguage, useShake, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
-import { AreaField, problem, useSetting } from '../../app/kit';
+import { AreaField, problem, useCountry, useSetting } from '../../app/kit';
 
 export type Rec = { gender: string; house: string; admissionNo: string; bloodGroup: string; address: string; feeCategory: string };
 export type Names = { name: string; givenName: string; familyName: string; nameLocal: string };
@@ -128,6 +128,7 @@ export function GuardiansDialog({ s, onClose, onDone }: { s: StudentDetail; onCl
   const { api } = useApp();
   const shake = useShake();
   const rels = useSetting<ListItem[]>('lists.relationships', []);
+  const country = useCountry();
   // Relations typed before the list existed ("Mother") open as the list's item when one matches.
   const [list, setList] = useState<G[]>(s.guardians.map((g) => ({ ...g, relation: listKey(rels, g.relation) ?? g.relation, key: g.id })));
   const [err, setErr] = useState<Record<string, string>>({});
@@ -151,7 +152,7 @@ export function GuardiansDialog({ s, onClose, onDone }: { s: StudentDetail; onCl
               <SelectField label={t('admin.student_record.relation')} value={g.relation} onChange={(relation) => upd(i, { relation })} options={choices(rels, g.relation)} />
             </div>
             <div className="two">
-              <Field label={t('admin.student_record.phone')} type="tel" value={g.phone} onChange={(phone) => upd(i, { phone })} maxLength={20} hint={g.id ? t('admin.student_record.shown_hidden_type_a_new') : undefined} />
+              <PhoneField country={country} label={t('admin.student_record.phone')} value={g.phone} onChange={(phone) => upd(i, { phone })} hint={g.id ? t('admin.student_record.shown_hidden_type_a_new') : undefined} />
               <Field label={t('admin.student_record.email_optional')} type="email" value={g.email} onChange={(email) => upd(i, { email })} maxLength={120} />
             </div>
             <SelectField label={t('admin.student_record.reads_messages_in')} value={g.language} onChange={(language) => upd(i, { language })}

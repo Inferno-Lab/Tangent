@@ -250,7 +250,8 @@ export const EnquiryApply = z.object({
 });
 export type EnquiryApply = z.infer<typeof EnquiryApply>;
 /** What the application page shows before anyone signs in. */
-export interface ApplyInfo { open: boolean; school: string; grades: { value: number; label: string }[] }
+/** `country` lets the form check a phone number as the school will. */
+export interface ApplyInfo { open: boolean; school: string; country: string; grades: { value: number; label: string }[] }
 
 export const EnquiryEnrol = z.object({ classId: z.string().min(1, 'Choose a class'), dob: IsoDate });
 export type EnquiryEnrol = z.infer<typeof EnquiryEnrol>;
