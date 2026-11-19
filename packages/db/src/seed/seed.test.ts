@@ -64,7 +64,18 @@ describe('Greenfield demo seed', () => {
       'students_user_idx', 'user_roles_role_idx', 'homework_class_due_idx', 'notices_status_pub_idx',
       'audit_entity_idx', 'fee_invoices_student_due_idx', 'substitutions_date_idx', 'users_phone_digits_idx',
     ]));
-    const plan = async (sql: string) => (await pool.query(`explain ${sql}`)).rows.map((r: Record<string, unknown>) => String(Object.values(r)[0])).join('\n');
+    // With fresh statistics a demo-sized table is rightly read whole; with sequential scans off, the plan shows whether the
+    // index can serve the lookup at all (what matters once the table is a real school's size).
+    const plan = async (sql: string) => {
+      const c = await pool.connect();
+      try {
+        await c.query('set enable_seqscan = off');
+        return (await c.query(`explain ${sql}`)).rows.map((r: Record<string, unknown>) => String(Object.values(r)[0])).join('\n');
+      } finally {
+        await c.query('reset enable_seqscan').catch(() => undefined);
+        c.release();
+      }
+    };
     const usesIndex = async (sql: string) => expect(await plan(sql), sql).toMatch(/Index Scan|Bitmap Index Scan|Index Only Scan/);
     await usesIndex("select id from users where right(regexp_replace(coalesce(phone,''), '\\D', '', 'g'), 10) = '9822011002' and length('9822011002') >= 8");
     await usesIndex("select * from fee_invoices where student_id = 'stu_aarav'");

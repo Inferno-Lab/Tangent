@@ -120,6 +120,8 @@ export async function seedSchool(pool: Pool, input: SeedInput): Promise<SeedRepo
       }
     }
     await client.query('commit');
+    // A new school is a bulk write: the planner learns the tables' real sizes now, not when autovacuum gets round to it.
+    await pool.query('analyze').catch(() => undefined);
     return { ...report, ms: Date.now() - started };
   } catch (err) {
     await client.query('rollback').catch(() => undefined);
