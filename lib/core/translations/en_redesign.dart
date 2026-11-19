@@ -548,7 +548,6 @@ const enRedesign = <String, String>{
   'settings.title': 'Settings',
   'settings.look': 'Look',
   'settings.theme_chalk': 'Chalk',
-  'settings.theme_blackboard': 'Blackboard',
   'settings.theme_amoled': 'AMOLED',
   'settings.theme_auto': 'Auto',
   'settings.text_size': 'Text size',

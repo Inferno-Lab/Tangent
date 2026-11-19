@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
 
-enum AppThemeMode { light, dark, amoled, system }
+/// Light, AMOLED black, or following the phone. (The tinted Blackboard dark theme was removed: it read green.)
+enum AppThemeMode { light, amoled, system }
 
 abstract final class AppTheme {
   static ThemeData resolve({
@@ -11,9 +12,8 @@ abstract final class AppTheme {
   }) {
     final colours = switch (mode) {
       AppThemeMode.light => AppColors.light,
-      AppThemeMode.dark => AppColors.blackboard,
       AppThemeMode.amoled => AppColors.amoled,
-      AppThemeMode.system => platformBrightness == Brightness.dark ? AppColors.blackboard : AppColors.light,
+      AppThemeMode.system => platformBrightness == Brightness.dark ? AppColors.amoled : AppColors.light,
     };
     AppColors.activeDark = colours.dark;
     return build(colours);

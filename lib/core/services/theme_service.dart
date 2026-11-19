@@ -20,10 +20,11 @@ class ThemeService extends GetxService {
   final notifyFees = true.obs;
 
   void load() {
-    mode.value = AppThemeMode.values.firstWhere(
-      (item) => item.name == _storage.read<String>(StorageKeys.themeMode),
-      orElse: () => AppThemeMode.system,
-    );
+    final saved = _storage.read<String>(StorageKeys.themeMode);
+    // Phones that chose the removed Blackboard theme keep a dark theme.
+    mode.value = saved == 'dark'
+        ? AppThemeMode.amoled
+        : AppThemeMode.values.firstWhere((item) => item.name == saved, orElse: () => AppThemeMode.system);
     textScale.value = (_storage.read<num>(StorageKeys.textScale) ?? 1).toDouble();
     reduceMotion.value = _storage.read<bool>(StorageKeys.reduceMotion) ?? false;
     final code = _storage.read<String>(StorageKeys.locale) ?? 'en';

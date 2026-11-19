@@ -269,7 +269,6 @@ class _ThemeTile extends StatelessWidget {
     final c = context.app;
     final (bg, bar, name) = switch (mode) {
       AppThemeMode.light => (AppColors.light.chalk, AppColors.light.paper, 'settings.theme_chalk'),
-      AppThemeMode.dark => (AppColors.blackboard.chalk, AppColors.blackboard.paper, 'settings.theme_blackboard'),
       AppThemeMode.amoled => (AppColors.amoled.chalk, AppColors.amoled.paper, 'settings.theme_amoled'),
       AppThemeMode.system => (null, context.app.brand, 'settings.theme_auto'),
     };
@@ -294,7 +293,7 @@ class _ThemeTile extends StatelessWidget {
                   color: bg,
                   gradient: bg == null
                       ? LinearGradient(
-                          colors: [AppColors.light.chalk, AppColors.light.chalk, AppColors.blackboard.chalk, AppColors.blackboard.chalk],
+                          colors: [AppColors.light.chalk, AppColors.light.chalk, AppColors.amoled.chalk, AppColors.amoled.chalk],
                           stops: const [0, .5, .5, 1],
                         )
                       : null,
