@@ -431,13 +431,26 @@ await flow('admin: reports open and offer a download', { storage: adminStore }, 
 });
 
 await flow('admin: a family message is read and answered', { storage: adminStore }, async (p) => {
-  await p.goto(A('/messages'), { waitUntil: 'networkidle' });
-  await expectVisible(p.getByText('Your reply'), 'the conversation');
-  await p.getByRole('button', { name: 'Send reply' }).click();
-  await expectVisible(p.getByText('Write a reply first.'), 'the empty-reply error');
-  await p.getByLabel('Your reply').fill('Thank you, we will look into this today.');
-  await p.getByRole('button', { name: 'Send reply' }).click();
-  await expectVisible(p.locator('.mb.staff .mbb', { hasText: 'we will look into this today' }), 'the reply in the thread');
+  // Chat is paused for every school (registry migration 0024); the flow lifts the pause for its run and puts it back.
+  const flag = (method, body) => fetch(`${API}/console/v1/flags/kill.chat`, { method, headers: { ...(body ? { 'content-type': 'application/json' } : {}), authorization: `Bearer ${ct.accessToken}` }, body: body && JSON.stringify(body) });
+  await flag('DELETE');
+  // The school's server keeps the console's flags a little while: wait until the admin's menu has Messages again.
+  for (let i = 0; i < 60; i++) {
+    const shell = await (await fetch(`${API}/v1/shell`, { headers: { 'x-school': slug, authorization: `Bearer ${t.accessToken}` } })).json();
+    if (shell.menu?.some((g) => g.pages.some((x) => x.id === 'msg'))) break;
+    await p.waitForTimeout(1000);
+  }
+  try {
+    await p.goto(A('/messages'), { waitUntil: 'networkidle' });
+    await expectVisible(p.getByText('Your reply'), 'the conversation');
+    await p.getByRole('button', { name: 'Send reply' }).click();
+    await expectVisible(p.getByText('Write a reply first.'), 'the empty-reply error');
+    await p.getByLabel('Your reply').fill('Thank you, we will look into this today.');
+    await p.getByRole('button', { name: 'Send reply' }).click();
+    await expectVisible(p.locator('.mb.staff .mbb', { hasText: 'we will look into this today' }), 'the reply in the thread');
+  } finally {
+    await flag('PUT', { enabled: true, schoolId: null, label: 'Chat paused' });
+  }
 });
 
 await flow('admin: an event is added, shown on the calendar and removed', { storage: adminStore }, async (p) => {
@@ -531,7 +544,7 @@ await flow('console: compliance logs a breach and shows the notice before it is 
 await flow('console: a module is paused and lifted on Plans and modules; rollout waves are edited under Releases', { storage: consoleStore }, async (p) => {
   await p.goto(`${CONSOLE}/modules`, { waitUntil: 'networkidle' });
   await p.getByRole('button', { name: 'Homework' }).first().click();
-  await p.getByRole('button', { name: 'Pause…' }).click();
+  await p.getByRole('button', { name: 'Pause…', exact: true }).click();
   await p.getByRole('dialog').getByRole('button', { name: 'Pause it' }).click();
   await expectVisible(p.getByText(/Homework is paused/), 'the paused toast');
   await p.getByRole('button', { name: 'Lift the pause' }).click();
