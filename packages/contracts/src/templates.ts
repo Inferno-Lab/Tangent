@@ -14,7 +14,7 @@ export const DOC_KIND_LABELS: Record<DocKind, string> = localizedLabels({ receip
 export const BLOCK_KINDS = ['school', 'heading', 'text', 'fact', 'items', 'signatures', 'rule', 'gap', 'pageBreak', 'photo', 'qr'] as const;
 export type BlockKind = (typeof BLOCK_KINDS)[number];
 export const BLOCK_KIND_LABELS: Record<BlockKind, string> = localizedLabels({
-  school: 'The school’s name, address and logo', heading: 'Heading', text: 'Text', fact: 'A line with a value at the end', items: 'The document’s lines',
+  school: 'School name and logo', heading: 'Heading', text: 'Text', fact: 'A line and its value', items: 'The document’s lines',
   signatures: 'Places to sign', rule: 'A line across', gap: 'Space', pageBreak: 'New page', photo: 'The person’s photo', qr: 'A QR code to check it',
 });
 
