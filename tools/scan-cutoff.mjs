@@ -2,6 +2,7 @@
 // Looks for what the eye catches and audit-ui does not: text cut by an ellipsis, boxes that hide their own content vertically,
 // and scrollable areas whose scrollbar is hidden. Usage: node tools/scan-cutoff.mjs [--only admin|console] [--sizes 1280x720,1440x900]
 import { chromium } from '@playwright/test';
+import * as scans from './lib/scans.mjs';
 import { consolePaths } from './lib/pages.mjs';
 
 const args = process.argv.slice(2);
@@ -38,30 +39,7 @@ if (only !== 'admin') {
   for (const p of consolePaths(c.school)) jobs.push({ name: `console${p}`, url: `${CONSOLE}${p}`, key: c.key });
 }
 
-const scan = () => {
-  const out = [];
-  const name = (el) => `${el.tagName.toLowerCase()}${typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : ''}`;
-  for (const el of document.querySelectorAll('body *')) {
-    const cs = getComputedStyle(el);
-    if (cs.display === 'none' || cs.visibility === 'hidden') continue;
-    const r = el.getBoundingClientRect();
-    if (!r.width || !r.height || el.closest('svg') && el.tagName !== 'svg') continue;
-    const txt = (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 40);
-    if (cs.textOverflow === 'ellipsis' && el.scrollWidth > el.clientWidth + 1) out.push(`text cut: ${name(el)} "${txt}"`);
-    else if ((cs.overflowX === 'hidden' || cs.overflowX === 'clip') && el.scrollWidth > el.clientWidth + 2 && el.children.length && cs.textOverflow !== 'ellipsis') out.push(`hides sideways: ${name(el)} ${el.scrollWidth}>${el.clientWidth} "${txt}"`);
-    if ((cs.overflowY === 'hidden' || cs.overflowY === 'clip') && el.scrollHeight > el.clientHeight + 2 && r.height > 20) out.push(`hides below: ${name(el)} ${el.scrollHeight}>${el.clientHeight} "${txt}"`);
-    if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 2 && r.height > 60) {
-      const hiddenBar = cs.scrollbarWidth === 'none' || getComputedStyle(el, '::-webkit-scrollbar').display === 'none';
-      if (hiddenBar) out.push(`scrolls with no bar: ${name(el)}`);
-    }
-    if (el.matches('input,textarea') && el.placeholder && cs.textOverflow !== 'ellipsis' && el.scrollWidth > el.clientWidth + 1) out.push(`input text cut: ${name(el)} "${el.placeholder}"`);
-    if (el.matches('input[placeholder]') && !el.value) {
-      const c = document.createElement('canvas').getContext('2d'); c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-      if (c.measureText(el.placeholder).width > el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)) out.push(`placeholder cut: ${name(el)} "${el.placeholder}"`);
-    }
-  }
-  return [...new Set(out)].slice(0, 25);
-};
+const scan = scans.cutoff;
 
 const browser = await chromium.launch();
 let n = 0;

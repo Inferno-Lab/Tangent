@@ -2,6 +2,7 @@
 // Looks for spacing that is too tight: a line of text (a heading, a label, a help line) flush against the card, field or table
 // above or below it. Usage: node tools/scan-tight.mjs [--only admin|console] [--sizes 1440x900,390x844]
 import { chromium } from '@playwright/test';
+import * as scans from './lib/scans.mjs';
 import { adminPaths, consolePaths } from './lib/pages.mjs';
 
 const args = process.argv.slice(2);
@@ -37,35 +38,7 @@ if (only !== 'admin') {
   for (const p of consolePaths(c.school)) jobs.push({ name: `console${p}`, url: `${CONSOLE}${p}`, key: c.key });
 }
 
-const scan = () => {
-  const out = [];
-  const nm = (el) => `${el.tagName.toLowerCase()}${typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : ''}`;
-  const shown = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.height > 0 && r.width > 0 && cs.display !== 'none' && cs.visibility !== 'hidden' && cs.position !== 'absolute' && cs.position !== 'fixed'; };
-  const boxed = (el) => {
-    if (el.matches('table,.tbl,.fld,.inp,input,textarea,.sel,.ch')) return true;
-    const cs = getComputedStyle(el);
-    const bg = cs.backgroundColor;
-    return (!!bg && !/rgba\(0, 0, 0, 0\)|transparent/.test(bg)) || (parseFloat(cs.borderTopWidth) > 0 && cs.borderTopStyle !== 'none' && parseFloat(cs.borderTopLeftRadius) >= 8);
-  };
-  const texty = (el) => !boxed(el) && !el.querySelector('input,textarea,table,button,.fld,.inp') && (el.textContent ?? '').trim().length > 2 && /^(H[1-6]|P|SMALL|LABEL|SPAN|B|DIV)$/.test(el.tagName);
-  const main = document.querySelector('.mn') ?? document.body;
-  for (const p of [main, ...main.querySelectorAll('*')]) {
-    const cs = getComputedStyle(p);
-    const column = cs.display === 'block' || (cs.display.includes('flex') && cs.flexDirection.startsWith('column')) || cs.display.includes('grid');
-    if (!column || p.closest('.popm,.sxp,.toast,.rw,button,a,.chip,label')) continue;
-    const kids = [...p.children].filter(shown);
-    for (let i = 1; i < kids.length; i++) {
-      const a = kids[i - 1], b = kids[i];
-      const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
-      // one below the other, overlapping sideways
-      if (rb.top < ra.bottom - 2 || rb.left >= ra.right || rb.right <= ra.left) continue;
-      const gap = Math.round(rb.top - ra.bottom);
-      if (gap >= 6) continue;
-      if ((texty(a) && boxed(b)) || (boxed(a) && texty(b))) out.push(`${gap}px between ${nm(a)} “${(a.textContent ?? '').trim().slice(0, 30)}” and ${nm(b)}`);
-    }
-  }
-  return [...new Set(out)];
-};
+const scan = scans.tight;
 
 const browser = await chromium.launch();
 let n = 0;
