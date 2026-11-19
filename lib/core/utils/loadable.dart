@@ -30,9 +30,14 @@ mixin Loadable on GetxController {
     if (state.value != ViewState.success) state.value = ViewState.loading;
     try {
       await body();
-      state.value = (isEmpty?.call() ?? false)
-          ? ViewState.empty
-          : ViewState.success;
+      final next = (isEmpty?.call() ?? false) ? ViewState.empty : ViewState.success;
+      // Screens rebuild on `state`; a reload that ends where it started (success again) must still tell them, or
+      // an approval showed its toast while the list kept the old row until the page was opened again.
+      if (state.value == next) {
+        state.refresh();
+      } else {
+        state.value = next;
+      }
     } on AppException catch (error) {
       errorMessage.value = error.message;
       state.value = ViewState.error;
