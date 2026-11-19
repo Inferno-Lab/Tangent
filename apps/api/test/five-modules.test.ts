@@ -197,7 +197,7 @@ describe('parent-teacher meetings', () => {
     expect(booked.status).toBe(200);
     expect((await call(parent, 'POST', '/v1/f/meetings/book', { slotId: first.teachers[0].slots[1].id, studentId: first.studentId, mode: 'inPerson' })).status).toBe(409);
     // The office cannot give the same time to another child.
-    const other = (await h.schoolSql("select id from students where class_id = $1 and id <> all($2) limit 1", [classes[0], kids.map((k: any) => k.id)]))[0].id;
+    const other = (await h.schoolSql("select id from students where class_id = (select class_id from students where id = $1) and id <> all($2) and status = 'active' limit 1", [first.studentId, kids.map((k: any) => k.id)]))[0].id;
     expect((await call(admin, 'POST', '/v1/meetings/book', { slotId: slot.id, studentId: other, mode: 'inPerson' })).status).toBe(409);
     // The second child, with another teacher at the same time: one family cannot be in two rooms.
     const second = list.children.find((c: any) => c.studentId !== first.studentId && c.teachers[0]?.teacherId !== first.teachers[0].teacherId);

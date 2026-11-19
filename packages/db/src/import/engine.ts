@@ -174,6 +174,14 @@ async function withCustom(client: pg.PoolClient, kind: string, w: Write, rows: R
   };
 }
 
+/**
+ * After a bulk write, the planner's picture of the tables is refreshed: until autovacuum gets to it, it still sees them as
+ * nearly empty and picks plans that crawl once they are full (a year of attendance went from milliseconds to a timeout).
+ */
+export async function freshStats(pool: pg.Pool, tables: string[]): Promise<void> {
+  for (const t of [...new Set(tables)]) await pool.query(`analyze ${ident(t)}`).catch(() => undefined);
+}
+
 /** Imports the rows that passed the checks as one batch, in one transaction, and records how to undo it. Rows with problems are left out. */
 export async function commitImport(pool: pg.Pool, input: ImportInput, byName: string): Promise<ImportBatchRow> {
   const client = await pool.connect();
@@ -198,6 +206,7 @@ export async function commitImport(pool: pg.Pool, input: ImportInput, byName: st
     }
     if (input.uploadId) await client.query("update import_uploads set status = 'imported', batch_id = $2 where id = $1", [input.uploadId, id]);
     await client.query('commit');
+    await freshStats(pool, changes.map((c) => c.table));
     return (await listBatches(pool)).find((b) => b.id === id)!;
   } catch (err) {
     await client.query('rollback').catch(() => undefined);
