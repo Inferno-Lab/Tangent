@@ -121,7 +121,7 @@ class ApiClient {
     return id;
   }
 
-  static final _quiet = RegExp(r'^/v1/auth/|/(position|typing|read|link|calendar-link|order)$');
+  static final _quiet = RegExp(r'^/v1/auth/|/(position|typing|read|link|calendar-link|order|devices)$|/devices/');
 
   Future<dynamic> get(String path, {Map<String, dynamic>? query}) => _send('GET', path, query: query);
 

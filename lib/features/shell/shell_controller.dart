@@ -7,6 +7,7 @@ import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/routes/middlewares.dart';
 import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/services/live_stream.dart';
+import 'package:tangent/core/services/push_service.dart';
 import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/widgets/sheets.dart';
 import 'package:tangent/data/models/user.dart';
@@ -29,6 +30,7 @@ class ShellController extends GetxController {
     SchoolConfig.applyRole((Get.find<AuthService>().role ?? UserRole.parent).name);
     // Live updates (chat, notifications, the bus) while the app is in front.
     if (Get.isRegistered<LiveStream>()) Get.find<LiveStream>().start();
+    if (Get.isRegistered<PushService>()) unawaited(Get.find<PushService>().start());
     unawaited(SchoolConfig.load().then((_) => askConsentIfNeeded()));
     _life = AppLifecycleListener(onResume: () => unawaited(SchoolConfig.load()));
   }
