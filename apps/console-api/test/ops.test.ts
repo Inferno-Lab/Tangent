@@ -139,8 +139,7 @@ describe('public status and kill switches', () => {
     const tok = (await h.s('POST', '/v1/auth/verify', { school: 'moveme', body: { challengeId: login.json.challenge.challengeId, code: /code for \S+ is (\d{6})/.exec(code.body)![1] } })).json.accessToken;
     expect((await h.s('GET', '/v1/fees/summary', { school: 'moveme', token: tok })).status).toBe(200);
     await h.c('PUT', '/console/v1/flags/kill.fees', { token: t, body: { enabled: true, schoolId: school.id, label: 'Fees paused' } });
-    // The school API caches a school for a few seconds.
-    await new Promise((ok) => setTimeout(ok, 16_000));
+    // A flag change drops the cached school, so the pause holds at once.
     const paused = await h.s('GET', '/v1/fees/summary', { school: 'moveme', token: tok });
     expect(paused.status).toBe(423);
     expect(paused.json.message).toMatch(/paused/);
