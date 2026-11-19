@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Chalk ground with the Tangent books, matching the Flutter splash. -->
+<!-- A plain ground until the Flutter splash draws: no picture, so nothing jumps when it hands over. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/tangent_chalk" />
-    <item>
-        <bitmap android:gravity="center" android:src="@drawable/launch_mark" />
-    </item>
 </layer-list>
