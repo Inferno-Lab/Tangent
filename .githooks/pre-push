@@ -1,0 +1,4 @@
+#!/bin/sh
+# Runs the checks for what this push changes (tools/pre-push.mjs). Turned on by `pnpm install` (core.hooksPath).
+# Skipping it (git push --no-verify) is for a docs-only fix when the checks cannot run; CI still checks everything.
+exec node tools/pre-push.mjs
