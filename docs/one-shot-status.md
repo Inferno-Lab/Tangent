@@ -73,17 +73,22 @@ other twenty-five modules of section 6, by the owner's choice.
 
 ## Gates (section 9)
 
-Last run, 18 and 19 November 2026:
+Last full run, 19 November 2026, on `fix/one-shot-gate` (after the one shot was merged):
 
-- Build and types: pass. Package tests: pass (security 8, api-client 7, config-engine 25, tenancy 1, contracts 46,
-  integrations 11, web-ui 25, db 35). Console API 73/73. API 187 (7 stale tests fixed and those files re-run: 89/89;
-  the whole API suite was not run again after the fix).
-- App: `tool/verify.sh` pass (analyze clean, 55 tests). Screenshots of the new screens, parent and teacher, light and
-  dark: checked; spacing and diary order fixed afterwards.
-- Browser flows: 60/60 (five new ones for the modules).
-- UI audit, every page, four widths, light and dark: clean.
-- **Not run yet:** the right-to-left audit (`node tools/audit-ui.mjs --rtl`), the scans (`scan-cutoff`, `scan-fit`,
-  `scan-gaps`, `scan-scroll`), the load script (`node tools/load.mjs`), and one full `pnpm test` after the last fixes.
+- Build and types: pass. Package tests: security 8, api-client 7, config-engine 25, tenancy 1, contracts 46,
+  integrations 11, web-ui 25, db 35. Console API 73/73. API 186/187 in the full run; the one failure (a meetings test that depended on row order) fixed and its file re-run twice, 14/14.
+- App: `tool/verify.sh` pass (analyze clean, 55 tests); screenshots of the new screens checked, parent and teacher,
+  light and dark.
+- Browser flows: 60/60. UI audit, every page, four widths, light and dark: clean. Right-to-left audit: clean.
+- Load (`tools/load.mjs`, the five modules' reads included): every read within target (admin p95 under 210 ms against
+  1000 ms, app p95 under 62 ms against 300 ms).
+- Scans: `scan-scroll` and `scan-fit` clean. `scan-gaps` and `scan-cutoff` report what is so by design: space under the
+  last card of a short list (cards are never stretched), the settings column's fixed reading width, counters whose
+  rolling digits sit inside a mask, long names shortened with an ellipsis; and findings on pages older than the one shot
+  (reports' side list, the console's school page). The ones in the one shot's own pages were fixed.
+- Fixed by this run: reports timing out right after a seed or an import (the tables' statistics were stale; they are
+  refreshed now), the load script's invoice address, the roll call's columns, block names cut on a phone, and a
+  meetings test that depended on row order.
 
 ## Needs the owner (section 10)
 
