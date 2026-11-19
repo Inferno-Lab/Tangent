@@ -6,6 +6,7 @@ import 'package:tangent/core/theme/tokens.dart';
 import 'package:tangent/core/utils/extensions.dart';
 import 'package:tangent/core/widgets/glass.dart';
 import 'package:tangent/core/widgets/states.dart';
+import 'package:tangent/core/widgets/ui/motion.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 /// Space a tab page leaves for the floating dock.
@@ -65,7 +66,10 @@ class PageFrame extends StatelessWidget {
     final top = inset.top + 8;
     // On a tab page a bottom bar floats above the dock.
     final barLift = dockPage ? 76.0 : 0.0;
-    final bottomSpace = bottomBar != null && edgeBar
+    // With the keyboard up the page can scroll its last field above it (and above a bar riding on the keyboard).
+    final bottomSpace = keyboard > 0
+        ? keyboard + (bottomBar != null ? bottomBarHeight + 24 : 16)
+        : bottomBar != null && edgeBar
         ? bottomBarHeight + 24 + inset.bottom
         : bottomBar != null
         ? bottomBarHeight + 48 + barLift + inset.bottom
@@ -76,25 +80,37 @@ class PageFrame extends StatelessWidget {
     // On tablets the reading column stays phone-like and centred.
     final side = padContent ? math.max<double>(20, (MediaQuery.sizeOf(context).width - 720) / 2) : 0.0;
     final c = context.app;
+    final contentTop = topPadding ?? (hasTopRow ? top + 58 : top + 8);
+    // The page's title stays where it is and the page scrolls beneath it (not over art, which has no title row).
+    final title = underlay == null && children.isNotEmpty && _isTitle(children.first) ? children.first : null;
     final list = ListView(
       controller: controller,
       physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-      padding: EdgeInsets.fromLTRB(side, topPadding ?? (hasTopRow ? top + 58 : top + 8), side, bottomSpace),
+      padding: EdgeInsets.fromLTRB(side, title == null ? contentTop : 8, side, bottomSpace),
       children: [
         if (underlay == null) const OfflineCapsule(),
-        ...children,
+        ...title == null ? children : children.skip(1),
       ],
     );
+    final body = title == null
+        ? list
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(padding: EdgeInsets.fromLTRB(side, contentTop, side, 8), child: title),
+              Expanded(child: list),
+            ],
+          );
     return Scaffold(
       backgroundColor: background ?? c.chalk,
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           if (onRefresh == null)
-            Positioned.fill(child: list)
+            Positioned.fill(child: body)
           else
             Positioned.fill(
-              child: _PullToRefresh(onRefresh: onRefresh!, top: top + 10, child: list),
+              child: _PullToRefresh(onRefresh: onRefresh!, top: top + 10, child: body),
             ),
           // A thin scrim keeps the clock readable over text. Nothing else covers content: page-coloured bands read as
           // dark shadows in dark themes.
@@ -155,6 +171,12 @@ class PageFrame extends StatelessWidget {
     );
   }
 }
+
+/// A page's title as screens write it: [PageTitle] alone, in a [Rise], or beside its buttons in a [Row].
+bool _isTitle(Widget w) =>
+    w is PageTitle ||
+    (w is Rise && _isTitle(w.child)) ||
+    (w is Row && w.children.any((c) => c is PageTitle || (c is Flexible && c.child is PageTitle)));
 
 /// Glass back button; pops the current route.
 class BackGlass extends StatelessWidget {

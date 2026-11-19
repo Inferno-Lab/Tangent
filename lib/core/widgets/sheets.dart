@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:tangent/core/theme/app_colors.dart';
@@ -37,7 +39,11 @@ class SheetBody extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(bottom: inset),
       child: Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .9),
+        // Above the keyboard the sheet keeps below the status bar and scrolls its fields, instead of growing past the
+        // top of the screen and being cut off.
+        constraints: BoxConstraints(
+          maxHeight: math.min(MediaQuery.sizeOf(context).height * .9, MediaQuery.sizeOf(context).height - inset - MediaQuery.paddingOf(context).top - 16),
+        ),
         decoration: BoxDecoration(
           color: context.app.paper,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
