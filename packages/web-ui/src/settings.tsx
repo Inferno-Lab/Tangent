@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, hasKey, type AppRole } from '@tangent/config-engine';
-import { AdmissionStages, CERTIFICATE_PLACEHOLDERS, DEFAULT_ADMISSION_STAGES, DEFAULT_CERTIFICATE_TYPES, DEFAULT_LEAVE_TYPES, DEFAULT_TRIP_SESSIONS, TimetableCycle, type CertificateType, type LeaveType, listLabel, type LateRule, type LibraryMember, type LibraryTypeRule, type TripSession, type AdmissionStage, rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, ADDRESS_PARTS, ADDRESS_PART_LABELS, SCHEME_KINDS, SCHEME_KIND_LABELS, BLOCK_KINDS, BLOCK_KIND_LABELS, DEFAULT_TEMPLATES, DOC_KINDS, DOC_KIND_LABELS, DOC_PLACEHOLDERS, PAGE_SIZES, type Block, type DocKind, type DocTemplate, type DocTemplates, type GradeBand, type GradingScheme, type AddressFormat, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
+import { AdmissionStages, CERTIFICATE_PLACEHOLDERS, DEFAULT_ADMISSION_STAGES, DEFAULT_CERTIFICATE_TYPES, DEFAULT_LEAVE_TYPES, DEFAULT_TRIP_SESSIONS, TimetableCycle, type CertificateType, type LeaveType, listLabel, readPlace, type LateRule, type LibraryMember, type LibraryTypeRule, type TripSession, type AdmissionStage, rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, ADDRESS_PARTS, ADDRESS_PART_LABELS, SCHEME_KINDS, SCHEME_KIND_LABELS, BLOCK_KINDS, BLOCK_KIND_LABELS, DEFAULT_TEMPLATES, DOC_KINDS, DOC_KIND_LABELS, DOC_PLACEHOLDERS, PAGE_SIZES, type Block, type DocKind, type DocTemplate, type DocTemplates, type GradeBand, type GradingScheme, type AddressFormat, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
 import { Checkbox, DateField, FilePick, NumberField, TimeField } from './fields';
 import { ColourField } from './ColourPicker';
 import { ErrorLine, Field, SelectField } from './forms';
@@ -365,9 +365,39 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
       const langs = [...new Set([school, ...(Array.isArray(v['app.languages']) ? (v['app.languages'] as string[]) : [])])];
       return box(<TemplatesEditor value={(value ?? {}) as Record<string, string | Record<string, string>>} school={school} languages={langs} disabled={disabled} onChange={onChange} />);
     }
+    case 'place':
+      return <PlaceField label={label} value={str} help={typeof help === 'string' ? help : undefined} error={error} disabled={disabled} onChange={(v) => onChange(v)} />;
     default:
       return <div style={{ marginTop: 12 }}><Field label={meta.label} value={str} onChange={onChange} disabled={disabled} error={error} hint={typeof help === 'string' ? help || undefined : undefined} /></div>;
   }
+}
+
+/** A point on the earth as "lat, lng": typed or pasted from a map, or this device's own position (the browser asks first). */
+function PlaceField({ label, value, help, error, disabled, onChange }: { label: ReactNode; value: string; help?: string; error?: string; disabled?: boolean; onChange: (v: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const at = readPlace(value);
+  const here = () => {
+    if (!('geolocation' in navigator)) { setErr(tr('ui.settings.place_no_location')); return; }
+    setBusy(true); setErr('');
+    navigator.geolocation.getCurrentPosition(
+      (p) => { setBusy(false); onChange(`${p.coords.latitude.toFixed(6)}, ${p.coords.longitude.toFixed(6)}`); },
+      (e) => { setBusy(false); setErr(e.code === e.PERMISSION_DENIED ? tr('ui.settings.place_denied') : tr('ui.settings.place_no_location')); },
+      { enableHighAccuracy: true, timeout: 20_000 },
+    );
+  };
+  const shown = error || err || (value.trim() && !at ? tr('ui.settings.place_invalid') : '');
+  return (
+    <div className="fld" style={{ marginTop: 12 }}>
+      <label>{label}</label>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ flex: '1 1 220px', minWidth: 0 }}><Field label="" aria-label={typeof label === 'string' ? label : tr('ui.settings.place')} value={value} placeholder="51.5074, -0.1278" maxLength={60} disabled={disabled} onChange={onChange} /></div>
+        <button type="button" className="btn sm" disabled={disabled || busy} onClick={here}><Icon name="map" />{busy ? tr('ui.settings.place_finding') : tr('ui.settings.place_here')}</button>
+        {at && <a className="btn sm" href={`https://www.openstreetmap.org/?mlat=${at.lat}&mlon=${at.lng}#map=18/${at.lat}/${at.lng}`} target="_blank" rel="noreferrer">{tr('ui.settings.place_map')}</a>}
+      </div>
+      {shown ? <ErrorLine>{shown}</ErrorLine> : help ? <div className="help">{help}</div> : null}
+    </div>
+  );
 }
 
 /** The logo is a file: picked here, sent with the rest of the change when it is saved. */

@@ -132,6 +132,8 @@ class CheckInCard extends StatelessWidget {
           ? 'staff.in_at'.trp({'time': _time(d.checkIn)}) + (d.checkOut != null ? ' · ${'staff.out_at'.trp({'time': _time(d.checkOut)})}' : '') + (d.late ? ' · ${'staff.late'.tr}' : '')
           : d.why.isNotEmpty
           ? d.why.tr
+          : d.needsPlace
+          ? 'staff.window_place'.trp({'from': d.opens, 'until': d.closes})
           : 'staff.window'.trp({'from': d.opens, 'until': d.closes});
       return EduCard(
         onTap: onHome ? () => Get.toNamed<void>(AppRoutes.staffMe) : null,

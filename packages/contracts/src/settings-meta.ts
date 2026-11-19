@@ -12,7 +12,7 @@ const regionName = (c: string): string => {
 
 /** How the console edits a setting. The console builds its Configuration forms from this list, so a new setting needs no new screen. */
 export type SettingKind =
-  | 'text' | 'textarea' | 'number' | 'bool' | 'enum' | 'color' | 'time' | 'date' | 'language'
+  | 'text' | 'textarea' | 'number' | 'place' | 'bool' | 'enum' | 'color' | 'time' | 'date' | 'language'
   | 'multi' | 'appRoles' | 'appLayout' | 'notifyRules' | 'templates' | 'classes' | 'logo'
   | 'houses' | 'categories' | 'strings' | 'gradingScale' | 'paymentMethods' | 'attendanceMarks' | 'vocabulary' | 'list' | 'customFields' | 'workflows' | 'taxSplit' | 'addressFormat' | 'gradingSchemes' | 'documentTemplates' | 'admissionStages' | 'timetableCycle' | 'weights' | 'lateRule' | 'reminderDays' | 'hours' | 'libraryTypes' | 'libraryMembers' | 'tripSessions' | 'leaveTypes' | 'certificateTypes';
 
@@ -217,8 +217,8 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = localized({
   'staffAttendance.lateAfter': { group: 'staffAttendance', label: 'Late after', kind: 'time', help: 'A check-in after this time is marked late.' },
   'staffAttendance.until': { group: 'staffAttendance', label: 'Check-in closes at', kind: 'time', help: 'After this, the office marks anyone who did not check in.' },
   'staffAttendance.earlyBefore': { group: 'staffAttendance', label: 'Leaving before this is early', kind: 'time' },
-  'staffAttendance.place': { group: 'staffAttendance', label: 'Where the school is (latitude, longitude)', kind: 'text', help: 'From a map, like 51.5074, -0.1278. With a distance below, staff check in only near it.' },
-  'staffAttendance.radius': { group: 'staffAttendance', label: 'Check in within (metres; 0: anywhere)', kind: 'number', min: 0, max: 5000 },
+  'staffAttendance.place': { group: 'staffAttendance', label: 'The middle of the school grounds (latitude, longitude)', kind: 'place', help: 'Stand there and use where you are, or copy it from a map, like 51.5074, -0.1278. With a distance below, staff check in only inside that circle.' },
+  'staffAttendance.radius': { group: 'staffAttendance', label: 'Staff check in within this many metres of it (0: anywhere)', kind: 'number', min: 0, max: 5000, help: 'Wide enough for the whole grounds and the gate, like 150. Phones are given up to 100 m for their own uncertainty.' },
   'staffAttendance.marks': { group: 'staffAttendance', label: 'Marks for staff', kind: 'attendanceMarks', max: 20, help: 'Each with its name, letter and what it means. Approved leave shows as the first mark that means authorised absence.' },
   'staffLeave.types': { group: 'staffAttendance', label: 'Leave types', kind: 'leaveTypes', help: 'Days a year (0 keeps no balance, like unpaid leave), given at the start of the year or a twelfth a month, what carries over, and whether half days and pay apply.' },
   'staffLeave.year': { group: 'staffAttendance', label: 'The leave year', kind: 'enum', options: [['academic', 'The academic year'], ['calendar', 'The calendar year']] },

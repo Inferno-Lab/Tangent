@@ -65,8 +65,16 @@ class StaffTimeController extends GetxController with Loadable {
     try {
       Position? at;
       if (day.value?.needsPlace ?? false) {
-        at = await _where().catchError((Object _) => null);
+        at = await _where().catchError((Object _) {
+          ToastHelper.show('staff.location_failed', kind: ToastKind.error);
+          return null;
+        });
         if (at == null) return;
+        // A location from a mock-location app would let anyone check in from home.
+        if (at.isMocked) {
+          ToastHelper.show('staff.location_mocked', kind: ToastKind.error);
+          return;
+        }
       }
       await _act(() async => day.value = await _repo.checkIn(lat: at?.latitude, lng: at?.longitude, accuracy: at?.accuracy), done: 'staff.checked_in');
     } finally {
