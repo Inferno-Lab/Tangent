@@ -44,8 +44,11 @@ const parent = await parentToken(process.env.PARENT_USER ?? 'priya.sharma@exampl
 const me = await fetch(`${API}/v1/f/me`, { headers: { ...h, authorization: `Bearer ${parent}` } }).then((x) => x.json());
 const child = me.childIds?.[0];
 
-const adminReads = ['/v1/dashboard', '/v1/students?page=1&limit=50', '/v1/fees/invoices?page=1&limit=25', '/v1/reports/attendance-class', '/v1/notices', '/v1/events', '/v1/config'];
-const appReads = ['/v1/f/me', '/v1/f/notices', '/v1/f/events', '/v1/config', ...(child ? [`/v1/f/students/${child}`, `/v1/f/students/${child}/attendance`, `/v1/f/students/${child}/fees`] : [])];
+const adminReads = ['/v1/dashboard', '/v1/students?page=1&limit=50', '/v1/fees/invoice-list?page=1&limit=25', '/v1/reports/attendance-class', '/v1/notices', '/v1/events', '/v1/config',
+  // The one shot's modules: the front desk and the office's busiest pages.
+  '/v1/staff-attendance', '/v1/diary', '/v1/visitors?view=today', '/v1/visitors/roll-call', '/v1/certificates', '/v1/meetings'];
+const appReads = ['/v1/f/me', '/v1/f/notices', '/v1/f/events', '/v1/config', '/v1/f/meetings', '/v1/f/gate-pass', '/v1/f/certificates',
+  ...(child ? [`/v1/f/students/${child}`, `/v1/f/students/${child}/attendance`, `/v1/f/students/${child}/fees`, `/v1/f/diary/student/${child}`] : [])];
 
 const results = [];
 for (const [who, token, reads, target] of [['admin', admin, adminReads, ADMIN_MS], ['app', parent, appReads, APP_MS]]) {
