@@ -21,7 +21,6 @@
     "exams",
     "fees",
     "notices",
-    "chat",
     "events",
     "gallery",
     "library",
@@ -47,14 +46,10 @@
     "fees.taxReceipts",
     "fees.refunds",
     "notices.teacherPosts",
-    "chat.familyChat",
-    "chat.studentChat",
-    "chat.calls",
     "events.rsvp",
     "gallery.downloads",
     "library.reservations",
-    "transport.routes",
-    "transport.liveBus"
+    "transport.routes"
   ],
   "settings": {
     "school.tagline": "Curiosity first. Kindness always.",
@@ -317,8 +312,7 @@
         "dock": [
           "home",
           "academics",
-          "fees",
-          "chat"
+          "fees"
         ],
         "home": [
           "dayRibbon",
@@ -332,16 +326,15 @@
         "quick": [
           "payFees",
           "applyLeave",
-          "messageTeacher",
-          "timetable"
+          "timetable",
+          "bookMeeting"
         ]
       },
       "student": {
         "dock": [
           "home",
           "homework",
-          "timetable",
-          "chat"
+          "timetable"
         ],
         "home": [
           "dayRibbon",
@@ -360,8 +353,7 @@
         "dock": [
           "home",
           "classes",
-          "timetable",
-          "chat"
+          "timetable"
         ],
         "home": [
           "dayRibbon",
@@ -377,9 +369,7 @@
       },
       "driver": {
         "dock": [
-          "home",
-          "trips",
-          "chat"
+          "home"
         ],
         "home": [],
         "quick": []
@@ -453,8 +443,7 @@
         "dock": [
           "home",
           "academics",
-          "fees",
-          "chat"
+          "fees"
         ],
         "home": [
           "dayRibbon",
@@ -468,16 +457,15 @@
         "quick": [
           "payFees",
           "applyLeave",
-          "messageTeacher",
-          "timetable"
+          "timetable",
+          "bookMeeting"
         ]
       },
       "student": {
         "dock": [
           "home",
           "homework",
-          "timetable",
-          "chat"
+          "timetable"
         ],
         "home": [
           "dayRibbon",
@@ -496,8 +484,7 @@
         "dock": [
           "home",
           "classes",
-          "timetable",
-          "chat"
+          "timetable"
         ],
         "home": [
           "checkIn",
@@ -514,9 +501,7 @@
       },
       "driver": {
         "dock": [
-          "home",
-          "trips",
-          "chat"
+          "home"
         ],
         "home": [
           "checkIn"
@@ -531,5 +516,8 @@
     "officerEmail": "hello@greenfield.edu.in",
     "officerPhone": ""
   },
-  "flags": {}
+  "flags": {
+    "kill.chat": true,
+    "kill.transport.liveBus": true
+  }
 }

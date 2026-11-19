@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:tangent/core/routes/app_routes.dart';
+import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
 import 'package:tangent/core/theme/tokens.dart';
@@ -45,6 +46,22 @@ class TransportView extends GetView<TransportController> {
               emptyHint: 'transport.empty_hint',
               emptyActions: [EmptyAction('common.ask_office', icon: PhosphorIconsRegular.lifebuoy, onTap: () => Get.toNamed<void>(AppRoutes.help))],
               child: const SizedBox.shrink(),
+            ),
+          ],
+        );
+      }
+      // Without live tracking (console: Transport → Live bus tracking) the family sees the route and its timetable,
+      // never a map that would look live.
+      if (!SchoolConfig.hasFeature('transport.liveBus')) {
+        return PageFrame(
+          leading: const BackGlass(),
+          onRefresh: controller.load,
+          children: [
+            const PageTitle('transport.title', subtitle: 'transport.live_off'),
+            const SizedBox(height: 16),
+            EduCard(
+              padding: const EdgeInsets.all(20),
+              child: _StopsSheet(route: route, controller: controller, live: false),
             ),
           ],
         );
@@ -339,10 +356,13 @@ class _BusBubbleState extends State<_BusBubble> with TickerProviderStateMixin {
 }
 
 class _StopsSheet extends StatelessWidget {
-  const _StopsSheet({required this.route, required this.controller});
+  const _StopsSheet({required this.route, required this.controller, this.live = true});
 
   final TransportInfo route;
   final TransportController controller;
+
+  /// False: the route on a card with its timetable, no arrival time and no stop marked as reached.
+  final bool live;
 
   static const _row = 37.0;
 
@@ -350,17 +370,28 @@ class _StopsSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.app;
     final stops = route.stops;
-    final reached = stops.where((s) => s.reached).length;
-    final next = stops.indexWhere((s) => !s.reached);
-    return Container(
-      decoration: BoxDecoration(
-        color: c.paper,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        border: Border(top: BorderSide(color: c.line)),
-      ),
-      child: ListView(
-        padding: EdgeInsets.fromLTRB(20, 22, 20, MediaQuery.paddingOf(context).bottom + 22),
-        children: [
+    final reached = live ? stops.where((s) => s.reached).length : 0;
+    final next = live ? stops.indexWhere((s) => !s.reached) : -1;
+    final children = [
+          if (!live)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Overline('transport.to'.trp({'stop': stops.isEmpty ? '' : stops.last.name})),
+                      const SizedBox(height: 8),
+                      Text(route.routeName, style: context.type.h3),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(route.busNumber, style: context.type.mono.copyWith(color: c.ink)),
+              ],
+            )
+          else
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -417,7 +448,7 @@ class _StopsSheet extends StatelessWidget {
                     for (var i = 0; i < stops.length; i++)
                       SizedBox(
                         height: _row,
-                        child: _StopRow(stop: stops[i], next: i == next, last: i == stops.length - 1),
+                        child: _StopRow(stop: stops[i], next: i == next, last: i == stops.length - 1, reached: live && stops[i].reached),
                       ),
                   ],
                 ),
@@ -453,23 +484,34 @@ class _StopsSheet extends StatelessWidget {
                 ),
             ],
           ),
-        ],
+    ];
+    if (!live) return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
+    return Container(
+      decoration: BoxDecoration(
+        color: c.paper,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        border: Border(top: BorderSide(color: c.line)),
+      ),
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(20, 22, 20, MediaQuery.paddingOf(context).bottom + 22),
+        children: children,
       ),
     );
   }
 }
 
 class _StopRow extends StatelessWidget {
-  const _StopRow({required this.stop, required this.next, required this.last});
+  const _StopRow({required this.stop, required this.next, required this.last, required this.reached});
 
   final BusStop stop;
   final bool next;
   final bool last;
+  final bool reached;
 
   @override
   Widget build(BuildContext context) {
     final c = context.app;
-    final Widget dot = stop.reached && !last
+    final Widget dot = reached && !last
         ? Dot(c.ink, size: 14)
         : Container(
             width: 14,
@@ -495,7 +537,7 @@ class _StopRow extends StatelessWidget {
             name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: stop.reached && !last ? context.type.s : context.type.ts,
+            style: reached && !last ? context.type.s : context.type.ts,
           ),
         ),
         Text(time, style: context.type.mono.copyWith(color: c.ink3)),

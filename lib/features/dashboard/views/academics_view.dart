@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
@@ -14,6 +15,7 @@ import 'package:tangent/core/widgets/page.dart';
 import 'package:tangent/core/widgets/states.dart';
 import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/features/dashboard/controllers/academics_controller.dart';
+import 'package:tangent/features/dashboard/widgets/home_cards.dart';
 import 'package:tangent/features/shell/shell_controller.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -62,7 +64,7 @@ class AcademicsView extends GetView<AcademicsController> {
             emptyBody: 'academics.empty_body',
             emptyArt: EmptyArt.results,
             emptyHint: 'academics.empty_hint',
-            emptyActions: [EmptyAction('common.ask_teacher', icon: PhosphorIconsRegular.chatCircle, onTap: () => ShellController.showTab('chat'))],
+            emptyActions: [if (SchoolConfig.has('chat')) EmptyAction('common.ask_teacher', icon: PhosphorIconsRegular.chatCircle, onTap: () => ShellController.showTab('chat'))],
             child: controller.shelf.isEmpty
                 ? const SizedBox.shrink()
                 : Column(
@@ -76,6 +78,8 @@ class AcademicsView extends GetView<AcademicsController> {
                     ],
                   ),
           ),
+          // The child's other learning pages (diary, library, meetings, certificates); on a new school too.
+          const Rise(index: 4, child: SchoolLinks('learning', title: 'academics.more')),
         ],
       );
     });

@@ -55,7 +55,7 @@ class ShellController extends GetxController {
     final at = shell.tabs.indexOf(key);
     if (at >= 0) {
       shell.go(at);
-    } else if (key == 'chat') {
+    } else if (key == 'chat' && SchoolConfig.has('chat')) {
       unawaited(Get.toNamed<void>(AppRoutes.chat));
     }
   }

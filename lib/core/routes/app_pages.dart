@@ -133,6 +133,9 @@ class AppPages {
     _page(AppRoutes.noticeDetail, const NoticeDetailView(), NoticeDetailController.new),
     _page(AppRoutes.events, const EventsView(), EventsController.new),
     GetPage(name: AppRoutes.eventDetail, page: () => const EventDetailView(), binding: BindingsBuilder<void>(() => Get.lazyPut(EventsController.new, fenix: true)), middlewares: [AuthMiddleware()], transition: Transition.fadeIn),
+    // Chat is a tab, and a page of its own where the school has no chat tab (Home's Message a teacher, the shell's
+    // showTab): without this route those taps went nowhere.
+    _page(AppRoutes.chat, const ChatListView(), ChatListController.new),
     _page(AppRoutes.chatThread, const ChatThreadView(), ChatThreadController.new),
     _page(AppRoutes.library, const LibraryView(), LibraryController.new),
     _page(AppRoutes.transport, const TransportView(), TransportController.new),

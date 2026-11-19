@@ -15,6 +15,7 @@ import 'package:tangent/core/widgets/page.dart';
 import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/data/models/academics.dart';
 import 'package:tangent/data/models/campus.dart';
+import 'package:tangent/data/models/user.dart';
 import 'package:tangent/features/dashboard/controllers/dashboard_controller.dart';
 import 'package:tangent/features/dashboard/views/dashboard_view.dart';
 import 'package:intl/intl.dart';
@@ -38,43 +39,129 @@ class QuickRow extends StatelessWidget {
   };
 
   @override
+  Widget build(BuildContext context) => Obx(
+    () => QuickGrid(
+      items: [
+        for (final k in SchoolConfig.quick.where(_buttons.containsKey))
+          (_buttons[k]!.$2, _buttons[k]!.$1, () => Get.toNamed<void>(_buttons[k]!.$3)),
+      ],
+    ),
+  );
+}
+
+/// Quick buttons two to a row: the old Home's chips (an icon and the whole name) grown into Hue's tiles. A name takes
+/// two lines when it needs them, so it is never cut short however many buttons the console picks.
+class QuickGrid extends StatelessWidget {
+  const QuickGrid({required this.items, super.key});
+
+  /// Icon, translation key of the name, and the tap (null shows the button but leaves it off).
+  final List<(IconData, String, VoidCallback?)> items;
+
+  @override
   Widget build(BuildContext context) {
-    return Obx(() {
-      final keys = SchoolConfig.quick.where(_buttons.containsKey).toList();
-      if (keys.isEmpty) return const SizedBox.shrink();
-      // The quick tiles of the ParentHome board: up to four, each an icon on the brand's soft fill with its name below.
-      final c = context.app;
-      return Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (final (i, k) in keys.take(4).indexed) ...[
-              if (i > 0) const SizedBox(width: 10),
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < items.length; i += 2) ...[
+          if (i > 0) const SizedBox(height: 10),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _tile(context, items[i])),
+                const SizedBox(width: 10),
+                Expanded(child: i + 1 < items.length ? _tile(context, items[i + 1]) : const SizedBox.shrink()),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _tile(BuildContext context, (IconData, String, VoidCallback?) item) {
+    final c = context.app;
+    final (icon, key, onTap) = item;
+    return Pressable(
+      onTap: onTap,
+      label: key.tr,
+      child: Opacity(
+        opacity: onTap == null ? .5 : 1,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
+          decoration: BoxDecoration(
+            color: c.paper,
+            borderRadius: BorderRadius.circular(AppRadius.field),
+            border: Border.all(color: c.line),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(color: c.mariSoft, borderRadius: BorderRadius.circular(AppRadius.md)),
+                child: Icon(icon, size: 20, color: c.mariText),
+              ),
+              const SizedBox(width: 10),
               Expanded(
-                child: Pressable(
-                  onTap: () => Get.toNamed<void>(_buttons[k]!.$3),
-                  label: _buttons[k]!.$1.tr,
-                  child: Column(
-                    children: [
-                      Container(
-                        height: 60,
-                        decoration: BoxDecoration(color: c.mariSoft, borderRadius: BorderRadius.circular(AppRadius.panel)),
-                        alignment: Alignment.center,
-                        child: Icon(_buttons[k]!.$2, size: 24, color: c.mariText),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(_buttons[k]!.$1.tr, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: context.type.capB.copyWith(color: c.ink)),
-                    ],
-                  ),
-                ),
+                child: Text(key.tr, maxLines: 2, overflow: TextOverflow.ellipsis, style: context.type.ts.copyWith(color: c.ink)),
               ),
             ],
-          ],
+          ),
         ),
-      );
-    });
+      ),
+    );
   }
+}
+
+/// The school's other pages, each where it belongs: learning on Academics, the day-to-day of school on Home, a teacher's
+/// class work on My classes. Profile keeps to the person. Only modules the school has (console: Modules), and never a
+/// page the console already put in the dock.
+class SchoolLinks extends StatelessWidget {
+  const SchoolLinks(this.place, {required this.title, super.key});
+
+  /// `learning`, `school` or `classes`.
+  final String place;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) => Obx(() {
+    final role = Get.find<AuthService>().role;
+    final parent = role == UserRole.parent;
+    final student = role == UserRole.student;
+    final teacher = role == UserRole.teacher;
+    bool has(String module, [String? tab]) => SchoolConfig.has(module) && !SchoolConfig.dock.contains(tab ?? module);
+    (IconData, String, VoidCallback?) go(IconData icon, String key, String route) => (icon, key, () => Get.toNamed<void>(route));
+    final items = switch (place) {
+      'learning' => [
+        if (has('diary')) go(PhosphorIconsRegular.notePencil, 'menu.diary', AppRoutes.diary),
+        if (has('library')) go(PhosphorIconsRegular.bookOpen, 'menu.library', AppRoutes.library),
+        if (has('ptm', 'meetings') && !student) go(PhosphorIconsRegular.calendarPlus, 'menu.meetings', AppRoutes.meetings),
+        if (has('certificates') && parent) go(PhosphorIconsRegular.certificate, 'menu.certificates', AppRoutes.certificates),
+      ],
+      'classes' => [
+        if (has('diary')) go(PhosphorIconsRegular.notePencil, 'menu.diary', AppRoutes.teacherDiary),
+        if (has('ptm', 'meetings')) go(PhosphorIconsRegular.calendarPlus, 'menu.meetings', AppRoutes.teacherMeetings),
+        if (has('visitors', 'invite')) go(PhosphorIconsRegular.userPlus, 'menu.invite_visitor', AppRoutes.inviteVisitor),
+        if (has('library')) go(PhosphorIconsRegular.bookOpen, 'menu.library', AppRoutes.library),
+      ],
+      _ => [
+        if (has('notices')) go(PhosphorIconsRegular.megaphone, 'menu.notices', AppRoutes.notices),
+        if (has('events')) go(PhosphorIconsRegular.calendarBlank, 'menu.events', AppRoutes.events),
+        if (has('gallery')) go(PhosphorIconsRegular.image, 'menu.gallery', AppRoutes.gallery),
+        if (has('transport') && !teacher) go(PhosphorIconsRegular.bus, 'menu.transport', AppRoutes.transport),
+        if (!teacher) go(PhosphorIconsRegular.calendarCheck, 'menu.leave', AppRoutes.leave),
+        if (has('visitors', 'gatePass') && parent) go(PhosphorIconsRegular.doorOpen, 'menu.gate_pass', AppRoutes.gatePass),
+        if (!student) go(PhosphorIconsRegular.clipboardText, 'menu.forms', AppRoutes.forms),
+      ],
+    };
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [SectionLabel(title.tr, top: 24), QuickGrid(items: items)],
+    );
+  });
 }
 
 /// The latest notices, pinned ones first (console: Home screen cards → Latest notices).

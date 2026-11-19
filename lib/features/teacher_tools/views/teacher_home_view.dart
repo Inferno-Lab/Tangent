@@ -5,7 +5,6 @@ import 'package:get/get.dart';
 import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
-import 'package:tangent/core/theme/tokens.dart';
 import 'package:tangent/core/utils/extensions.dart';
 import 'package:tangent/core/utils/schedule.dart';
 import 'package:tangent/core/utils/view_state.dart';
@@ -18,6 +17,7 @@ import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/data/models/campus.dart';
 import 'package:tangent/data/models/student.dart';
 import 'package:tangent/features/dashboard/views/dashboard_view.dart' show PeriodStrip, greeting, todayLine;
+import 'package:tangent/features/dashboard/widgets/home_cards.dart' show QuickGrid, SchoolLinks;
 import 'package:tangent/features/shell/shell_controller.dart';
 import 'package:tangent/features/teacher_tools/controllers/teacher_controller.dart';
 import 'package:tangent/features/school_life/views/staff_time_view.dart';
@@ -118,7 +118,6 @@ class _Body extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.app;
     final now = controller.current;
     final next = controller.next;
     final String line;
@@ -178,55 +177,25 @@ class _Body extends StatelessWidget {
           const Rise(index: 1, child: CheckInCard(onHome: true)),
           const SizedBox(height: 16),
         ],
+        // The console's quick buttons for staff (The app → Quick buttons); the server keeps only those of modules the
+        // school has. Roll call and marks open the class in front of the teacher now, or their own.
         Rise(
           index: 2,
-          child: Row(
-            children: [
-              for (final (i, a) in [
-                (
-                  PhosphorIconsBold.check,
-                  'teacher.qa_attendance',
-                  focus == null ? null : () => Get.toNamed<void>(_attendanceRoute((controller.own ?? focus).id)),
-                ),
-                (
-                  PhosphorIconsRegular.fileText,
-                  'teacher.qa_assign',
-                  () => Get.toNamed<void>(AppRoutes.teacherAssign, arguments: {'classId': focus?.id}),
-                ),
-                (
-                  PhosphorIconsRegular.pencilSimple,
-                  'teacher.qa_grade',
-                  () => Get.toNamed<void>(AppRoutes.teacherGrade),
-                ),
-                (PhosphorIconsRegular.megaphone, 'teacher.qa_notice', () => Get.toNamed<void>(AppRoutes.teacherNotice)),
-              ].indexed) ...[
-                if (i > 0) const SizedBox(width: 8),
-                Expanded(
-                  child: Semantics(
-                    button: true,
-                    label: a.$2.tr,
-                    excludeSemantics: true,
-                    child: Pressable(
-                      onTap: a.$3,
-                      // The quick tiles of the home boards: the icon on the brand's soft fill, the word below.
-                      child: Column(
-                        children: [
-                          Container(
-                            height: 60,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(color: c.mariSoft, borderRadius: BorderRadius.circular(AppRadius.panel)),
-                            child: Icon(a.$1, size: 24, color: c.mariText),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(a.$2.tr, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: context.type.capB.copyWith(color: c.ink)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
+          child: Obx(() {
+            final cls = controller.own ?? focus;
+            final buttons = <String, (IconData, String, VoidCallback?)>{
+              'markAttendance': (PhosphorIconsBold.check, 'teacher.qa_attendance', cls == null ? null : () => Get.toNamed<void>(_attendanceRoute(cls.id))),
+              'assignHomework': (PhosphorIconsRegular.fileText, 'teacher.qa_assign', () => Get.toNamed<void>(AppRoutes.teacherAssign, arguments: {'classId': focus?.id})),
+              'grade': (PhosphorIconsRegular.pencilSimple, 'teacher.qa_grade', () => Get.toNamed<void>(AppRoutes.teacherGrade)),
+              'enterMarks': (PhosphorIconsRegular.exam, 'teacher.qa_marks', cls == null ? null : () => Get.toNamed<void>(_marksRoute(cls.id))),
+              'postNotice': (PhosphorIconsRegular.megaphone, 'teacher.qa_notice', () => Get.toNamed<void>(AppRoutes.teacherNotice)),
+              'staffLeave': (PhosphorIconsRegular.calendarPlus, 'teacher.qa_leave', () => Get.toNamed<void>(AppRoutes.staffMe)),
+              'writeDiary': (PhosphorIconsRegular.notebook, 'teacher.qa_diary', () => Get.toNamed<void>(AppRoutes.teacherDiary)),
+              'mySlots': (PhosphorIconsRegular.calendarDots, 'teacher.qa_slots', () => Get.toNamed<void>(AppRoutes.teacherMeetings)),
+              'inviteVisitor': (PhosphorIconsRegular.userPlus, 'teacher.qa_visitor', () => Get.toNamed<void>(AppRoutes.inviteVisitor)),
+            };
+            return QuickGrid(items: [for (final k in SchoolConfig.quick) ?buttons[k]]);
+          }),
         ),
         if (tasks.isNotEmpty) ...[
           Rise(index: 3, child: SectionLabel('teacher.needs_you'.trp({'n': '${tasks.length}'}))),
@@ -263,6 +232,7 @@ class _Body extends StatelessWidget {
             ),
           ),
         ],
+        const Rise(index: 6, child: SchoolLinks('school', title: 'home.around_school')),
       ],
     );
   }
@@ -449,6 +419,8 @@ class TeacherClassesView extends GetView<TeacherHomeController> {
               ],
             ),
           ),
+          // A class teacher's other work: the diary, meeting slots, visitors.
+          const SchoolLinks('classes', title: 'teacher.class_work'),
         ],
       );
     });

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
@@ -583,22 +584,24 @@ class AttendanceDaySheet extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 24),
-          if (absent)
+          // Asking for notes goes through chat, so it is offered only where the school has chat.
+          if (absent && (SchoolConfig.has('chat') || leave == null))
             Row(
               children: [
-                Expanded(
-                  child: Btn(
-                    'attendance.ask_notes',
-                    kind: BtnKind.quiet,
-                    expand: true,
-                    onPressed: () {
-                      Get.back<void>();
-                      unawaited(Get.toNamed<void>(AppRoutes.chat));
-                    },
+                if (SchoolConfig.has('chat'))
+                  Expanded(
+                    child: Btn(
+                      'attendance.ask_notes',
+                      kind: BtnKind.quiet,
+                      expand: true,
+                      onPressed: () {
+                        Get.back<void>();
+                        unawaited(Get.toNamed<void>(AppRoutes.chat));
+                      },
+                    ),
                   ),
-                ),
                 if (leave == null) ...[
-                  const SizedBox(width: 10),
+                  if (SchoolConfig.has('chat')) const SizedBox(width: 10),
                   Expanded(
                     flex: 13,
                     child: Btn(

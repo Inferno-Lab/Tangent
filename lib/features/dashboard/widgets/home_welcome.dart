@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/utils/extensions.dart';
@@ -9,7 +10,7 @@ import 'package:tangent/features/shell/shell_controller.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 List<(IconData, String, String, VoidCallback)> _firstSteps() => [
-  (PhosphorIconsRegular.chatCircle, 'home.step_chat', 'home.step_chat_sub', () => ShellController.showTab('chat')),
+  if (SchoolConfig.has('chat')) (PhosphorIconsRegular.chatCircle, 'home.step_chat', 'home.step_chat_sub', () => ShellController.showTab('chat')),
   (PhosphorIconsRegular.identificationCard, 'home.step_profile', 'home.step_profile_sub', () => ShellController.showTab('profile')),
   (PhosphorIconsRegular.bellRinging, 'home.step_alerts', 'home.step_alerts_sub', () => Get.toNamed<void>(AppRoutes.settings)),
 ];
