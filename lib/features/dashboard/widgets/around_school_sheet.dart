@@ -168,7 +168,7 @@ class AroundSchoolSheet extends StatelessWidget {
       if (_open('diary'))
         (
           wide: true,
-          height: teacher ? 84 : 104,
+          height: teacher ? 84 : 112,
           child: _QuoteTile(
             over: g.diary == null ? 'school.diary'.tr : 'school.diary_on'.trp({'date': _diaryDay(g.diary!.date, lang)}),
             text: teacher ? 'school.diary_write'.tr : (g.diary?.text.isNotEmpty ?? false ? g.diary!.text : 'school.diary_none'.tr),

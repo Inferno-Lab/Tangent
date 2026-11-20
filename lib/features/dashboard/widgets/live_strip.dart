@@ -162,7 +162,7 @@ class _LiveStripState extends State<LiveStrip> with SingleTickerProviderStateMix
                         children: [
                           Text(over, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.cap(color: c.onDeep2)),
                           Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.h3(color: tone)),
-                          Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.cap(color: c.onDeep2)),
+                          Text(sub, maxLines: lessons.isEmpty ? 2 : 1, overflow: TextOverflow.ellipsis, style: AppText.cap(color: c.onDeep2)),
                         ],
                       ),
                     ),
