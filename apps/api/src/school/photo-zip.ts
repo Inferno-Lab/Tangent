@@ -110,7 +110,8 @@ export class PhotoZipService implements OnModuleInit {
       if (++done % 20 === 0) await s.pool.query('update photo_imports set done = $2, matched = $3 where id = $1', [imp.id, done, matched]);
     }
     await s.pool.query("update photo_imports set status = 'done', done = $2, matched = $3, unmatched = $4, done_at = now() where id = $1", [imp.id, done, matched, JSON.stringify(unmatched.slice(0, 500))]);
-    return `${matched} of ${photos.length} photos and documents matched.`;
+    const pdfs = photos.filter(([name]) => /\.pdf$/i.test(name)).length;
+    return `${matched} of ${photos.length} ${!pdfs ? 'photos' : pdfs === photos.length ? 'documents' : 'photos and documents'} matched.`;
   }
 }
 
