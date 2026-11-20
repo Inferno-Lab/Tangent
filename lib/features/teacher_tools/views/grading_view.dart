@@ -466,6 +466,8 @@ class _GradeSheetViewState extends State<GradeSheetView> {
           ),
           Positioned.fill(
             top: paperH,
+            // Ends at the keyboard, so the feedback field scrolls into view when it is typed into.
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
             child: Container(
               decoration: BoxDecoration(
                 color: c.paper,

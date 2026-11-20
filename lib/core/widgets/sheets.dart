@@ -64,43 +64,49 @@ class _SheetBodyState extends State<SheetBody> {
     final footer = widget.footer;
     final inset = MediaQuery.viewInsetsOf(context).bottom;
     final safe = MediaQuery.paddingOf(context).bottom;
-    return Padding(
-      padding: EdgeInsets.only(bottom: inset),
-      child: Container(
-        // Above the keyboard the sheet keeps below the status bar and scrolls its fields, instead of growing past the
-        // top of the screen and being cut off.
-        constraints: BoxConstraints(
-          maxHeight: math.min(MediaQuery.sizeOf(context).height * .9, MediaQuery.sizeOf(context).height - inset - MediaQuery.paddingOf(context).top - 16),
-        ),
-        decoration: BoxDecoration(
-          color: context.app.paper,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
-          boxShadow: [BoxShadow(color: AppColors.light.ink.withValues(alpha: 0.2), blurRadius: 40, offset: const Offset(0, -12))],
-        ),
-        child: Form(
-          key: _form,
-          autovalidateMode: AutovalidateMode.onUserInteraction,
-          child: SafeArea(
-            top: false,
-            minimum: EdgeInsets.only(bottom: safe > 0 ? 0 : 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Grab(),
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: padding,
-                    child: child,
+    // The route may already end the sheet's space at the keyboard (Get's sheets do) or give it the whole screen: lift the
+    // sheet by the keyboard only in the second case. Padding it in the first counted the keyboard twice, squeezed the sheet
+    // and pushed it up under the status bar, cut off.
+    return LayoutBuilder(builder: (context, box) {
+      final screen = MediaQuery.sizeOf(context).height;
+      final double lift = box.maxHeight > screen - inset + 1 ? inset : 0;
+      // Below the status bar (from the device itself: a bottom sheet is given a MediaQuery without the top safe area),
+      // and never taller than nine tenths of the screen; what does not fit scrolls.
+      final double room = math.max(0, math.min(screen * .9, box.maxHeight - lift - _statusBar(context) - 16));
+      return Padding(
+        padding: EdgeInsets.only(bottom: lift),
+        child: Container(
+          constraints: BoxConstraints(maxHeight: room),
+          decoration: BoxDecoration(
+            color: context.app.paper,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
+            boxShadow: [BoxShadow(color: AppColors.light.ink.withValues(alpha: 0.2), blurRadius: 40, offset: const Offset(0, -12))],
+          ),
+          child: Form(
+            key: _form,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            child: SafeArea(
+              top: false,
+              minimum: EdgeInsets.only(bottom: safe > 0 ? 0 : 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Grab(),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: padding,
+                      child: child,
+                    ),
                   ),
-                ),
-                if (footer != null) Padding(padding: const EdgeInsets.fromLTRB(24, 12, 24, 16), child: footer),
-              ],
+                  if (footer != null) Padding(padding: const EdgeInsets.fromLTRB(24, 12, 24, 16), child: footer),
+                ],
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    });
   }
 }
 
@@ -152,4 +158,9 @@ Future<bool> confirmSheet({
     ),
   );
   return result ?? false;
+}
+
+double _statusBar(BuildContext context) {
+  final view = View.of(context);
+  return view.padding.top / view.devicePixelRatio;
 }
