@@ -2,12 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:tangent/features/auth/views/account_sheets.dart';
-import 'package:tangent/features/auth/views/password_sheets.dart';
 import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/services/auth_service.dart';
-import 'package:tangent/data/models/user.dart';
 import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/services/theme_service.dart';
 import 'package:tangent/core/theme/app_colors.dart';
@@ -26,7 +23,7 @@ import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/data/models/student.dart';
 import 'package:tangent/data/repositories/directory_repository.dart';
 import 'package:tangent/features/chat/controllers/chat_controller.dart';
-import 'package:tangent/features/settings/views/privacy_sheet.dart';
+import 'package:tangent/features/profile/views/profile_sections.dart' show LinkRow;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -217,32 +214,20 @@ class SettingsView extends StatelessWidget {
           EduCard(
             child: Column(
               children: [
-                _LinkRow(
+                LinkRow(
                   icon: PhosphorIconsRegular.info,
                   label: 'menu.about',
                   onTap: () => Get.toNamed<void>(AppRoutes.about),
                 ),
                 const Hr(indent: 46),
-                _LinkRow(
+                LinkRow(
                   icon: PhosphorIconsRegular.question,
                   label: 'menu.help',
                   onTap: () => Get.toNamed<void>(AppRoutes.help),
                 ),
                 const Hr(indent: 46),
-                _LinkRow(icon: PhosphorIconsRegular.shieldCheck, label: 'privacy.title', onTap: () => unawaited(showPrivacy())),
-                const Hr(indent: 46),
-                // Staff sign in with a password; families sign in with a code and have none to change.
-                if (Get.find<AuthService>().role == UserRole.teacher) ...[
-                  _LinkRow(icon: PhosphorIconsRegular.password, label: 'auth.change_password', onTap: () => unawaited(showChangePassword())),
-                  const Hr(indent: 46),
-                ],
-                _LinkRow(icon: PhosphorIconsRegular.at, label: 'account.phone_email', onTap: () => unawaited(showContactChange())),
-                const Hr(indent: 46),
-                _LinkRow(icon: PhosphorIconsRegular.devices, label: 'account.devices', onTap: () => unawaited(showDevices())),
-                const Hr(indent: 46),
-                _LinkRow(icon: PhosphorIconsRegular.signOut, label: 'auth.sign_out_everywhere', onTap: () => unawaited(signOutEverywhere())),
-                const Hr(indent: 46),
-                _LinkRow(
+                // The account (how you are reached, password, devices, your data) is on Profile; signing out is in both.
+                LinkRow(
                   icon: PhosphorIconsRegular.signOut,
                   label: 'common.logout',
                   color: c.badText,
@@ -351,34 +336,6 @@ class _ThemeTile extends StatelessWidget {
       ),
     );
   }
-}
-
-class _LinkRow extends StatelessWidget {
-  const _LinkRow({required this.icon, required this.label, required this.onTap, this.color});
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) => Pressable(
-    onTap: onTap,
-    scale: .985,
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: color ?? context.app.ink),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(label.tr, style: context.type.ts.copyWith(color: color)),
-          ),
-          if (color == null) Icon(PhosphorIconsRegular.caretRight, size: 16, color: context.app.ink3),
-        ],
-      ),
-    ),
-  );
 }
 
 class AboutView extends StatefulWidget {

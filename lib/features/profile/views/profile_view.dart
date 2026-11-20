@@ -16,7 +16,9 @@ import 'package:tangent/core/widgets/page.dart';
 import 'package:tangent/core/widgets/states.dart';
 import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/data/models/user.dart';
-import 'package:tangent/features/dashboard/widgets/home_cards.dart' show QuickGrid;
+import 'package:tangent/features/profile/views/profile_sections.dart';
+import 'package:tangent/features/school_life/views/staff_time_view.dart' show CheckInCard;
+import 'package:tangent/features/settings/views/settings_view.dart' show signOut;
 import 'package:tangent/features/profile/controllers/profile_controller.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -48,7 +50,7 @@ class ProfileView extends GetView<ProfileController> {
         children: [
           Row(
             children: [
-              Expanded(child: Builder(builder: (context) => Text('profile.title'.tr, style: context.type.h1))),
+              const Expanded(child: PageTitle('profile.title')),
               GlassIconButton(
                 icon: PhosphorIconsRegular.slidersHorizontal,
                 label: 'menu.settings'.tr,
@@ -110,21 +112,23 @@ class ProfileView extends GetView<ProfileController> {
                       onPhoto: () => unawaited(controller.editPhoto()),
                     ),
                   ),
-                // Profile keeps to the person; the school's pages live on Home, Academics and My classes.
-                if (role == UserRole.teacher && SchoolConfig.has('staffAttendance')) ...[
-                  Rise(index: 1, child: SectionLabel('profile.mine'.tr, top: 20)),
-                  Rise(
-                    index: 2,
-                    child: QuickGrid(
-                      items: [
-                        (PhosphorIconsRegular.clockUser, 'menu.my_attendance', () => Get.toNamed<void>(AppRoutes.staffMe)),
-                        (PhosphorIconsRegular.bell, 'menu.notifications', () => Get.toNamed<void>(AppRoutes.notifications)),
-                      ],
-                    ),
-                  ),
+                // Profile is the person: their figures, their family or their day, their account. The school's pages live
+                // on Home, Academics and My classes.
+                if (student != null && role == UserRole.parent) ...[
+                  const SizedBox(height: 12),
+                  const Rise(index: 1, child: ChildFigures()),
+                  const Rise(index: 2, child: ChildrenRow()),
+                ],
+                if (role == UserRole.teacher) ...[
+                  const SizedBox(height: 12),
+                  const Rise(index: 1, child: TeacherFigures()),
+                  if (SchoolConfig.has('staffAttendance')) ...[
+                    Rise(index: 2, child: SectionLabel('profile.your_day'.tr, action: 'profile.leave_and_history', onAction: () => Get.toNamed<void>(AppRoutes.staffMe))),
+                    const Rise(index: 2, child: CheckInCard()),
+                  ],
                 ],
                 if (student != null) ...[
-                  const SizedBox(height: 12),
+                  Rise(index: 3, child: SectionLabel((role == UserRole.parent ? 'profile.family' : 'profile.guardian_title').tr)),
                   Rise(
                     index: 3,
                     child: EduCard(
@@ -159,6 +163,7 @@ class ProfileView extends GetView<ProfileController> {
                     ),
                   ),
                 ],
+                if (user != null) Rise(index: 4, child: AccountCard(onSignOut: () => unawaited(signOut()))),
               ],
             ),
           ),
@@ -264,13 +269,23 @@ class _IdCard extends StatelessWidget {
                         Text(name, style: context.type.h2.copyWith(color: on)),
                         const SizedBox(height: 10),
                         LayoutBuilder(
-                          builder: (context, box) => Wrap(
+                          builder: (context, box) {
+                            final half = (box.maxWidth - 10) / 2;
+                            // Two facts to a row; one that would wrap there (a phone number, a long class list) takes the
+                            // whole row, so a value never breaks over two lines.
+                            bool fits(String s) => (TextPainter(
+                              text: TextSpan(text: s, style: AppText.ts(color: on)),
+                              textDirection: Directionality.of(context),
+                              textScaler: MediaQuery.textScalerOf(context),
+                              maxLines: 1,
+                            )..layout()).width <= half;
+                            return Wrap(
                             spacing: 10,
                             runSpacing: 8,
                             children: [
                               for (final f in facts)
                                 SizedBox(
-                                  width: (box.maxWidth - 10) / 2,
+                                  width: fits(f.$2) ? half : box.maxWidth,
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
@@ -281,7 +296,8 @@ class _IdCard extends StatelessWidget {
                                   ),
                                 ),
                             ],
-                          ),
+                          );
+                          },
                         ),
                       ],
                     ),
