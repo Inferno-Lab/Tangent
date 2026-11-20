@@ -8,6 +8,7 @@ import 'package:tangent/core/utils/schedule.dart';
 import 'package:tangent/core/utils/status.dart';
 import 'package:tangent/data/models/academics.dart';
 import 'package:tangent/data/models/student.dart';
+import 'package:tangent/data/models/user.dart';
 import 'package:tangent/data/repositories/academic_repository.dart';
 import 'package:tangent/data/repositories/directory_repository.dart';
 import 'package:tangent/core/utils/clock.dart';
@@ -21,6 +22,10 @@ class TimetableController extends GetxController with Loadable {
   List<TimetableDay> days = [];
   SchoolClass? schoolClass;
   final teachers = <String, String>{}.obs;
+
+  /// A teacher's timetable: the class each of their lessons is with (their lessons come from all their classes).
+  final classOf = <PeriodSlot, SchoolClass>{};
+  bool get forTeacher => Get.find<AuthService>().role == UserRole.teacher;
 
   /// Subjects with homework due by the next school day.
   Set<String> homeworkDue = {};
@@ -62,6 +67,8 @@ class TimetableController extends GetxController with Loadable {
 
   @override
   Future<void> load() async {
+    final teacherId = Get.find<AuthService>().user.value?.teacherId;
+    if (forTeacher && teacherId != null) return _loadTeacher(teacherId);
     final id = Get.find<AuthService>().activeStudentId.value;
     if (id == null) {
       await run(() async {}, isEmpty: () => true);
@@ -90,6 +97,28 @@ class TimetableController extends GetxController with Loadable {
       };
     }, isEmpty: () => days.isEmpty);
   }
+
+  /// The teacher's own lessons on each day, from every class they teach, in time order.
+  Future<void> _loadTeacher(String teacherId) => run(() async {
+    final classes = await Get.find<DirectoryRepository>().classesForTeacher(teacherId);
+    final byDay = <String, List<PeriodSlot>>{};
+    classOf.clear();
+    for (final c in classes) {
+      for (final d in await Get.find<TimetableRepository>().forClass(c.id)) {
+        for (final p in d.periods.where((p) => p.kind == PeriodKind.klass && p.teacherId == teacherId)) {
+          byDay.putIfAbsent(d.day, () => []).add(p);
+          classOf[p] = c;
+        }
+      }
+    }
+    days = [
+      for (final e in byDay.entries)
+        TimetableDay(classId: '', day: e.key, periods: e.value..sort((a, b) => minutesOf(a.start).compareTo(minutesOf(b.start)))),
+    ];
+    schoolClass = null;
+    teachers.clear();
+    homeworkDue = {};
+  }, isEmpty: () => days.isEmpty);
 
   bool isNow(PeriodSlot period) {
     if (!isToday) return false;
