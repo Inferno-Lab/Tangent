@@ -41,6 +41,7 @@ Headless screenshots (no emulator needed; they look the same as on a device, sin
 ```bash
 flutter test test/tool/shoot_test.dart --dart-define=SHOOT_DIR=D:/out --dart-define=SHOOT_ROLE=parent
 #   SHOOT_ROLE=parent|teacher|guest   SHOOT_DARK=true   EMPTY_DATA=true   SHOOT_W=390 SHOOT_H=844
+#   SHOOT_POPUPS=true: also opens every sheet, dialog and toast by its real button, and shoots each again with a keyboard up
 ```
 
 Release builds come from the console's build workflow (`.github/workflows/mobile-build.yml`), which sets `SCHOOL` and `API_BASE_URL` and leaves `assets/mock/` out; a release build without both refuses to start. See `docs/dev-environment.md` for machine setup and build pitfalls.
