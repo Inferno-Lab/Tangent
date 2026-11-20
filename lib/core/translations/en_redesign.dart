@@ -684,6 +684,8 @@ const enRedesign = <String, String>{
   'teacher.attendance_saved': 'Attendance saved',
   'teacher.no_students': 'No students in this class',
   'teacher.no_students_body': 'Ask the office to add the class list.',
+  'teacher.no_exam': 'No exam to enter marks for yet',
+  'teacher.no_exam_body': 'Marks open here once the office sets an exam for this class.',
   'teacher.new_homework': 'New homework',
   'teacher.draft_saved': 'Draft saved',
   'teacher.title': 'Title',

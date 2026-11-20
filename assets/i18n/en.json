@@ -1200,6 +1200,8 @@
  "teacher.no_classes": "No classes yet",
  "teacher.no_classes_body": "Classes the office assigns to you appear here.",
  "teacher.no_classes_hint": "The office assigns classes before term starts",
+ "teacher.no_exam": "No exam to enter marks for yet",
+ "teacher.no_exam_body": "Marks open here once the office sets an exam for this class.",
  "teacher.no_file": "No file attached",
  "teacher.no_marks": "no marks yet",
  "teacher.no_next": "No class left today",
