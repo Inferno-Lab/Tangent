@@ -34,28 +34,21 @@ class AcademicsView extends GetView<AcademicsController> {
         onRefresh: controller.load,
         topPadding: MediaQuery.paddingOf(context).top + 14,
         children: [
-          // The title and the subjects on the school's deep colour; the chosen subject is in its bright colour.
-          Builder(
-            builder: (context) => Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(child: Text('nav.academics'.tr, style: context.type.h1)),
-                    GlassIconButton(
-                      icon: PhosphorIconsRegular.magnifyingGlass,
-                      label: 'common.search'.tr,
-                      onTap: () => Get.toNamed<void>(AppRoutes.search),
-                    ),
-                  ],
-                ),
-                if (state == ViewState.success && controller.shelf.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  _Shelf(controller: controller, selected: selected),
-                ],
-              ],
-            ),
+          // The title stays put (PageFrame pins it); the subjects scroll with the page.
+          Row(
+            children: [
+              const Expanded(child: PageTitle('nav.academics')),
+              GlassIconButton(
+                icon: PhosphorIconsRegular.magnifyingGlass,
+                label: 'common.search'.tr,
+                onTap: () => Get.toNamed<void>(AppRoutes.search),
+              ),
+            ],
           ),
+          if (state == ViewState.success && controller.shelf.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _Shelf(controller: controller, selected: selected),
+          ],
           ViewStateView(
             state: state,
             onRetry: controller.load,

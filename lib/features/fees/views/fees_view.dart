@@ -69,24 +69,18 @@ class _FeesViewState extends State<FeesView> {
         topPadding: standalone ? null : MediaQuery.paddingOf(context).top + 14,
         onRefresh: controller.load,
         children: [
-          // As the ParentFees board: what is due, in the school's bright colour on its deep one, with the Pay button.
-          Builder(
-            builder: (context) => Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                PageTitle(
-                  'fees.title',
-                  subtitle: account == null || student == null
-                      ? null
-                      : '${account.academicYear.replaceAll('-', '–')} · ${student.name.split(' ').first}${cls == null ? '' : ' · ${cls.name} ${cls.section}'}',
-                ),
-                if (account != null && account.installments.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  _Due(controller: controller),
-                ],
-              ],
-            ),
+          // The title stays put (PageFrame pins it). As the ParentFees board: what is due, in the school's bright colour on
+          // its deep one, with the Pay button.
+          PageTitle(
+            'fees.title',
+            subtitle: account == null || student == null
+                ? null
+                : '${account.academicYear.replaceAll('-', '–')} · ${student.name.split(' ').first}${cls == null ? '' : ' · ${cls.name} ${cls.section}'}',
           ),
+          if (account != null && account.installments.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _Due(controller: controller),
+          ],
           ViewStateView(
             state: state,
             onRetry: controller.load,
