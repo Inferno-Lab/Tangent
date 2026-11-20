@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -35,7 +34,6 @@ class _DayRibbonState extends State<DayRibbon> with SingleTickerProviderStateMix
   static const _lead = 24.0;
   late final _drop = AnimationController(vsync: this, duration: AppMotion.celebrate);
   final _scroll = ScrollController();
-  Timer? _tick;
 
   int get _start => minutesOf(widget.periods.first.start) - 10;
   int get _end => minutesOf(widget.periods.last.end) + 10;
@@ -45,9 +43,6 @@ class _DayRibbonState extends State<DayRibbon> with SingleTickerProviderStateMix
   void initState() {
     super.initState();
     _drop.forward();
-    _tick = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted) setState(() {});
-    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scroll.hasClients) return;
       final now = nowMinutes().clamp(_start, _end);
@@ -58,7 +53,6 @@ class _DayRibbonState extends State<DayRibbon> with SingleTickerProviderStateMix
 
   @override
   void dispose() {
-    _tick?.cancel();
     _drop.dispose();
     _scroll.dispose();
     super.dispose();

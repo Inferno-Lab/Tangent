@@ -3,12 +3,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
-import 'package:tangent/features/dashboard/widgets/home_cards.dart';
 import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/data/models/user.dart';
 import 'package:tangent/features/dashboard/controllers/dashboard_controller.dart';
 import 'package:tangent/features/dashboard/views/dashboard_view.dart';
+import 'package:tangent/features/dashboard/widgets/live_strip.dart';
+import 'package:tangent/features/dashboard/widgets/parent_home.dart';
 import 'package:tangent/features/settings/views/settings_view.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -54,36 +55,48 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
   }
 
-  testWidgets('home shows the quick buttons the school chose, in its order', (tester) async {
+  testWidgets('home shows the quick buttons the school chose, in its order, then Around school', (tester) async {
     SchoolConfig.quick.assignAll(['timetable', 'payFees']);
     await home(tester);
-    expect(find.text('Timetable'), findsWidgets);
-    expect(find.text('Pay fees'), findsOneWidget);
     expect(find.text('Apply for leave'), findsNothing);
-    // The quick buttons, not the lessons header's Timetable link.
-    final quick = find.byType(QuickGrid);
+    final quick = find.byType(QuickTiles);
     Finder inQuick(String t) => find.descendant(of: quick, matching: find.text(t));
     expect(tester.getTopLeft(inQuick('Pay fees')).dx, greaterThan(tester.getTopLeft(inQuick('Timetable')).dx));
+    expect(tester.getTopLeft(inQuick('Around school')).dx, greaterThan(tester.getTopLeft(inQuick('Pay fees')).dx));
   });
 
-  testWidgets('home leaves out a card the school took away, and the notices card follows the list', (tester) async {
-    SchoolConfig.home.assignAll(['notices']);
+  testWidgets('more quick buttons than fit keep Home to one row of four', (tester) async {
+    SchoolConfig.quick.assignAll(['payFees', 'applyLeave', 'timetable', 'bookMeeting', 'events']);
     await home(tester);
-    expect(find.text('Latest notices'), findsOneWidget);
-    expect(find.textContaining('due across'), findsNothing);
+    final quick = find.byType(QuickTiles);
+    final tops = {for (final t in ['Pay fees', 'Apply for leave', 'Timetable', 'Around school']) tester.getTopLeft(find.descendant(of: quick, matching: find.text(t))).dy};
+    expect(tops, hasLength(1), reason: 'one row');
+    expect(find.descendant(of: quick, matching: find.text('Book a meeting')), findsNothing);
   });
 
-  testWidgets('with the default cards, what is due comes before the notices', (tester) async {
+  testWidgets('the live strip follows the Home cards the console set', (tester) async {
+    SchoolConfig.home.assignAll(['dueStack']);
     await home(tester);
-    expect(tester.getTopLeft(find.textContaining('due across')).dy, lessThan(tester.getTopLeft(find.text('Latest notices')).dy));
+    expect(find.byType(LiveStrip), findsNothing);
+    expect(find.text('Needs you'), findsOneWidget);
   });
 
-  testWidgets('a module switched off takes its card and its button with it', (tester) async {
-    SchoolConfig.modules.assignAll(['people', 'attendance', 'timetable']);
+  testWidgets('what needs the parent comes before what is coming up', (tester) async {
+    await home(tester);
+    expect(find.byType(LiveStrip), findsOneWidget);
+    final coming = find.text('Coming up');
+    if (coming.evaluate().isNotEmpty) {
+      expect(tester.getTopLeft(find.text('Needs you')).dy, lessThan(tester.getTopLeft(coming).dy));
+    }
+  });
+
+  testWidgets('a module switched off takes its button and what is due from it', (tester) async {
+    SchoolConfig.modules.assignAll(['people', 'attendance', 'timetable', 'homework']);
+    // The server keeps only buttons of modules the school has.
     SchoolConfig.quick.assignAll(['timetable']);
     await home(tester);
-    expect(find.text('Latest notices'), findsNothing);
     expect(find.text('Pay fees'), findsNothing);
+    expect(find.textContaining('Pay ₹'), findsNothing);
   });
 
   testWidgets('settings offers only the languages the school offers', (tester) async {

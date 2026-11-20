@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -43,21 +42,15 @@ class LiveStrip extends StatefulWidget {
 class _LiveStripState extends State<LiveStrip> with SingleTickerProviderStateMixin {
   // One clock for the entrance: the period line grows, the minutes roll in, then the ring fills.
   late final _c = AnimationController(vsync: this, duration: AppMotion.celebrate);
-  Timer? _tick;
 
   @override
   void initState() {
     super.initState();
     _c.forward();
-    // The strip is about now: it moves on with the clock.
-    _tick = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted) setState(() {});
-    });
   }
 
   @override
   void dispose() {
-    _tick?.cancel();
     _c.dispose();
     super.dispose();
   }

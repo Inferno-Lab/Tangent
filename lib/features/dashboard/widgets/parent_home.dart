@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/services/auth_service.dart';
+import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
 import 'package:tangent/core/theme/tokens.dart';
@@ -107,6 +108,8 @@ class NeedsYou extends StatelessWidget {
     final first = data.student.name.split(' ').first;
     final mine = data.due
         .where((d) => d.kind != DueKind.event)
+        // Only what the school's modules cover (a school without fees on the app shows no fee here).
+        .where((d) => d.kind == DueKind.fee ? SchoolConfig.has('fees') : SchoolConfig.has('homework'))
         .where((d) => d.studentId != null ? d.studentId == data.student.id : (d.childName == null || d.childName == first))
         .take(3)
         .toList();

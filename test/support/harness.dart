@@ -23,6 +23,8 @@ import 'package:tangent/data/repositories/school_life_repository.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 Future<void> bootMock() async {
+  // A cached asset read belongs to the test that started it; a later test waiting on it would wait for ever.
+  rootBundle.clear();
   await initializeDateFormatting();
   // The image cache asks for temp directories; there is no platform plugin in tests.
   TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
