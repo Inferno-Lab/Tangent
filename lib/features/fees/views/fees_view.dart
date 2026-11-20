@@ -164,6 +164,8 @@ class _Body extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // 24 before a titled card (the spacing rule): the Pay button sat right on top of it.
+        if (account.installments.isNotEmpty) const SizedBox(height: 24),
         Rise(
           child: _Card(
             title: 'fees.plan',
@@ -179,7 +181,7 @@ class _Body extends StatelessWidget {
           ),
         ),
         if (receipts.isNotEmpty) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Rise(
             index: 1,
             child: _Card(
@@ -190,7 +192,7 @@ class _Body extends StatelessWidget {
             ),
           ),
         ],
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         Rise(
           index: 2,
           child: _Card(
@@ -363,7 +365,7 @@ class _ReceiptRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: context.type.t,
                   ),
-                  Text('${receipt.title} · ${'fees.${receipt.method}'.tr}', maxLines: 1, overflow: TextOverflow.ellipsis, style: context.type.s),
+                  Text('${receipt.title} · ${paymentMethod(receipt.method)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: context.type.s),
                 ],
               ),
             ),
