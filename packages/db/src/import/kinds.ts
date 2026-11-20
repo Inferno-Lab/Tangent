@@ -675,17 +675,19 @@ const marks = kind<MarkLookups>({
   },
 });
 
-type SlotLookups = { classes: Map<string, ClassRow>; subjects: Map<string, SubjectRow>; staff: Map<string, string>; periods: Set<number>; slots: Map<string, string> };
+type SlotLookups = { classes: Map<string, ClassRow>; subjects: Map<string, SubjectRow>; staff: Map<string, string>; periods: Set<number>; starts: Map<string, number>; slots: Map<string, string> };
+/** A lesson's period: its number, or its start time (a timetable program numbers lessons only, without the breaks). */
+const periodOf = (v: string, l: SlotLookups) => { const at = /[:.]/.test(v) ? hhmm(v) : null; return at ? l.starts.get(at) ?? null : whole(v); };
 const DAY_NAMES: readonly string[] = WEEKDAYS;
 const timetable = kind<SlotLookups>({
   async load(db) {
-    const ps = (await db.query<{ idx: number }>('select idx from periods')).rows;
+    const ps = (await db.query<{ idx: number; starts_at: string }>('select idx, starts_at from periods')).rows;
     const sl = (await db.query<{ id: string; class_id: string; day: number; period: number }>('select id, class_id, day, period from timetable_slots')).rows;
-    return { classes: await classMap(db), subjects: await subjectMap(db), staff: await staffMap(db), periods: new Set(ps.map((p) => p.idx)), slots: new Map(sl.map((s) => [`${s.class_id}|${s.day}|${s.period}`, s.id])) };
+    return { classes: await classMap(db), subjects: await subjectMap(db), staff: await staffMap(db), periods: new Set(ps.map((p) => p.idx)), starts: new Map(ps.map((p) => [p.starts_at, p.idx])), slots: new Map(sl.map((s) => [`${s.class_id}|${s.day}|${s.period}`, s.id])) };
   },
   check(r, l) {
     const cls = l.classes.get(classKey(r.class!));
-    const [day, period] = [dayNum(r.day!), whole(r.period!)];
+    const [day, period] = [dayNum(r.day!), periodOf(r.period!, l)];
     const errors = [...(!cls ? [`Class “${r.class}” is not set up: import classes first.`] : []), ...(!day ? ['Day is a weekday name or 1 (Monday) to 7 (Sunday).'] : []),
       ...(period === null || !l.periods.has(period) ? [`Period ${r.period} is not set up: import periods and bells first.`] : []), ...(!l.subjects.has(norm(r.subject!)) ? [`Subject “${r.subject}” is not set up: import subjects first.`] : []),
       ...(!l.staff.has(lc(r.teacher!)) ? [`No staff member has the email ${r.teacher}: import staff first.`] : [])];
@@ -693,7 +695,7 @@ const timetable = kind<SlotLookups>({
   },
   writes: (rows, l) => [{ table: 'timetable_slots', pk: ['id'], cols: ['subject_id', 'teacher_id', 'room', 'published_teacher_id', 'published_subject_id'], rows: rows.map((r) => {
     const cls = l.classes.get(classKey(r.class!))!;
-    const [day, period] = [dayNum(r.day!)!, whole(r.period!)!];
+    const [day, period] = [dayNum(r.day!)!, periodOf(r.period!, l)!];
     const [subjectId, teacherId] = [l.subjects.get(norm(r.subject!))!.id, l.staff.get(lc(r.teacher!))!];
     return { id: l.slots.get(`${cls.id}|${day}|${period}`) ?? newId('slt'), class_id: cls.id, day, period, subject_id: subjectId, teacher_id: teacherId, room: r.room || null, published_teacher_id: teacherId, published_subject_id: subjectId };
   }) }],

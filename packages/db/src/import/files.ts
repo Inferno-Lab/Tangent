@@ -175,11 +175,82 @@ export function readXlsx(buf: Buffer): string[][] {
   return rows;
 }
 
-/** What a school sent: CSV text, or a file as a data URL (an .xlsx, or a CSV the browser could not read as text). */
+const WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+/**
+ * An aSc Timetables XML export (File → Export → aSc Timetables 2012 XML) as timetable rows. Each card is one lesson in one
+ * period on the days its `days` mask marks (Monday first); a lesson names its classes, subject, teachers and room by id. The
+ * period goes as its start time, since aSc numbers lessons only and the school's bell numbers its breaks too.
+ */
+export function ascTimetable(xml: string): string[][] {
+  const tags = (name: string) => [...xml.matchAll(new RegExp(`<${name}\\s[^>]*>`, 'g'))].map((m) => m[0]);
+  const byId = (name: string, value: (t: string) => string) => new Map(tags(name).map((t) => [attr(t, 'id') ?? '', value(t)]));
+  const name = (t: string) => unxml(attr(t, 'name') ?? '');
+  const classes = byId('class', name);
+  const subjects = byId('subject', name);
+  const teachers = byId('teacher', (t) => unxml(attr(t, 'email') || attr(t, 'name') || ''));
+  const rooms = byId('classroom', name);
+  const starts = new Map(tags('period').map((t) => [attr(t, 'period') ?? '', attr(t, 'starttime') ?? '']));
+  const lessons = byId('lesson', (t) => t);
+  const ids = (v: string | undefined) => (v ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+  const rows = [['class', 'day', 'period', 'subject', 'teacher', 'room']];
+  for (const card of tags('card')) {
+    const lesson = lessons.get(attr(card, 'lessonid') ?? '');
+    if (!lesson) continue;
+    const period = attr(card, 'period') ?? '';
+    const room = rooms.get(ids(attr(card, 'classroomids'))[0] ?? ids(attr(lesson, 'classroomids'))[0] ?? '') ?? '';
+    const teacher = teachers.get(ids(attr(lesson, 'teacherids'))[0] ?? '') ?? '';
+    const days = [...(attr(card, 'days') ?? '')].flatMap((bit, i) => (bit === '1' && WEEK[i] ? [WEEK[i]!] : []));
+    for (const c of ids(attr(lesson, 'classids'))) for (const day of days) rows.push([classes.get(c) ?? c, day, starts.get(period) || period, subjects.get(attr(lesson, 'subjectid') ?? '') ?? '', teacher, room]);
+  }
+  if (rows.length === 1) throw new ImportError('This aSc file has no lessons placed in periods (cards). Export it again once the timetable is generated.');
+  return rows;
+}
+
+/** Library item types as Koha codes them. */
+const KOHA_TYPES: Record<string, string> = { BK: 'Book', REF: 'Reference', MAG: 'Magazine', PER: 'Magazine', DVD: 'DVD', CD: 'CD', MAP: 'Map' };
+
+/**
+ * A MARC 21 file (ISO 2709, as Koha's Export catalog data writes it) as library catalogue rows: title and author from 245
+ * and 100, ISBN from 020, category from 650, and one copy per 952 holding with its call number, barcode and item type.
+ * Lengths in MARC count bytes, so the record is read as bytes.
+ */
+export function marcCatalogue(buf: Buffer): string[][] {
+  const rows = [['title', 'author', 'isbn', 'category', 'shelf', 'copies', 'item_type', 'barcode']];
+  const clean = (v: string) => v.replace(/[\s/:;,.=]+$/, '').trim();
+  for (let at = 0; at + 24 < buf.length;) {
+    const len = Number(buf.subarray(at, at + 5).toString('latin1'));
+    if (!Number.isInteger(len) || len < 25) break;
+    const rec = buf.subarray(at, at + len);
+    at += len;
+    const base = Number(rec.subarray(12, 17).toString('latin1'));
+    const fields: [string, string[]][] = [];
+    for (let d = 24; d + 12 <= base - 1; d += 12) {
+      const entry = rec.subarray(d, d + 12).toString('latin1');
+      const data = rec.subarray(base + Number(entry.slice(7, 12)), base + Number(entry.slice(7, 12)) + Number(entry.slice(3, 7)) - 1).toString('utf8');
+      fields.push([entry.slice(0, 3), data.split('\x1f').slice(1)]);
+    }
+    const sub = (tag: string, code: string) => fields.filter(([t]) => t === tag).map(([, subs]) => subs.find((x) => x[0] === code)?.slice(1) ?? '').filter(Boolean);
+    const title = [sub('245', 'a')[0], sub('245', 'b')[0]].filter(Boolean).map((x) => clean(x!)).join(': ');
+    if (!title) continue;
+    const items = fields.filter(([t]) => t === '952');
+    rows.push([title, clean(sub('100', 'a')[0] ?? ''), (sub('020', 'a')[0] ?? '').split(' ')[0]!, clean(sub('650', 'a')[0] ?? ''), sub('952', 'o')[0] ?? sub('082', 'a')[0] ?? '',
+      String(Math.max(1, items.length)), KOHA_TYPES[(sub('952', 'y')[0] ?? '').toUpperCase()] ?? '', sub('952', 'p')[0] ?? '']);
+  }
+  if (rows.length === 1) throw new ImportError('This MARC file has no records with a title (field 245).');
+  return rows;
+}
+
+/** A MARC record starts with its length and a leader, and ends with the record terminator. */
+const isMarc = (buf: Buffer) => /^\d{5}[a-z ]{5}/.test(buf.subarray(0, 10).toString('latin1')) && buf.includes(0x1d);
+const isAsc = (text: string) => /^\s*(<\?xml[^>]*>\s*)?<timetable[\s>]/.test(text);
+
+/** What a school sent: CSV text, or a file as a data URL (an .xlsx, an aSc timetable, a MARC catalogue, or a CSV). */
 export function readTable(content: string): string[][] {
   const m = /^data:[^,]*;base64,/.exec(content);
-  if (!m) return parseCsv(content);
+  if (!m) return isAsc(content) ? ascTimetable(content) : parseCsv(content);
   const buf = Buffer.from(content.slice(m[0].length), 'base64');
-  if (buf.subarray(0, 2).toString('latin1') !== 'PK') return parseCsv(buf.toString('utf8'));
+  if (isMarc(buf)) return marcCatalogue(buf);
+  if (buf.subarray(0, 2).toString('latin1') !== 'PK') return isAsc(buf.toString('utf8')) ? ascTimetable(buf.toString('utf8')) : parseCsv(buf.toString('utf8'));
   try { return readXlsx(buf); } catch { throw new ImportError('This file is not a spreadsheet Tangent can read. Save it as .xlsx or .csv.'); }
 }

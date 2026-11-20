@@ -76,7 +76,7 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
           <div className="ch" style={{ flexWrap: 'wrap', gap: 10 }}><h2>{tr('console.data_tab.import')}</h2><span className="grow"></span><button className="btn sm" disabled={tpl.isPending} onClick={() => tpl.mutate(kind.key)}>{tr('console.data_tab.blank_template')}</button></div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'end', flexWrap: 'wrap' }}>
             <div className="fld" style={{ flex: '1 1 240px', maxWidth: 360 }}><label htmlFor="imp-kind">{tr('console.data_tab.what_to_import')}</label><Select id="imp-kind" value={kind.key} onChange={pickKind} options={v.kinds.map((k, i) => ({ value: k.key, label: `${i + 1}. ${k.label}` }))} /></div>
-            <FilePick accept=".csv,.txt,.xlsx" onPick={(f) => void readFile(f).then((content) => change({ kind: 'file', fileName: f.name, content }), fail)}>{tr('console.data_tab.choose_a_file')}</FilePick>
+            <FilePick accept=".csv,.txt,.xlsx,.xml,.mrc" onPick={(f) => void readFile(f).then((content) => change({ kind: 'file', fileName: f.name, content }), fail)}>{tr('console.data_tab.choose_a_file')}</FilePick>
             <button className="btn" onClick={() => change({ kind: 'rows', fileName: tr('console.data_tab.typed_in_the_console'), rows: Array.from({ length: 5 }, () => blank(kind)) })}>{tr('console.data_tab.type_rows')}</button>
           </div>
           <div className="help" style={{ marginTop: 8 }}>{kind.blurb} {tr('console.data_tab.import_in_the_order_of')}</div>
