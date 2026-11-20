@@ -18,7 +18,6 @@ const OTP_MINUTES = 10;
 // Each code has OTP_TRIES guesses, so the number of codes is what bounds guessing (and the SMS bill).
 const OTP_SENDS = 5;
 const OTP_WINDOW_MINUTES = 15;
-export const DEMO_CODE = '424242';
 
 
 interface UserRow {
@@ -186,18 +185,14 @@ export class AuthService {
   }
 
   private async sendCode(t: TenantCtx, user: { id: string; phone: string | null; email: string | null }, purpose: 'sign_in' | 'reset' | 'contact', target?: { channel: 'sms' | 'email'; to: string }): Promise<LoginChallenge> {
-    const demo = t.info.demo;
-    let sends = 0;
-    if (!demo) {
-      const { rows: [r] } = await t.pool.query<{ n: string; first: Date | null }>(
-        `select count(*) n, min(created_at) first from otp_challenges where user_id = $1 and created_at > now() - interval '${OTP_WINDOW_MINUTES} minutes'`, [user.id]);
-      if (Number(r!.n) >= OTP_SENDS) {
-        const retryAfter = Math.max(60, Math.ceil((r!.first!.getTime() + OTP_WINDOW_MINUTES * 60_000 - Date.now()) / 1000));
-        throw new ApiError('rate_limited', tx('Too many codes sent. Try again in {p0} minutes.', { p0: Math.ceil(retryAfter / 60) }), { retryAfter });
-      }
-      sends = Number(r!.n) + 1;
+    const { rows: [r] } = await t.pool.query<{ n: string; first: Date | null }>(
+      `select count(*) n, min(created_at) first from otp_challenges where user_id = $1 and created_at > now() - interval '${OTP_WINDOW_MINUTES} minutes'`, [user.id]);
+    if (Number(r!.n) >= OTP_SENDS) {
+      const retryAfter = Math.max(60, Math.ceil((r!.first!.getTime() + OTP_WINDOW_MINUTES * 60_000 - Date.now()) / 1000));
+      throw new ApiError('rate_limited', tx('Too many codes sent. Try again in {p0} minutes.', { p0: Math.ceil(retryAfter / 60) }), { retryAfter });
     }
-    const code = demo ? DEMO_CODE : randomCode(6);
+    const sends = Number(r!.n) + 1;
+    const code = randomCode(6);
     const id = newId('otp');
     const channel: 'sms' | 'email' = target?.channel ?? (user.phone ? 'sms' : 'email');
     const to = target?.to ?? (channel === 'sms' ? user.phone : user.email) ?? '';
@@ -217,7 +212,7 @@ export class AuthService {
     const resendInSeconds = sends >= OTP_SENDS ? OTP_WINDOW_MINUTES * 60 : 30 * Math.max(1, sends);
     return {
       challengeId: id, channel, maskedTo: channel === 'sms' ? maskPhone(to) : maskEmail(to),
-      expiresInSeconds: OTP_MINUTES * 60, resendInSeconds, ...(demo ? { demoCode: DEMO_CODE } : {}),
+      expiresInSeconds: OTP_MINUTES * 60, resendInSeconds,
     };
   }
 

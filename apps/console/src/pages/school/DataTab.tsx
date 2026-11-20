@@ -24,7 +24,6 @@ const save = (blob: Blob, name: string) => { const a = document.createElement('a
 export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger: React.ReactNode }) {
   const schoolId = d.id;
   const app = useApp();
-  const about = useQuery({ queryKey: ['about'], queryFn: app.api.about, staleTime: Infinity });
   const [undoing, setUndoing] = useState<ImportBatchRow | null>(null);
   const qc = useQueryClient();
   // While a big import runs in the background, the page looks again every few seconds.
@@ -35,7 +34,6 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
   const { src, mapping, values } = job;
   // A new revision on every change: the query key stays small however big the file is.
   const change = (s: Source | null, m?: Record<string, string>, vals?: Record<string, Record<string, string>>) => setJob((j) => ({ src: s, mapping: m, values: vals, rev: j.rev + 1 }));
-  const [sample, setSample] = useState('300');
   const v = q.data;
   const kind = v?.kinds.find((k) => k.key === (kindKey || v.kinds[0]?.key));
   const input = (): ImportInputIn | null => (!src || !kind ? null : src.kind === 'file'
@@ -62,7 +60,6 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
     onSuccess: (f, id) => change({ kind: 'file', fileName: f.fileName, content: f.content, uploadId: id }),
     onError: fail,
   });
-  const load = useMutation({ mutationFn: () => app.api.migration.sample(schoolId, Number(sample)), onSuccess: (batches) => { refresh({ batches }); say(tr('console.data_tab.a_test_school_of_students', { sample })); }, onError: fail });
   const exp = useMutation({ mutationFn: () => app.api.migration.exportAll(schoolId), onSuccess: (b) => save(b, `${schoolId}-export.zip`), onError: fail });
   const tpl = useMutation({ mutationFn: (k: string) => app.api.migration.template(schoolId, k), onSuccess: (blob, k) => save(blob, `${k}-template.xlsx`), onError: fail });
 
@@ -134,14 +131,8 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
 
       {can && (
         <div className="card s12 rise">
-          <div className="ch"><h2>{about.data?.demos && v.students === 0 ? tr('console.data_tab.test_school_and_export') : tr('console.data_tab.export')}</h2></div>
-          {about.data?.demos && v.students === 0 && (
-            <div style={{ display: 'flex', gap: 10, alignItems: 'end', flexWrap: 'wrap', marginBottom: 12 }}>
-              <div style={{ width: 200 }}><Field label={tr('console.data_tab.students_10_to_3_000')} value={sample} onChange={(x) => setSample(x.replace(/\D/g, '').slice(0, 4))} inputMode="numeric" /></div>
-              <button className="btn" disabled={load.isPending || Number(sample) < 10 || Number(sample) > 3000} onClick={() => load.mutate()}>{load.isPending ? tr('console.data_tab.importing') : tr('console.data_tab.load_a_realistic_test_school')}</button>
-            </div>
-          )}
-          <div className="help">{about.data?.demos && v.students === 0 ? tr('console.data_tab.the_test_school_goes_through') : ''}{tr('console.data_tab.the_export_is_every_kind')}</div>
+          <div className="ch"><h2>{tr('console.data_tab.export')}</h2></div>
+          <div className="help">{tr('console.data_tab.the_export_is_every_kind')}</div>
           <div style={{ marginTop: 12 }}><button className="btn" disabled={exp.isPending} onClick={() => exp.mutate()}>{exp.isPending ? tr('console.data_tab.preparing') : tr('console.data_tab.export_everything')}</button></div>
         </div>
       )}

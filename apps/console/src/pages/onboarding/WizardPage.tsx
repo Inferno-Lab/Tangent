@@ -54,7 +54,6 @@ export function WizardPage() {
   const plans = useQuery({ queryKey: ['plans'], queryFn: app.api.plans, staleTime: 5 * 60_000 });
   const cells = useQuery({ queryKey: ['cells'], queryFn: app.api.cells });
   const catalog = useQuery({ queryKey: ['catalog'], queryFn: app.api.catalog, staleTime: 10 * 60_000 });
-  const about = useQuery({ queryKey: ['about'], queryFn: app.api.about, staleTime: Infinity });
   const saved = useQuery({ queryKey: ['draft', draftParam], queryFn: () => app.api.wizard.draft(draftParam!), enabled: !!draftParam });
 
   useEffect(() => {
@@ -266,7 +265,7 @@ export function WizardPage() {
       );
       case 'data': return (
         <div style={{ display: 'grid', gap: 10 }} role="radiogroup" aria-label={tr('console.wizard_page.starting_data')}>
-          {([...(about.data?.demos ? [['demo', tr('console.wizard_page.the_demo_school'), tr('console.wizard_page.classes_students_fees_and_a')]] as const : []), ['empty', tr('console.wizard_page.empty'), tr('console.wizard_page.a_brand_new_school_with')], ['import', tr('console.wizard_page.empty_then_import'), tr('console.wizard_page.starts_empty_tangent_s_team')]] as const).map(([v, t, h]) => (
+          {([['empty', tr('console.wizard_page.empty'), tr('console.wizard_page.a_brand_new_school_with')], ['import', tr('console.wizard_page.empty_then_import'), tr('console.wizard_page.starts_empty_tangent_s_team')]] as const).map(([v, t, h]) => (
             <button key={v} type="button" role="radio" aria-checked={data.data.start === v} className={`opt ${data.data.start === v ? 'on' : ''}`} onClick={() => set('data', 'start', v)}>
               <span className="rd"><Icon name="check" /></span><span><b>{t}</b><small>{h}</small></span>
             </button>

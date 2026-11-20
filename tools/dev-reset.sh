@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Local development: wipe and restart the database and the server, then create the Greenfield demo school.
+# Local development: wipe and restart the database and the server, then move the Sunrise Valley test school in from its
+# files through the console, as a real school moves in (tools/dataset). The server creates no sample content.
 # Needs `pnpm install` and a built workspace (`pnpm build`) once. The admin runs separately: `pnpm --filter @tangent/admin dev`.
 set -e
 cd "$(dirname "$0")/.."
@@ -14,4 +15,4 @@ for i in $(seq 1 30); do grep -q ready /tmp/pg.log 2>/dev/null && break; sleep 1
 (cd packages/db && node -e "import('pg').then(async ({default:pg})=>{const c=new pg.Client({connectionString:'postgres://tangent:tangent@127.0.0.1:54329/postgres'});await c.connect();await c.query('create database registry');await c.end()})")
 (cd apps/server && set -a && . ../../.env && set +a && nohup npx tsx src/main.ts > /tmp/server.log 2>&1 &)
 for i in $(seq 1 40); do curl -s localhost:4000/health >/dev/null 2>&1 && break; sleep 1; done
-node tools/provision-demo.mjs
+(set -a && . ./.env && set +a && node tools/dataset/load.mjs)

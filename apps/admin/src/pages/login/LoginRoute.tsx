@@ -19,7 +19,7 @@ export function LoginRoute() {
   return (
     <LoginPage
       controller={{
-        product: 'admin', schoolName: b?.name ?? tr('admin.login_route.tangent'), shortName: b?.shortName ?? 'school', color: b?.color, logoText: b?.logoText, logoUrl: b?.logoUrl, privacy: b?.privacy, demoMode: !!b?.demoMode, goName: tr('admin.login_route.the_dashboard'),
+        product: 'admin', schoolName: b?.name ?? tr('admin.login_route.tangent'), shortName: b?.shortName ?? 'school', color: b?.color, logoText: b?.logoText, logoUrl: b?.logoUrl, privacy: b?.privacy, goName: tr('admin.login_route.the_dashboard'),
         initialEmail: (() => { try { return localStorage.getItem(`tangent.admin.${slug}.email`) ?? ''; } catch { return ''; } })(),
         submitCredentials: async (email, password) => {
           const res = await client.api.login({ identifier: email, password });

@@ -449,7 +449,6 @@ export interface SchoolBrand {
   /** The office's phone and email, for pages a family sees before signing in. */
   phone?: string;
   email?: string;
-  demoMode: boolean;
   /** The seed hue (0–359) of the school's colours, from its brand colour, so the sign-in pages wear them before anyone signs in. */
   hue: number;
   /** The app's full palette for each of its themes (hue.ts `hueTokens`), so the app needs no colour arithmetic. */

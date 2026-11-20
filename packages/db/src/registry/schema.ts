@@ -76,8 +76,6 @@ export const schools = pgTable(
     address: text('address').notNull().default(''),
     addressing: text('addressing').notNull().default('path'),
     customDomain: text('custom_domain').notNull().default(''),
-    /** Started from the demo data: demo sign-in cards and the demo code work. */
-    demo: boolean('demo').notNull().default(false),
     /** The day Tangent pressed Go live: until then the school is moving in (Moving in, invites, imports). */
     wentLiveAt: timestamp('went_live_at', { withTimezone: true }),
     /** What the host said about the school's own address: verified, certificate, the DNS target to point at. */

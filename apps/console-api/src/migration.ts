@@ -1,13 +1,13 @@
 import { Body, Controller, Get, Header, HttpCode, Inject, Injectable, Param, Patch, Post, type OnModuleInit } from '@nestjs/common';
 import { activeFeatures, activeModules } from '@tangent/config-engine';
-import { fmtMoney, IMPORT_KINDS, ImportInput, type ImportRunRow, ReadinessMark, SampleLoad, importKind, type EntitlementDoc, type ImportBatchRow, type ImportPreview, type MigrationView, type UploadRow, tx } from '@tangent/contracts';
-import { commitImport, exportAll, listBatches, newId, pg, previewImport, readTable, sampleSchool, templateXlsx, undoBatch } from '@tangent/db';
+import { fmtMoney, IMPORT_KINDS, ImportInput, type ImportRunRow, ReadinessMark, importKind, type EntitlementDoc, type ImportBatchRow, type ImportPreview, type MigrationView, type UploadRow, tx } from '@tangent/contracts';
+import { commitImport, exportAll, listBatches, newId, pg, previewImport, readTable, templateXlsx, undoBatch } from '@tangent/db';
 import { ApiError, ZodPipe, notFound } from '@tangent/nest-kit';
 import { z } from 'zod';
 import type { Registry } from '@tangent/tenancy';
 import { Actions } from './actions.js';
 import { Db, Me, Needs, type ConsoleUser } from './core.js';
-import { ENV, demosAllowed, type Env } from './env.js';
+import { ENV, type Env } from './env.js';
 import { withSchoolDb } from './school-db.js';
 import { REGISTRY } from './tokens.js';
 
@@ -192,19 +192,6 @@ export class Migration implements OnModuleInit {
     return zip;
   }
 
-  /** A realistic test school through the same importer a real one uses: only into a school with no students yet. */
-  async loadSample(id: string, students: number, by: string): Promise<ImportBatchRow[]> {
-    const s = await this.school(id);
-    if (!demosAllowed(this.env)) throw new ApiError('forbidden', 'A test school is only for the test track, never a real school.');
-    return this.with(id, async (pool) => {
-      if (await n(pool, 'select count(*) n from students')) throw new ApiError('conflict', 'This school already has students. A test school only goes into an empty one.');
-      if (students > s.entitlement.limits.students) throw new ApiError('validation', tx('The plan allows {students} students. Raise the limit on the Plan and modules tab first.', { students: s.entitlement.limits.students }));
-      for (const f of sampleSchool(students).files.filter((f) => s.kinds.includes(f.kind))) await commitImport(pool, { kind: f.kind, csv: f.csv, fileName: f.name }, by);
-      await this.db.pool.query('update schools set students_count = $2 where id = $1', [id, await n(pool, 'select count(*) n from students')]);
-      await this.db.audit(by, 'import.sample_loaded', 'school', id, { students });
-      return listBatches(pool);
-    });
-  }
 }
 
 @Controller('console/v1/schools/:id/import')
@@ -258,8 +245,4 @@ export class MigrationController {
     return this.migration.exportAll(id, me.email);
   }
 
-  @Post('sample') @HttpCode(200) @Needs('schools.configure')
-  sample(@Me() me: ConsoleUser, @Param('id') id: string, @Body(new ZodPipe(SampleLoad)) body: SampleLoad): Promise<ImportBatchRow[]> {
-    return this.migration.loadSample(id, body.students, me.email);
-  }
 }

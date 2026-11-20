@@ -6,7 +6,7 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ensureDatabase, startDevPostgres, type DevPostgres } from '../dev.js';
 import { migrate } from '../migrate.js';
-import { seedSchool } from '../seed/greenfield.js';
+import { seedSchool } from '../seed/school.js';
 import { IMPORT_KINDS, setLocaleSource } from '@tangent/contracts';
 import { commitImport, exportAll, listBatches, previewImport, templateXlsx, undoBatch } from './engine.js';
 import { parseCsv, readTable, readXlsx } from './files.js';

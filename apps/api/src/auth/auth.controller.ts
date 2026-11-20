@@ -156,7 +156,7 @@ export class MeController {
     const cfg = await this.settings.effective(t);
     const hue = hueOf(cfg.school.color || DEFAULT_BRAND);
     return {
-      ...cfg.school, logoUrl: await this.files.logoUrl(t), demoMode: t.info.demo, hue, palette: { light: appTokens(hue, 'light'), dark: appTokens(hue, 'dark'), amoled: appTokens(hue, 'amoled') },
+      ...cfg.school, logoUrl: await this.files.logoUrl(t), hue, palette: { light: appTokens(hue, 'light'), dark: appTokens(hue, 'dark'), amoled: appTokens(hue, 'amoled') },
       privacy: cfg.privacy,
     };
   }

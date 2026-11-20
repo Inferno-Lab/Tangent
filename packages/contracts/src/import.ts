@@ -215,8 +215,6 @@ export interface MigrationView {
   students: number;
   studentLimit: number;
 }
-export const SampleLoad = z.object({ students: z.number().int().min(10).max(3000) });
-export type SampleLoad = z.infer<typeof SampleLoad>;
 
 /** Where an imported file came from, as the import engine recognises it, in words. */
 export const IMPORT_SOURCES: Record<string, string> = { tangent: 'Tangent template', fedena: 'Fedena export', entab: 'Entab export', sheet: 'The school’s own sheet', typed: 'Typed or fixed here' };
