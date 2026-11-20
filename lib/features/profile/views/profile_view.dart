@@ -3,34 +3,31 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:tangent/core/config/app_config.dart';
-import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/services/auth_service.dart';
-import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
 import 'package:tangent/core/theme/tokens.dart';
+import 'package:tangent/core/utils/clock.dart';
 import 'package:tangent/core/utils/extensions.dart';
-import 'package:tangent/core/widgets/glass.dart';
+import 'package:tangent/core/utils/view_state.dart';
 import 'package:tangent/core/widgets/page.dart';
 import 'package:tangent/core/widgets/states.dart';
 import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/data/models/user.dart';
-import 'package:tangent/features/profile/views/profile_sections.dart';
-import 'package:tangent/features/school_life/views/staff_time_view.dart' show CheckInCard;
-import 'package:tangent/features/settings/views/settings_view.dart' show signOut;
+import 'package:tangent/features/auth/views/account_sheets.dart';
+import 'package:tangent/features/dashboard/controllers/dashboard_controller.dart';
+import 'package:tangent/features/dashboard/widgets/child_switcher.dart' show classLine;
+import 'package:tangent/features/dashboard/widgets/parent_home.dart' show childColour;
 import 'package:tangent/features/profile/controllers/profile_controller.dart';
-import 'package:intl/intl.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:tangent/core/utils/clock.dart';
+import 'package:tangent/features/profile/views/id_card.dart';
+import 'package:tangent/features/profile/views/profile_sections.dart';
+import 'package:tangent/features/settings/views/settings_view.dart' show signOut;
 
-final _houseColors = {
-  'Emerald': AppColors.ok,
-  'Sapphire': AppColors.subject('maths').fill,
-  'Ruby': AppColors.subject('hindi').fill,
-  'Amber': AppColors.houses[3],
-};
-
+/// Profile as the approved canvas: who you are, your children (a parent), the school ID card on the page, a few figures,
+/// your account and the app, then signing out. The card and the figures keep their size while a child is switched, so
+/// nothing below them moves.
 class ProfileView extends GetView<ProfileController> {
   const ProfileView({super.key});
 
@@ -38,131 +35,40 @@ class ProfileView extends GetView<ProfileController> {
   Widget build(BuildContext context) {
     final auth = Get.find<AuthService>();
     return Obx(() {
-      controller.state.value;
+      final state = controller.state.value;
       final user = auth.user.value;
       final role = user?.role;
       final student = controller.student;
       final teacher = controller.teacher;
+      // Reloading keeps what is shown (a child switch reloads): the skeleton is for the first load only.
+      final shown = student != null || teacher != null;
+      final view = state == ViewState.loading && shown ? ViewState.success : state;
       return PageFrame(
         dockPage: true,
-        topPadding: MediaQuery.paddingOf(context).top + 14,
+        topPadding: MediaQuery.paddingOf(context).top + 16,
         onRefresh: controller.load,
         children: [
-          Row(
-            children: [
-              const Expanded(child: PageTitle('profile.title')),
-              GlassIconButton(
-                icon: PhosphorIconsRegular.slidersHorizontal,
-                label: 'menu.settings'.tr,
-                onTap: () => Get.toNamed<void>(AppRoutes.settings),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
+          _Header(user: user, controller: controller),
           ViewStateView(
-            state: controller.state.value,
+            state: view,
             onRetry: controller.load,
             errorKey: controller.errorMessage.value,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (student != null)
+                if (role == UserRole.parent) const Rise(index: 1, child: _ChildPicker()),
+                const SizedBox(height: 16),
+                if (shown)
                   Rise(
-                    child: _IdCard(
-                      color: _houseColors[student.house] ?? Avatar.houseFor(student.name),
-                      name: student.name,
-                      photo: role == UserRole.student ? user?.avatarUrl : null,
-                      facts: [
-                        (
-                          SchoolConfig.classWord.isEmpty ? 'profile.class'.tr : SchoolConfig.classWord,
-                          '${controller.schoolClass?.label ?? ''} · ${'fees.roll'.trp({'n': student.rollNo})}',
-                        ),
-                        if (student.nameLocal.isNotEmpty) ('profile.also_written'.tr, student.nameLocal),
-                        ('profile.house'.tr, student.house),
-                        ('profile.born'.tr, _dob(student.dob)),
-                        ('profile.blood'.tr, student.bloodGroup),
-                        // The school's own fields it shows families (named in their language by the server).
-                        for (final f in student.fields.entries) (f.key, f.value),
-                      ],
-                      // The school's own admission number; sample content shows the class and roll number.
-                      code: student.admissionNo.isNotEmpty
-                          ? student.admissionNo
-                          : '${(controller.schoolClass?.label ?? '').replaceAll(' ', '')}-${student.rollNo}',
-                      onPhoto: role == UserRole.student ? () => unawaited(controller.editPhoto()) : null,
-                    ),
-                  )
-                else if (teacher != null)
-                  Rise(
-                    child: _IdCard(
-                      color: AppColors.subject(teacher.subject).fill,
-                      name: teacher.name,
-                      photo: user?.avatarUrl,
-                      facts: [
-                        ('profile.subject'.tr, subjectName(teacher.subject)),
-                        (
-                          'profile.classes'.tr,
-                          controller.teaching
-                              .map((c) => c.label)
-                              .join(', '),
-                        ),
-                        ('profile.phone'.tr, teacher.phone),
-                        ('profile.role'.tr, 'profile.teacher'.tr),
-                      ],
-                      code: teacher.id.toUpperCase().replaceAll('_', '-'),
-                      onPhoto: () => unawaited(controller.editPhoto()),
+                    index: 2,
+                    child: AnimatedSwitcher(
+                      duration: context.reduceMotion ? Duration.zero : AppMotion.t2,
+                      child: KeyedSubtree(key: ValueKey(student?.id ?? teacher?.id), child: _card(context, role, user)),
                     ),
                   ),
-                // Profile is the person: their figures, their family or their day, their account. The school's pages live
-                // on Home, Academics and My classes.
-                if (student != null && role == UserRole.parent) ...[
-                  const SizedBox(height: 12),
-                  const Rise(index: 1, child: ChildFigures()),
-                  const Rise(index: 2, child: ChildrenRow()),
-                ],
-                if (role == UserRole.teacher) ...[
-                  const SizedBox(height: 12),
-                  const Rise(index: 1, child: TeacherFigures()),
-                  if (SchoolConfig.has('staffAttendance')) ...[
-                    Rise(index: 2, child: SectionLabel('profile.your_day'.tr, action: 'profile.leave_and_history', onAction: () => Get.toNamed<void>(AppRoutes.staffMe))),
-                    const Rise(index: 2, child: CheckInCard()),
-                  ],
-                ],
-                if (student != null) ...[
-                  Rise(index: 3, child: SectionLabel((role == UserRole.parent ? 'profile.family' : 'profile.guardian_title').tr)),
-                  Rise(
-                    index: 3,
-                    child: EduCard(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        child: Row(
-                          children: [
-                            Avatar(
-                              student.guardianName,
-                              size: 32,
-                              background: context.app.paper2,
-                              foreground: context.app.ink,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    role == UserRole.parent && user?.name == student.guardianName
-                                        ? '${student.guardianName} · ${'profile.you'.tr}'
-                                        : '${student.guardianName} · ${'profile.guardian'.tr}',
-                                    style: context.type.ts,
-                                  ),
-                                  Text(student.guardianPhone, style: context.type.cap),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                const SizedBox(height: 16),
+                Rise(index: 3, child: role == UserRole.teacher ? const TeacherFigures() : const ChildFigures()),
+                if (student != null && role == UserRole.student) Rise(index: 4, child: _Guardian(controller: controller)),
                 if (user != null) Rise(index: 4, child: AccountCard(onSignOut: () => unawaited(signOut()))),
               ],
             ),
@@ -172,180 +78,233 @@ class ProfileView extends GetView<ProfileController> {
     });
   }
 
-  static String _dob(String iso) {
-    final d = DateTime.tryParse(iso);
-    return d == null ? iso : DateFormat('d MMM y').format(d);
+  Widget _card(BuildContext context, UserRole? role, AppUser? user) {
+    final student = controller.student;
+    final teacher = controller.teacher;
+    final now = Clock.now();
+    final start = now.month >= 6 ? now.year : now.year - 1;
+    final year = '$start–${(start + 1) % 100}';
+    if (student != null) {
+      final family = [for (final k in Get.find<DashboardController>().snapshot?.children ?? const <ChildToday>[]) k.student.name];
+      final id = student.admissionNo.isNotEmpty ? student.admissionNo : '${(controller.schoolClass?.label ?? '').replaceAll(' ', '')}-${student.rollNo}';
+      return IdBadge(
+        accent: childColour(student.name, family.isEmpty ? [student.name] : family),
+        school: AppConfig.schoolName,
+        kind: 'profile.kind_student'.tr,
+        name: student.name,
+        line: [if (controller.schoolClass != null) classLine(controller.schoolClass!.label), 'fees.roll'.trp({'n': student.rollNo})].join(' · '),
+        fields: [('profile.id_number'.tr, id), ('profile.blood'.tr, student.bloodGroup), ('profile.year'.tr, year)],
+        code: controller.pickupCode ?? id,
+        codeTitle: controller.pickupCode == null ? 'profile.id_number'.tr : 'profile.pickup_code'.tr,
+        back: [
+          if (controller.pickups.isNotEmpty) ('profile.pickup'.tr, controller.pickups.map((p) => p.name).join(', ')),
+          ('profile.guardian'.tr, [student.guardianName, student.guardianPhone].where((x) => x.isNotEmpty).join(' · ')),
+          if (student.house.isNotEmpty) ('profile.house'.tr, student.house),
+        ],
+        photo: role == UserRole.student ? user?.avatarUrl : null,
+      );
+    }
+    final t = teacher!;
+    final code = t.id.toUpperCase().replaceAll('_', '-');
+    return IdBadge(
+      accent: AppColors.subject(t.subject).fill,
+      school: AppConfig.schoolName,
+      kind: 'profile.kind_staff'.tr,
+      name: t.name,
+      line: 'profile.teacher_of'.trp({'subject': subjectName(t.subject)}),
+      fields: [('profile.id_number'.tr, code), ('profile.subject'.tr, subjectName(t.subject)), ('profile.year'.tr, year)],
+      code: code,
+      codeTitle: 'profile.id_number'.tr,
+      back: [
+        ('profile.classes'.tr, controller.teaching.map((c) => c.label).join(', ')),
+        if (t.phone.isNotEmpty) ('profile.phone'.tr, t.phone),
+      ],
+      photo: user?.avatarUrl,
+    );
   }
 }
 
-class _IdCard extends StatelessWidget {
-  const _IdCard({
-    required this.color,
-    required this.name,
-    required this.facts,
-    required this.code,
-    this.photo,
-    this.onPhoto,
-  });
+/// You: your photo (with a button to change it where the school keeps one), your name, what you are here, and Edit.
+class _Header extends StatelessWidget {
+  const _Header({required this.user, required this.controller});
 
-  final Color color;
-  final String name;
-  final String? photo;
-  final List<(String, String)> facts;
-  final String code;
-  final VoidCallback? onPhoto;
+  final AppUser? user;
+  final ProfileController controller;
 
   @override
   Widget build(BuildContext context) {
-    final on = AppPalette.on(color);
-    final now = Clock.now();
-    final start = now.month >= 6 ? now.year : now.year - 1;
-    TextStyle k() => AppText.o(color: on.withValues(alpha: .75), height: 1.2);
-    final local = photo != null && photo!.isNotEmpty && !photo!.startsWith('http');
-    final initials = Text(Avatar.initialsOf(name), style: AppText.h2(color: color, height: 1));
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(color: AppColors.light.ink.withValues(alpha: 0.7), blurRadius: 40, spreadRadius: -24, offset: const Offset(0, 20)),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            right: -68,
-            top: -68,
-            child: Container(
-              width: 180,
-              height: 180,
-              decoration: BoxDecoration(color: AppColors.white.withValues(alpha: 0.08), shape: BoxShape.circle),
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final c = context.app;
+    final u = user;
+    if (u == null) return const SizedBox.shrink();
+    final role = u.role;
+    final teacher = controller.teacher;
+    final kids = Get.find<DashboardController>().snapshot?.children ?? const <ChildToday>[];
+    final line = switch (role) {
+      UserRole.parent => kids.isEmpty
+          ? 'profile.parent'.tr
+          : 'profile.parent_of'.trp({'names': kids.map((k) => k.student.name.split(' ').first).join(', ')}),
+      UserRole.teacher => teacher == null ? 'profile.teacher'.tr : 'profile.teacher_of'.trp({'subject': subjectName(teacher.subject)}),
+      _ => controller.schoolClass == null ? '' : classLine(controller.schoolClass!.label),
+    };
+    final photo = u.avatarUrl;
+    final local = photo.isNotEmpty && !photo.startsWith('http');
+    final canPhoto = role == UserRole.teacher || role == UserRole.student;
+    return Row(
+      children: [
+        SizedBox(
+          width: 64,
+          height: 64,
+          child: Stack(
+            clipBehavior: Clip.none,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      AppConfig.schoolName.toUpperCase(),
-                      style: k(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+              if (local)
+                ClipOval(child: Image.file(File(photo), width: 60, height: 60, fit: BoxFit.cover, errorBuilder: (_, _, _) => Avatar(u.name, size: 60)))
+              else
+                Avatar(u.name, size: 60, background: role == UserRole.teacher && teacher != null ? AppColors.subject(teacher.subject).fill : c.brand, foreground: c.onBrand),
+              if (canPhoto)
+                PositionedDirectional(
+                  end: -2,
+                  bottom: -2,
+                  child: Pressable(
+                    onTap: () => unawaited(controller.editPhoto()),
+                    label: 'profile.new_photo'.tr,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(color: c.brand, shape: BoxShape.circle, border: Border.all(color: c.chalk, width: 3)),
+                      child: Icon(PhosphorIconsBold.camera, size: 14, color: c.onBrand),
                     ),
                   ),
-                  Text('$start–${(start + 1) % 100}', style: k()),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 78,
-                    height: 96,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(color: AppColors.light.paper, borderRadius: BorderRadius.circular(12)),
-                    clipBehavior: Clip.antiAlias,
-                    child: local
-                        ? Image.file(
-                            File(photo!),
-                            fit: BoxFit.cover,
-                            width: 78,
-                            height: 96,
-                            errorBuilder: (_, _, _) => initials,
-                          )
-                        : initials,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(name, style: context.type.h2.copyWith(color: on)),
-                        const SizedBox(height: 10),
-                        LayoutBuilder(
-                          builder: (context, box) {
-                            final half = (box.maxWidth - 10) / 2;
-                            // Two facts to a row; one that would wrap there (a phone number, a long class list) takes the
-                            // whole row, so a value never breaks over two lines.
-                            bool fits(String s) => (TextPainter(
-                              text: TextSpan(text: s, style: AppText.ts(color: on)),
-                              textDirection: Directionality.of(context),
-                              textScaler: MediaQuery.textScalerOf(context),
-                              maxLines: 1,
-                            )..layout()).width <= half;
-                            return Wrap(
-                            spacing: 10,
-                            runSpacing: 8,
-                            children: [
-                              for (final f in facts)
-                                SizedBox(
-                                  width: fits(f.$2) ? half : box.maxWidth,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(f.$1.toUpperCase(), style: k()),
-                                      const SizedBox(height: 2),
-                                      Text(f.$2, style: AppText.ts(color: on), maxLines: 2),
-                                    ],
-                                  ),
-                                ),
-                            ],
-                          );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: Text(code, style: context.type.mono.copyWith(color: on.withValues(alpha: .85))),
-                  ),
-                  if (onPhoto != null)
-                    GlassPress(
-                      onTap: onPhoto,
-                      child: Semantics(
-                        button: true,
-                        // A wash of the card's own ink, so it reads on any card colour in any theme (a theme-coloured
-                        // pill was black on black in dark mode). It sits on the card, so it is not glass.
-                        child: Container(
-                          height: 36,
-                          width: 120,
-                          decoration: BoxDecoration(color: on.withValues(alpha: .16), borderRadius: BorderRadius.circular(AppRadius.pill)),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(PhosphorIconsRegular.camera, size: 15, color: on),
-                              const SizedBox(width: 6),
-                              Flexible(
-                                child: Text(
-                                  'profile.new_photo'.tr,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: AppText.capB(color: on, height: 1),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+                ),
             ],
           ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(u.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: context.type.h2),
+              if (line.isNotEmpty) Text(line, maxLines: 1, overflow: TextOverflow.ellipsis, style: context.type.s.copyWith(color: c.ink3)),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Pressable(
+          onTap: () => unawaited(showContactChange()),
+          label: 'profile.edit'.tr,
+          child: Container(
+            height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(color: c.paper, borderRadius: BorderRadius.circular(AppRadius.pill), border: Border.all(color: c.line2)),
+            child: Center(widthFactor: 1, child: Text('profile.edit'.tr, style: AppText.chip(color: c.ink, height: 1))),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// A family with more than one child: each child on one track, the one shown raised. Switching keeps the page still.
+class _ChildPicker extends StatelessWidget {
+  const _ChildPicker();
+
+  @override
+  Widget build(BuildContext context) {
+    final dash = Get.find<DashboardController>();
+    final auth = Get.find<AuthService>();
+    return Obx(() {
+      dash.state.value;
+      final kids = dash.snapshot?.children ?? const <ChildToday>[];
+      final active = auth.activeStudentId.value;
+      if (kids.length < 2) return const SizedBox.shrink();
+      final c = context.app;
+      final family = [for (final k in kids) k.student.name];
+      return Padding(
+        padding: const EdgeInsets.only(top: 24),
+        child: Container(
+          height: 56,
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(color: c.paper3, borderRadius: BorderRadius.circular(AppRadius.pill)),
+          child: Row(
+            children: [
+              for (final (i, k) in kids.indexed) ...[
+                if (i > 0) const SizedBox(width: 4),
+                Expanded(
+                  child: Pressable(
+                    onTap: k.student.id == active ? null : () => unawaited(auth.switchChild(k.student.id)),
+                    label: k.student.name,
+                    child: AnimatedContainer(
+                      duration: AppMotion.t2,
+                      curve: kEase,
+                      decoration: BoxDecoration(
+                        color: k.student.id == active ? c.paper : c.paper3,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                        boxShadow: k.student.id == active ? [BoxShadow(color: c.ink.withValues(alpha: .12), blurRadius: 8, offset: const Offset(0, 2))] : null,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Avatar(k.student.name, size: 28, initials: Avatar.siblingInitials(k.student.name, family), background: childColour(k.student.name, family), foreground: AppColors.white),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              k.student.name.split(' ').first,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppText.ts(color: k.student.id == active ? c.ink : c.ink3, height: 1),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(k.schoolClass.label, maxLines: 1, style: AppText.cap(color: c.ink3, height: 1)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    });
+  }
+}
+
+/// A student's own guardian (a student signs in where the console turns their role on).
+class _Guardian extends StatelessWidget {
+  const _Guardian({required this.controller});
+
+  final ProfileController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = controller.student!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionLabel('profile.guardian_title'.tr),
+        EduCard(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Avatar(s.guardianName, size: 32, background: context.app.paper2, foreground: context.app.ink),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${s.guardianName} · ${'profile.guardian'.tr}', style: context.type.ts),
+                      Text(s.guardianPhone, style: context.type.cap),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

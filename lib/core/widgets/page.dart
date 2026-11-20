@@ -228,7 +228,7 @@ class PageTitle extends StatelessWidget {
 
 /// Section header: a label on the left (Hue `.lbl`), an optional link on the right.
 class SectionLabel extends StatelessWidget {
-  const SectionLabel(this.text, {this.action, this.onAction, this.top = 22, super.key});
+  const SectionLabel(this.text, {this.action, this.onAction, this.top = 24, super.key});
 
   final String text;
   final String? action;

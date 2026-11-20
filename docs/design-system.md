@@ -12,7 +12,7 @@ Source of truth in code: `lib/core/theme/` (`app_colors.dart`, `app_typography.d
 
 Hybrid, like the admin and the console (owner's call, 14 Nov 2026): Tangent Hue's layouts, parts, icons and empty
 scenes, worn in the old **Chalk & Glass** look. Every screen sits on the chalk ground (no coloured header band); the
-dock floats as a paper pill with an ink tab that slides; type is Anek on its width axis. The neutrals never take the
+dock floats as a paper pill with an ink tab that slides; type is Bricolage Grotesque at its normal width. The neutrals never take the
 school's tint (`APP_NEUTRALS` in `packages/contracts/src/hue.ts`): chalk, paper and ink from the old app, an ink
 **deep** for the dock and headline cards, and marigold **bright** for the one thing that matters now (the period on
 now, the chosen tab, the Pay button). Actions are the school's **brand**; state is ok, warn, bad and info; subjects take
@@ -34,7 +34,7 @@ TeacherHome, ParentFees, ParentResults, RollCall, AppKit, EmptyApp1–4).
 
 ## Type
 
-`context.type.<role>` or `AppText.<role>(color:)`, set in Anek Latin (Anek Devanagari for Hindi and Marathi) through
+`context.type.<role>` or `AppText.<role>(color:)`, set in Bricolage Grotesque (Anek Devanagari for Hindi and Marathi) through
 `hueText()`. Display roles (`dx`, `dl`, `h1`–`h3`) use the wide cut. A screen sets only colour, tabular figures and line
 height; it never changes size or weight.
 

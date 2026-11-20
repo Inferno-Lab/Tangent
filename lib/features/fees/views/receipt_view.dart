@@ -54,7 +54,7 @@ class ReceiptView extends StatelessWidget {
           false,
         ),
       ('fees.paid_on'.tr, DateFormat('EEE d MMM y, HH:mm').format(receipt.paidOn), false),
-      ('fees.method'.tr, 'fees.${receipt.method}'.tr, false),
+      ('fees.method'.tr, paymentMethod(receipt.method), false),
       ('fees.reference'.tr, receipt.reference, true),
       ('fees.receipt_no'.tr, number, true),
     ];
@@ -268,4 +268,12 @@ class _PerforatedClipper extends CustomClipper<Path> {
 
   @override
   bool shouldReclip(_PerforatedClipper oldClipper) => false;
+}
+
+/// A payment method in the reader's words; one the app has no word for (a country's own scheme, such as UPI) shows as the
+/// school's server names it, never as a key.
+String paymentMethod(String method) {
+  final key = 'fees.$method';
+  if (key.tr != key) return key.tr;
+  return method.length <= 4 ? method.toUpperCase() : '${method[0].toUpperCase()}${method.substring(1)}';
 }

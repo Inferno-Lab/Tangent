@@ -63,6 +63,8 @@ class AcademicsView extends GetView<AcademicsController> {
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // 16 between parts (the spacing rule): the shelf sat right on top of this card.
+                      const SizedBox(height: 16),
                       Rise(
                         child: _SubjectCard(item: controller.shelf[selected], examName: controller.latestExam?.name),
                       ),

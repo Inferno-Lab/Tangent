@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:tangent/core/services/auth_service.dart';
+import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/theme/app_typography.dart';
 import 'package:tangent/core/theme/tokens.dart';
 import 'package:tangent/core/utils/extensions.dart';
@@ -12,6 +13,7 @@ import 'package:tangent/core/widgets/glass.dart';
 import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/data/models/student.dart';
 import 'package:tangent/data/repositories/directory_repository.dart';
+import 'package:tangent/features/dashboard/widgets/parent_home.dart' show childColour;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 /// Loads the parent's children once; shared by the capsule and the popover.
@@ -36,6 +38,9 @@ class ChildrenCache {
 }
 
 String shortClass(SchoolClass c) => c.label;
+
+/// "Class 8 A", in the school's own word for a class where it has one ("Grade 8 A", "Year 8 A").
+String classLine(String label) => SchoolConfig.classWord.isEmpty ? 'home.class_line'.trp({'class': label}) : '${SchoolConfig.classWord} $label';
 
 /// Glass capsule with stacked child avatars. Tap to open the switcher,
 /// swipe sideways to switch straight away.
@@ -76,7 +81,6 @@ class _ChildCapsuleState extends State<ChildCapsule> {
     return Obx(() {
       final active = auth.activeStudentId.value;
       final current = _kids.where((k) => k.$1.id == active).firstOrNull ?? _kids.firstOrNull;
-      final others = _kids.where((k) => k.$1.id != current?.$1.id).toList();
       final family = [for (final k in _kids) k.$1.name];
       final label = current == null ? '' : '${current.$1.name.split(' ').first} · ${shortClass(current.$2)}';
       return Semantics(
@@ -87,33 +91,36 @@ class _ChildCapsuleState extends State<ChildCapsule> {
           child: GlassPress(
             // One child: nothing to switch to, so the capsule only names them.
             onTap: _kids.length < 2 ? null : () => _open(context),
-            child: Glass(
+            child: Container(
               key: _anchor,
-              height: 44,
-              padding: const EdgeInsets.only(left: 6, right: 12),
+              height: 48,
+              padding: const EdgeInsetsDirectional.only(start: 6, end: 16),
+              decoration: BoxDecoration(color: context.app.paper, borderRadius: BorderRadius.circular(AppRadius.pill), border: Border.all(color: context.app.line)),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // The child shown in front, a sibling tucked behind it; each ringed in the capsule's colour so the two
-                  // read as two (a pale avatar on the pale capsule showed only its letters).
-                  SizedBox(
-                    width: others.isEmpty ? 32 : 50,
-                    height: 32,
-                    child: Stack(
+                  if (current != null)
+                    Avatar(current.$1.name, initials: Avatar.siblingInitials(current.$1.name, family), size: 36, background: childColour(current.$1.name, family)),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (others.isNotEmpty)
-                          Positioned(left: 18, top: 0, child: _ringed(context, others.first.$1.name, family, faded: true)),
-                        if (current != null) Positioned(left: 0, top: 0, child: _ringed(context, current.$1.name, family)),
+                        Text(current?.$1.name.split(' ').first ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.t(color: context.app.ink, height: 1.1)),
+                        if (current != null)
+                          Text(
+                            classLine(shortClass(current.$2)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppText.tiny(color: context.app.ink3, height: 1.2),
+                          ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.chip(color: context.app.ink, height: 1)),
-                  ),
                   if (_kids.length > 1) ...[
-                    const SizedBox(width: 6),
-                    Icon(PhosphorIconsBold.caretDown, size: 13, color: context.app.ink2),
+                    const SizedBox(width: 10),
+                    Icon(PhosphorIconsBold.caretDown, size: 13, color: context.app.ink3),
                   ],
                 ],
               ),
@@ -123,12 +130,6 @@ class _ChildCapsuleState extends State<ChildCapsule> {
       );
     });
   }
-
-  Widget _ringed(BuildContext context, String name, List<String> family, {bool faded = false}) => Container(
-    padding: const EdgeInsets.all(2),
-    decoration: BoxDecoration(color: context.app.paper, shape: BoxShape.circle),
-    child: Opacity(opacity: faded ? .7 : 1, child: Avatar(name, initials: Avatar.siblingInitials(name, family), size: 28)),
-  );
 
   Future<void> _open(BuildContext context) async {
     final box = _anchor.currentContext?.findRenderObject() as RenderBox?;

@@ -23,6 +23,8 @@ import 'package:tangent/data/repositories/school_life_repository.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 Future<void> bootMock() async {
+  // A cached asset read belongs to the test that started it; a later test waiting on it would wait for ever.
+  rootBundle.clear();
   await initializeDateFormatting();
   // The image cache asks for temp directories; there is no platform plugin in tests.
   TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
@@ -94,7 +96,7 @@ Widget testApp({Widget? home, List<GetPage<dynamic>> pages = const []}) {
 /// Loads the app's real fonts so text measures as on a phone.
 Future<void> loadAppFonts() async {
   final fonts = {
-    'AnekLatin': ['assets/fonts/AnekLatin.ttf'],
+    'BricolageGrotesque': ['assets/fonts/BricolageGrotesque.ttf'],
     'AnekDevanagari': ['assets/fonts/AnekDevanagari.ttf'],
     'IBMPlexMono': ['assets/fonts/IBMPlexMono-Regular.ttf', 'assets/fonts/IBMPlexMono-Medium.ttf'],
     'packages/phosphor_flutter/PhosphorRegular': ['packages/phosphor_flutter/lib/fonts/Phosphor.ttf'],
