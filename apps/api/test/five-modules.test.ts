@@ -9,12 +9,18 @@ let admin: string;
 let parent: string;
 let teacher: string;
 let kavita: string;
+/** The first child of the parent with two at the school. */
+let aarav: string;
+let aaravName: string;
 beforeAll(async () => {
   h = await startHarness();
   admin = await h.login();
-  parent = await h.login('priya.sharma@example.com');
-  teacher = await h.login('kavita.iyer@greenfield.edu.in');
-  kavita = (await h.schoolSql("select id from users where email = 'kavita.iyer@greenfield.edu.in'"))[0].id;
+  parent = await h.login(h.people.parentOfTwo.phone);
+  teacher = await h.login(h.people.classTeacher.email);
+  kavita = await h.userId(h.people.classTeacher.email);
+  const child = h.people.parentOfTwo.children![0]!;
+  aarav = (await h.schoolSql('select id from students where admission_no = $1', [child.admissionNo]))[0].id;
+  aaravName = child.name;
 }, 240_000);
 afterAll(async () => {
   await h?.close();
@@ -75,13 +81,15 @@ describe('staff attendance', () => {
     const month = (await call(admin, 'GET', `/v1/staff-attendance/month?month=${day.slice(0, 7)}`)).json.find((r: any) => r.userId === kavita);
     expect(month.present).toBeGreaterThanOrEqual(1);
     const csv = await call(admin, 'GET', `/v1/staff-attendance/month.csv?month=${day.slice(0, 7)}`);
-    expect(csv.text).toContain('Kavita Iyer');
+    expect(csv.text).toContain(h.people.classTeacher.name);
     // A teacher without the permission cannot mark.
     expect((await call(teacher, 'PUT', `/v1/staff-attendance/${day}`, { marks: [{ userId: kavita, status: 'present' }] })).status).toBe(403);
   });
 });
 
 describe('staff leave', () => {
+  // These count days, so the school's holidays (its own calendar, brought in) are taken out of this copy of the school.
+  beforeAll(() => h.schoolSql("delete from events where kind = 'holiday'"));
   const from = () => addDays(today(), 40);
   it('refuses leave that overlaps, runs past the balance, takes half a day of a whole-day type, or falls on closed days', async () => {
     const ask = (b: Record<string, unknown>) => call(teacher, 'POST', '/v1/f/staff/leave', { reason: 'Family', halfDay: null, ...b });
@@ -159,7 +167,7 @@ describe('diary', () => {
     expect(e.json.remarks).toHaveLength(2);
     expect((await call(parent, 'POST', '/v1/f/diary', base)).status).toBe(403);
     // A family sees only its own child's remark.
-    await h.schoolSql("insert into student_guardians (student_id, guardian_id, is_primary) select $1, g.id, false from guardians g join users u on u.id = g.user_id where u.email = 'priya.sharma@example.com' on conflict do nothing", [kids[0].id]);
+    await h.schoolSql("insert into student_guardians (student_id, guardian_id, is_primary) select $1, g.id, false from guardians g join users u on u.id = g.user_id where u.phone = $2 on conflict do nothing", [kids[0].id, h.people.parentOfTwo.phone]);
     const read = await call(parent, 'GET', `/v1/f/diary/student/${kids[0].id}`);
     const entry = read.json.find((x: any) => x.id === e.json.id);
     expect(entry.remark).toBe('Lovely reading today.');
@@ -179,9 +187,9 @@ describe('diary', () => {
 describe('parent-teacher meetings', () => {
   it('families book one time per teacher per child, never two at once, and the day stays once booked', async () => {
     const kids = await h.schoolSql(
-      "select s.id, s.class_id from students s join student_guardians sg on sg.student_id = s.id join guardians g on g.id = sg.guardian_id join users u on u.id = g.user_id where u.email = 'priya.sharma@example.com' and s.status = 'active' order by s.id");
+      "select s.id, s.class_id from students s join student_guardians sg on sg.student_id = s.id join guardians g on g.id = sg.guardian_id join users u on u.id = g.user_id where u.phone = $1 and s.status = 'active' order by s.id", [h.people.parentOfTwo.phone]);
     const classes = [...new Set(kids.map((k: any) => k.class_id))];
-    const day = addDays(today(), 3);
+    const day = await h.openDay(3);
     const m = { title: 'Mid-term meeting', date: day, from: '09:00', to: '10:00', slotMinutes: 10, gapMinutes: 0, mode: 'either', place: 'Hall', link: '', classIds: classes, teacherIds: [], closesAt: null, status: 'open' };
     expect((await call(teacher, 'POST', '/v1/meetings', m)).status).toBe(403);
     expect((await call(admin, 'POST', '/v1/meetings', { ...m, to: '09:05' })).status).toBe(400);
@@ -244,7 +252,6 @@ describe('visitors, gate passes and pick-up', () => {
   });
 
   it('a child leaves early only on an approved pass, the school’s own pass waits for the family, and pick-up needs the code', async () => {
-    const aarav = (await h.schoolSql("select id from students where id = 'stu_aarav'"))[0].id;
     const leaveAt = new Date(Date.now() + 3 * 3600_000).toISOString();
     const p = await call(parent, 'POST', '/v1/f/gate-pass', { studentId: aarav, leaveAt, reason: 'Dentist', collector: 'Mother', pickupId: null, returns: false });
     expect(p.status).toBe(200);
@@ -279,13 +286,13 @@ describe('visitors, gate passes and pick-up', () => {
   });
 
   it('writes a late arrival once a day and lists everyone on site', async () => {
-    const st = (await h.schoolSql("select id from students where status = 'active' and id <> 'stu_aarav' order by id limit 1"))[0].id;
+    const st = (await h.schoolSql("select id from students where status = 'active' and id <> $1 order by id limit 1", [aarav]))[0].id;
     expect((await call(admin, 'POST', '/v1/late-arrivals', { studentId: st, reason: 'Traffic' })).status).toBe(200);
     expect((await call(admin, 'POST', '/v1/late-arrivals', { studentId: st, reason: 'Again' })).status).toBe(409);
     expect((await call(admin, 'POST', '/v1/late-arrivals', { studentId: st, at: new Date(Date.now() - 3 * 86_400_000).toISOString() })).status).toBe(400);
     const roll = (await call(admin, 'GET', '/v1/visitors/roll-call')).json;
     expect(roll.students.length).toBeGreaterThan(0);
-    expect(roll.students.map((x: any) => x.id)).not.toContain('stu_aarav');
+    expect(roll.students.map((x: any) => x.id)).not.toContain(aarav);
     expect((await call(admin, 'GET', '/v1/visitors/roll-call.pdf')).headers['content-type']).toContain('pdf');
     expect((await call(parent, 'GET', '/v1/visitors/roll-call')).status).toBe(403);
   });
@@ -295,10 +302,10 @@ describe('certificates', () => {
   it('a family asks, the school issues it with a number and a QR page, and can revoke it', async () => {
     const mine = (await call(parent, 'GET', '/v1/f/certificates')).json;
     expect(mine.types.map((x: any) => x.key)).not.toContain('participation');
-    const r = await call(parent, 'POST', '/v1/f/certificates', { type: 'bonafide', studentId: 'stu_aarav', purpose: 'a bank account' });
+    const r = await call(parent, 'POST', '/v1/f/certificates', { type: 'bonafide', studentId: aarav, purpose: 'a bank account' });
     expect(r.status).toBe(200);
-    expect((await call(parent, 'POST', '/v1/f/certificates', { type: 'bonafide', studentId: 'stu_aarav', purpose: 'again' })).status).toBe(409);
-    expect((await call(parent, 'POST', '/v1/f/certificates', { type: 'participation', studentId: 'stu_aarav' })).status).toBe(400);
+    expect((await call(parent, 'POST', '/v1/f/certificates', { type: 'bonafide', studentId: aarav, purpose: 'again' })).status).toBe(409);
+    expect((await call(parent, 'POST', '/v1/f/certificates', { type: 'participation', studentId: aarav })).status).toBe(400);
     expect((await call(parent, 'GET', `/v1/f/certificates/${r.json.id}/certificate.pdf`)).status).toBe(409);
     expect((await decide(admin, await approvalOf('certificate', 'certificateId', r.json.id), 'approve')).status).toBe(200);
     const issued = (await call(parent, 'GET', '/v1/f/certificates')).json.certificates.find((c: any) => c.id === r.json.id);
@@ -313,7 +320,7 @@ describe('certificates', () => {
     const token = (await h.schoolSql('select token from certificates where id = $1', [r.json.id]))[0].token;
     const check = await h.call('GET', `/v1/certificates/verify/${token}`);
     expect(check.json.genuine).toBe(true);
-    expect(check.json.student).toBe('Aarav Sharma');
+    expect(check.json.student).toBe(aaravName);
     expect((await h.call('GET', '/v1/certificates/verify/not-a-real-token-at-all')).json.genuine).toBe(false);
     expect((await call(admin, 'POST', `/v1/certificates/${r.json.id}/revoke`, { note: '' })).status).toBe(400);
     expect((await call(admin, 'POST', `/v1/certificates/${r.json.id}/revoke`, { note: 'Issued in error' })).status).toBe(200);
@@ -324,26 +331,26 @@ describe('certificates', () => {
   it('waits for its fee and, where asked, for nothing to be owed; a cancelled request drops its unpaid fee', async () => {
     const types = (await call(admin, 'GET', '/v1/certificates/types')).json;
     await h.setSettings({ 'certificates.types': types.map((x: any) => (x.key === 'character' ? { ...x, fee: 150 } : x)) });
-    const c = await call(admin, 'POST', '/v1/certificates', { type: 'character', studentId: 'stu_aarav', purpose: '' });
+    const c = await call(admin, 'POST', '/v1/certificates', { type: 'character', studentId: aarav, purpose: '' });
     expect(c.json.feeDue).toBeGreaterThan(0);
     const aid = await approvalOf('certificate', 'certificateId', c.json.id);
     // The office asked, so someone else decides; the fee is still owed.
-    const meera = await h.login((await h.schoolSql("select email from users where kind = 'staff' and email <> 'neha.menon@greenfield.edu.in' and id in (select user_id from user_roles where role_id = 'role_principal') limit 1"))[0]?.email ?? 'neha.menon@greenfield.edu.in');
+    const meera = await h.login(h.people.vicePrincipal.email);
     const refused = await decide(meera === admin ? admin : meera, aid, 'approve');
     expect([403, 409]).toContain(refused.status);
     const invoice = (await h.schoolSql('select invoice_id from certificates where id = $1', [c.json.id]))[0].invoice_id;
     expect((await call(admin, 'POST', `/v1/certificates/${c.json.id}/cancel`)).json.state).toBe('cancelled');
     expect(await h.schoolSql('select 1 from fee_invoices where id = $1', [invoice])).toHaveLength(0);
     // A leaving certificate with fees owed is refused at approval.
-    await h.schoolSql("insert into fee_invoices (id, student_id, head, title, amount, due_on) values ('inv_owed', 'stu_aarav', 'tuition', 'Owed', 500, $1)", [addDays(today(), -5)]);
-    const lc = await call(parent, 'POST', '/v1/f/certificates', { type: 'transfer', studentId: 'stu_aarav', purpose: '' });
+    await h.schoolSql("insert into fee_invoices (id, student_id, head, title, amount, due_on) values ('inv_owed', $2, 'tuition', 'Owed', 500, $1)", [addDays(today(), -5), aarav]);
+    const lc = await call(parent, 'POST', '/v1/f/certificates', { type: 'transfer', studentId: aarav, purpose: '' });
     const owed = await decide(admin, await approvalOf('certificate', 'certificateId', lc.json.id), 'approve');
     expect(owed.status).toBe(409);
     expect(owed.json.message).toMatch(/owed/);
   });
 
   it('prints ID cards for a class at card size', async () => {
-    const cls = (await h.schoolSql("select class_id from students where id = 'stu_aarav'"))[0].class_id;
+    const cls = (await h.schoolSql('select class_id from students where id = $1', [aarav]))[0].class_id;
     const r = await call(admin, 'POST', '/v1/certificates/id-cards', { classIds: [cls], studentIds: [], staff: false, validUntil: null });
     expect(r.headers['content-type']).toContain('pdf');
     expect(r.raw.length).toBeGreaterThan(1000);

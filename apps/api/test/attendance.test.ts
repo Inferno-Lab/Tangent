@@ -16,7 +16,7 @@ const call = (method: string, path: string, body?: unknown) => h.call(method, pa
 describe('a morning and an afternoon register', () => {
   it('keeps each half on its own, puts them together where one mark a day is shown, and refuses a half the school does not keep', async () => {
     const date = (await call('GET', '/v1/dashboard')).json.day.date as string;
-    const cls = 'cls_5c';
+    const cls = await h.classId('5 B');
     const day = (q = '') => call('GET', `/v1/attendance/day?classId=${cls}&date=${date}${q}`);
     expect((await day('&part=am')).status).toBe(400);
     expect((await day()).json).toMatchObject({ part: 'day', parts: ['day'] });

@@ -212,7 +212,8 @@ export function generateSchool({ today = iso(Date.now()), seed = 20261120, perCl
   const enrolledOn = (st, d) => d >= st.joined && (!st.leftOn || d <= st.leftOn);
 
   // The people a tester signs in as.
-  const twoKids = families.find((f) => f.children.length === 2 && f.email && !f.rte && f.children.every((k) => k.status === 'active' && !k.joinedMidYear));
+  // The parent with two at the school has one in 8 A, the class teacher's class, listed first.
+  const twoKids = families.find((f) => f.children.length === 2 && f.email && !f.rte && f.children.every((k) => k.status === 'active' && !k.joinedMidYear) && f.children.some((k) => k.cls === '8 A'));
   const oneKid = families.find((f) => f.children.length === 1 && f.email && f !== twoKids && f.children[0].status === 'active' && !f.children[0].joinedMidYear && f.children[0].grade >= 9 && !phoneless.includes(f));
   const classTeacher = classes.find((c) => c.name === '8 A').teacher;
   const maths = teachersOf.Mathematics[0];
@@ -360,7 +361,7 @@ export function generateSchool({ today = iso(Date.now()), seed = 20261120, perCl
       vicePrincipal: who(vice), office: who(office), accountant: who(accountant),
       classTeacher: { ...who(classTeacher), class: '8 A' }, mathsTeacher: { ...who(maths), classes: maths.classes },
       driver: { ...who(drivers[0]), route: ROUTES[0] },
-      parentOfTwo: { name: twoKids.father, phone: `+91${twoKids.fatherPhone}`, email: twoKids.email, children: twoKids.children.map((k) => ({ name: k.name, admissionNo: k.adm, class: k.cls })) },
+      parentOfTwo: { name: twoKids.father, phone: `+91${twoKids.fatherPhone}`, email: twoKids.email, children: [...twoKids.children].sort((x, y) => Number(y.cls === '8 A') - Number(x.cls === '8 A')).map((k) => ({ name: k.name, admissionNo: k.adm, class: k.cls })) },
       parentOfOne: { name: oneKid.father, phone: `+91${oneKid.fatherPhone}`, email: oneKid.email, children: oneKid.children.map((k) => ({ name: k.name, admissionNo: k.adm, class: k.cls })) },
       student: { name: oneKid.children[0].name, admissionNo: oneKid.children[0].adm, class: oneKid.children[0].cls },
     },

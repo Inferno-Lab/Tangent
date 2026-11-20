@@ -78,10 +78,10 @@ describe('a school gets only what it has', () => {
     expect((await h.call('GET', '/v1/config', { token })).json.features).toEqual(expect.arrayContaining(['fees.reminders', 'attendance.teacherApp']));
     // A message that belongs to a feature the school does not have is never sent.
     const date = schoolToday();
-    const day = (await h.call('GET', `/v1/attendance/day?classId=cls_7a&date=${date}`, { token })).json;
+    const day = (await h.call('GET', `/v1/attendance/day?classId=${await h.classId('7 A')}&date=${date}`, { token })).json;
     const before = (await h.registry.query("select count(*)::int n from sandbox_messages where body like '%marked absent%'")).rows[0].n;
     const marks = day.marks.map((m: { studentId: string }, i: number) => ({ studentId: m.studentId, status: i === 0 ? 'absent' : 'present' }));
-    expect((await h.call('PUT', '/v1/attendance/day', { token, body: { classId: 'cls_7a', date, marks } })).status).toBe(200);
+    expect((await h.call('PUT', '/v1/attendance/day', { token, body: { classId: await h.classId('7 A'), date, marks } })).status).toBe(200);
     expect((await h.registry.query("select count(*)::int n from sandbox_messages where body like '%marked absent%'")).rows[0].n).toBe(before);
   }, 60_000);
 
@@ -91,6 +91,7 @@ describe('a school gets only what it has', () => {
     await h.entitle({ dates: {} });
     const back = await h.call('GET', '/v1/fees/summary', { token });
     expect(back.status).toBe(200);
-    expect(back.json.due).toBeGreaterThan(0);
+    // Mid-year, what families owe is past its date: it is all overdue.
+    expect(back.json.overdue).toBeGreaterThan(0);
   }, 60_000);
 });

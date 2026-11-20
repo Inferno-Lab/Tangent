@@ -8,7 +8,7 @@ let teacher: string;
 beforeAll(async () => {
   h = await startHarness();
   admin = await h.login();
-  teacher = await h.login('kavita.iyer@greenfield.edu.in');
+  teacher = await h.login(h.people.classTeacher.email);
 }, 240_000);
 afterAll(async () => {
   await h?.close();
@@ -51,6 +51,28 @@ describe('photos from a zip', () => {
     const photos = await h.schoolSql("select owner_id, mime from files where kind = 'student_photo' and deleted_at is null and owner_id = any($1) order by owner_id", [[a.id, b.id]]);
     expect(photos.map((p: any) => p.owner_id).sort()).toEqual([a.id, b.id].sort());
     expect(photos.find((p: any) => p.owner_id === b.id).mime).toBe('image/png');
+  });
+
+  it('files each PDF as a document of the student its name begins with, the rest of the name its label', async () => {
+    const [a] = await h.schoolSql("select id, admission_no from students where status = 'active' and admission_no <> '' order by admission_no desc limit 1");
+    const file = zip([
+      { name: `report cards/${a.admission_no.replace(/\//g, '-')} Report card Term 1.pdf`, content: Buffer.from('%PDF-1.4\n% a report card\n') },
+      { name: `${a.admission_no.replace(/\//g, '-')} Transfer certificate.pdf`, content: Buffer.from('not really a pdf') },
+    ]);
+    const { HubService } = await import('../src/school/hub.service.js');
+    const school = (await h.registry.query('select id from schools where slug = $1', [h.slug])).rows[0].id;
+    const r = await h.app.get(HubService).hub.resolve('storage', school, h.slug);
+    await r.adapter.storage!.put(r.ctx, `schools/${h.slug}/photo_zip/fil_zip2/cards.zip`, file, 'application/zip');
+    await h.schoolSql("insert into files (id, kind, owner_id, name, mime, bytes, storage_key, status) values ('fil_zip2', 'photo_zip', 'school', 'cards.zip', 'application/zip', $1, $2, 'clean')",
+      [file.length, `schools/${h.slug}/photo_zip/fil_zip2/cards.zip`]);
+    const started = await h.call('POST', '/v1/moving-in/photos', { token: admin, body: { fileId: 'fil_zip2' } });
+    expect(started.status, JSON.stringify(started.json)).toBe(200);
+    const { PhotoZipService } = await import('../src/school/photo-zip.js');
+    const msg = await (h.app.get(PhotoZipService) as any).run({ id: 'job_d', schoolId: school, kind: 'people.photoZip', payload: { importId: started.json[0].id }, attempts: 0 });
+    expect(msg).toBe('1 of 2 documents matched.');
+    const docs = await h.schoolSql("select name, mime from files where kind = 'student_document' and owner_id = $1", [a.id]);
+    expect(docs).toEqual([{ name: 'Report card Term 1.pdf', mime: 'application/pdf' }]);
+    expect((await h.call('GET', '/v1/moving-in/photos', { token: admin })).json[0].unmatched).toEqual([`${a.admission_no.replace(/\//g, '-')} Transfer certificate (not a PDF)`]);
   });
 
   it('keeps a photo’s small copy beside it: only an image, only small, only by whoever added the photo', async () => {

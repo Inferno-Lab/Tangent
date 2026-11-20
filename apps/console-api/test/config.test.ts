@@ -8,7 +8,7 @@ let second: string;
 let id: string;
 let school: string;
 
-async function launch(slug: string, payload: object = wizardPayload(slug, { data: { start: 'demo' } })) {
+async function launch(slug: string, payload: object = wizardPayload(slug)) {
   const r = await h.c('POST', '/console/v1/wizard/launch', { token: t, body: { payload } });
   for (let i = 0; i < 400; i++) {
     const run = (await h.c('GET', `/console/v1/runs/${r.json.id}`, { token: t })).json;
@@ -29,8 +29,7 @@ beforeAll(async () => {
   second = await h.signIn('second@tangent.app', 'another-long-pass');
   expect((await launch('cfgschool')).status).toBe('succeeded');
   id = (await h.c('GET', '/console/v1/schools', { token: t })).json.find((s: { slug: string }) => s.slug === 'cfgschool').id;
-  const a = await h.s('POST', '/v1/auth/login', { school: 'cfgschool', body: { identifier: 'asha@cfgschool.test', password: 'nest2026' } });
-  school = (await h.s('POST', '/v1/auth/verify', { school: 'cfgschool', body: { challengeId: a.json.challenge.challengeId, code: '424242' } })).json.accessToken;
+  school = await h.schoolSignIn('cfgschool');
 }, 240_000);
 afterAll(async () => {
   await h?.close();
@@ -81,6 +80,8 @@ describe('configuration from the console', () => {
     expect((await h.c('POST', `/console/v1/schools/${id}/roles`, { token: t, body: { name: 'Bad', permissions: ['settings.write'] } })).status).toBe(400);
     const principal = roles.find((r: { key: string }) => r.key === 'principal');
     expect((await h.c('PUT', `/console/v1/schools/${id}/roles/${principal.id}`, { token: t, body: { name: 'Principal', permissions: [] } })).status).toBe(409);
+    // The school adds a teacher of its own; the console decides the role they hold.
+    expect((await h.s('POST', '/v1/staff', { school: 'cfgschool', token: school, body: { name: 'Ravi Kumar', email: 'ravi@cfgschool.test', phone: '+91 90000 33333', designation: 'Teacher', roleId: 'role_teacher' } })).status).toBe(201);
     const staff = (await cfg()).json.staff.find((s: { designation: string }) => s.designation !== 'Principal');
     expect((await h.c('PUT', `/console/v1/schools/${id}/staff/${staff.id}/role`, { token: t, body: { roleId: exam.id } })).status).toBe(204);
     expect((await cfg()).json.staff.find((s: { id: string }) => s.id === staff.id).roleId).toBe(exam.id);

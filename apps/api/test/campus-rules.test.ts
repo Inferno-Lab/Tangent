@@ -9,8 +9,8 @@ let teacher: string;
 beforeAll(async () => {
   h = await startHarness();
   admin = await h.login();
-  parent = await h.login('priya.sharma@example.com');
-  teacher = await h.login('kavita.iyer@greenfield.edu.in');
+  parent = await h.login(h.people.parentOfTwo.phone);
+  teacher = await h.login(h.people.classTeacher.email);
 }, 240_000);
 afterAll(async () => {
   await h?.close();
@@ -21,10 +21,10 @@ const today = () => schoolToday(new Date(), 'Asia/Kolkata');
 const call = (token: string, method: string, path: string, body?: unknown) => h.call(method, path, { token, body });
 const f = (token: string, url: string) => call(token, 'GET', `/v1/f${url}`);
 const post = (token: string, url: string, body?: unknown) => call(token, 'POST', `/v1/f${url}`, body ?? {});
-/** Priya's children with their year groups. */
+/** The children of the parent with two at the school, with their year groups. */
 const kids = () => h.schoolSql(
   `select s.id, c.grade, s.class_id from students s join classes c on c.id = s.class_id join student_guardians sg on sg.student_id = s.id
-   join guardians g on g.id = sg.guardian_id join users u on u.id = g.user_id where u.email = 'priya.sharma@example.com' and s.status = 'active' order by s.id`);
+   join guardians g on g.id = sg.guardian_id join users u on u.id = g.user_id where u.phone = $1 and s.status = 'active' order by s.id`, [h.people.parentOfTwo.phone]);
 
 describe('codeForms', () => {
   it('reads an ISBN in both its forms, and anything else as typed', () => {
@@ -57,7 +57,7 @@ describe('notice targets', () => {
     // Aimed at some students, it is not one staff read.
     expect((await f(teacher, '/notices')).json.map((n: any) => n.title)).not.toContain('Targets: my year');
     // A teacher writes to the classes they teach, without targets.
-    const taught = (await h.schoolSql("select c.id from classes c join users u on u.id = c.class_teacher_id where u.email = 'kavita.iyer@greenfield.edu.in' limit 1"))[0]?.id;
+    const taught = await h.classId(h.people.classTeacher.class!);
     expect((await call(teacher, 'POST', '/v1/notices', { title: 'Targets: by a teacher', body: 'Only some of my class.', audience: 'class', classId: taught, publish: true, targets: { houses: ['Red'] } })).status).toBe(403);
   });
 });
@@ -148,7 +148,7 @@ describe('bus trips', () => {
   it('runs only the school’s trips the route runs, by its driver or attendant (a teaching attendant keeps the teachers’ app)', async () => {
     await h.setSettings({ 'transport.sessions': [{ key: 'morning', name: 'Morning', from: '00:00' }, { key: 'afternoon', name: 'Afternoon', from: '12:00' }, { key: 'late', name: 'Late bus', from: '16:30' }] });
     const route = (await call(admin, 'GET', '/v1/transport')).json.routes[0];
-    const kavita = (await h.schoolSql("select id from users where email = 'kavita.iyer@greenfield.edu.in'"))[0].id;
+    const kavita = await h.userId(h.people.classTeacher.email);
     const body = (b: Record<string, unknown>) => ({ name: route.name, vehicle: route.vehicle, driverUserId: route.driverUserId, attendantName: '', attendantPhone: '', trackerId: route.trackerId, fee: route.fee,
       stops: route.stops.map((s: any) => ({ id: s.id, name: s.name, pickup: s.pickup, dropTime: s.dropTime, lat: s.lat, lng: s.lng })), ...b });
     expect((await call(admin, 'PUT', `/v1/transport/routes/${route.id}`, body({ sessions: ['night'] }))).status).toBe(400);

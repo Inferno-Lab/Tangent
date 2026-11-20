@@ -1,3 +1,4 @@
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startHarness, wizardPayload, type Harness } from './harness.js';
 
@@ -18,11 +19,8 @@ beforeAll(async () => {
     await new Promise((ok) => setTimeout(ok, 100));
   }
   id = (await h.c('GET', '/console/v1/schools', { token: t })).json.find((s: { slug: string }) => s.slug === 'moveschool').id;
-  // An empty school is not a demo: the admin's password and sign-in code arrive in the sandbox inbox.
-  const inbox = async (to: string, re: RegExp) => re.exec((await h.registry.query("select body from sandbox_messages where school_slug = 'moveschool' and to_addr = $1 order by created_at desc limit 1", [to])).rows[0].body)![1]!;
-  const password = await inbox('asha@moveschool.test', /temporary password (\S+)\./);
-  const a = await h.s('POST', '/v1/auth/login', { school: 'moveschool', body: { identifier: 'asha@moveschool.test', password } });
-  school = (await h.s('POST', '/v1/auth/verify', { school: 'moveschool', body: { challengeId: a.json.challenge.challengeId, code: await inbox('+919000022222', /(\d{6})/) } })).json.accessToken;
+  // Its admin signs in from the welcome email: the temporary password and the code arrive in the Test inbox.
+  school = await h.schoolSignIn('moveschool');
 }, 240_000);
 afterAll(async () => {
   await h?.close();
@@ -48,19 +46,35 @@ describe('the Migration workspace', () => {
     expect((await post('/preview', { kind: 'marks', csv: 'a\n1' })).status).toBe(400);
   });
 
-  it('loads a realistic test school through the importer, and it adds up', async () => {
-    const r = await post('/sample', { students: 120 });
-    expect(r.status).toBe(200);
-    expect(r.json.some((b: any) => b.kind === 'students' && b.created === 120)).toBe(true);
+  it('moves in the school’s staff, classes and first students from the files its old systems wrote', async () => {
+    // The dataset's own exports (tools/dataset): its subjects, staff register and class list, and the first rows of the Fedena export.
+    const dataset = (name: string) => import(pathToFileURL(fileURLToPath(new URL(`../../../tools/dataset/${name}`, import.meta.url))).href);
+    const { generateSchool } = await dataset('school.mjs');
+    const { asUpload } = await dataset('build.mjs');
+    const { files } = generateSchool({});
+    const file = (name: string) => files.find((f: any) => f.name === name);
+    const fedena = file('09-students-fedena.csv');
+    const first = { ...fedena, content: fedena.content.split('\n').slice(0, 21).join('\n') };
+    // The opening dues of those students only, as the old ERP's report would give them for a class.
+    const enrolled = new Set(first.content.split('\n').slice(1).map((l: string) => l.split(',')[0]));
+    const dues = file('15-opening-dues.csv');
+    const [head, ...lines] = dues.content.split('\n');
+    const owed = { ...dues, content: [head, ...lines.filter((l: string) => enrolled.has(l.split(',')[0]))].join('\n') };
+    const names = ['05-subjects.csv', '06-bell-timings.csv', '07-staff-register.xlsx', '08-classes.csv'];
+    for (const f of [...names.map(file), first, file('13-fee-heads.csv'), owed, file('19-timetable-asc.xml')]) {
+      const input = { kind: f.kind, csv: asUpload(f), fileName: f.name };
+      const p = (await post('/preview', input)).json;
+      expect(p.rows.filter((r: any) => r.errors.length).map((r: any) => r.errors).slice(0, 3), f.name).toEqual([]);
+      expect((await post('/commit', input)).status, f.name).toBe(200);
+    }
     const v = await view();
-    expect(v.students).toBe(120);
+    expect(v.students).toBe(20);
     expect(v.readiness.find((r: any) => r.key === 'structure').done).toBe(true);
     expect(v.readiness.find((r: any) => r.key === 'students').done).toBe(true);
-    expect((await post('/sample', { students: 50 })).status).toBe(409);
   }, 120_000);
 
   it('imports a file the school sent, after showing what is wrong with it, and undoes it', async () => {
-    const subjects = 'Subject,Periods\nArt,2\nMusic,x\n';
+    const subjects = 'Subject,Periods\nPottery,2\nMusic,x\n';
     const up = await h.s('POST', '/v1/moving-in/uploads', { school: 'moveschool', token: school, body: { fileName: 'subjects.csv', note: '', content: subjects } });
     expect(up.status).toBe(201);
     const v = await view();

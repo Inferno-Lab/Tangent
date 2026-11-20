@@ -9,8 +9,8 @@ let teacher: string;
 beforeAll(async () => {
   h = await startHarness();
   admin = await h.login();
-  parent = await h.login('priya.sharma@example.com');
-  teacher = await h.login('kavita.iyer@greenfield.edu.in');
+  parent = await h.login(h.people.parentOfTwo.phone);
+  teacher = await h.login(h.people.classTeacher.email);
 }, 240_000);
 afterAll(async () => {
   await h?.close();

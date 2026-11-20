@@ -19,6 +19,8 @@ export interface Harness {
   signIn: (email?: string, password?: string) => Promise<string>;
   /** Invites a team member and joins with the link, as the person would: they choose the password. */
   invite: (token: string, body: { name: string; email: string; roles: string[] }, password: string) => Promise<{ status: number; json: any }>;
+  /** A school's first admin signs in as they would: the temporary password from the welcome email, then the code, both from the Test inbox. */
+  schoolSignIn: (slug: string) => Promise<string>;
   close: () => Promise<void>;
 }
 
@@ -59,8 +61,16 @@ export async function startHarness(extra: Record<string, string> = {}): Promise<
     if (r.status !== 200) return r;
     return c('POST', '/console/v1/auth/join', { body: { token: new URL(r.json.link).searchParams.get('token'), password } });
   };
+  const inbox = async (slug: string, to: string, re: RegExp) => re.exec((await pool.query(
+    'select body from sandbox_messages where school_slug = $1 and to_addr = $2 order by created_at desc limit 1', [slug, to])).rows[0]?.body ?? '')?.[1];
+  const schoolSignIn: Harness['schoolSignIn'] = async (slug) => {
+    const password = await inbox(slug, `asha@${slug}.test`, /temporary password (\S+)\./);
+    const a = await s('POST', '/v1/auth/login', { school: slug, body: { identifier: `asha@${slug}.test`, password } });
+    const code = await inbox(slug, '+919000022222', /(\d{6})/);
+    return (await s('POST', '/v1/auth/verify', { school: slug, body: { challengeId: a.json.challenge.challengeId, code } })).json.accessToken as string;
+  };
   return {
-    console: console_, api, server, registry: pool, c, s, signIn, invite,
+    console: console_, api, server, registry: pool, c, s, signIn, invite, schoolSignIn,
     close: async () => { await pool.end(); await console_.close(); await api.close(); await registry.close(); await pools.closeAll(); await server.stop(); },
   };
 }
