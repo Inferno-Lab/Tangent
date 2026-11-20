@@ -288,7 +288,9 @@ await flow('console: team invite validates, then invites with a link the person 
   const link = (await dialog.locator('.card').textContent()).trim();
   await dialog.getByRole('button', { name: 'Done' }).click();
   await expectVisible(p.getByText('Test Person'), 'the new person');
-  await p.goto(link, { waitUntil: 'networkidle' });
+  // The link carries the console address the server was given (Vite's on a laptop); the flow opens it on the console it tests.
+  const u = new URL(link);
+  await p.goto(`${CONSOLE}${u.pathname.replace(/^\/console(?=\/)/, '')}${u.search}`, { waitUntil: 'networkidle' });
   await p.getByLabel('Choose a password').fill('long-enough-password');
   await p.getByLabel('The same password again').fill('long-enough-password');
   await p.getByRole('button', { name: 'Set my password' }).click();
