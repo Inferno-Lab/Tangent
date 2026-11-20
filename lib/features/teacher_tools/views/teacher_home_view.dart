@@ -5,6 +5,8 @@ import 'package:get/get.dart';
 import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
+import 'package:tangent/core/theme/tokens.dart';
+import 'package:tangent/core/utils/formatters.dart';
 import 'package:tangent/core/utils/extensions.dart';
 import 'package:tangent/core/utils/schedule.dart';
 import 'package:tangent/core/utils/view_state.dart';
@@ -16,8 +18,11 @@ import 'package:tangent/core/widgets/states.dart';
 import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/data/models/campus.dart';
 import 'package:tangent/data/models/student.dart';
-import 'package:tangent/features/dashboard/views/dashboard_view.dart' show PeriodStrip, greeting, openTimetable, todayLine;
-import 'package:tangent/features/dashboard/widgets/home_cards.dart' show QuickGrid, SchoolLinks;
+import 'package:tangent/features/dashboard/views/dashboard_view.dart' show todayLine;
+import 'package:tangent/features/dashboard/widgets/around_school_sheet.dart';
+import 'package:tangent/features/dashboard/widgets/parent_home.dart' show HomeHeading;
+import 'package:tangent/features/teacher_tools/widgets/day_ribbon.dart';
+import 'package:tangent/features/dashboard/widgets/home_cards.dart' show SchoolLinks;
 import 'package:tangent/features/shell/shell_controller.dart';
 import 'package:tangent/features/teacher_tools/controllers/teacher_controller.dart';
 import 'package:tangent/features/school_life/views/staff_time_view.dart';
@@ -37,77 +42,254 @@ class TeacherHomeView extends GetView<TeacherHomeController> {
     final inset = MediaQuery.paddingOf(context);
     return Obx(() {
       controller.state.value;
+      final c = context.app;
       final t = controller.teacher;
       final ready = controller.state.value == ViewState.success && t != null;
       final periods = controller.today.map((p) => p.slot).toList();
       final classOf = {for (final p in controller.today) p.slot.id: p.schoolClass};
       final hasDay = ready && periods.isNotEmpty;
-      // As the TeacherHome board: who and when on the school's deep colour (PageFrame puts the first child there), then
-      // today's classes as a strip and the tasks.
-      return PageFrame(
-        dockPage: true,
-        onRefresh: controller.load,
-        topPadding: inset.top + 8,
-        children: [
-          Builder(
-            builder: (context) => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      final own = controller.own;
+      // As the approved canvas: the day as the old ribbon from the top of the screen, the teacher's capsule and bell over it,
+      // then the greeting, the lesson on now, the check-in, the quick buttons and what needs the teacher.
+      return Scaffold(
+        backgroundColor: c.chalk,
+        body: ListView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          padding: EdgeInsets.only(bottom: kDockClearance + inset.bottom),
+          children: [
+            Stack(
               children: [
-                Row(
-                  children: [
-                    if (t != null)
-                      GlassPress(
-                        onTap: () => ShellController.showTab('profile'),
-                        child: Glass(
-                          height: 44,
-                          radius: 22,
-                          shadow: false,
-                          padding: const EdgeInsets.only(left: 4, right: 16),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Avatar(t.name, size: 34),
-                              const SizedBox(width: 8),
-                              Text(t.name.split(' ').first, maxLines: 1, style: AppText.chip(color: context.app.ink, height: 1.05)),
-                            ],
+                if (hasDay)
+                  DayRibbon(
+                    periods: periods,
+                    subject: t.subject,
+                    height: inset.top + 230,
+                    label: (p) => classOf[p.id] == null ? subjectName(p.subject) : classLabel(classOf[p.id]!),
+                  )
+                else
+                  SizedBox(height: inset.top + 64),
+                PositionedDirectional(
+                  start: 16,
+                  end: 16,
+                  top: inset.top + 8,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      if (t != null)
+                        Flexible(
+                          child: Pressable(
+                            onTap: () => ShellController.showTab('profile'),
+                            label: t.name,
+                            child: Container(
+                              height: 48,
+                              padding: const EdgeInsetsDirectional.only(start: 6, end: 16),
+                              decoration: BoxDecoration(
+                                color: c.paper,
+                                borderRadius: BorderRadius.circular(AppRadius.pill),
+                                border: Border.all(color: c.line),
+                                boxShadow: [BoxShadow(color: c.ink.withValues(alpha: .1), blurRadius: 20, offset: const Offset(0, 6))],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Avatar(t.name, size: 36, background: c.subjectFor(t.subject).fill, foreground: c.subjectFor(t.subject).on),
+                                  const SizedBox(width: 10),
+                                  Flexible(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(t.name.split(' ').first, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.t(color: c.ink, height: 1.1)),
+                                        Text(
+                                          own == null
+                                              ? subjectName(t.subject)
+                                              : 'teacher.capsule_line'.trp({'subject': subjectName(t.subject), 'class': classLabel(own)}),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: AppText.tiny(color: c.ink3, height: 1.2),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
+                      const SizedBox(width: 12),
+                      GlassIconButton(
+                        icon: PhosphorIconsRegular.bell,
+                        label: 'menu.notifications'.tr,
+                        onTap: () => Get.toNamed<void>(AppRoutes.notifications),
                       ),
-                    const Spacer(),
-                    GlassIconButton(
-                      icon: PhosphorIconsRegular.bell,
-                      label: 'menu.notifications'.tr,
-                      onTap: () => Get.toNamed<void>(AppRoutes.notifications),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 16),
-                if (t != null) ...[
-                  Rise(child: Text(todayLine(), style: context.type.capB)),
-                  const SizedBox(height: 6),
-                  Rise(index: 1, child: Text(greeting(t.name.split(' ').first), style: context.type.h1)),
-                ],
               ],
             ),
-          ),
-          if (hasDay)
             Padding(
-              padding: const EdgeInsets.only(top: 20, bottom: 16),
-              child: PeriodStrip(
-                periods: periods,
-                onAll: SchoolConfig.has('timetable') ? openTimetable : null,
-                label: (p) => classOf[p.id] == null ? subjectName(p.subject) : classLabel(classOf[p.id]!),
+              padding: EdgeInsets.fromLTRB(20, hasDay ? 20 : 24, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (t != null) ...[
+                    Rise(child: Text(todayLine().toUpperCase(), style: context.type.o)),
+                    const SizedBox(height: 6),
+                    Rise(index: 1, child: Text('${Formatters.greetingKey(Clock.now()).tr}, ${t.name.split(' ').first}', style: context.type.h1)),
+                  ],
+                  const SizedBox(height: 20),
+                  ViewStateView(
+                    state: controller.state.value,
+                    onRetry: controller.load,
+                    errorKey: controller.errorMessage.value,
+                    child: t == null ? const SizedBox.shrink() : _Body(controller: controller, teacher: t),
+                  ),
+                ],
               ),
             ),
-          ViewStateView(
-            state: controller.state.value,
-            onRetry: controller.load,
-            errorKey: controller.errorMessage.value,
-            child: t == null ? const SizedBox.shrink() : _Body(controller: controller, teacher: t),
-          ),
-        ],
+          ],
+        ),
       );
     });
+  }
+}
+
+/// The lesson on now (or the next one) in the teacher's subject colour, with roll call and the class list a tap away.
+class _NowLesson extends StatelessWidget {
+  const _NowLesson({required this.period, required this.live, required this.subject});
+
+  final TeacherPeriod period;
+  final bool live;
+  final String subject;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.app;
+    final pigment = c.subjectFor(subject);
+    final cls = period.schoolClass!;
+    final a = minutesOf(period.slot.start);
+    final b = minutesOf(period.slot.end);
+    final room = period.slot.room.isEmpty ? cls.room : period.slot.room;
+    final ground = live ? pigment.fill : pigment.soft;
+    final ink = live ? pigment.on : pigment.ink;
+    final left = b - nowMinutes();
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: ground, borderRadius: BorderRadius.circular(AppRadius.panel)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                height: 24,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(color: ink.withValues(alpha: .18), borderRadius: BorderRadius.circular(AppRadius.pill)),
+                child: Center(widthFactor: 1, child: Text((live ? 'home.now' : 'teacher.next').tr, style: AppText.tiny(color: ink))),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  live ? 'teacher.until_left'.trp({'time': clockOf(b), 'n': '$left'}) : 'teacher.at_time'.trp({'time': clockOf(a)}),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.cap(color: ink.withValues(alpha: .86)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            [classLabel(cls), subjectName(period.slot.subject), if (room.isNotEmpty) 'teacher.room_n'.trp({'room': room})].join(' · '),
+            style: AppText.h3(color: ink),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _Pill(
+                label: 'teacher.take_roll_call'.tr,
+                ground: ink,
+                ink: ground,
+                onTap: () => Get.toNamed<void>(_attendanceRoute(cls.id)),
+              ),
+              _Pill(
+                label: 'teacher.class_list'.tr,
+                ground: ink.withValues(alpha: .16),
+                ink: ink,
+                onTap: () => Get.toNamed<void>(AppRoutes.teacherRoster.replaceFirst(':classId', cls.id)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  const _Pill({required this.label, required this.ground, required this.ink, required this.onTap});
+
+  final String label;
+  final Color ground;
+  final Color ink;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Pressable(
+    onTap: onTap,
+    label: label,
+    child: Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(color: ground, borderRadius: BorderRadius.circular(AppRadius.pill)),
+      child: Center(widthFactor: 1, child: Text(label, style: AppText.chip(color: ink, height: 1))),
+    ),
+  );
+}
+
+/// The quick buttons as one row of pills that scrolls sideways, "More" last (it opens Around school).
+class _QuickPills extends StatelessWidget {
+  const _QuickPills({required this.items});
+
+  final List<(IconData, String, VoidCallback?)> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.app;
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        clipBehavior: Clip.none,
+        physics: const BouncingScrollPhysics(),
+        itemCount: items.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final (icon, key, onTap) = items[i];
+          return Pressable(
+            onTap: onTap,
+            label: key.tr,
+            child: Opacity(
+              opacity: onTap == null ? .5 : 1,
+              child: Container(
+                padding: const EdgeInsetsDirectional.only(start: 12, end: 16),
+                decoration: BoxDecoration(color: c.paper, borderRadius: BorderRadius.circular(AppRadius.pill), border: Border.all(color: c.line2)),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 18, color: c.mariText),
+                    const SizedBox(width: 8),
+                    Text(key.tr, style: AppText.ts(color: c.ink, height: 1)),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 }
 
@@ -121,22 +303,6 @@ class _Body extends StatelessWidget {
   Widget build(BuildContext context) {
     final now = controller.current;
     final next = controller.next;
-    final String line;
-    if (now != null) {
-      line = 'teacher.now_line'.trp({
-        'class': classLabel(now.schoolClass!),
-        'room': now.slot.room.isEmpty ? now.schoolClass!.room : now.slot.room,
-        'until': clockOf(minutesOf(now.slot.end)),
-      });
-    } else if (next != null) {
-      line = 'teacher.next_line'.trp({
-        'class': classLabel(next.schoolClass!),
-        'room': next.slot.room.isEmpty ? next.schoolClass!.room : next.slot.room,
-        'at': clockOf(minutesOf(next.slot.start)),
-      });
-    } else {
-      line = 'teacher.day_done'.tr;
-    }
     final focus = now?.schoolClass ?? next?.schoolClass ?? controller.own ?? controller.classes.firstOrNull;
     final ownTaken = controller.own == null ? null : controller.taken(controller.own!.id);
     final tasks = <Widget>[
@@ -171,8 +337,13 @@ class _Body extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Rise(child: Text(line, style: context.type.s)),
-        const SizedBox(height: 16),
+        if (now?.schoolClass != null || next?.schoolClass != null) ...[
+          Rise(child: _NowLesson(period: (now ?? next)!, live: now != null, subject: teacher.subject)),
+          const SizedBox(height: 16),
+        ] else ...[
+          Rise(child: Text('teacher.day_done'.tr, style: context.type.s)),
+          const SizedBox(height: 16),
+        ],
         // Today's check-in, where the school keeps staff attendance and puts it on staff's Home (console: The app).
         if (SchoolConfig.has('staffAttendance') && SchoolConfig.home.contains('checkIn')) ...[
           const Rise(index: 1, child: CheckInCard(onHome: true)),
@@ -195,11 +366,16 @@ class _Body extends StatelessWidget {
               'mySlots': (PhosphorIconsRegular.calendarDots, 'teacher.qa_slots', () => Get.toNamed<void>(AppRoutes.teacherMeetings)),
               'inviteVisitor': (PhosphorIconsRegular.userPlus, 'teacher.qa_visitor', () => Get.toNamed<void>(AppRoutes.inviteVisitor)),
             };
-            return QuickGrid(items: [for (final k in SchoolConfig.quick) ?buttons[k]]);
+            return _QuickPills(
+              items: [
+                for (final k in SchoolConfig.quick) ?buttons[k],
+                if (AroundSchoolSheet.hasAny()) (PhosphorIconsRegular.squaresFour, 'teacher.more_school', () => unawaited(openAroundSchool())),
+              ],
+            );
           }),
         ),
         if (tasks.isNotEmpty) ...[
-          Rise(index: 3, child: SectionLabel('teacher.needs_you'.trp({'n': '${tasks.length}'}))),
+          Rise(index: 3, child: HomeHeading('teacher.needs_you'.trp({'n': '${tasks.length}'}))),
           Rise(
             index: 4,
             child: EduCard(
@@ -233,7 +409,6 @@ class _Body extends StatelessWidget {
             ),
           ),
         ],
-        const Rise(index: 6, child: SchoolLinks('school', title: 'home.around_school')),
       ],
     );
   }

@@ -148,6 +148,10 @@ Future<void> _popups(WidgetTester tester, UserRole role) async {
     shell.go(0);
     await _settle(tester);
     await on(AppRoutes.shell, [('leave_requests', text('teacher.leave_one'), false)]);
+    // "More" ends the row of quick pills, which scrolls sideways: bring it in first.
+    if (text('teacher.qa_attendance').evaluate().isNotEmpty) await tester.drag(text('teacher.qa_attendance').first, const Offset(-900, 0));
+    await _settle(tester);
+    await on(AppRoutes.shell, [('around_school', text('teacher.more_school'), false)]);
     await on(AppRoutes.staffMe, [('staff_leave', text('staff.ask_for_leave'), true)]);
     await on(AppRoutes.teacherDiary, [('diary_write', text('diary.write'), true)]);
     await on(AppRoutes.inviteVisitor, [('invite', text('visitors.invite'), true)]);

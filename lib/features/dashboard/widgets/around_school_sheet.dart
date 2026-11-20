@@ -168,7 +168,7 @@ class AroundSchoolSheet extends StatelessWidget {
       if (_open('diary'))
         (
           wide: true,
-          height: 104,
+          height: teacher ? 84 : 104,
           child: _QuoteTile(
             over: g.diary == null ? 'school.diary'.tr : 'school.diary_on'.trp({'date': _diaryDay(g.diary!.date, lang)}),
             text: teacher ? 'school.diary_write'.tr : (g.diary?.text.isNotEmpty ?? false ? g.diary!.text : 'school.diary_none'.tr),
@@ -176,8 +176,10 @@ class AroundSchoolSheet extends StatelessWidget {
             onTap: () => go(teacher ? AppRoutes.teacherDiary : AppRoutes.diary),
           ),
         ),
-      if (_open('ptm', 'meetings') && !student)
-        (wide: false, height: 138, child: _MeetingTile(glance: g, teacher: teacher, day: day, onTap: () => go(teacher ? AppRoutes.teacherMeetings : AppRoutes.meetings))),
+      if (_open('ptm', 'meetings') && parent)
+        (wide: false, height: 138, child: _MeetingTile(glance: g, day: day, onTap: () => go(AppRoutes.meetings))),
+      if (_open('ptm', 'meetings') && teacher)
+        (wide: false, height: 138, child: _SmallTile(icon: PhosphorIconsRegular.calendarDots, colour: 'violet', title: 'school.meeting_title'.tr, line: 'school.meeting_slots'.tr, tall: true, onTap: () => go(AppRoutes.teacherMeetings))),
       if (_open('visitors', 'gatePass') && parent)
         (wide: false, height: 138, child: _PickupTile(glance: g, onTap: () => go(AppRoutes.gatePass))),
       if (_open('visitors', 'invite') && teacher)
@@ -569,10 +571,9 @@ class _QuoteTile extends StatelessWidget {
 }
 
 class _MeetingTile extends StatelessWidget {
-  const _MeetingTile({required this.glance, required this.teacher, required this.day, required this.onTap});
+  const _MeetingTile({required this.glance, required this.day, required this.onTap});
 
   final SchoolGlance glance;
-  final bool teacher;
   final String Function(DateTime) day;
   final VoidCallback onTap;
 
@@ -590,7 +591,7 @@ class _MeetingTile extends StatelessWidget {
         children: [
           Text('school.meeting_title'.tr, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.ts(color: c.ink, height: 1.15)),
           Text(
-            teacher ? 'school.meeting_slots'.tr : (m == null ? 'school.meeting_none'.tr : [if (when != null) day(when), m.place].where((x) => x.isNotEmpty).join(' · ')),
+            m == null ? 'school.meeting_none'.tr : [if (when != null) day(when), m.place].where((x) => x.isNotEmpty).join(' · '),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: context.type.cap,
