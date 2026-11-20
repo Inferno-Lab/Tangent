@@ -70,9 +70,9 @@ class PageFrame extends StatelessWidget {
     final top = inset.top + 8;
     // On a tab page a bottom bar floats above the dock.
     final barLift = dockPage ? 76.0 : 0.0;
-    // With the keyboard up the page can scroll its last field above it (and above a bar riding on the keyboard).
+    // With the keyboard up the page ends above the keyboard and the bar riding on it (below).
     final bottomSpace = keyboard > 0
-        ? keyboard + (bottomBar != null ? bottomBarHeight + 24 : 16)
+        ? 16.0
         : bottomBar != null && edgeBar
         ? bottomBarHeight + 24 + inset.bottom
         : bottomBar != null
@@ -105,7 +105,11 @@ class PageFrame extends StatelessWidget {
               Expanded(child: list),
             ],
           );
-    final body = formKey == null ? page : Form(key: formKey, autovalidateMode: AutovalidateMode.onUserInteraction, child: page);
+    // The scrolling area stops at the keyboard: a field that takes focus is scrolled into the part that can be seen. (Ending
+    // it under the keyboard left the field counted as visible while the keyboard covered it.)
+    // A bottom bar rides on the keyboard, so the area also stops above the bar: a field scrolled to its end is never under it.
+    final shown = Padding(padding: EdgeInsets.only(bottom: keyboard > 0 && bottomBar != null ? keyboard + bottomBarHeight + 12 : keyboard), child: page);
+    final body = formKey == null ? shown : Form(key: formKey, autovalidateMode: AutovalidateMode.onUserInteraction, child: shown);
     return Scaffold(
       backgroundColor: background ?? c.chalk,
       resizeToAvoidBottomInset: false,

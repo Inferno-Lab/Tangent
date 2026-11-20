@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -174,17 +176,48 @@ class Field extends StatefulWidget {
   State<Field> createState() => _FieldState();
 }
 
-class _FieldState extends State<Field> {
+class _FieldState extends State<Field> with WidgetsBindingObserver {
   final _focus = FocusNode();
+  final _box = GlobalKey();
+  Timer? _settle;
 
   @override
   void initState() {
     super.initState();
-    _focus.addListener(() => setState(() {}));
+    WidgetsBinding.instance.addObserver(this);
+    _focus.addListener(() {
+      setState(() {});
+      if (_focus.hasFocus) {
+        // After the frame that draws the focus (a post-frame callback asks for no frame itself).
+        WidgetsBinding.instance
+          ..addPostFrameCallback((_) => _reveal())
+          ..scheduleFrame();
+      }
+    });
+  }
+
+  // The keyboard opening (or growing) while this field has focus: once it stops moving (this is called on every frame of
+  // its slide, before the page has laid itself out for it), bring the whole field back into view.
+  @override
+  void didChangeMetrics() {
+    if (!_focus.hasFocus) return;
+    _settle?.cancel();
+    _settle = Timer(AppMotion.t2, _reveal);
+  }
+
+  /// Scrolls the whole field (its label, the box and its error) into the part of the page the keyboard leaves, after the
+  /// frame that laid the page out for the keyboard. Flutter's own caret check kept only the caret line, and missed a field
+  /// that was already under the keyboard when it opened.
+  void _reveal() {
+    final ctx = _box.currentContext;
+    if (!mounted || ctx == null || !_focus.hasFocus) return;
+    unawaited(Scrollable.ensureVisible(ctx, duration: context.reduceMotion ? Duration.zero : AppMotion.t2, curve: kEase, alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd));
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _settle?.cancel();
     _focus.dispose();
     super.dispose();
   }
@@ -201,6 +234,7 @@ class _FieldState extends State<Field> {
             ? AppColors.bad
             : (_focus.hasFocus ? c.ink : (widget.borderless ? Colors.transparent : c.line2));
         return Column(
+          key: _box,
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [

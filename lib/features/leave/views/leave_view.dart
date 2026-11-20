@@ -315,7 +315,7 @@ class LeaveApplyView extends GetView<LeaveApplyController> {
           ),
         ),
         children: [
-          Builder(builder: (context) => Text(past ? 'leave.explain_title'.tr : 'leave.ask_title'.tr, style: context.type.h2)),
+          PageTitle(past ? 'leave.explain_title' : 'leave.ask_title', small: true),
           const SizedBox(height: 12),
           Wrap(
             crossAxisAlignment: WrapCrossAlignment.center,

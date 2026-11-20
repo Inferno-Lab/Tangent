@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:get/get.dart';
 import 'package:tangent/core/services/auth_service.dart';
+import 'package:tangent/core/services/error_reporter.dart';
 import 'package:tangent/core/services/session_bus.dart';
 import 'package:tangent/core/utils/app_exception.dart';
 import 'package:tangent/core/utils/view_state.dart';
@@ -40,6 +41,12 @@ mixin Loadable on GetxController {
       }
     } on AppException catch (error) {
       errorMessage.value = error.message;
+      state.value = ViewState.error;
+    } on Object catch (error, stack) {
+      // A bug (bad data, a case nobody wrote for): the screen says it could not load and offers Retry, instead of
+      // spinning for ever; the school's server hears of it.
+      ErrorReporter.report(error, stack);
+      errorMessage.value = 'errors.generic';
       state.value = ViewState.error;
     }
   }

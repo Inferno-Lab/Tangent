@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:get/get.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/tokens.dart';
@@ -34,6 +35,12 @@ abstract final class ToastHelper {
 
   static void show(String messageKey, {ToastKind kind = ToastKind.info, String? body}) {
     if (Get.testMode) return;
+    // Asked for while a frame is being built (a sheet's initState): shown once that frame is done, since changing the
+    // toast host mid-build throws.
+    if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+      SchedulerBinding.instance.addPostFrameCallback((_) => show(messageKey, kind: kind, body: body));
+      return;
+    }
     final toast = _Toast(messageKey, kind, body);
     final now = _current.value;
     if (now != null && now.same(toast)) return _hold(now);

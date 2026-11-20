@@ -22,6 +22,7 @@ import 'package:tangent/features/dashboard/controllers/dashboard_controller.dart
 import 'package:tangent/features/dashboard/widgets/child_switcher.dart';
 import 'package:tangent/features/dashboard/widgets/home_cards.dart';
 import 'package:tangent/features/dashboard/widgets/home_welcome.dart';
+import 'package:tangent/features/shell/shell_controller.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:tangent/core/utils/clock.dart';
@@ -117,6 +118,7 @@ class _DashboardViewState extends State<DashboardView> {
                             padding: const EdgeInsets.only(bottom: 16),
                             child: PeriodStrip(
                               periods: data.periods,
+                              onAll: SchoolConfig.has('timetable') ? () => openTimetable() : null,
                               picked: _scrub == null ? null : data.periods.firstWhereOrNull((p) => minutesOf(p.start) <= _scrub! && _scrub! < minutesOf(p.end)),
                               // A child's lesson opens the timetable; a student's own shows in the Now card (again
                               // on the lesson on now, to come back to now).
@@ -158,20 +160,23 @@ class _DashboardViewState extends State<DashboardView> {
   }
 }
 
-/// Today's lessons on a time line (the old day ribbon's idea in Hue's cards): each lesson a block as long as it lasts, in
-/// its subject's colour, breaks as quiet gaps, a line at now, the times beneath. It scrolls to now on its own; tapping a
-/// lesson calls [onPick].
+/// Today's lessons as a row of cards, each as wide as it is long (the old day ribbon's idea in Hue's cards): its name and
+/// its times inside it, the lesson on now filled in its subject's colour with how much of it has gone, earlier lessons
+/// quiet, breaks as a cup. It opens on now; tapping a lesson calls [onPick].
 class PeriodStrip extends StatefulWidget {
-  const PeriodStrip({required this.periods, this.label, this.onPick, this.picked, super.key});
+  const PeriodStrip({required this.periods, this.label, this.onPick, this.picked, this.onAll, super.key});
 
   final List<PeriodSlot> periods;
 
-  /// What a block says: the subject by default, a class for a teacher.
+  /// What a card says: the subject by default, a class for a teacher.
   final String Function(PeriodSlot)? label;
   final ValueChanged<PeriodSlot>? onPick;
 
   /// The lesson the person is looking at, when it is not the one on now.
   final PeriodSlot? picked;
+
+  /// The whole timetable (the header's link); null hides the link.
+  final VoidCallback? onAll;
 
   @override
   State<PeriodStrip> createState() => _PeriodStripState();
@@ -180,8 +185,11 @@ class PeriodStrip extends StatefulWidget {
 class _PeriodStripState extends State<PeriodStrip> {
   final _scroll = ScrollController();
 
-  // Long enough that a 30-minute lesson holds a subject name on two lines.
-  static const _perMinute = 3.0;
+  // A 40-minute lesson is about a phone's half-width; no lesson is narrower than its name and times need.
+  static const _perMinute = 3.4;
+  static const _minLesson = 116.0;
+  static const _break = 44.0;
+  static const _gap = 8.0;
 
   @override
   void initState() {
@@ -195,106 +203,115 @@ class _PeriodStripState extends State<PeriodStrip> {
     super.dispose();
   }
 
+  double _width(PeriodSlot p) => p.kind == PeriodKind.klass ? math.max(_minLesson, (minutesOf(p.end) - minutesOf(p.start)) * _perMinute) : _break;
+
+  // The lesson on now (or the next) opens at the left edge, whole; earlier ones are a swipe back (a sliver of one read as
+  // cut-off text).
   void _toNow() {
-    if (!mounted || !_scroll.hasClients || widget.periods.isEmpty) return;
-    final at = (nowMinutes() - minutesOf(widget.periods.first.start)) * _perMinute - 48;
-    _scroll.jumpTo(at.clamp(0, _scroll.position.maxScrollExtent));
+    if (!mounted || !_scroll.hasClients) return;
+    final now = nowMinutes();
+    var x = 0.0;
+    for (final p in widget.periods) {
+      if (minutesOf(p.end) > now) break;
+      x += _width(p) + _gap;
+    }
+    _scroll.jumpTo(x.clamp(0, _scroll.position.maxScrollExtent));
   }
 
   @override
   Widget build(BuildContext context) {
-    final c = context.app;
     final periods = widget.periods;
-    if (periods.every((p) => p.kind != PeriodKind.klass)) return const SizedBox.shrink();
+    final lessons = periods.where((p) => p.kind == PeriodKind.klass).length;
+    if (lessons == 0) return const SizedBox.shrink();
     final now = nowMinutes();
-    final start = minutesOf(periods.first.start);
-    final end = minutesOf(periods.last.end);
-    double x(int minute) => (minute - start) * _perMinute;
-    final onNow = now >= start && now < end;
-    return SizedBox(
-      height: 92,
-      child: SingleChildScrollView(
-        controller: _scroll,
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        child: SizedBox(
-          width: x(end),
-          child: Stack(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionLabel('home.todays_lessons'.trn(lessons), top: 0, action: widget.onAll == null ? null : 'home.timetable', onAction: widget.onAll),
+        SizedBox(
+          height: 76,
+          child: ListView.separated(
+            controller: _scroll,
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
             clipBehavior: Clip.none,
-            children: [
-              for (final p in periods)
-                Positioned(
-                  left: x(minutesOf(p.start)),
-                  width: math.max(0, x(minutesOf(p.end)) - x(minutesOf(p.start)) - 4),
-                  top: 0,
-                  height: 64,
-                  child: p.kind == PeriodKind.klass ? _lesson(context, p, now) : _gap(context),
-                ),
-              for (final p in periods)
-                if (p.kind == PeriodKind.klass)
-                  Positioned(
-                    left: x(minutesOf(p.start)),
-                    top: 70,
-                    // Clear of the now mark when it sits on this lesson's start.
-                    child: Padding(
-                      padding: EdgeInsets.only(left: onNow && (now - minutesOf(p.start)).abs() * _perMinute < 12 ? 14 : 0),
-                      child: Text(clockOf(minutesOf(p.start)), style: context.type.cap.copyWith(color: c.ink3)),
-                    ),
-                  ),
-              // Now is marked on the time scale, under the blocks, so it never runs through a lesson's name.
-              if (onNow)
-                Positioned(
-                  left: x(now) - 5,
-                  top: 64,
-                  width: 10,
-                  height: 26,
-                  child: IgnorePointer(
-                    child: Column(
-                      children: [
-                        Container(width: 2, height: 14, color: c.ink),
-                        Container(width: 10, height: 10, decoration: BoxDecoration(color: c.ink, shape: BoxShape.circle)),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
+            itemCount: periods.length,
+            separatorBuilder: (_, _) => const SizedBox(width: _gap),
+            itemBuilder: (context, i) {
+              final p = periods[i];
+              return SizedBox(width: _width(p), child: p.kind == PeriodKind.klass ? _lesson(context, p, now) : _breakCard(context, p));
+            },
           ),
         ),
-      ),
+      ],
     );
   }
 
   Widget _lesson(BuildContext context, PeriodSlot p, int now) {
-    final col = context.app.subjectFor(p.subject);
+    final c = context.app;
+    final col = c.subjectFor(p.subject);
     final a = minutesOf(p.start);
     final b = minutesOf(p.end);
-    final on = widget.picked == null ? now >= a && now < b : widget.picked!.id == p.id;
-    final past = now >= b && !on;
+    final live = now >= a && now < b;
+    final picked = widget.picked == null ? live : widget.picked!.id == p.id;
+    final past = now >= b && !picked;
     final name = widget.label?.call(p) ?? subjectName(p.subject);
+    // On now: the subject's own colour. Later: its soft fill. Earlier: the page's quiet card, so the day reads at a glance.
+    final ground = live ? col.fill : past ? c.paper : col.soft;
+    final ink = live ? col.on : past ? c.ink3 : col.ink;
     return Pressable(
       onTap: widget.onPick == null ? null : () => widget.onPick!(p),
       label: '$name · ${clockOf(a)} – ${clockOf(b)}',
-      child: Opacity(
-        opacity: past ? .55 : 1,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
-          decoration: BoxDecoration(color: col.soft, borderRadius: BorderRadius.circular(AppRadius.md)),
-          // The outline of the lesson on now is drawn over the block, so it never changes its size.
-          foregroundDecoration: on
-              ? BoxDecoration(borderRadius: BorderRadius.circular(AppRadius.md), border: Border.all(color: col.ink, width: 2))
-              : null,
-          alignment: Alignment.topLeft,
-          child: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: context.type.ts.copyWith(color: col.ink, height: 1.2)),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+        decoration: BoxDecoration(
+          color: ground,
+          borderRadius: BorderRadius.circular(AppRadius.field),
+          border: past ? Border.all(color: c.line) : null,
+        ),
+        // The lesson being looked at, when it is not the one on now, is outlined over the card (it never changes size).
+        foregroundDecoration: picked && !live
+            ? BoxDecoration(borderRadius: BorderRadius.circular(AppRadius.field), border: Border.all(color: col.ink, width: 2))
+            : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: context.type.ts.copyWith(color: ink))),
+                if (live) ...[const SizedBox(width: 6), Stamp('home.now'.tr, color: ink)],
+              ],
+            ),
+            const Spacer(),
+            Text('${clockOf(a)} – ${clockOf(b)}', maxLines: 1, style: context.type.cap.copyWith(color: ink, fontFeatures: const [FontFeature.tabularFigures()])),
+            if (live) ...[
+              const SizedBox(height: 6),
+              // How much of the lesson has gone.
+              ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.hair),
+                child: LinearProgressIndicator(value: ((now - a) / (b - a)).clamp(0, 1), minHeight: 3, color: col.on, backgroundColor: col.on.withValues(alpha: .25)),
+              ),
+            ],
+          ],
         ),
       ),
     );
   }
 
-  Widget _gap(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(color: context.app.paper2, borderRadius: BorderRadius.circular(AppRadius.md)),
-    child: Center(child: Icon(PhosphorIconsRegular.coffee, size: 16, color: context.app.ink3)),
-  );
+  Widget _breakCard(BuildContext context, PeriodSlot p) {
+    final c = context.app;
+    return Semantics(
+      label: 'timetable.break_line'.trp({'name': subjectName(p.subject), 'n': '${minutesOf(p.end) - minutesOf(p.start)}'}),
+      child: DecoratedBox(
+        decoration: BoxDecoration(color: c.paper2, borderRadius: BorderRadius.circular(AppRadius.field)),
+        child: Center(child: Icon(PhosphorIconsRegular.coffee, size: 16, color: c.ink3)),
+      ),
+    );
+  }
 }
+
+/// The whole timetable: its dock tab where the console put one there, else its page.
+void openTimetable() => SchoolConfig.dock.contains('timetable') ? ShellController.showTab('timetable') : unawaited(Get.toNamed<void>(AppRoutes.timetable));
 
 class _ProfileCapsule extends StatelessWidget {
   const _ProfileCapsule({required this.data});

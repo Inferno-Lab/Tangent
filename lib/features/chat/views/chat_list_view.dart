@@ -67,7 +67,7 @@ class ChatListView extends GetView<ChatListController> {
         children: [
           Row(
             children: [
-              Expanded(child: Builder(builder: (context) => Text('chat.title'.tr, style: context.type.h1))),
+              const Expanded(child: PageTitle('chat.title')),
               if (suggested.isNotEmpty || controller.threads.isNotEmpty)
                 GlassIconButton(
                   icon: PhosphorIconsRegular.pencilSimple,

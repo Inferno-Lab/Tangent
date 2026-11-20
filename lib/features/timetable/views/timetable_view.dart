@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/utils/calendar.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
@@ -28,8 +29,11 @@ class TimetableView extends GetView<TimetableController> {
       final day = controller.selected;
       final cls = controller.schoolClass;
       final classes = day?.periods.where((p) => p.kind == PeriodKind.klass).length ?? 0;
+      // A dock tab (a teacher's or a family's, as the console sets it) has no way back; the page opened from Home does.
+      final tab = ModalRoute.of(context)?.settings.name != AppRoutes.timetable;
       return PageFrame(
-        leading: const BackGlass(),
+        leading: tab ? null : const BackGlass(),
+        dockPage: tab,
         actions: [
           GlassIconButton(
             icon: PhosphorIconsRegular.calendarPlus,
@@ -46,7 +50,7 @@ class TimetableView extends GetView<TimetableController> {
                 ? controller.dayLabel(index)
                 : DateFormat('EEEE').format(controller.dateOf(index)!),
             subtitle: cls == null
-                ? null
+                ? (controller.forTeacher && day != null ? 'timetable.lessons'.trn(classes) : null)
                 : 'timetable.subtitle'.trp({
                     'class': cls.label,
                     'room': cls.room,
@@ -163,7 +167,8 @@ class _Block extends StatelessWidget {
     final pigment = AppColors.subject(period.subject);
     final now = controller.isNow(period);
     final hw = controller.homeworkDue.contains(period.subject);
-    final teacher = controller.teachers[period.teacherId];
+    // A teacher's block names the class; a family's the teacher.
+    final teacher = controller.classOf[period]?.label ?? controller.teachers[period.teacherId];
     Widget block = Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(color: pigment.fill, borderRadius: BorderRadius.circular(12)),

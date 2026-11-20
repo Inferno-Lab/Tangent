@@ -520,6 +520,8 @@ class MarksEntryController extends GetxController with Loadable {
         final mine = (await directory.teacher(teacherId)).subject;
         if (subjects.contains(mine)) subject.value = mine;
       }
+      // No exam set for the class yet: nothing to enter marks for (the screen's empty state says so).
+      if (subjects.isEmpty) return;
       if (!subjects.contains(subject.value)) subject.value = subjects.first;
       await _draft();
     }, isEmpty: () => students.isEmpty || subjects.isEmpty);

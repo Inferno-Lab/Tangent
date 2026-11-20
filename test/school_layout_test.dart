@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
+import 'package:tangent/features/dashboard/widgets/home_cards.dart';
 import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/data/models/user.dart';
@@ -59,7 +60,10 @@ void main() {
     expect(find.text('Timetable'), findsWidgets);
     expect(find.text('Pay fees'), findsOneWidget);
     expect(find.text('Apply for leave'), findsNothing);
-    expect(tester.getTopLeft(find.text('Pay fees')).dx, greaterThan(tester.getTopLeft(find.text('Timetable').first).dx));
+    // The quick buttons, not the lessons header's Timetable link.
+    final quick = find.byType(QuickGrid);
+    Finder inQuick(String t) => find.descendant(of: quick, matching: find.text(t));
+    expect(tester.getTopLeft(inQuick('Pay fees')).dx, greaterThan(tester.getTopLeft(inQuick('Timetable')).dx));
   });
 
   testWidgets('home leaves out a card the school took away, and the notices card follows the list', (tester) async {

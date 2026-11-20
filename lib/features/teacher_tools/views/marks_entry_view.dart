@@ -9,6 +9,7 @@ import 'package:tangent/core/theme/tokens.dart';
 import 'package:tangent/core/utils/extensions.dart';
 import 'package:tangent/core/widgets/empty_kit.dart';
 import 'package:tangent/core/widgets/glass.dart';
+import 'package:tangent/core/utils/view_state.dart';
 import 'package:tangent/core/widgets/page.dart';
 import 'package:tangent/core/widgets/states.dart';
 import 'package:tangent/core/widgets/toast.dart';
@@ -101,7 +102,8 @@ class _MarksEntryViewState extends State<MarksEntryView> {
           Chip2(controller.graded ? 'teacher.graded_chip'.tr : 'teacher.marks_chip'.trp({'max': '${controller.maxMarks}'})),
         ],
         edgeBar: true,
-        bottomBar: controller.students.isEmpty
+        // Only with marks to enter: no class list or no exam yet leaves nothing to move on to.
+        bottomBar: controller.state.value != ViewState.success
             ? null
             : TeacherActionBar(
                 sub: controller.saving.value ? 'teacher.saving'.tr : 'teacher.saved_typing'.tr,
@@ -113,18 +115,16 @@ class _MarksEntryViewState extends State<MarksEntryView> {
                 onPressed: next == null && active == null ? null : _next,
               ),
         children: [
-          Builder(builder: (context) => Text(
-            cls == null ? 'teacher.marks'.tr : 'teacher.marks_title'.trp({'class': classLabel(cls)}),
-            style: context.type.h2,
-          )),
+          PageTitle(cls == null ? 'teacher.marks' : 'teacher.marks_title'.trp({'class': classLabel(cls)}), small: true),
           const SizedBox(height: 12),
           ViewStateView(
             state: controller.state.value,
             onRetry: controller.load,
             errorKey: controller.errorMessage.value,
             emptyArt: EmptyArt.marks,
-            emptyTitle: 'teacher.no_students',
-            emptyBody: 'teacher.no_students_body',
+            // A class list but no exam set for it yet is a different wait from a class with no students.
+            emptyTitle: controller.students.isNotEmpty ? 'teacher.no_exam' : 'teacher.no_students',
+            emptyBody: controller.students.isNotEmpty ? 'teacher.no_exam_body' : 'teacher.no_students_body',
             child: Column(
               children: [
                 _SubjectBar(
