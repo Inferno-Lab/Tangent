@@ -1,9 +1,9 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:tangent/core/services/auth_service.dart';
-import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
 import 'package:tangent/core/theme/tokens.dart';
 import 'package:tangent/core/utils/extensions.dart';
@@ -85,7 +85,8 @@ class _ChildCapsuleState extends State<ChildCapsule> {
         child: GestureDetector(
           onHorizontalDragEnd: (d) => _switchBy((d.primaryVelocity ?? 0) < 0 ? 1 : -1),
           child: GlassPress(
-            onTap: () => _open(context),
+            // One child: nothing to switch to, so the capsule only names them.
+            onTap: _kids.length < 2 ? null : () => _open(context),
             child: Glass(
               key: _anchor,
               height: 44,
@@ -93,32 +94,27 @@ class _ChildCapsuleState extends State<ChildCapsule> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (current != null)
-                    Avatar(
-                      current.$1.name,
-                      initials: Avatar.siblingInitials(current.$1.name, family),
-                      size: 30,
-                      background: AppColors.light.paper,
-                      foreground: AppColors.light.ink,
+                  // The child shown in front, a sibling tucked behind it; each ringed in the capsule's colour so the two
+                  // read as two (a pale avatar on the pale capsule showed only its letters).
+                  SizedBox(
+                    width: others.isEmpty ? 32 : 50,
+                    height: 32,
+                    child: Stack(
+                      children: [
+                        if (others.isNotEmpty)
+                          Positioned(left: 18, top: 0, child: _ringed(context, others.first.$1.name, family, faded: true)),
+                        if (current != null) Positioned(left: 0, top: 0, child: _ringed(context, current.$1.name, family)),
+                      ],
                     ),
-                  for (final k in others.take(1))
-                    Transform.translate(
-                      offset: const Offset(-10, 0),
-                      child: Avatar(
-                        k.$1.name,
-                        initials: Avatar.siblingInitials(k.$1.name, family),
-                        size: 30,
-                        background: Color.lerp(AppColors.subject('hindi').fill, AppColors.light.paper, .8),
-                        foreground: AppColors.subject('hindi').fill,
-                      ),
-                    ),
-                  SizedBox(width: others.isEmpty ? 8 : 0),
-                  Text(
-                    label,
-                    style: AppText.chip(color: context.app.ink, height: 1),
                   ),
-                  const SizedBox(width: 4),
-                  Icon(PhosphorIconsBold.caretDown, size: 13, color: context.app.ink),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.chip(color: context.app.ink, height: 1)),
+                  ),
+                  if (_kids.length > 1) ...[
+                    const SizedBox(width: 6),
+                    Icon(PhosphorIconsBold.caretDown, size: 13, color: context.app.ink2),
+                  ],
                 ],
               ),
             ),
@@ -127,6 +123,12 @@ class _ChildCapsuleState extends State<ChildCapsule> {
       );
     });
   }
+
+  Widget _ringed(BuildContext context, String name, List<String> family, {bool faded = false}) => Container(
+    padding: const EdgeInsets.all(2),
+    decoration: BoxDecoration(color: context.app.paper, shape: BoxShape.circle),
+    child: Opacity(opacity: faded ? .7 : 1, child: Avatar(name, initials: Avatar.siblingInitials(name, family), size: 28)),
+  );
 
   Future<void> _open(BuildContext context) async {
     final box = _anchor.currentContext?.findRenderObject() as RenderBox?;
@@ -165,72 +167,47 @@ class _SwitcherPopover extends StatelessWidget {
     final auth = Get.find<AuthService>();
     final c = context.app;
     final active = auth.activeStudentId.value;
-    final colors = [AppColors.subject('maths').fill, AppColors.subject('hindi').fill];
+    final family = [for (final k in kids) k.$1.name];
+    final screen = MediaQuery.sizeOf(context).width;
+    // As wide as a phone allows, never past either edge.
+    final width = math.min(320.0, screen - 32);
     return Stack(
       children: [
         Positioned(
-          left: left,
+          left: left.clamp(16, math.max(16, screen - 16 - width)),
           top: top,
-          width: 300,
+          width: width,
           child: Material(
             type: MaterialType.transparency,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Glass(
-                  radius: 999,
-                  tint: c.dark ? AppColors.blackboard.paper.withValues(alpha: 0.95) : AppColors.light.paper.withValues(alpha: 0.97),
-                  padding: const EdgeInsets.all(8),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (var i = 0; i < kids.length; i++)
-                        _Option(
-                          selected: kids[i].$1.id == active,
-                          avatar: Avatar(
-                            kids[i].$1.name,
-                            initials: Avatar.siblingInitials(kids[i].$1.name, [for (final k in kids) k.$1.name]),
-                            background: colors[i % 2],
-                          ),
-                          title: kids[i].$1.name,
-                          subtitle: 'home.child_line'.trp({
-                            'class': '${kids[i].$2.name} ${kids[i].$2.section}',
-                            'roll': kids[i].$1.rollNo,
-                          }),
-                          onTap: () async {
-                            Get.back<void>();
-                            await auth.switchChild(kids[i].$1.id);
-                          },
-                        ),
-                      Container(
-                        height: 1,
-                        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        color: c.line,
-                      ),
-                      _Option(
-                        selected: false,
-                        avatar: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(color: c.paper2, shape: BoxShape.circle),
-                          child: Icon(PhosphorIconsRegular.columns, size: 18, color: c.ink),
-                        ),
-                        title: 'home.both_side'.tr,
-                        subtitle: 'home.both_side_sub'.tr,
-                        onTap: () => Get.back<void>(),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: 280,
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 8),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: c.paper,
+                borderRadius: BorderRadius.circular(AppRadius.card),
+                border: Border.all(color: c.line),
+                boxShadow: [BoxShadow(color: c.shadow, blurRadius: 24, offset: const Offset(0, 10))],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final k in kids)
+                    _Option(
+                      selected: k.$1.id == active,
+                      avatar: Avatar(k.$1.name, initials: Avatar.siblingInitials(k.$1.name, family)),
+                      title: k.$1.name,
+                      subtitle: 'home.child_line'.trp({'class': k.$2.label, 'roll': k.$1.rollNo}),
+                      onTap: () async {
+                        Get.back<void>();
+                        if (k.$1.id != active) await auth.switchChild(k.$1.id);
+                      },
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
                     child: Text('home.swipe_tip'.tr, style: context.type.cap),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -266,7 +243,7 @@ class _Option extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: selected ? c.ink.withValues(alpha: .06) : Colors.transparent,
+            color: selected ? c.paper2 : Colors.transparent,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
