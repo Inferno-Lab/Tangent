@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/translations/languages.dart';
 
-/// Anek Latin + Anek Devanagari (one family, three languages), the type the app had before Tangent Hue: the width axis
-/// carries the hierarchy, wide and heavy for numbers and headings. Hue's roles and sizes stay.
-const kSans = 'AnekLatin';
+/// Bricolage Grotesque (the owner's choice, 20 November 2026), with Anek Devanagari for Hindi and Marathi: weight and size
+/// carry the hierarchy at the face's normal width, and its optical size follows the text size as on the approved boards.
+const kSans = 'BricolageGrotesque';
 const kDeva = 'AnekDevanagari';
 const kMono = 'IBMPlexMono';
 
@@ -25,7 +25,8 @@ TextStyle hueText(
     fontFamilyFallback: const [kDeva, 'NotoSansArabic', ...kScriptFonts],
     fontSize: size,
     fontWeight: FontWeight.values[((weight / 100).round() - 1).clamp(0, 8)],
-    fontVariations: [FontVariation('wght', weight), FontVariation('wdth', width)],
+    // [width] is kept for callers but no longer used: the app's face sets one width (the boards' normal 100).
+    fontVariations: [FontVariation('wght', weight), FontVariation('opsz', size.clamp(12, 96))],
     height: height,
     letterSpacing: em * size,
     color: color,
@@ -37,19 +38,19 @@ TextStyle hueText(
 /// may only set its colour, tabular figures, or a tighter line height for text inside a fixed box.
 abstract final class AppText {
   /// Hero numerals (attendance %, the home clock).
-  static TextStyle dx({Color? color, double height = .86}) => hueText(68, 780, width: 125, height: height, em: -.025, color: color, tabular: true);
+  static TextStyle dx({Color? color, double height = .86}) => hueText(68, 750, width: 125, height: height, em: -.025, color: color, tabular: true);
 
   /// Large numerals on cards.
-  static TextStyle dl({Color? color, double height = .9}) => hueText(48, 760, width: 122, height: height, em: -.02, color: color, tabular: true);
+  static TextStyle dl({Color? color, double height = .9}) => hueText(48, 740, width: 122, height: height, em: -.02, color: color, tabular: true);
 
   /// Page titles.
-  static TextStyle h1({Color? color, double height = 1}) => hueText(34, 730, width: 118, height: height, em: -.018, color: color);
+  static TextStyle h1({Color? color, double height = 1}) => hueText(34, 700, width: 118, height: height, em: -.018, color: color);
 
   /// Section titles and big amounts.
-  static TextStyle h2({Color? color, double height = 1.08, bool tabular = false}) => hueText(24, 690, width: 112, height: height, em: -.01, color: color, tabular: tabular);
+  static TextStyle h2({Color? color, double height = 1.08, bool tabular = false}) => hueText(24, 700, width: 112, height: height, em: -.01, color: color, tabular: tabular);
 
   /// Numbers inside cards and rows (counts, amounts, marks).
-  static TextStyle num({Color? color, double height = 1}) => hueText(22, 740, width: 112, height: height, em: -.01, color: color, tabular: true);
+  static TextStyle num({Color? color, double height = 1}) => hueText(22, 700, width: 112, height: height, em: -.01, color: color, tabular: true);
 
   /// Card titles.
   static TextStyle h3({Color? color, double height = 1.15}) => hueText(19, 650, width: 108, height: height, color: color);
@@ -79,7 +80,7 @@ abstract final class AppText {
   static TextStyle capB({Color? color, double height = 1.3, bool tabular = false}) => hueText(13, 650, width: 104, height: height, color: color, tabular: tabular);
 
   /// Stamps (1 DAY, WED, NOT MARKED): uppercase, tracked.
-  static TextStyle stamp({Color? color, double height = 1}) => hueText(12, 760, width: 118, height: height, em: .09, color: color);
+  static TextStyle stamp({Color? color, double height = 1}) => hueText(12, 700, width: 118, height: height, em: .09, color: color);
 
   /// Overlines above sections: uppercase, tracked.
   static TextStyle o({Color? color, double height = 1}) => hueText(11, 700, width: 118, height: height, em: .1, color: color);

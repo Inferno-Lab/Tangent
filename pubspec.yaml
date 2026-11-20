@@ -45,9 +45,9 @@ flutter:
     # The app's words in each language (the built-in English is in lib/core/translations).
     - assets/i18n/
   fonts:
-    - family: AnekLatin
+    - family: BricolageGrotesque
       fonts:
-        - asset: assets/fonts/AnekLatin.ttf
+        - asset: assets/fonts/BricolageGrotesque.ttf
     - family: AnekDevanagari
       fonts:
         - asset: assets/fonts/AnekDevanagari.ttf
