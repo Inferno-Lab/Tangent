@@ -18,32 +18,45 @@ import 'package:tangent/data/models/campus.dart';
 import 'package:tangent/data/models/user.dart';
 import 'package:tangent/features/dashboard/controllers/dashboard_controller.dart';
 import 'package:tangent/features/dashboard/views/dashboard_view.dart';
+import 'package:tangent/features/dashboard/widgets/around_school_sheet.dart';
+import 'package:tangent/features/dashboard/widgets/parent_home.dart' show QuickTiles;
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
-/// The quick buttons under the greeting (console: The app → Quick buttons), for families. The server keeps only
-/// buttons of modules the school has.
+/// The quick buttons under the greeting (console: The app → Quick buttons), for families, as tiles four to a row, and
+/// last "Around school", which opens the school's other pages. The server keeps only buttons of modules the school has.
 class QuickRow extends StatelessWidget {
   const QuickRow({super.key});
 
-  static const _buttons = <String, (String, IconData, String)>{
-    'payFees': ('quick.pay_fees', AppIcons.fees, AppRoutes.fees),
-    'applyLeave': ('quick.apply_leave', AppIcons.calendar, AppRoutes.leaveApply),
-    'messageTeacher': ('quick.message_teacher', AppIcons.messages, AppRoutes.chat),
-    'timetable': ('quick.timetable', AppIcons.timetable, AppRoutes.timetable),
-    'homework': ('quick.homework', AppIcons.homework, AppRoutes.homework),
-    'events': ('quick.events', AppIcons.events, AppRoutes.events),
-    'bookMeeting': ('quick.book_meeting', PhosphorIconsRegular.calendarPlus, AppRoutes.meetings),
-    'gatePass': ('quick.gate_pass', PhosphorIconsRegular.doorOpen, AppRoutes.gatePass),
-    'certificates': ('quick.certificates', PhosphorIconsRegular.certificate, AppRoutes.certificates),
+  static const _buttons = <String, (String, IconData, String, String)>{
+    'payFees': ('quick.pay_fees', AppIcons.fees, AppRoutes.fees, 'green'),
+    'applyLeave': ('quick.apply_leave', AppIcons.calendar, AppRoutes.leaveApply, 'blue'),
+    'messageTeacher': ('quick.message_teacher', AppIcons.messages, AppRoutes.chat, 'indigo'),
+    'timetable': ('quick.timetable', AppIcons.timetable, AppRoutes.timetable, 'red'),
+    'homework': ('quick.homework', AppIcons.homework, AppRoutes.homework, 'amber'),
+    'events': ('quick.events', AppIcons.events, AppRoutes.events, 'teal'),
+    'bookMeeting': ('quick.book_meeting', PhosphorIconsRegular.calendarPlus, AppRoutes.meetings, 'violet'),
+    'gatePass': ('quick.gate_pass', PhosphorIconsRegular.doorOpen, AppRoutes.gatePass, 'cyan'),
+    'certificates': ('quick.certificates', PhosphorIconsRegular.certificate, AppRoutes.certificates, 'lime'),
   };
+
+  static (IconData, String, VoidCallback?, String) _item(String k) =>
+      (_buttons[k]!.$2, _buttons[k]!.$1, () => Get.toNamed<void>(_buttons[k]!.$3), _buttons[k]!.$4);
+
+  static List<String> get _keys => SchoolConfig.quick.where(_buttons.containsKey).toList();
+
+  /// One row of four on a phone: with "Around school" last, three of the console's buttons fit beside it.
+  static int get _shown => AroundSchoolSheet.hasAny() && _keys.length > 3 ? 3 : 4;
+
+  /// The console's buttons that did not fit on Home; "Around school" shows them first.
+  static List<(IconData, String, VoidCallback?, String)> get overflow => [for (final k in _keys.skip(_shown)) _item(k)];
 
   @override
   Widget build(BuildContext context) => Obx(
-    () => QuickGrid(
+    () => QuickTiles(
       items: [
-        for (final k in SchoolConfig.quick.where(_buttons.containsKey))
-          (_buttons[k]!.$2, _buttons[k]!.$1, () => Get.toNamed<void>(_buttons[k]!.$3)),
+        for (final k in _keys.take(_shown)) _item(k),
+        if (AroundSchoolSheet.hasAny()) (PhosphorIconsRegular.squaresFour, 'quick.around_school', () => unawaited(openAroundSchool()), 'brand'),
       ],
     ),
   );
@@ -239,9 +252,9 @@ class _DueRow extends StatelessWidget {
                 }),
           subtitleColor: overdue ? c.badText : null,
           trailing: overdue
-              ? Btn('home.pay', small: true, onPressed: () => unawaited(_openFees(item, pay: true)))
+              ? Btn('home.pay', small: true, onPressed: () => unawaited(openFees(item, pay: true)))
               : Stamp(daysStamp(fee.dueDate), color: c.lateText),
-          onTap: () => unawaited(_openFees(item)),
+          onTap: () => unawaited(openFees(item)),
         );
       case DueKind.homework:
         final hw = item.homework!;
@@ -256,7 +269,7 @@ class _DueRow extends StatelessWidget {
       case DueKind.event:
         final event = item.event!;
         return _Row(
-          leading: Cover(subject: _eventPigment(event)),
+          leading: Cover(subject: eventSubject(event.category)),
           title: 'home.reply_to'.trp({'title': event.title}),
           subtitle: 'home.are_you_going'.trp({'date': DateFormat('EEE d MMM').format(event.date)}),
           trailing: Icon(PhosphorIconsRegular.caretRight, size: 18, color: c.ink3),
@@ -266,12 +279,6 @@ class _DueRow extends StatelessWidget {
   }
 }
 
-String _eventPigment(SchoolEvent event) => switch (event.category) {
-  'sports' => 'pe',
-  'academic' => 'maths',
-  'cultural' => 'hindi',
-  _ => 'science',
-};
 
 class _MoneyCover extends StatelessWidget {
   const _MoneyCover({required this.overdue});
@@ -471,7 +478,7 @@ Color noticeTone(BuildContext context, String category) {
 }
 
 /// Opens Fees for the child the fee belongs to, optionally straight into paying it.
-Future<void> _openFees(DueItem item, {bool pay = false}) async {
+Future<void> openFees(DueItem item, {bool pay = false}) async {
   final auth = Get.find<AuthService>();
   if (item.studentId != null && item.studentId != auth.activeStudentId.value) {
     await auth.switchChild(item.studentId!);

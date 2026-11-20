@@ -1,5 +1,7 @@
 import 'package:get/get.dart';
+import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/services/auth_service.dart';
+import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/utils/extensions.dart';
 import 'package:tangent/core/utils/formatters.dart';
 import 'package:tangent/core/utils/loadable.dart';
@@ -12,6 +14,7 @@ import 'package:tangent/data/models/user.dart';
 import 'package:tangent/data/repositories/academic_repository.dart';
 import 'package:tangent/data/repositories/campus_repository.dart';
 import 'package:tangent/data/repositories/directory_repository.dart';
+import 'package:tangent/data/repositories/school_life_repository.dart';
 import 'package:tangent/core/utils/clock.dart';
 
 enum DueKind { fee, homework, event }
@@ -49,6 +52,22 @@ class ChildToday {
   final PeriodSlot? period;
 }
 
+/// One date on the parent's "Coming up": an event, the next exam or a meeting the family can book.
+class UpcomingItem {
+  const UpcomingItem({required this.date, required this.title, required this.sub, required this.subject, required this.route, this.action});
+
+  final DateTime date;
+  final String title;
+  final String sub;
+
+  /// The subject whose colour the date takes (events and meetings borrow one, as their covers do).
+  final String subject;
+  final String route;
+
+  /// Translation key of the button on the row ("Book", "Reply"), or none.
+  final String? action;
+}
+
 class HomeSnapshot {
   HomeSnapshot({
     required this.student,
@@ -62,6 +81,7 @@ class HomeSnapshot {
     required this.notices,
     required this.children,
     required this.dueTotal,
+    this.upcoming = const [],
   });
 
   final Student student;
@@ -78,12 +98,23 @@ class HomeSnapshot {
   /// Fees due across every child of a parent (0 for students).
   final num dueTotal;
 
+  /// The next few dates for a family (events, the next exam, meetings to book), soonest first.
+  final List<UpcomingItem> upcoming;
+
   List<PeriodSlot> get periods => today?.periods ?? const [];
 
   /// A new school: no timetable, nothing due, no notices, no exam. Home then
   /// welcomes the family and suggests first steps instead of empty sections.
   bool get isNew => periods.isEmpty && due.isEmpty && notices.isEmpty && nextExam == null;
 }
+
+/// The subject whose colour an event borrows, by its category.
+String eventSubject(String category) => switch (category) {
+  'sports' => 'pe',
+  'academic' => 'maths',
+  'cultural' => 'hindi',
+  _ => 'science',
+};
 
 class DashboardController extends GetxController with Loadable {
   HomeSnapshot? snapshot;
@@ -184,6 +215,38 @@ class DashboardController extends GetxController with Loadable {
         return a.when.compareTo(b.when);
       });
 
+      final dates = <UpcomingItem>[];
+      if (user?.role == UserRole.parent) {
+        bool soon(DateTime d) => Formatters.daysUntil(d) >= 0 && Formatters.daysUntil(d) <= 21;
+        for (final e in events.where((e) => soon(e.date))) {
+          final replied = e.rsvps.any((r) => r.userId == userId);
+          dates.add(UpcomingItem(
+            date: e.date,
+            title: e.title,
+            sub: [e.time, e.venue].where((x) => x.isNotEmpty).join(' · '),
+            subject: eventSubject(e.category),
+            route: AppRoutes.eventDetail.replaceFirst(':id', e.id),
+            action: e.needsRsvp && !replied ? 'home.reply' : null,
+          ));
+        }
+        final exam = upcoming.firstOrNull;
+        if (exam != null && soon(exam.startDate)) {
+          dates.add(UpcomingItem(date: exam.startDate, title: exam.name, sub: 'home.exam_subjects'.trn(exam.subjects.length), subject: 'maths', route: AppRoutes.examTimetable));
+        }
+        if (SchoolConfig.has('ptm')) {
+          try {
+            for (final m in await Get.find<SchoolLifeRepository>().meetings()) {
+              final d = DateTime.tryParse(m.date);
+              if (d == null || !soon(d)) continue;
+              dates.add(UpcomingItem(date: d, title: m.title, sub: m.place, subject: 'english', route: AppRoutes.meetings, action: m.canBook ? 'home.book' : null));
+            }
+          } on Object {
+            // shortcut: meetings are a nicety on Home; their own page shows the error.
+          }
+        }
+        dates.sort((a, b) => a.date.compareTo(b.date));
+      }
+
       final sortedNotices = [...notices]
         ..sort((a, b) {
           if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
@@ -202,6 +265,7 @@ class DashboardController extends GetxController with Loadable {
         notices: sortedNotices.take(5).toList(),
         children: children,
         dueTotal: dueTotal,
+        upcoming: dates.take(3).toList(),
       );
     }, isEmpty: () => snapshot == null);
   }

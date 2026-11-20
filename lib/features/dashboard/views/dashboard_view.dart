@@ -22,6 +22,8 @@ import 'package:tangent/features/dashboard/controllers/dashboard_controller.dart
 import 'package:tangent/features/dashboard/widgets/child_switcher.dart';
 import 'package:tangent/features/dashboard/widgets/home_cards.dart';
 import 'package:tangent/features/dashboard/widgets/home_welcome.dart';
+import 'package:tangent/features/dashboard/widgets/live_strip.dart';
+import 'package:tangent/features/dashboard/widgets/parent_home.dart';
 import 'package:tangent/features/shell/shell_controller.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -76,7 +78,7 @@ class _DashboardViewState extends State<DashboardView> {
                 padding: EdgeInsets.zero,
                 children: [
                   Padding(
-                    padding: EdgeInsets.fromLTRB(side, top + 8, wide ? 40 : 16, 20),
+                    padding: EdgeInsets.fromLTRB(side, top + 8, wide ? 40 : (parent ? 20 : 16), parent ? 16 : 20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -92,17 +94,20 @@ class _DashboardViewState extends State<DashboardView> {
                               ),
                               const SizedBox(width: 10),
                             ],
-                            GlassIconButton(
-                              icon: PhosphorIconsRegular.bell,
-                              label: 'notifications.title'.tr,
-                              badge: true,
-                              onTap: () => Get.toNamed<void>(AppRoutes.notifications),
-                            ),
+                            if (parent)
+                              const _Bell()
+                            else
+                              GlassIconButton(
+                                icon: PhosphorIconsRegular.bell,
+                                label: 'notifications.title'.tr,
+                                badge: true,
+                                onTap: () => Get.toNamed<void>(AppRoutes.notifications),
+                              ),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        Rise(child: Text(todayLine(), style: context.type.capB)),
-                        const SizedBox(height: 6),
+                        SizedBox(height: parent ? 24 : 16),
+                        Rise(child: Text(parent ? dateLine() : todayLine(), style: parent ? context.type.s.copyWith(color: c.ink3) : context.type.capB)),
+                        SizedBox(height: parent ? 2 : 6),
                         Rise(index: 1, child: Text(hello, style: context.type.h1)),
                       ],
                     ),
@@ -113,7 +118,7 @@ class _DashboardViewState extends State<DashboardView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const OfflineCapsule(),
-                        if (hasDay)
+                        if (hasDay && !(parent && !wide))
                           Padding(
                             padding: const EdgeInsets.only(bottom: 16),
                             child: PeriodStrip(
@@ -362,6 +367,9 @@ class _ProfileCapsule extends StatelessWidget {
 
 String greeting(String first) => '${Formatters.greetingKey(Clock.now()).tr},\n$first';
 
+/// "Friday, 20 November", the parent home's date line.
+String dateLine() => DateFormat('EEEE, d MMMM', Get.locale?.languageCode).format(Clock.now());
+
 String todayLine() => DateFormat('EEEE · d MMMM', Get.locale?.languageCode).format(Clock.now());
 
 /// Home sections follow what Tangent set for the school (console → The app → Home screen cards) and its modules.
@@ -421,7 +429,6 @@ class _StudentBody extends StatelessWidget {
           ),
           for (final (i, w) in homeSections(data).indexed) Rise(index: 3 + i, child: w),
         ],
-        const Rise(index: 8, child: SchoolLinks('school', title: 'home.around_school')),
       ],
     );
   }
@@ -434,47 +441,76 @@ class _ParentBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.app;
-    final quiet = data.children.where(
-      (child) => data.due.every((d) => d.childName != child.student.name.split(' ').first),
-    );
+    final named = [for (final k in data.children) k.student.name];
+    final family = named.isEmpty ? [data.student.name] : named;
+    final me = data.children.where((k) => k.student.id == data.student.id).firstOrNull;
+    final name = data.student.name;
+    // As the approved canvas: the child's live strip, the quick tiles, then only what needs the parent and what is coming.
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Rise(index: 1, child: QuickRow()),
-        Rise(index: 2, child: SectionLabel('home.both_children'.tr)),
-        Rise(index: 2, child: ChildrenStrip(children: data.children)),
-        if (data.isNew)
-          const Padding(
-            padding: EdgeInsets.only(top: 16),
-            child: Rise(index: 3, child: HomeWelcome()),
-          )
-        else
-          for (final (i, w) in homeSections(
-            data,
-            parent: true,
-            due: [
-              SectionLabel(
-                'home.due_across'.trp({'amount': Formatters.money(data.dueTotal)}),
-                action: 'nav.fees',
-                onAction: () => Get.toNamed<void>(AppRoutes.fees),
+        if (_show('dayRibbon', 'timetable')) ...[
+          Rise(
+            index: 2,
+            child: AnimatedSwitcher(
+              duration: context.reduceMotion ? Duration.zero : AppMotion.t2,
+              child: LiveStrip(
+                key: ValueKey(data.student.id),
+                name: name.split(' ').first,
+                initials: Avatar.siblingInitials(name, family),
+                avatar: childColour(name, family),
+                periods: data.periods,
+                teacherNames: data.teacherNames,
+                status: me?.status,
+                onTap: SchoolConfig.has('timetable') ? openTimetable : null,
               ),
-              DueList(items: data.due.take(4).toList(), showChild: true),
-              for (final child in quiet)
-                Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: Center(
-                    child: Text(
-                      'home.nothing_due_for'.trp({'name': child.student.name.split(' ').first}),
-                      style: context.type.cap.copyWith(color: c.ink3),
-                    ),
-                  ),
-                ),
-            ],
-          ).indexed)
-            Rise(index: 3 + i, child: w),
-        const Rise(index: 8, child: SchoolLinks('school', title: 'home.around_school')),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+        const Rise(index: 3, child: QuickRow()),
+        if (data.isNew)
+          const Padding(padding: EdgeInsets.only(top: 24), child: Rise(index: 4, child: HomeWelcome()))
+        else ...[
+          Rise(index: 4, child: NeedsYou(data: data)),
+          Rise(index: 5, child: ComingUp(items: data.upcoming)),
+        ],
+        Rise(index: 6, child: SiblingRow(data: data)),
       ],
+    );
+  }
+}
+
+/// The parent's bell: paper with the page's line, an amber dot when something is new.
+class _Bell extends StatelessWidget {
+  const _Bell();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.app;
+    return Pressable(
+      onTap: () => Get.toNamed<void>(AppRoutes.notifications),
+      label: 'notifications.title'.tr,
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(color: c.paper, shape: BoxShape.circle, border: Border.all(color: c.line)),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Icon(PhosphorIconsRegular.bell, size: 20, color: c.ink),
+            PositionedDirectional(
+              top: 12,
+              end: 12,
+              child: Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(color: c.bright, shape: BoxShape.circle, border: Border.all(color: c.paper, width: 2)),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

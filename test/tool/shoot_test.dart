@@ -166,7 +166,7 @@ Future<void> _popups(WidgetTester tester, UserRole role) async {
   } else {
     shell.go(0);
     await _settle(tester);
-    await on(AppRoutes.shell, [('child_switcher', find.byType(ChildCapsule), false)]);
+    await on(AppRoutes.shell, [('child_switcher', find.byType(ChildCapsule), false), ('around_school', text('quick.around_school'), false)]);
     await on(AppRoutes.gatePass, [('gate_pass', text('gate.leave_early'), true), ('pickup_person', text('gate.add_person'), true)]);
     await on(AppRoutes.certificates, [('certificate', text('certificates.ask'), true)]);
     await on(AppRoutes.leaveApply, [('leave_note', find.byType(EditableText), true)]);
