@@ -60,3 +60,24 @@ export const resend: Adapter = {
     return { ok: true, detail: `Resend accepted the key. Domains: ${domains || 'none yet'}.${input.to ? ' A test email was sent.' : ''}` };
   },
 };
+
+/** "Name <a@b.org>" or "a@b.org" as Brevo takes a sender. */
+const sender = (from: string) => { const m = /^(.*?)\s*<([^>]+)>$/.exec(from.trim()); return m ? { name: m[1]!.trim() || undefined, email: m[2]! } : { email: from.trim() }; };
+
+/** Brevo's transactional email API (free plan: 300 emails a day). */
+export const brevo: Adapter = {
+  async email(c, m) {
+    const r = await call('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST', headers: { 'api-key': c.secrets.apiKey!, 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ sender: sender(s(c, 'from')), to: [{ email: m.to }], subject: m.subject ?? '', textContent: m.text, ...(m.html ? { htmlContent: m.html } : {}) }),
+    });
+    return { providerId: r.json?.messageId ?? null };
+  },
+  async test(c, input) {
+    const r = await call('https://api.brevo.com/v3/account', { headers: { 'api-key': c.secrets.apiKey!, accept: 'application/json' } }).catch((e: Error) => e);
+    if (r instanceof Error) return { ok: false, detail: r.message };
+    if (input.to) await brevo.email!(c, testMail(input.to));
+    const plan = (r.json?.plan ?? []).map((p: any) => `${p.type}${p.credits != null ? ` (${p.credits} left)` : ''}`).join(', ');
+    return { ok: true, detail: `Brevo accepted the key for ${r.json?.email ?? 'the account'}${plan ? `; plan: ${plan}` : ''}.${input.to ? ' A test email was sent.' : ''}` };
+  },
+};
