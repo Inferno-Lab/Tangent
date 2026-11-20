@@ -149,7 +149,8 @@ export class StudentsService {
           from attendance_marks m join attendance_sessions ses on ses.id = m.session_id where m.student_id = s.id) a on true
        ${w}`, params);
     const r = rows[0]!;
-    const total = Number((await t.pool.query<{ n: string }>('select count(*) n from students')).rows[0]!.n);
+    // The school's roll: students who have left are kept on record but are no longer in the total.
+    const total = Number((await t.pool.query<{ n: string }>("select count(*) n from students where status = 'active'")).rows[0]!.n);
     const now = r.a_now ?? 1;
     const prev = r.a_prev ?? now;
     const out: StudentSummary = {
