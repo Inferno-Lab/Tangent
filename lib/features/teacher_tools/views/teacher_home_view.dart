@@ -16,7 +16,7 @@ import 'package:tangent/core/widgets/states.dart';
 import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/data/models/campus.dart';
 import 'package:tangent/data/models/student.dart';
-import 'package:tangent/features/dashboard/views/dashboard_view.dart' show PeriodStrip, greeting, todayLine;
+import 'package:tangent/features/dashboard/views/dashboard_view.dart' show PeriodStrip, greeting, openTimetable, todayLine;
 import 'package:tangent/features/dashboard/widgets/home_cards.dart' show QuickGrid, SchoolLinks;
 import 'package:tangent/features/shell/shell_controller.dart';
 import 'package:tangent/features/teacher_tools/controllers/teacher_controller.dart';
@@ -95,6 +95,7 @@ class TeacherHomeView extends GetView<TeacherHomeController> {
               padding: const EdgeInsets.only(top: 20, bottom: 16),
               child: PeriodStrip(
                 periods: periods,
+                onAll: SchoolConfig.has('timetable') ? openTimetable : null,
                 label: (p) => classOf[p.id] == null ? subjectName(p.subject) : classLabel(classOf[p.id]!),
               ),
             ),
