@@ -10,7 +10,7 @@ export function LoginRoute() {
   return (
     <LoginPage
       controller={{
-        product: 'console', schoolName: tr('console.login_route.tangent_console'), shortName: 'console', demoMode: !!import.meta.env.VITE_DEMO_LOGIN, goName: tr('console.login_route.the_console'),
+        product: 'console', schoolName: tr('console.login_route.tangent_console'), shortName: 'console', goName: tr('console.login_route.the_console'),
         initialEmail: (() => { try { return localStorage.getItem('tangent.console.email') ?? ''; } catch { return ''; } })(),
         submitCredentials: async (email, password) => {
           const res = await client.api.login({ identifier: email, password });

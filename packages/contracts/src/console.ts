@@ -570,7 +570,6 @@ export type ConsoleLoginResponse =
       channel: 'email' | 'app';
       maskedTo: string;
       expiresInSeconds: number;
-      demoCode?: string;
       /** First sign-in without an authenticator: add this key to the app, then type its code. */
       enroll?: { secret: string; uri: string };
     };
