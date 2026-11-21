@@ -269,7 +269,9 @@ export function generateSchool({ today = iso(Date.now()), seed = 20261120, perCl
     const recent = ch.due >= add(today, -45);
     const r = rnd();
     const share = r < (recent ? 0.62 : 0.93) ? 1 : r < (recent ? 0.72 : 0.97) ? 0.5 : 0;
-    const days = Math.floor(rnd() * (share === 1 ? 25 : 10)) - 8;
+    // Late payers of the latest quarter keep coming in, up to yesterday, as the office's daily collection shows.
+    const since = Math.round((Date.parse(today) - Date.parse(ch.due)) / 86_400_000);
+    const days = Math.floor(rnd() * (share === 1 ? (recent ? Math.max(25, since + 8) : 25) : 10)) - 8;
     const parts = share === 1 && chance(0.04) ? [0.5, 0.5] : share ? [share] : [];
     for (const [i, part] of parts.entries()) {
       // A fee paid in two halves: the second about three weeks after the first.
