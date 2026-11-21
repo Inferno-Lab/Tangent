@@ -22,8 +22,10 @@ export class Migration implements OnModuleInit {
   constructor(private readonly db: Db, private readonly actions: Actions, @Inject(ENV) private readonly env: Env, @Inject(REGISTRY) private readonly registry: Registry) {}
 
   onModuleInit(): void {
-    // A run this server was doing when it stopped never finishes: it is failed so it can be run again.
-    void this.db.pool.query("update import_runs set status = 'failed', error = 'The server restarted while it ran. Run it again.', done_at = now() where status = 'running' and started_at < now() - interval '2 hours'").catch(() => undefined);
+    // A run lives in the server that started it, so one still marked running when a server starts died with the last one (a
+    // deploy, a crash): it is failed at once so its row stops saying Running and it can be run again. Its transaction rolled back.
+    // ponytail: assumes one server runs imports; with several, record which server owns a run and fail only the dead one's.
+    void this.db.pool.query("update import_runs set status = 'failed', error = 'The server restarted while it ran. Run it again.', done_at = now() where status = 'running'").catch(() => undefined);
     // Go live is the end of moving in: the school's Moving in page closes and the day is kept. Only with every item green.
     this.actions.handle('school.golive', async (schoolId, _params, by) => {
       const r = (await this.db.pool.query<{ name: string; slug: string; status: string; went_live_at: Date | null }>('select name, slug, status, went_live_at from schools where id = $1 and deleted_at is null', [schoolId])).rows[0];
@@ -139,19 +141,23 @@ export class Migration implements OnModuleInit {
     return this.with(id, (pool) => previewImport(pool, input));
   }
 
-  /** Small imports apply at once; a big one starts in the background and its run is returned instead. */
+  /**
+   * Small imports apply at once; a big one starts in the background and its run is returned instead. Any number can be started:
+   * the engine's lock in the school's database runs them one after another, in the order they came. While one is running a
+   * small one goes to the background too, so the request never waits on the lock.
+   */
   async commit(id: string, input: ImportInput, by: string): Promise<ImportBatchRow | { run: ImportRunRow }> {
     await this.kindFor(id, input.kind);
     const rows = input.rows?.length ?? (() => { try { return Math.max(0, readTable(input.csv ?? '').length - 1); } catch { return 0; } })();
-    if (rows <= BIG_ROWS && (input.csv?.length ?? 0) <= BIG_BYTES) return this.commitNow(id, input, by);
-    if ((await this.db.pool.query("select 1 from import_runs where school_id = $1 and status = 'running'", [id])).rowCount) throw new ApiError('conflict', tx('Another import is running for this school. Wait for it to finish.'));
+    const busy = (await this.db.pool.query("select 1 from import_runs where school_id = $1 and status = 'running'", [id])).rowCount;
+    if (!busy && rows <= BIG_ROWS && (input.csv?.length ?? 0) <= BIG_BYTES) return this.commitNow(id, input, by);
     const runId = newId('run');
     await this.db.pool.query('insert into import_runs (id, school_id, kind, file_name, rows, by) values ($1,$2,$3,$4,$5,$6)', [runId, id, input.kind, input.fileName, rows, by]);
     void this.commitNow(id, input, by).then(
       (b) => this.db.pool.query("update import_runs set status = 'done', batch_id = $2, created = $3, updated = $4, skipped = $5, done_at = now() where id = $1", [runId, b.id, b.created, b.updated, b.skipped]),
       (e: Error) => this.db.pool.query("update import_runs set status = 'failed', error = $2, done_at = now() where id = $1", [runId, e.message.slice(0, 500)]),
     ).catch(() => undefined);
-    return { run: (await this.runs(id))[0]! };
+    return { run: (await this.runs(id)).find((r) => r.id === runId)! };
   }
 
   async runs(id: string): Promise<ImportRunRow[]> {
