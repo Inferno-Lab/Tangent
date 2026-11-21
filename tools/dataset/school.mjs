@@ -270,8 +270,10 @@ export function generateSchool({ today = iso(Date.now()), seed = 20261120, perCl
     const r = rnd();
     const share = r < (recent ? 0.62 : 0.93) ? 1 : r < (recent ? 0.72 : 0.97) ? 0.5 : 0;
     const days = Math.floor(rnd() * (share === 1 ? 25 : 10)) - 8;
-    for (const part of share === 1 && chance(0.04) ? [0.5, 0.5] : share ? [share] : []) {
-      const on = add(ch.due, days + (part !== share ? 20 : 0));
+    const parts = share === 1 && chance(0.04) ? [0.5, 0.5] : share ? [share] : [];
+    for (const [i, part] of parts.entries()) {
+      // A fee paid in two halves: the second about three weeks after the first.
+      const on = add(ch.due, days + i * 20);
       if (on >= today) continue;
       const mode = pick(MODES);
       payments.push([`SVS/${pad(Y % 100)}-${pad((Y + 1) % 100)}/${pad(receipt++, 5)}`, st.adm, ch.title, `₹${Math.round(owed * part).toLocaleString('en-IN')}`, dMonY(on), mode, mode === 'Cheque' ? String(100000 + Math.floor(rnd() * 899999)) : mode === 'UPI' ? `UPI${Math.floor(rnd() * 1e11)}` : '']);
@@ -352,8 +354,9 @@ export function generateSchool({ today = iso(Date.now()), seed = 20261120, perCl
     generatedFor: today, seed,
     school: { name: 'Sunrise Valley School', shortName: 'Sunrise Valley', slug: 'sunrise-valley', board: 'CBSE', address: 'Whitefield Main Road, Whitefield', city: 'Bengaluru', country: 'IN', timezone: 'Asia/Kolkata', locale: 'en-IN', currency: 'INR', language: 'en',
       color: '#1F6FB2', logoText: 'S', appName: 'Sunrise Valley', tagline: 'Learn. Lead. Serve.', contactName: principal.name, contactPhone: `+91 ${principal.phone}`, contactEmail: principal.email },
-    // What Tangent sets for the school in the console before its files come in: the library keeps reference copies too.
-    settings: { 'library.itemTypes': [{ key: 'book', name: 'Book' }, { key: 'reference', name: 'Reference' }] },
+    // What Tangent sets for the school in the console before its files come in: the library keeps reference copies too, and
+    // families, teachers and the bus drivers use the app.
+    settings: { 'library.itemTypes': [{ key: 'book', name: 'Book' }, { key: 'reference', name: 'Reference' }], 'app.roles': ['parent', 'teacher', 'driver'] },
     modules: ['people', 'attendance', 'fees', 'notices', 'timetable', 'homework', 'events', 'exams', 'chat', 'transport', 'library', 'gallery', 'staffAttendance', 'diary', 'ptm', 'visitors', 'certificates'],
     // Each with the email and the phone (international form) their codes go to.
     people: {
