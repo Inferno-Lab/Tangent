@@ -7,7 +7,7 @@
 // Usage: node tools/dataset/load.mjs [--today 2026-11-20]   (API, BOOTSTRAP_EMAIL, BOOTSTRAP_PASSWORD, DEMO_CODE, TEST_PASSWORD from the env)
 import { generateSchool } from './school.mjs';
 import { asUpload } from './build.mjs';
-import { API, STAFF_PASSWORD, call, codeIn, consoleSignIn, newMessage, setPassword } from './session.mjs';
+import { API, STAFF_PASSWORD, call, codeIn, consoleSignIn, newMessage, saveManifest, setPassword } from './session.mjs';
 
 const arg = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : fallback; };
 const today = arg('today', undefined);
@@ -18,6 +18,8 @@ const s = manifest.school;
 const principal = manifest.people.principal;
 
 const { accessToken: ct } = await consoleSignIn();
+// The tools read who is who from here (session.mjs).
+saveManifest(manifest);
 if ((await call(`/console/v1/schools?query=${s.slug}`, { token: ct })).some((x) => x.slug === s.slug)) {
   console.log(`${s.name} already exists.`);
   process.exit(0);

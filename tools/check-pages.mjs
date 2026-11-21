@@ -15,6 +15,7 @@ import { cpus } from 'node:os';
 import { auditPage } from './lib/audit.mjs';
 import { adminPaths as pages, consolePaths } from './lib/pages.mjs';
 import * as scans from './lib/scans.mjs';
+import { SCHOOL, adminKey, consoleKey } from './dataset/session.mjs';
 
 const args = process.argv.slice(2);
 const has = (n) => args.includes(n);
@@ -27,27 +28,13 @@ if (shots) mkdirSync(shots, { recursive: true });
 const API = process.env.API ?? 'http://localhost:4000';
 const ADMIN = process.env.ADMIN ?? 'http://127.0.0.1:5173';
 const CONSOLE = process.env.CONSOLE ?? 'http://127.0.0.1:5174';
-const slug = process.env.SCHOOL ?? 'greenfield';
+const slug = SCHOOL;
 const SIZES = val('--sizes') ? val('--sizes').split(',').map((x) => x.split('x').map(Number))
   : full ? [[360, 740], [390, 844], [768, 1024], [1440, 900]] : [[390, 844], [1440, 900]];
 const THEMES = has('--dark') ? [true] : has('--light') ? [false] : full || has('--both') ? [false, true] : [false];
 const WORKERS = Number(val('--workers') ?? Math.max(2, Math.min(6, cpus().length - 1)));
 const SCANS = val('--scans') === 'all' ? Object.keys(scans) : (val('--scans') ?? '').split(',').filter(Boolean);
 for (const s of SCANS) if (!scans[s]) { console.error(`No scan called ${s}: ${Object.keys(scans).join(', ')}`); process.exit(2); }
-
-const post = async (path, body, headers = {}) => (await fetch(`${API}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) })).json();
-async function adminSession() {
-  const h = { 'x-school': slug };
-  const a = await post('/v1/auth/login', { identifier: 'neha.menon@greenfield.edu.in', password: 'nest2026' }, h);
-  const t = await post('/v1/auth/verify', { challengeId: a.challenge.challengeId, code: '424242' }, h);
-  return [`tangent.admin.${slug}`, JSON.stringify({ user: t.user }), t.accessToken];
-}
-async function consoleSession() {
-  const a = await post('/console/v1/auth/login', { identifier: 'kaushal@tangent.app', password: 'nest2026' });
-  const t = await post('/console/v1/auth/verify', { challengeId: a.challenge.challengeId, code: '424242' });
-  const list = await (await fetch(`${API}/console/v1/schools`, { headers: { authorization: `Bearer ${t.accessToken}` } })).json();
-  return { key: ['tangent.console', JSON.stringify({ user: t.user }), t.accessToken], school: list.find((s) => s.slug === slug)?.id };
-}
 
 /**
  * --changed: the pages a change can reach. A page's own folder (apps/admin/src/pages/fees) reaches the pages under its
@@ -74,7 +61,7 @@ const jobs = [];
 const sessions = [];
 const scope = has('--changed') ? changedScope() : null;
 if (only !== 'console') {
-  const key = await adminSession();
+  const key = await adminKey();
   sessions.push(key);
   let paths = [...pages, '/design', '/apply', '/nope'];
   if (scope) {
@@ -85,7 +72,7 @@ if (only !== 'console') {
   for (const p of paths) jobs.push({ name: `admin${p || '/'}`, url: `${ADMIN}/s/${slug}${p}` });
 }
 if (only !== 'admin') {
-  const c = await consoleSession();
+  const c = await consoleKey();
   sessions.push(c.key);
   let paths = consolePaths(c.school);
   if (scope) {

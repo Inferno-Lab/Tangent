@@ -1,32 +1,18 @@
 #!/usr/bin/env node
 // Measures a running server the way a busy school morning uses it (docs/one-shot-plan.md §5.3.1): the admin's main reads, the
-// app's reads, and many people at once. Fails when a target is missed or anything errors. Run against `tools/dev-reset.sh`, or
-// a school loaded with a big test school (console → Migration → "Load a realistic test school", up to 3,000 students).
-// Usage: node tools/load.mjs [--school greenfield] [--rounds 20] [--at-once 50]
-//   API=http://localhost:4000   ADMIN_USER / ADMIN_PASS / PARENT_USER   targets: ADMIN_MS (1000), APP_MS (300) at the 95th percentile
-const API = process.env.API ?? 'http://localhost:4000';
+// app's reads, and many people at once. Fails when a target is missed or anything errors. Run against `tools/dev-reset.sh`
+// (Sunrise Valley, 840 students moved in from its files); the principal and a parent sign in with codes from the Test inbox.
+// Usage: node tools/load.mjs [--rounds 20] [--at-once 50]
+//   API=http://localhost:4000   SCHOOL (sunrise-valley)   targets: ADMIN_MS (1000), APP_MS (300) at the 95th percentile
+import { API, SCHOOL, familySignIn, manifest, staffSignIn } from './dataset/session.mjs';
+
 const arg = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : fallback; };
-const slug = arg('school', 'greenfield');
+const slug = SCHOOL;
 const rounds = Number(arg('rounds', '20'));
 const atOnce = Number(arg('at-once', '50'));
 const ADMIN_MS = Number(process.env.ADMIN_MS ?? 1000);
 const APP_MS = Number(process.env.APP_MS ?? 300);
 const h = { 'x-school': slug, 'content-type': 'application/json' };
-
-async function signIn(identifier, password) {
-  const r = await fetch(`${API}/v1/auth/login`, { method: 'POST', headers: h, body: JSON.stringify(password ? { identifier, password } : { identifier }) }).then((x) => x.json());
-  if (r.step === 'done') return r.tokens.accessToken;
-  const code = r.challenge?.demoCode ?? process.env.CODE ?? '424242';
-  const v = await fetch(`${API}/v1/auth/verify`, { method: 'POST', headers: h, body: JSON.stringify({ challengeId: r.challenge.challengeId, code, client: 'mobile' }) }).then((x) => x.json());
-  if (!v.accessToken) throw new Error(`Could not sign in ${identifier}: ${JSON.stringify(v).slice(0, 200)}`);
-  return v.accessToken;
-}
-async function parentToken(identifier) {
-  const r = await fetch(`${API}/v1/auth/code`, { method: 'POST', headers: h, body: JSON.stringify({ identifier, client: 'mobile' }) }).then((x) => x.json());
-  const v = await fetch(`${API}/v1/auth/verify`, { method: 'POST', headers: h, body: JSON.stringify({ challengeId: r.challengeId, code: r.demoCode ?? process.env.CODE ?? '424242', client: 'mobile' }) }).then((x) => x.json());
-  if (!v.accessToken) throw new Error(`Could not sign in ${identifier}: ${JSON.stringify(v).slice(0, 200)}`);
-  return v.accessToken;
-}
 
 const errors = [];
 async function timed(token, path) {
@@ -39,8 +25,9 @@ async function timed(token, path) {
 }
 const p = (list, q) => { const s = [...list].sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.floor(q * s.length))] ?? 0; };
 
-const admin = await signIn(process.env.ADMIN_USER ?? 'neha.menon@greenfield.edu.in', process.env.ADMIN_PASS ?? 'nest2026');
-const parent = await parentToken(process.env.PARENT_USER ?? 'priya.sharma@example.com');
+const { people } = manifest();
+const admin = (await staffSignIn(slug, people.principal)).accessToken;
+const parent = (await familySignIn(slug, people.parentOfTwo)).accessToken;
 const me = await fetch(`${API}/v1/f/me`, { headers: { ...h, authorization: `Bearer ${parent}` } }).then((x) => x.json());
 const child = me.childIds?.[0];
 
