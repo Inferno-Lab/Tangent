@@ -5,7 +5,7 @@
 //
 //   node tools/check-pages.mjs                 every page at 390 and 1440, light          (before a push)
 //   node tools/check-pages.mjs --changed       only pages whose files changed since origin/main
-//   node tools/check-pages.mjs --full          360, 390, 768 and 1440, light and dark     (CI; also `audit-ui.mjs`)
+//   node tools/check-pages.mjs --full          360, 390, 768 and 1440, light and dark     (CI)
 //   options: --only admin|console  --sizes 1440x900,390x844  --dark|--light|--both  --rtl  --workers 6
 //            --scans gaps,fit,cutoff,scroll,tight,align,long,empty|all (reported; they fail the run only with --strict)  --shots dir
 //            --popups: also opens each page's drawers and dialogs (its first row, its Add/New/Edit… buttons) and checks inside them
