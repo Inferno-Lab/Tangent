@@ -58,7 +58,7 @@ font-family:var(--fb);color:var(--ink);background:var(--bd);-webkit-font-smoothi
 .nest .btn{flex:none;height:42px;padding:0 20px;border-radius:999px;border:1.5px solid var(--line2);background:var(--s1);color:var(--ink);font:700 14px var(--fb);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;text-decoration:none;transition:transform var(--t2) var(--e),background var(--t1),box-shadow var(--t1),border-color var(--t1),color var(--t1),opacity var(--t1)}
 .nest .btn:hover{background:var(--s2);border-color:var(--ink3)}
 /* Buttons answer a press, quickly; nothing moves on hover. */
-.nest .btn:active,.nest .ibtn:active,.nest .mini:active{transform:scale(.97);transition-duration:var(--t1)}
+.nest .btn:active,.nest .mini:active{transform:scale(.97);transition-duration:var(--t1)}
 .nest .btn svg{width:17px;height:17px;flex:none}
 .nest .btn.pri{background:var(--ink);color:var(--s1);border-color:transparent}
 .nest .btn.pri:hover{background:color-mix(in srgb,var(--ink) 86%,var(--s1));border-color:transparent}
@@ -71,9 +71,6 @@ font-family:var(--fb);color:var(--ink);background:var(--bd);-webkit-font-smoothi
 .nest .btn.dng:hover{background:color-mix(in srgb,var(--bad-s) 82%,var(--bad));border-color:transparent}
 .nest .btn.dngf{background:var(--bad);color:var(--on-bad);border-color:transparent}
 .nest .btn[disabled]{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
-.nest .ibtn{position:relative;width:42px;height:42px;border-radius:50%;border:1.5px solid var(--line2);background:var(--s1);color:var(--ink2);display:grid;place-items:center;cursor:pointer;flex:none;transition:transform var(--t2) var(--e),background var(--t2),color var(--t2)}
-.nest .ibtn:hover{background:var(--s2);color:var(--ink);border-color:var(--ink3)}
-.nest .ibtn svg{width:19px;height:19px}
 .nest .pip{position:absolute;top:8px;inset-inline-end:9px;width:9px;height:9px;border-radius:50%;background:var(--bad);box-shadow:0 0 0 2.5px var(--s1)}
 .nest .spin{width:16px;height:16px;border-radius:50%;border:2.5px solid color-mix(in srgb,currentColor 28%,transparent);border-top-color:currentColor;animation:nSpin .7s linear infinite}
 @keyframes nSpin{to{transform:rotate(360deg)}}

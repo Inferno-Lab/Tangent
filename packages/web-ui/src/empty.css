@@ -1,5 +1,4 @@
 /* Empty, error and not-found states, from the Empties board. */
-.nest .eg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
 .nest .es{position:relative;background:var(--s1);border:1px solid var(--line);border-radius:28px;box-shadow:var(--sh1);overflow:hidden;display:flex;flex-direction:column;transition:transform var(--t3) var(--e),box-shadow var(--t3);animation:nRise var(--t3) var(--e) both;animation-delay:var(--d)}
 .nest .es:hover{transform:translateY(-5px);box-shadow:var(--sh2)}
 .nest .eh{display:flex;align-items:center;gap:10px;padding:20px 24px;border-bottom:1px solid var(--line)}

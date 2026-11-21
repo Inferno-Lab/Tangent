@@ -76,13 +76,6 @@
 .nest .dpkd button:disabled{opacity:.3;cursor:not-allowed}
 .nest .dpkd button:focus-visible{outline-offset:1px}
 /* Colour swatches */
-.nest .sw5{display:flex;gap:12px;flex-wrap:wrap}
-.nest .sw5 button{width:44px;height:44px;border-radius:50%;border:0;cursor:pointer;position:relative;transition:transform var(--t2) var(--e);box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--on-deep) 35%,transparent)}
-.nest .sw5 button:hover:not(:disabled){transform:scale(1.08)}
-.nest .sw5 button.on{box-shadow:0 0 0 3px var(--s1),0 0 0 5.5px var(--c2,var(--ink))}
-.nest .sw5 button svg{position:absolute;inset:0;margin:auto;width:20px;height:20px;color:currentColor;opacity:0;transform:scale(.6);transition:opacity var(--t1),transform var(--t2) var(--e)}
-.nest .sw5 button.on svg{opacity:1;transform:none}
-.nest .sw5 button:disabled{opacity:.5;cursor:not-allowed}
 /* A tick box beside its words */
 .nest .hwc .cb{width:20px;height:20px;border-radius:6px}
 /* A field box in a table row: smaller, same look. */
