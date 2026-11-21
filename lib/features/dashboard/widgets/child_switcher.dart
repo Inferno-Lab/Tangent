@@ -60,9 +60,13 @@ class _ChildCapsuleState extends State<ChildCapsule> {
     super.initState();
     final ids = Get.find<AuthService>().user.value?.childIds ?? const [];
     unawaited(
-      ChildrenCache.load(ids).then((kids) {
-        if (mounted) setState(() => _kids = kids);
-      }),
+      ChildrenCache.load(ids).then(
+        (kids) {
+          if (mounted) setState(() => _kids = kids);
+        },
+        // Offline or slow: the capsule stays as it is, and the next time it is built it asks again.
+        onError: (Object _) {},
+      ),
     );
   }
 
