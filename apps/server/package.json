@@ -15,7 +15,6 @@
     "@tangent/console-api": "workspace:*",
     "@tangent/nest-kit": "workspace:*",
     "@tangent/tenancy": "workspace:*",
-    "@fastify/cors": "^11.0.0",
     "@fastify/static": "^10.1.2",
     "@nestjs/common": "^11.1.0",
     "@nestjs/core": "^11.1.0",
