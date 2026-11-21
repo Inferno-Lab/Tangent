@@ -54,7 +54,7 @@ export class Health implements OnApplicationBootstrap, OnApplicationShutdown {
     let students = s.studentsCount;
     try {
       const pool = this.pools.get(s.slug, unseal(s.dbUrlSealed!, this.env.SECRETS_KEY));
-      students = Number((await pool.query<{ n: string }>('select count(*) n from students')).rows[0]?.n ?? 0);
+      students = Number((await pool.query<{ n: string }>("select count(*) n from students where status = 'active'")).rows[0]?.n ?? 0);
     } catch {
       ok = false;
     }
