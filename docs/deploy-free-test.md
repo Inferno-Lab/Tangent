@@ -13,7 +13,7 @@ You make two accounts (Neon and Render). Everything else is in this repository.
    - copy the string. It starts with `postgresql://` and ends with `?sslmode=require`.
 4. Keep that string private. You paste it in step 3 below.
 
-Free limits: 0.5 GB storage per project. The demo school with 1,498 students uses well under that.
+Free limits: 0.5 GB storage per project. The test school (840 students, a term of attendance, its photos and report cards) uses well under that.
 
 ## 2. GitHub: the code
 
@@ -36,10 +36,17 @@ If `tangent` is already taken as a name, Render proposes another one. That is fi
 | Where | Address | Sign in with |
 | --- | --- | --- |
 | Console | `https://<service>.onrender.com/console/` | `kaushal@tangent.app`, the password from Render → your service → **Environment** → `BOOTSTRAP_PASSWORD`, then your `DEMO_CODE` |
-| Demo school admin | `https://<service>.onrender.com/s/greenfield` | `neha.menon@greenfield.edu.in`, password `nest2026`, then press *Type the demo code* |
-| Phone app (a build for `greenfield`) | the app | parent `priya.sharma@example.com`, teacher `kavita.iyer@greenfield.edu.in`; password `nest2026`, code `424242` |
+| Test school admin | `https://<service>.onrender.com/s/sunrise-valley` | `principal@sunrisevalley.example` and your `TEST_PASSWORD`, then the code from the console's Test inbox |
+| Phone app (a build for `sunrise-valley`) | the app | a parent's phone (in `.tangent-data/manifest.json` after the load), then the code from the Test inbox |
 
-The demo school Greenfield is created by the first start (a minute or two; watch it appear on the console's Fleet page). Anyone with the address can open the demo school, so keep real data out of this environment.
+The service starts with no school. Move the test school in from your computer, through the console, as onboarding would
+(`docs/test-school.md`); it takes a few minutes:
+
+```bash
+API=https://<service>.onrender.com BOOTSTRAP_PASSWORD=<from Render> DEMO_CODE=<yours> TEST_PASSWORD=<one you choose> node tools/dataset/load.mjs
+```
+
+Anyone with the address and the passwords can open the test school, so keep real data out of this environment.
 
 Texts and emails are caught in the console under **Test inbox**; nothing is sent to real phones. New schools created from **Onboarding** get their invite and sign-in codes there.
 
@@ -59,7 +66,7 @@ Android builds go to the chosen Google Play track; iPhone builds go to TestFligh
 
 ### What the app does against the test track
 
-A build made with `SCHOOL` and `API_BASE_URL` (the workflow passes both) signs in with the school's real accounts (teachers: password, then the code; families: a code to their phone; the demo school hands out `424242`) and reads every screen from the family API (`/v1/f/*`). It follows what the console set for the school: tabs, Home cards and quick buttons, languages, the privacy notice and consent. What a teacher marks in the app shows up in the admin. The workflow leaves the sample content out of the package. Payments open the provider's checkout (the test checkout on the test track), and files, the library, transport with the live bus and the gallery work from the school's data. Not yet: push notifications (the app needs the owner's Firebase project files; see `docs/integrations.md`).
+A build made with `SCHOOL` and `API_BASE_URL` (the workflow passes both) signs in with the school's real accounts (teachers: password, then the code; families: a code to their phone, which the Test inbox shows) and reads every screen from the family API (`/v1/f/*`). It follows what the console set for the school: tabs, Home cards and quick buttons, languages, the privacy notice and consent. What a teacher marks in the app shows up in the admin. Payments open the provider's checkout (the test checkout on the test track), and files, the library, transport with the live bus and the gallery work from the school's data. Push notifications reach the phone once the Firebase connection is set (`docs/integrations.md`, Phone notifications).
 
 ## Updating
 

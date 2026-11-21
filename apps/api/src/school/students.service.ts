@@ -149,7 +149,8 @@ export class StudentsService {
           from attendance_marks m join attendance_sessions ses on ses.id = m.session_id where m.student_id = s.id) a on true
        ${w}`, params);
     const r = rows[0]!;
-    const total = Number((await t.pool.query<{ n: string }>('select count(*) n from students')).rows[0]!.n);
+    // The school's roll: students who have left are kept on record but are no longer in the total.
+    const total = Number((await t.pool.query<{ n: string }>("select count(*) n from students where status = 'active'")).rows[0]!.n);
     const now = r.a_now ?? 1;
     const prev = r.a_prev ?? now;
     const out: StudentSummary = {
@@ -546,6 +547,9 @@ export class StudentsService {
   }
 
   async assignFee(t: TenantCtx, body: AssignFee, user: { id: string; name: string }): Promise<{ created: number }> {
+    // Only students at the school are billed: an unknown or former student is refused, never left to the database.
+    const known = (await t.pool.query("select id from students where id = any($1) and status = 'active'", [body.ids])).rowCount;
+    if (known !== new Set(body.ids).size) throw new ApiError('validation', 'Choose students who are at the school.', { fields: { ids: 'Some of these students are not at the school.' } });
     const amount = await this.settings.billed(t, body.head, body.amount);
     const rows = body.ids.map((id) => [newId('inv'), id, body.head, body.title, amount, body.dueOn]);
     const params: unknown[] = [];

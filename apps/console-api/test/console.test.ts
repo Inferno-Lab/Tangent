@@ -132,12 +132,19 @@ describe('the new-school wizard', () => {
     expect(r.status).toBe(400);
     expect(r.json.message).toMatch(/already used/);
   });
-  it('sets up the demo school with its 1,498 students', async () => {
-    const run = await launch(wizardPayload('demoschool', { data: { start: 'demo' }, plan: { plan: 'premium', modules: ['people', 'attendance', 'fees', 'notices', 'timetable', 'homework'], addOns: [], locks: [], students: 1500 } }));
+  it('sets up a school for its files to come in: no starter bell, and its admin signs in from the welcome email', async () => {
+    const run = await launch(wizardPayload('importschool', { data: { start: 'import' }, plan: { plan: 'premium', modules: ['people', 'attendance', 'fees', 'notices', 'timetable', 'homework'], addOns: [], locks: [], students: 1500 } }));
     expect(run.status).toBe('succeeded');
-    expect(run.steps.find((s: any) => s.key === 'migrate-seed').log.at(-1).text).toMatch(/1,498 sample students/);
-    const login = await h.s('POST', '/v1/auth/login', { school: 'demoschool', body: { identifier: 'asha@demoschool.test', password: 'nest2026' } });
-    expect(login.json.challenge.demoCode).toBe('424242');
+    expect(run.steps.find((s: any) => s.key === 'migrate-seed').log.at(-1).text).toMatch(/ready for the school’s files/);
+    const tok = await h.schoolSignIn('importschool');
+    expect((await h.s('GET', '/v1/me', { school: 'importschool', token: tok })).status).toBe(200);
+    // The school's own bell comes in with its files; none is made up for it.
+    const setup = (await h.s('GET', '/v1/setup', { school: 'importschool', token: tok })).json;
+    expect(setup.find((x: any) => x.kind === 'periods').rows).toHaveLength(0);
+    expect(setup.find((x: any) => x.kind === 'subjects').rows).toHaveLength(0);
+    // No fixed code: a demo code is never offered to a school.
+    const login = await h.s('POST', '/v1/auth/login', { school: 'importschool', body: { identifier: 'asha@importschool.test', password: 'wrong-password' } });
+    expect(login.json.challenge).toBeUndefined();
   }, 120_000);
 });
 
@@ -153,9 +160,8 @@ describe('actions', () => {
   it('pushes new entitlements and the school’s menu follows', async () => {
     const id = (await h.c('GET', '/console/v1/schools/freshschool', { token: t })).json.id;
     await h.c('POST', '/console/v1/actions', { token: t, body: { action: 'entitlements.push', schoolId: id, params: { modules: ['people', 'notices'] } } });
-    const login = await h.s('POST', '/v1/auth/login', { school: 'demoschool', body: { identifier: 'asha@demoschool.test', password: 'nest2026' } });
-    const tok = (await h.s('POST', '/v1/auth/verify', { school: 'demoschool', body: { challengeId: login.json.challenge.challengeId, code: '424242' } })).json.accessToken;
-    expect((await h.s('GET', '/v1/config', { school: 'demoschool', token: tok })).json.modules).toContain('fees');
+    const tok = await h.schoolSignIn('importschool');
+    expect((await h.s('GET', '/v1/config', { school: 'importschool', token: tok })).json.modules).toContain('fees');
   });
   it('needs the school’s own address typed to erase it, and a second person to approve', async () => {
     const id = (await h.c('GET', '/console/v1/schools/freshschool', { token: t })).json.id;
@@ -176,7 +182,7 @@ describe('actions', () => {
 
 describe('releases', () => {
   it('rolls out in waves, running migrations and moving every school’s version', async () => {
-    await h.registry.query("update schools set ring = 'internal' where slug = 'demoschool'");
+    await h.registry.query("update schools set ring = 'internal' where slug = 'importschool'");
     const rel = (await h.c('POST', '/console/v1/releases', { token: t, body: { version: '2026.10.3', notes: 'First rollout' } })).json;
     expect((await h.c('POST', '/console/v1/releases', { token: t, body: { version: 'bad' } })).status).toBe(400);
     const started = await h.c('POST', `/console/v1/releases/${rel.id}/start`, { token: t });
@@ -197,7 +203,7 @@ describe('releases', () => {
   it('halts and rolls back by itself when a school fails its check', async () => {
     const before = (await h.c('GET', '/console/v1/schools', { token: t })).json.map((s: any) => [s.slug, s.versions.api]);
     // Break one school's database connection so the rollout cannot reach it.
-    await h.registry.query("update schools set db_url_sealed = db_url_sealed || 'x' where slug = 'demoschool'");
+    await h.registry.query("update schools set db_url_sealed = db_url_sealed || 'x' where slug = 'importschool'");
     const rel = (await h.c('POST', '/console/v1/releases', { token: t, body: { version: '2026.10.4' } })).json;
     await h.c('POST', `/console/v1/releases/${rel.id}/start`, { token: t });
     let r: any;
@@ -215,16 +221,16 @@ describe('releases', () => {
 
 describe('support and fleet', () => {
   it('opens a read-only look inside a school that expires, and writes it down', async () => {
-    const s = (await h.c('GET', '/console/v1/schools/demoschool', { token: t })).json;
-    // The earlier test broke the demo school's connection on purpose; restore it.
-    await h.registry.query("update schools set db_url_sealed = left(db_url_sealed, length(db_url_sealed) - 1) where slug = 'demoschool'");
+    const s = (await h.c('GET', '/console/v1/schools/importschool', { token: t })).json;
+    // The earlier test broke this school's connection on purpose; restore it.
+    await h.registry.query("update schools set db_url_sealed = left(db_url_sealed, length(db_url_sealed) - 1) where slug = 'importschool'");
     const bad = await h.c('POST', '/console/v1/support', { token: t, body: { schoolId: s.id, reason: 'x' } });
     expect(bad.status).toBe(400);
     const ok = await h.c('POST', '/console/v1/support', { token: t, body: { schoolId: s.id, reason: 'Checking the fee report with the principal' } });
     expect(ok.status).toBe(200);
-    const view = await h.s('GET', '/v1/me', { school: 'demoschool', token: ok.json.token });
+    const view = await h.s('GET', '/v1/me', { school: 'importschool', token: ok.json.token });
     expect(view.json.roleNames).toEqual(['Tangent support']);
-    const write = await h.s('POST', '/v1/notices', { school: 'demoschool', token: ok.json.token, body: { title: 'Not from support', body: 'Support sessions are read-only.', audience: 'everyone', publish: false } });
+    const write = await h.s('POST', '/v1/notices', { school: 'importschool', token: ok.json.token, body: { title: 'Not from support', body: 'Support sessions are read-only.', audience: 'everyone', publish: false } });
     expect(write.status).toBe(403);
     expect((await h.s('GET', '/v1/me', { school: 'freshschool', token: ok.json.token })).status).toBe(404);
     const audit = (await h.c('GET', '/console/v1/audit', { token: t })).json;
@@ -247,11 +253,11 @@ describe('support and fleet', () => {
 describe('error reports', () => {
   it('groups what the admin and the app report, and shows it on the console', async () => {
     const body = { source: 'admin', message: 'Cannot read properties of undefined (reading "rows")', stack: 'TypeError: x\n    at DashboardPage (dashboard.tsx:12:3)', url: '/s/greenfield/' };
-    expect((await h.s('POST', '/v1/errors', { school: 'greenfield', body })).status).toBe(204);
-    expect((await h.s('POST', '/v1/errors', { school: 'greenfield', body })).status).toBe(204);
-    expect((await h.s('POST', '/v1/errors', { school: 'greenfield', body: { source: 'nobody', message: 'x' } })).status).toBe(400);
+    expect((await h.s('POST', '/v1/errors', { school: 'importschool', body })).status).toBe(204);
+    expect((await h.s('POST', '/v1/errors', { school: 'importschool', body })).status).toBe(204);
+    expect((await h.s('POST', '/v1/errors', { school: 'importschool', body: { source: 'nobody', message: 'x' } })).status).toBe(400);
     const list = (await h.c('GET', '/console/v1/errors', { token: t })).json;
-    expect(list.find((e: { message: string }) => e.message === body.message)).toMatchObject({ source: 'admin', schoolSlug: 'greenfield', count: 2 });
+    expect(list.find((e: { message: string }) => e.message === body.message)).toMatchObject({ source: 'admin', schoolSlug: 'importschool', count: 2 });
     expect((await h.c('GET', '/console/v1/errors')).status).toBe(401);
   });
 });
@@ -266,7 +272,7 @@ describe('plans', () => {
 
 describe('backups', () => {
   it('backs a school up on request, and waits for a second person to put one back', async () => {
-    const school = (await h.c('GET', '/console/v1/schools', { token: t })).json.find((s: { slug: string }) => s.slug === 'demoschool');
+    const school = (await h.c('GET', '/console/v1/schools', { token: t })).json.find((s: { slug: string }) => s.slug === 'importschool');
     const took = (await h.c('POST', '/console/v1/actions', { token: t, body: { action: 'backup.take', schoolId: school.id } })).json;
     expect(took.status).toBe('done');
     const list = (await h.c('GET', `/console/v1/schools/${school.id}/backups`, { token: t })).json;

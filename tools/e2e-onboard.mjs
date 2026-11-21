@@ -78,8 +78,9 @@ await ap.getByText('Verify and sign in').waitFor();
 // A real school sends the code by text; on the test track it lands in the console's inbox.
 await ap.waitForTimeout(600);
 const after = await (await fetch(`${API}/console/v1/sandbox?school=${slug}`, { headers: { authorization: `Bearer ${t.accessToken}` } })).json();
-const codeMsg = after.find((m) => /(\d{6})/.test(m.body) && !/password/.test(m.body));
-const code = /(\d{6})/.exec(codeMsg?.body ?? '')?.[1] ?? '424242';
+const codeMsg = after.find((m) => /sign-in code/.test(m.body));
+const code = /(\d{6})/.exec(codeMsg?.body ?? '')?.[1];
+if (!code) throw new Error('No sign-in code reached the Test inbox.');
 await ap.getByLabel('6-digit code').fill(code);
 await ap.waitForURL(`${ADMIN}/s/${slug}`, { timeout: 15000 }).catch(() => undefined);
 await ap.waitForTimeout(2500);

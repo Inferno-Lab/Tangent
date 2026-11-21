@@ -5,7 +5,6 @@ import 'package:get/get.dart';
 import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/utils/validators.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/utils/app_exception.dart';
 import 'package:tangent/core/utils/extensions.dart';
@@ -22,22 +21,16 @@ Future<void> showChangePassword() => showSheet<void>(const _ChangeSheet());
 
 /// Signs this person out on every phone and computer, then here.
 Future<void> signOutEverywhere() async {
-  if (AppConfig.live) {
-    try {
-      await Get.find<RemoteDataSource>().post('/v1/auth/logout-all', const {});
-    } on AppException catch (e) {
-      ToastHelper.show(e.message, kind: ToastKind.error);
-      return;
-    }
+  try {
+    await Get.find<RemoteDataSource>().post('/v1/auth/logout-all', const {});
+  } on AppException catch (e) {
+    ToastHelper.show(e.message, kind: ToastKind.error);
+    return;
   }
   await Get.find<AuthService>().signOut();
 }
 
 Future<bool> _send(String path, Map<String, dynamic> body, {void Function(dynamic json)? then}) async {
-  if (!AppConfig.live) {
-    ToastHelper.show('common.sample_only');
-    return false;
-  }
   try {
     final json = await Get.find<RemoteDataSource>().post(path, body);
     then?.call(json);
@@ -71,7 +64,7 @@ class _ForgotSheetState extends State<_ForgotSheet> {
     await _send('/v1/auth/reset/start', {'identifier': _who.text.trim()}, then: (json) {
       final m = Map<String, dynamic>.from(json as Map);
       _challenge = m['challengeId'] as String?;
-      _sentTo = '${m['maskedTo'] ?? ''}${m['demoCode'] == null ? '' : ' · ${m['demoCode']}'}';
+      _sentTo = '${m['maskedTo'] ?? ''}';
     });
     if (mounted) setState(() => _busy = false);
   }

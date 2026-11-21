@@ -1,0 +1,4 @@
+# Tests tagged `school` read a running school (tools/dev-reset.sh, then node tools/dataset/app-sessions.mjs); without one,
+# flutter test --exclude-tags school runs the rest (tools/pre-push.mjs does so when no local server answers).
+tags:
+  school:

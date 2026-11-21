@@ -22,7 +22,7 @@ abstract final class ErrorReporter {
       return false;
     };
     // Reports kept while offline go once the app is up again.
-    if (AppConfig.live && !kDebugMode) Future<void>.delayed(const Duration(seconds: 20), () => unawaited(_flush()));
+    if (!kDebugMode) Future<void>.delayed(const Duration(seconds: 20), () => unawaited(_flush()));
   }
 
   static StorageService? get _storage => Get.isRegistered<StorageService>() ? Get.find<StorageService>() : null;
@@ -48,7 +48,7 @@ abstract final class ErrorReporter {
   }
 
   static void report(Object error, StackTrace? stack) {
-    if (!AppConfig.live || kDebugMode) return;
+    if (kDebugMode) return;
     final message = error.toString();
     // Once per message per run, and never a flood from one broken screen.
     if (!_seen.add(message) || _seen.length > 20) return;

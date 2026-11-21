@@ -1,17 +1,19 @@
 #!/usr/bin/env node
-// Drives the real admin and console in a browser through the flows people use, against the demo school, and fails on the first thing that
-// does not behave. Run after `tools/dev-reset.sh` (it changes demo data). Usage: node tools/e2e-flows.mjs [outDir]
+// Drives the real admin and console in a browser through the flows people use, against Sunrise Valley (the dataset school
+// tools/dataset/load.mjs moves in), and fails on the first thing that does not behave. Codes come from the console's Test inbox.
+// Run after `tools/dev-reset.sh` (it changes the school's data). Usage: node tools/e2e-flows.mjs [outDir]
 import { chromium } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { consolePaths } from './lib/pages.mjs';
+import { CONSOLE_LOGIN, SCHOOL, STAFF_PASSWORD, adminKey, call, codeIn, consoleKey, familySignIn, manifest, newMessage, staffSignIn } from './dataset/session.mjs';
 
 const out = process.argv[2] ?? 'e2e-shots';
 mkdirSync(out, { recursive: true });
 const API = process.env.API ?? 'http://localhost:4000';
 const ADMIN = process.env.ADMIN ?? 'http://127.0.0.1:5173';
 const CONSOLE = process.env.CONSOLE ?? 'http://127.0.0.1:5174';
-const slug = 'greenfield';
-const post = async (p, b, h = {}) => (await fetch(API + p, { method: 'POST', headers: { 'content-type': 'application/json', ...h }, body: JSON.stringify(b) })).json();
+const slug = SCHOOL;
+const { people, school: info } = manifest();
 
 const browser = await chromium.launch();
 const errors = [];
@@ -46,29 +48,59 @@ const expectVisible = async (loc, what, timeout = 8000) => { await loc.first().w
 
 // ── tokens ───────────────────────────────────────────────────────────────
 const h = { 'x-school': slug };
-const a = await post('/v1/auth/login', { identifier: 'neha.menon@greenfield.edu.in', password: 'nest2026' }, h);
-const t = await post('/v1/auth/verify', { challengeId: a.challenge.challengeId, code: '424242' }, h);
-const adminStore = [`tangent.admin.${slug}`, JSON.stringify({ user: t.user }), t.accessToken];
-const ca = await post('/console/v1/auth/login', { identifier: 'kaushal@tangent.app', password: 'nest2026' });
-const ct = await post('/console/v1/auth/verify', { challengeId: ca.challenge.challengeId, code: '424242' });
-const consoleStore = ['tangent.console', JSON.stringify({ user: ct.user }), ct.accessToken];
-const school = (await (await fetch(`${API}/console/v1/schools`, { headers: { authorization: `Bearer ${ct.accessToken}` } })).json()).find((s) => s.slug === slug);
+const adminStore = await adminKey();
+const t = { accessToken: adminStore[2] };
+const { key: consoleStore, school: schoolId } = await consoleKey();
+const ct = { accessToken: consoleStore[2] };
+const school = { id: schoolId };
+const child = people.parentOfTwo.children[0];
+
+// ── what the school's staff and families ask for before the flows look at it ───────────────────────────────
+// Its files bring no requests, conversations or open exams: the people who would ask for them do, through the API.
+{
+  const as = (token) => ({ token: token.accessToken, school: slug });
+  const teacher = await staffSignIn(slug, people.classTeacher);
+  const parent = await familySignIn(slug, people.parentOfTwo);
+  const day = (n) => new Date(Date.now() + (n * 86_400_000) + 330 * 60_000).toISOString().slice(0, 10);
+  // Two days off for the class teacher, waiting on the dashboard (a day the school is closed is refused, so the next is tried).
+  for (let n = 30, asked = 0; asked < 2 && n < 90; n++) asked += await call('/v1/f/staff/leave', { body: { type: 'casual', from: day(n), to: day(n), reason: 'A family wedding', halfDay: null }, ...as(teacher) }).then(() => 1, () => 0);
+  // A sibling concession the accounts office asked for on a late quarter.
+  const accounts = await staffSignIn(slug, people.accountant);
+  const late = (await call('/v1/fees/invoice-list?status=overdue&limit=1', as(accounts))).items[0];
+  await call(`/v1/fees/invoice/${late.id}/waive`, { body: { amount: 500, reason: 'Sibling concession' }, ...as(accounts) }).catch(() => undefined);
+  // A class test in 8 B, written yesterday and waiting for its marks.
+  const classes = await call('/v1/classes', as(t));
+  const subjects = await call('/v1/subjects', as(t));
+  const science = subjects.find((x) => x.name === 'Science');
+  await call('/v1/exams', { body: { name: 'Unit test 2', classId: classes.find((c) => c.name === '8 B').id, startsOn: day(-1), endsOn: day(-1), subjects: [{ subjectId: science.id, maxMarks: 40 }] }, ...as(t) });
+  // The Annual Day circular, as an event families reply to.
+  await call('/v1/events', { body: { title: 'Annual Day', startsAt: `${day(23)}T11:30:00.000Z`, kind: 'event', venue: 'School auditorium', audience: 'everyone', needsRsvp: true }, ...as(t) });
+  // A bonafide certificate a family asked for and the school issued, and a character certificate waiting.
+  const stu = (await call(`/v1/students?query=${encodeURIComponent(child.admissionNo)}`, as(t))).items[0].id;
+  const asked = await call('/v1/f/certificates', { body: { type: 'bonafide', studentId: stu, purpose: 'a bank account' }, ...as(parent) }).catch(() => null);
+  if (asked) {
+    const it = (await call('/v1/approvals', as(t))).find((x) => x.kind === 'certificate');
+    if (it) await call(`/v1/approvals/${it.id}/decision`, { body: { decision: 'approve', note: '' }, ...as(t) });
+  }
+  await call('/v1/certificates', { body: { type: 'character', studentId: stu, purpose: '' }, ...as(t) }).catch(() => undefined);
+}
 
 // ── admin ────────────────────────────────────────────────────────────────
-await flow('admin: wrong password shows an error, then the demo code signs in', {}, async (p) => {
+await flow('admin: wrong password shows an error, a wrong code is refused, then the code sent by text signs in', {}, async (p) => {
   await p.goto(`${ADMIN}/s/${slug}/login`, { waitUntil: 'networkidle' });
   await p.getByRole('button', { name: /^Sign in/ }).click();
   await expectVisible(p.getByText('Enter your email or phone number to continue').or(p.getByText('Enter your password to continue')), 'an empty-form error');
-  await p.getByLabel('Email or phone number').fill('neha.menon@greenfield.edu.in');
+  await p.getByLabel('Email or phone number').fill(people.principal.email);
   await p.locator('#lg-pw').fill('wrong-password');
   await p.getByRole('button', { name: /^Sign in/ }).click();
   await expectVisible(p.getByRole('alert'), 'the wrong-password message');
-  await p.locator('#lg-pw').fill('nest2026');
-  await p.getByRole('button', { name: /^Sign in/ }).click();
+  await p.locator('#lg-pw').fill(STAFF_PASSWORD);
+  const { message } = await newMessage(slug, [people.principal.email, people.principal.phone], /sign-in code/, () => p.getByRole('button', { name: /^Sign in/ }).click());
   await expectVisible(p.getByText('Verify and sign in'), 'the code step');
-  await p.getByLabel('6-digit code').fill('111111');
+  const code = codeIn(message);
+  await p.getByLabel('6-digit code').fill(code === '111111' ? '222222' : '111111');
   await expectVisible(p.getByRole('alert'), 'the wrong-code message');
-  await p.getByRole('button', { name: /Type the demo code/ }).click();
+  await p.getByLabel('6-digit code').fill(code);
   await p.waitForURL(`${ADMIN}/s/${slug}/`, { timeout: 15000 });
   await expectVisible(p.getByRole('heading', { name: 'Dashboard' }), 'the dashboard');
 });
@@ -77,15 +109,18 @@ await flow('admin: a forgotten password is replaced with a code, then signs in b
   await p.goto(`${ADMIN}/s/${slug}/login`, { waitUntil: 'networkidle' });
   await p.getByRole('button', { name: 'Forgot it?' }).click();
   await expectVisible(p.getByText('Type your email or phone number first'), 'a request for the email first');
-  await p.getByLabel('Email or phone number').fill('kavita.iyer@greenfield.edu.in');
-  await p.getByRole('button', { name: 'Forgot it?' }).click();
+  // The maths teacher: the class teacher's session is used by the setup above, and a new password would end it.
+  const who = people.mathsTeacher;
+  await p.getByLabel('Email or phone number').fill(who.email);
+  const { message } = await newMessage(slug, [who.email, who.phone], /new password/, () => p.getByRole('button', { name: 'Forgot it?' }).click());
   await expectVisible(p.getByText('Type it with your new password'), 'the reset step');
-  await p.getByLabel('New password').fill('kavita-new-2026');
-  await p.getByRole('button', { name: /Type the demo code/ }).click();
+  await p.getByLabel('New password').fill('a-new-pass-2026');
+  await p.getByLabel('6-digit code').fill(codeIn(message));
+  await p.getByRole('button', { name: 'Save the new password' }).click();
   await expectVisible(p.getByText('Your password is changed'), 'the changed-password note');
-  const phone = (await (await fetch(`${API}/v1/staff`, { headers: { ...h, authorization: `Bearer ${t.accessToken}` } })).json()).find((s) => s.email === 'kavita.iyer@greenfield.edu.in').phone;
+  const phone = (await (await fetch(`${API}/v1/staff`, { headers: { ...h, authorization: `Bearer ${t.accessToken}` } })).json()).find((s) => s.email === who.email).phone;
   await p.getByLabel('Email or phone number').fill(phone);
-  await p.locator('#lg-pw').fill('kavita-new-2026');
+  await p.locator('#lg-pw').fill('a-new-pass-2026');
   await p.getByRole('button', { name: /^Sign in/ }).click();
   await expectVisible(p.getByText('Verify and sign in'), 'the code step');
 });
@@ -185,8 +220,9 @@ await flow('admin: the school edits its own profile, sees what Tangent sets, and
 await flow('admin: search palette and keyboard shortcuts', { storage: adminStore }, async (p) => {
   await p.goto(`${ADMIN}/s/${slug}/`, { waitUntil: 'networkidle' });
   await p.keyboard.press('Control+k');
-  await p.keyboard.type('Aarav', { delay: 40 });
-  await expectVisible(p.getByText(/^Aarav /), 'a search result');
+  const first = child.name.split(' ')[0];
+  await p.keyboard.type(first, { delay: 40 });
+  await expectVisible(p.getByText(new RegExp(`^${first} `)), 'a search result');
   await p.keyboard.press('Escape');
   await p.keyboard.press('g');
   await p.keyboard.press('s');
@@ -205,8 +241,7 @@ await flow('admin: search opens on every page and the menu collapses', { storage
 });
 
 // Sign-out revokes its session on the server, so this flow gets a session of its own and the flows after it keep theirs.
-const so = await post('/v1/auth/login', { identifier: 'neha.menon@greenfield.edu.in', password: 'nest2026' }, h);
-const st = await post('/v1/auth/verify', { challengeId: so.challenge.challengeId, code: '424242' }, h);
+const st = await staffSignIn(slug, people.vicePrincipal, { fresh: true });
 const signOutStore = [adminStore[0], JSON.stringify({ user: st.user }), st.accessToken];
 await flow('admin: sign out returns to the sign-in page', { storage: signOutStore }, async (p) => {
   await p.goto(`${ADMIN}/s/${slug}/`, { waitUntil: 'networkidle' });
@@ -228,14 +263,14 @@ await flow('admin: phone dock navigates', { storage: adminStore, context: { view
 // ── console ──────────────────────────────────────────────────────────────
 await flow('console: wrong password shakes, right password and code sign in', {}, async (p) => {
   await p.goto(`${CONSOLE}/login`, { waitUntil: 'networkidle' });
-  await p.getByLabel('Tangent email').fill('kaushal@tangent.app');
+  await p.getByLabel('Tangent email').fill(CONSOLE_LOGIN.email);
   await p.locator('#lg-pw').fill('nope');
   await p.getByRole('button', { name: /^Continue/ }).click();
   await expectVisible(p.getByRole('alert'), 'the wrong-password message');
-  await p.locator('#lg-pw').fill('nest2026');
+  await p.locator('#lg-pw').fill(CONSOLE_LOGIN.password);
   await p.getByRole('button', { name: /^Continue/ }).click();
   await expectVisible(p.getByText('Verify and sign in'), 'the code step');
-  await p.getByLabel('6-digit code').fill('424242');
+  await p.getByLabel('6-digit code').fill(CONSOLE_LOGIN.code);
   await p.waitForURL(`${CONSOLE}/`, { timeout: 15000 });
   await expectVisible(p.getByRole('heading', { name: 'Fleet' }), 'the fleet page');
 });
@@ -340,13 +375,13 @@ const A = (path) => `${ADMIN}/s/${slug}${path}`;
 
 await flow('admin: set homework, tick a hand-in and save it', { storage: adminStore }, async (p) => {
   await p.goto(A('/homework'), { waitUntil: 'networkidle' });
-  await expectVisible(p.getByText('Reading and notes').first(), 'the homework list');
+  await expectVisible(p.getByRole('heading', { name: 'Homework' }).first(), 'the homework page');
   await p.getByRole('button', { name: 'Set homework' }).first().click();
   const d = p.getByRole('dialog');
   await d.getByRole('button', { name: 'Set homework' }).click();
   await expectVisible(d.getByText('Choose a class.'), 'the class error');
   await pick(p, d, 'Class', 'Class 8 A');
-  await pick(p, d, 'Subject', 'Maths');
+  await pick(p, d, 'Subject', 'Mathematics');
   await d.getByLabel('Title').fill('E2E homework');
   await d.getByRole('button', { name: 'Set homework' }).click();
   await expectVisible(p.getByText(/Homework set\./), 'the set toast');
@@ -360,7 +395,7 @@ await flow('admin: set homework, tick a hand-in and save it', { storage: adminSt
 await flow('admin: exams show marking and open the marks grid and results', { storage: adminStore }, async (p) => {
   await p.goto(A('/exams'), { waitUntil: 'networkidle' });
   await expectVisible(p.getByRole('heading', { name: 'Marking' }), 'the marking group');
-  await p.getByRole('button', { name: /Open Unit test 1, Class 8 B/ }).click();
+  await p.getByRole('button', { name: /Open Unit test 2, Class 8 B/ }).click();
   await expectVisible(p.getByRole('dialog').getByText(/marks entered/), 'the marks sheet');
   const cell = p.getByRole('dialog').getByRole('textbox', { name: /, Science$/ }).first();
   await cell.fill('31');
@@ -380,9 +415,9 @@ await flow('admin: add a staff member, find them and switch them off', { storage
   await p.getByRole('dialog').getByRole('button', { name: /Add and send invite/ }).click();
   await expectVisible(p.getByText('Enter the name.'), 'the name error');
   await p.getByLabel('Full name').fill('E2E Teacher');
-  await p.getByLabel('Email').fill('e2e.teacher@greenfield.edu.in');
+  await p.getByLabel('Email').fill('e2e.teacher@sunrisevalley.example');
   await p.getByLabel('Phone').fill('+91 98000 12345');
-  await p.getByRole('button', { name: 'Maths', exact: true }).click();
+  await p.getByRole('button', { name: 'Mathematics', exact: true }).click();
   await p.getByRole('button', { name: /Add and send invite/ }).click();
   await expectVisible(p.getByText(/E2E Teacher was added/), 'the added toast');
   await p.getByLabel('Search staff').fill('E2E');
@@ -419,7 +454,7 @@ await flow('admin: invoices filter, receipts open and print', { storage: adminSt
   await p.getByRole('tab', { name: 'Overdue' }).click();
   await expectVisible(p.getByRole('button', { name: 'Collect' }).first(), 'a Collect button');
   await p.getByRole('tab', { name: 'Receipts' }).click();
-  await p.getByRole('button', { name: /Open receipt RCPT/ }).first().click();
+  await p.getByRole('button', { name: /^Open receipt / }).first().click();
   await expectVisible(p.getByRole('dialog').getByRole('button', { name: 'Receipt', exact: true }).first(), 'the receipt button');
 });
 
@@ -443,6 +478,10 @@ await flow('admin: a family message is read and answered', { storage: adminStore
     await p.waitForTimeout(1000);
   }
   try {
+    const as = (token) => ({ token, school: slug });
+    const stu = (await call(`/v1/students?query=${encodeURIComponent(child.admissionNo)}`, as(t.accessToken))).items[0].id;
+    const thread = await call('/v1/messages', { body: { studentId: stu, subject: 'Science project', body: 'Please send the project file by Friday.' }, ...as(t.accessToken) });
+    await call(`/v1/f/threads/${thread.id}/messages`, { body: { text: 'Sorry, it was late. We will send it tomorrow.' }, ...as((await familySignIn(slug, people.parentOfTwo)).accessToken) });
     await p.goto(A('/messages'), { waitUntil: 'networkidle' });
     await expectVisible(p.getByText('Your reply'), 'the conversation');
     await p.getByRole('button', { name: 'Send reply' }).click();
@@ -574,7 +613,7 @@ await flow('console: the module grid takes a feature from a school only after a 
   await p.goto(`${CONSOLE}/modules`, { waitUntil: 'networkidle' });
   await expectVisible(p.getByRole('table', { name: 'Modules by school' }), 'the module grid');
   await p.getByRole('button', { name: 'Take away' }).isDisabled().then((d) => { if (!d) throw new Error('Take away should wait for a chosen school'); });
-  await p.getByLabel(/^Choose Greenfield/).check();
+  await p.getByLabel(new RegExp(`^Choose ${info.shortName}`)).check();
   await pick(p, p, 'Module or feature', 'Fees: Families pay in the app');
   await p.getByRole('button', { name: 'Take away' }).click();
   const review = p.getByRole('dialog');
@@ -637,7 +676,7 @@ await flow('admin: the menu collapses, can be opened again, and its account menu
   if (!box || box.x < 80 || box.x + box.width > 1440) throw new Error('the account menu is clipped by the narrow menu');
   await p.keyboard.press('Escape');
   await p.getByRole('button', { name: 'Expand the menu' }).click();
-  await expectVisible(p.getByText('Greenfield').first(), 'the school name after expanding');
+  await expectVisible(p.getByText(info.shortName).first(), 'the school name after expanding');
 });
 
 await flow('admin: a dropdown lists every option above the cards and a bar has a tooltip', { storage: adminStore }, async (p) => {
@@ -748,9 +787,9 @@ await flow('console: go-live reconciles the dues with the old system, and a rest
 await flow('admin: the sign-in page shows the school’s mark and its privacy notice', {}, async (p) => {
   await p.goto(`${ADMIN}/s/${slug}/login`, { waitUntil: 'networkidle' });
   const mark = p.locator('.pnl .lg').first();
-  // The crest wears the school's own colour (Greenfield's brand, #6A4CF5).
+  // The crest wears the school's own colour (Sunrise Valley's brand, #1F6FB2).
   const bg = await mark.evaluate((el) => getComputedStyle(el).backgroundColor);
-  if (!/rgb\(106, 76, 245\)/.test(bg)) throw new Error(`the mark should be in the school's colour, got ${bg}`);
+  if (!/rgb\(31, 111, 178\)/.test(bg)) throw new Error(`the mark should be in the school's colour, got ${bg}`);
   await p.getByRole('button', { name: 'Privacy' }).click();
   await expectVisible(p.getByRole('region', { name: 'Privacy' }), 'the privacy notice');
   if (!(await p.getByRole('link', { name: 'Help' }).getAttribute('href'))?.startsWith('mailto:')) throw new Error('Help should write to support');
@@ -898,10 +937,10 @@ await flow('admin: library adds a book, issues it and takes it back', { storage:
   await p.getByLabel('Search the catalogue').fill('E2E Atlas');
   await p.locator('.rw', { hasText: 'E2E Atlas' }).getByRole('button', { name: 'Issue', exact: true }).click();
   const i = p.getByRole('dialog');
-  await i.getByLabel('To').fill('Aarav Sharma');
-  await i.getByRole('button', { name: /Aarav Sharma/ }).first().click();
+  await i.getByLabel('To').fill(child.name);
+  await i.getByRole('button', { name: new RegExp(child.name) }).first().click();
   await i.getByRole('button', { name: 'Issue', exact: true }).click();
-  await expectVisible(p.getByText(/E2E Atlas is with Aarav Sharma/), 'the issue toast');
+  await expectVisible(p.getByText(new RegExp(`E2E Atlas is with ${child.name}`)), 'the issue toast');
   await p.getByRole('tab', { name: 'Loans' }).click();
   await p.locator('.rw', { hasText: 'E2E Atlas' }).getByRole('button', { name: 'Take back' }).click();
   await p.getByRole('dialog').getByRole('button', { name: 'Take back' }).click();

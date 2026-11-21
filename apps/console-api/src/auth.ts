@@ -6,7 +6,7 @@ import { constantTimeEqual, hashPassword, maskEmail, newTotpSecret, passwordNeed
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { checkCookieCsrf, clearConsoleRefreshCookie, consoleCookieToken, setConsoleRefreshCookie } from '@tangent/nest-kit';
 import { Db, Me, Public, type ConsoleUser } from './core.js';
-import { ENV, demosAllowed, type Env } from './env.js';
+import { ENV, type Env } from './env.js';
 import { Sandbox } from './sandbox.js';
 import { PlatformHub } from './platform-hub.js';
 import { randomInt } from 'node:crypto';
@@ -119,9 +119,9 @@ export class ConsoleAuth implements OnModuleInit {
   }
 
   /** Which console this is, said by the server: a guess from the address could call production "Test". */
-  about(): { environment: 'Production' | 'Test track' | 'Local'; version: string; demos: boolean } {
+  about(): { environment: 'Production' | 'Test track' | 'Local'; version: string } {
     const environment = this.env.NODE_ENV !== 'production' ? 'Local' : this.env.DEMO_CODE || this.env.ALLOW_DEMO === 'true' ? 'Test track' : 'Production';
-    return { environment, version: this.env.APP_VERSION, demos: demosAllowed(this.env) };
+    return { environment, version: this.env.APP_VERSION };
   }
 
   /** An invitation link: the person chooses their password; their authenticator is added at their first sign-in. */
@@ -330,7 +330,7 @@ export class AuthController {
   }
 
   @Public() @Get('about')
-  about(): { environment: string; version: string; demos: boolean } {
+  about(): { environment: string; version: string } {
     return this.auth.about();
   }
 

@@ -51,7 +51,15 @@ if (any(/^(lib|test|assets|packages\/phosphor_flutter)\/|^pubspec\.(yaml|lock)$|
   const bad = out.split('\n').filter((l) => /^\s*(error|warning) -/.test(l));
   steps.push(`${bad.length ? '✗' : '✓'} dart analyze (${Math.round((Date.now() - t) / 1000)}s)`);
   if (bad.length) { console.error(`${bad.join('\n')}\n\n✗ dart analyze found errors or warnings.`); process.exit(1); }
-  run('flutter test', 'flutter', ['test']);
+  // The app's tests read a running school: with one up, they all run (each signed-in role once); without, the rest do.
+  const school = await fetch(`${process.env.API ?? 'http://localhost:4000'}/health`).then((r) => r.ok).catch(() => false);
+  if (school) {
+    run('app sessions', 'node', ['tools/dataset/app-sessions.mjs']);
+    run('flutter test', 'flutter', ['test']);
+  } else {
+    run('flutter test (no school running)', 'flutter', ['test', '--exclude-tags', 'school']);
+    steps.push('· app tests that read a school: no local server (bash tools/dev-reset.sh starts one); CI runs them');
+  }
 }
 
 if (any(/^(apps\/(admin|console)\/src|packages\/(web-ui|contracts|config-engine|api-client))\//)) {

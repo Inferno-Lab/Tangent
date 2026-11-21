@@ -19,7 +19,7 @@ describe('fee categories', () => {
   it('bills a category its own fee in place of the everyone fee of that head, and refuses a category the school does not have', async () => {
     await h.setSettings({ 'fees.categories': [{ key: 'staff', name: 'Staff child' }] });
     try {
-      const stu = (await call('GET', '/v1/students?classId=cls_3a')).json.items.slice(0, 2).map((s: any) => s.id);
+      const stu = (await call('GET', `/v1/students?classId=${await h.classId('3 A')}`)).json.items.slice(0, 2).map((s: any) => s.id);
       expect((await call('PATCH', `/v1/students/${stu[0]}`, { feeCategory: 'royalty' })).status).toBe(400);
       expect((await call('PATCH', `/v1/students/${stu[0]}`, { feeCategory: 'Staff child' })).json.feeCategory).toBe('staff');
       const due = addDays(schoolToday(), 40);
@@ -46,7 +46,7 @@ describe('fee categories', () => {
 describe('late fees and reminders', () => {
   it('charges a fee by the day after the grace days up to the cap, once per run, and catches up a missed run', async () => {
     const t = await pool();
-    const stu = (await call('GET', '/v1/students?classId=cls_2b')).json.items[0].id;
+    const stu = (await call('GET', `/v1/students?classId=${await h.classId('2 B')}`)).json.items[0].id;
     const today = schoolToday();
     await t.pool.query("insert into fee_invoices (id, student_id, head, title, amount, due_on) values ('inv_late_test', $1, 'tuition', 'Late check', 1000, $2)", [stu, addDays(today, -10)]);
     await h.setSettings({ 'fees.lateRule': { kind: 'fixed', amount: 5, every: 'day', graceDays: 3, cap: 25, heads: ['tuition'] } });
@@ -74,7 +74,7 @@ describe('late fees and reminders', () => {
 
   it('reminds on each of the school’s days, saying overdue after the due date, once a day', async () => {
     const t = await pool();
-    const stu = (await call('GET', '/v1/students?classId=cls_2b')).json.items[1].id;
+    const stu = (await call('GET', `/v1/students?classId=${await h.classId('2 B')}`)).json.items[1].id;
     const today = schoolToday();
     await t.pool.query("insert into fee_invoices (id, student_id, head, title, amount, due_on) values ('inv_rem_a', $1, 'tuition', 'Rem before', 100, $2), ('inv_rem_b', $1, 'tuition', 'Rem after', 100, $3)", [stu, addDays(today, 5), addDays(today, -7)]);
     await h.setSettings({ 'fees.reminderDays': [-5, 7] });

@@ -1,14 +1,13 @@
 import { Body, Controller, Delete, Get, Header, HttpCode, Inject, Injectable, Logger, Param, Post, Put, Query, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
 import { POOLS, REGISTRY } from './tokens.js';
 import { MODULES, PRICE_CURRENCY, activeModules, closeModules, moduleByKey } from '@tangent/config-engine';
-import { fmtMoney, roundToCurrency, type SchoolContract, CellCreate, CellPatch, CONSOLE_PERMISSIONS, DEPLOY_TARGET_LABELS, InvoicePaid, auditLabel, CONSOLE_ROLES, WizardPayload, type AuditRow, type DeployTarget, type ConsoleRole, type FleetSummary, type ConsoleUserRow, type FlagRow, type EntitlementDoc, type EntitlementRow, type InvoiceRowC, type SupportSessionRow, type SupportToken, tx } from '@tangent/contracts';
+import { fmtMoney, roundToCurrency, type SchoolContract, CellCreate, CellPatch, DEPLOY_TARGET_LABELS, InvoicePaid, auditLabel, CONSOLE_ROLES, type AuditRow, type ConsoleRole, type FleetSummary, type ConsoleUserRow, type FlagRow, type EntitlementDoc, type EntitlementRow, type InvoiceRowC, type SupportSessionRow, type SupportToken, tx } from '@tangent/contracts';
 import { migrate, newId, pg, scheduleJob } from '@tangent/db';
-import { topUpDemo } from '@tangent/db/seed';
 import { ApiError, ZodPipe, alert, notFound } from '@tangent/nest-kit';
 import { hashPassword, randomToken, sha256, signJwt, unseal } from '@tangent/security';
 import type { PoolManager, Registry } from '@tangent/tenancy';
 import { Db, Me, Needs, type ConsoleUser, type reg } from './core.js';
-import { ENV, demosAllowed, type Env } from './env.js';
+import { ENV, testTrack, type Env } from './env.js';
 import { adminUrlFor } from './provisioning/drivers.js';
 import { PlatformHub } from './platform-hub.js';
 import { Blueprints } from './provisioning/provisioner.js';
@@ -343,7 +342,6 @@ export class Bootstrap implements OnApplicationBootstrap {
     }
     await this.policy.get();
     await this.upgradeSchools();
-    if (this.env.SEED_DEMO === 'true') void this.seedDemo().catch((err) => this.log.error(`could not create the demo school: ${(err as Error).message}`));
   }
 
   /**
@@ -365,8 +363,7 @@ export class Bootstrap implements OnApplicationBootstrap {
     try {
       const applied = await migrate(pool, 'school');
       for (const m of applied) await this.actions.recordMigration(m.tag, m.kind, s.id, 'applied', m.ms, null);
-      const filled = this.env.SEED_DEMO === 'true' && s.slug === 'greenfield' ? await topUpDemo(pool) : [];
-      if (applied.length || filled.length) this.log.log(`${s.slug}: ${applied.length} migrations applied${filled.length ? `, sample content added for ${filled.join(', ')}` : ''}`);
+      if (applied.length) this.log.log(`${s.slug}: ${applied.length} migrations applied`);
     } catch (err) {
       alert(`${s.slug}: could not bring the database up to date at start-up: ${(err as Error).message}`);
       await this.actions.recordMigration('start-up', 'expand', s.id, 'failed', Date.now() - started, (err as Error).message.slice(0, 500)).catch(() => undefined);
@@ -375,26 +372,6 @@ export class Bootstrap implements OnApplicationBootstrap {
     }
   }
 
-  /** Test tracks start with the Greenfield demo school already live, so the admin and the app have something to show. Runs in the background. */
-  async seedDemo(): Promise<void> {
-    // A Greenfield made before schools carried the demo flag (registry migration 0013 only caught schools with a matching
-    // provision run) would refuse the demo code and hide the demo buttons: it is the demo school, so say so.
-    const there = await this.db.pool.query("update schools set demo = true where slug = 'greenfield' and deleted_at is null returning 1");
-    if (there.rowCount) return;
-    const cell = (await this.db.pool.query<{ key: string; target: DeployTarget }>('select key, target from cells order by key limit 1')).rows[0];
-    if (!cell) return;
-    const payload = WizardPayload.parse({
-      basics: { name: 'Greenfield International School', shortName: 'Greenfield', slug: 'greenfield', board: 'CBSE', address: '42, Baner Road, Baner', city: 'Pune', contactName: 'Neha Menon', contactPhone: '+91 98220 41200', contactEmail: 'neha.menon@greenfield.edu.in', language: 'en', country: 'IN', timezone: 'Asia/Kolkata', locale: 'en-IN', currency: 'INR' },
-      plan: { plan: 'premium', modules: ['people', 'attendance', 'fees', 'notices', 'timetable', 'homework', 'events', 'exams', 'chat', 'transport', 'library', 'gallery', 'staffAttendance', 'diary', 'ptm', 'visitors', 'certificates'], students: 1500 },
-      branding: { color: '#6A4CF5', logoText: 'G', appName: 'Greenfield', tagline: 'Curiosity first. Kindness always.' },
-      placement: { target: cell.target, cell: cell.key, addressing: 'path' },
-      admin: { name: 'Neha Menon', email: 'neha.menon@greenfield.edu.in', phone: '+91 98220 41200', invite: 'both', roles: ['principal'] },
-      data: { start: 'demo' },
-    });
-    this.log.log('creating the Greenfield demo school');
-    const system: ConsoleUser = { id: 'system', name: 'Tangent', email: 'system@tangent.app', roles: ['super_admin'], permissions: [...CONSOLE_PERMISSIONS], sid: 'system' };
-    await this.wizard.launch(system, payload, { dryRun: false });
-  }
 }
 
 @Controller('console/v1')
@@ -428,12 +405,12 @@ export class OpsController {
     return rows.map((r) => ({ key: r.key, target: r.target, region: r.region, maxSchools: r.max_schools, schools: Number(r.n), accepting: r.accepting, connectionId: r.connection_id, connectionName: r.connection_name }));
   }
 
-  /** The places a new cell can run on this deployment: this computer only in development, the free track only where demos are allowed. */
+  /** The places a new cell can run on this deployment: this computer only in development, the free track only on the test track. */
   @Get('cells/targets') @Needs('schools.read')
   targets(): { key: string; label: string; note: string }[] {
     return [
       ...(this.env.NODE_ENV !== 'production' ? [{ key: 'local', label: DEPLOY_TARGET_LABELS.local, note: 'Databases on this machine’s PostgreSQL.' }] : []),
-      ...(demosAllowed(this.env) ? [{ key: 'free-test', label: DEPLOY_TARGET_LABELS['free-test'], note: 'Databases on the registry’s own server, or a School databases connection.' }] : []),
+      ...(testTrack(this.env) ? [{ key: 'free-test', label: DEPLOY_TARGET_LABELS['free-test'], note: 'Databases on the registry’s own server, or a School databases connection.' }] : []),
       { key: 'aws-cell', label: DEPLOY_TARGET_LABELS['aws-cell'], note: 'Databases made through a School databases connection (Integrations → Databases).' },
     ];
   }

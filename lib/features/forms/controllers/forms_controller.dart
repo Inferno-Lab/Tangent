@@ -1,5 +1,4 @@
 import 'package:get/get.dart';
-import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/utils/app_exception.dart';
 import 'package:tangent/core/utils/loadable.dart';
 import 'package:tangent/core/widgets/toast.dart';
@@ -78,11 +77,6 @@ class FormsController extends GetxController with Loadable {
 
   @override
   Future<void> load() => run(() async {
-    // Sample content has no school forms.
-    if (!AppConfig.live) {
-      forms = [];
-      return;
-    }
     final json = await Get.find<RemoteDataSource>().get('/v1/f/forms');
     forms = [for (final f in json as List) SchoolForm.fromJson(Map<String, dynamic>.from(f as Map))];
   }, isEmpty: () => forms.isEmpty);

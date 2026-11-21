@@ -20,7 +20,7 @@ export function consoleApi(h: Http) {
     resetStart: (identifier: string) => h.post<LoginChallenge>(`${base}/auth/reset/start`, { identifier }),
     resetFinish: (b: { challengeId: string; code: string; password: string }) => h.post<void>(`${base}/auth/reset/finish`, b),
     join: (b: { token: string; password: string }) => h.post<{ email: string }>(`${base}/auth/join`, b),
-    about: () => h.get<{ environment: string; version: string; demos: boolean }>(`${base}/auth/about`),
+    about: () => h.get<{ environment: string; version: string }>(`${base}/auth/about`),
     changePassword: (b: { current: string; next: string }) => h.post<void>(`${base}/auth/password`, b),
     resetAuthenticator: (password: string) => h.post<void>(`${base}/auth/authenticator/reset`, { password }),
     logout: () => h.post<void>(`${base}/auth/logout`),
@@ -48,7 +48,6 @@ export function consoleApi(h: Http) {
       commit: (schoolId: string, b: ImportInputIn) => h.post<ImportBatchRow | { run: ImportRunRow }>(`${base}/schools/${schoolId}/import/commit`, b),
       undo: (schoolId: string, batchId: string) => h.post<ImportBatchRow[]>(`${base}/schools/${schoolId}/import/batches/${batchId}/undo`),
       exportAll: (schoolId: string) => h.blob(`${base}/schools/${schoolId}/import/export`),
-      sample: (schoolId: string, students: number) => h.post<ImportBatchRow[]>(`${base}/schools/${schoolId}/import/sample`, { students }),
     },
     config: {
       get: (schoolId: string) => h.get<SchoolConfig>(`${base}/schools/${schoolId}/config`),

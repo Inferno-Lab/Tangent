@@ -1,4 +1,5 @@
-import 'dart:io';
+@Tags(['school'])
+library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,29 +12,15 @@ import 'package:tangent/features/dashboard/views/dashboard_view.dart';
 import 'package:tangent/features/dashboard/widgets/live_strip.dart';
 import 'package:tangent/features/dashboard/widgets/parent_home.dart';
 import 'package:tangent/features/settings/views/settings_view.dart';
-import 'package:mocktail/mocktail.dart';
 
 import 'support/harness.dart';
-
-class _OfflineHttp extends HttpOverrides {
-  @override
-  HttpClient createHttpClient(SecurityContext? context) {
-    final client = _MockClient();
-    when(() => client.openUrl(any(), any())).thenThrow(const SocketException('offline'));
-    return client;
-  }
-}
-
-class _MockClient extends Mock implements HttpClient {}
 
 /// What the console sets for a school (modules, Home cards, quick buttons, languages) is what a family sees.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  HttpOverrides.global = _OfflineHttp();
-  setUpAll(() => registerFallbackValue(Uri.parse('https://tangent.app')));
 
   setUp(() async {
-    await bootMock();
+    await bootLive();
     Get.testMode = false;
   });
 
@@ -46,13 +33,17 @@ void main() {
   });
 
   Future<void> home(WidgetTester tester) async {
+    // What the test set for the school stands in for what the console sets: signing in reads the school's own setup.
+    final quick = [...SchoolConfig.quick], cards = [...SchoolConfig.home], modules = [...SchoolConfig.modules];
     final user = (await real(tester, () => signIn(UserRole.parent)))!;
+    SchoolConfig.quick.assignAll(quick);
+    SchoolConfig.home.assignAll(cards);
+    if (modules.isNotEmpty) SchoolConfig.modules.assignAll(modules);
     await real(tester, () => Get.find<AuthService>().setSession(user.copyWith(avatarUrl: '')));
-    final c = Get.put(DashboardController());
+    final c = await put(tester, DashboardController.new);
     await real(tester, c.load);
     await tester.pumpWidget(testApp(home: const Scaffold(body: DashboardView())));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 600));
+    await settle(tester);
   }
 
   testWidgets('home shows the quick buttons the school chose, in its order, then Around school', (tester) async {

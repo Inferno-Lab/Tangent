@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import type { DashboardData } from '@tangent/contracts';
+import { firstName, type DashboardData } from '@tangent/contracts';
 import { EmptyNote, Icon, MenuButton, PageScope, Roll, Segmented, ToastSlot, rollDigits, type IconName, type PageIcon, t as tr, listOf } from '@tangent/web-ui';
 
 // The dashboard as the Today board (design/hue/src/Today.html): the day on the deep colour, what needs the person, fees and the
@@ -31,7 +31,7 @@ export function TodayView({ v, d }: { v: V; d: DashboardData }) {
     <PageScope page="dashboard" overlays={<><ToastSlot toast={v.toast} />{v.widgetsDialog}</>}>
       <main className="mn hb">
         <header className="top">
-          <div><h1>{v.greeting}, {d.greetingName.split(' ')[0]}</h1><p>{v.dayLine}{d.term.name ? ` · ${d.term.name}` : ''}</p></div>
+          <div><h1>{v.greeting}, {firstName(d.greetingName)}</h1><p>{v.dayLine}{d.term.name ? ` · ${d.term.name}` : ''}</p></div>
           <span className="sp" />
           <button className="search" onClick={v.openSearch}><Icon name="search" className="i" />{tr('admin.today_view.search_students_staff_receipts')}<kbd>{tr('admin.today_view.ctrl_k')}</kbd></button>
           {v.news.length > 0 && (

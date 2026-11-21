@@ -26,7 +26,7 @@ What "the entire plan" means in practice: the plan's build order (section 24) ha
 
 ### 2.1 Running system
 
-- **Deployed test track:** `https://tangent.onrender.com` (Render free web service `tangent`, Neon Postgres). Admin at `/`, console at `/console/`. Demo school at `/s/greenfield`. See section 8.
+- **Deployed test track:** `https://tangent.onrender.com` (Render free web service `tangent`, Neon Postgres). Admin at `/`, console at `/console/`. It starts with no school; the test school is moved in with `tools/dataset/load.mjs` (`docs/deploy-free-test.md`), then at `/s/sunrise-valley`. See section 8.
 - **Local:** `bash tools/dev-reset.sh` plus the two Vite dev servers (README).
 
 ### 2.2 Code by area
@@ -36,24 +36,24 @@ What "the entire plan" means in practice: the plan's build order (section 24) ha
 | Shared types | `packages/contracts` | zod schemas and TypeScript types for every request/response of both APIs, the 7 provisioning `STEP_KEYS`, permission keys, console roles/permissions, date helpers (IST). Everything that crosses the wire is defined here first. |
 | Config engine | `packages/config-engine` | Module manifests (which modules exist, what each requires), plans, `closeModules` (add required, drop dependents), `resolveConfig` (layers: platform defaults, plan entitlements, school settings, platform locks, audience), `validateSettingsChanges` (schema + locks), `contrastRatio` (WCAG, used for brand colours). |
 | Security | `packages/security` | scrypt password hashing, AES-256-GCM `seal/unseal` for connection strings, HS256 JWT sign/verify, constant-time compare. |
-| Database | `packages/db` | Drizzle schemas for the school database and the registry; **hand-reviewed SQL migrations** with `-- kind: expand|backfill|contract` headers; migrator (advisory lock, checksums, refuses edited applied files); the Greenfield seed (1,498 students, 42 classes, 24 days of attendance, fees, timetable with one deliberate teacher clash, approvals); `dev.ts` starts a throwaway PostgreSQL with `pg_ctl`. |
+| Database | `packages/db` | Drizzle schemas for the school database and the registry; **hand-reviewed SQL migrations** with `-- kind: expand|backfill|contract` headers; migrator (advisory lock, checksums, refuses edited applied files); a new school's starter seed (its year, roles, principal, settings; a starter bell and subjects when it starts empty); `dev.ts` starts a throwaway PostgreSQL with `pg_ctl`. |
 | Tenancy | `packages/tenancy` | `Registry` (looks up a school by slug, unseals its URL, 15 s positive / 5 s negative cache) and `PoolManager` (LRU of connection pools per school). |
 | Nest kit | `packages/nest-kit` | `ApiError` with machine codes and field errors, `ZodPipe`, `ApiExceptionFilter`. |
 | API client | `packages/api-client` | `createHttp` (bearer token, `X-School` header, one refresh-and-retry on 401, sign-out when refresh fails, network-error message) plus `schoolApi` and `consoleApi` typed from contracts. Tested. |
 | Web UI | `packages/web-ui` | The Nest design as React: `nest.css` (verbatim from the canvas), `shell.css` (menu stickiness, dock, sheet, account menu), `blocks.css` (grid, status pills, usage bars, key-value rows, tables, option cards, support banner), `Shell`, `Sidebar`, `Dock`, `Palette` (Ctrl K), `Dialog`, `Toast`, `Field`/`SelectField`/`useShake`, `Select` and `Pop` (dropdown and menu drawn on the page root so nothing clips them), `Tooltips` (`data-tip`), `EvenRows` (lines up side-by-side columns), `SegFit` (sizes segmented knobs), `EmptyCard`, 12 illustrations, `Roll` digits, `useTheme`, `useMedia`, and the sign-in page (`login/`). `controls.css` holds the dropdown, tooltip and switch; `polish.css` (loaded last) the scroll, fit and sticky-header rules. |
-| School API | `apps/api` | NestJS 11 on Fastify. Sign-in (password then one-time code; 5 wrong passwords lock the account for 15 minutes; a code lasts 10 minutes with 3 tries; demo code only in demo schools), refresh-token rotation with replay detection, students (list/filter/sort/page, summary, views, detail, create, CSV import/export, message, assign fee), attendance (day view, roll call save, reminders), fees (summary, invoices, payments with receipts, reminders), approvals (decide with undo), notices (draft → pending → published, approval rule from settings), timetable (view, loads, teacher options, patch, cover, publish with clash detection), dashboard (+shell data), settings (versioned, locks, audit, plan usage), search, audit log, health, metrics. Homework, exams, staff, admissions, invoices, reports, messages, events, data requests and the family API for the app (`/v1/f/*`). Permission guard (`@Require`) and module guard (`@RequireModule`, which also honours kill switches). 57 tests on a real PostgreSQL. |
+| School API | `apps/api` | NestJS 11 on Fastify. Sign-in (password then one-time code; 5 wrong passwords lock the account for 15 minutes; a code lasts 10 minutes with 3 tries), refresh-token rotation with replay detection, students (list/filter/sort/page, summary, views, detail, create, CSV import/export, message, assign fee), attendance (day view, roll call save, reminders), fees (summary, invoices, payments with receipts, reminders), approvals (decide with undo), notices (draft → pending → published, approval rule from settings), timetable (view, loads, teacher options, patch, cover, publish with clash detection), dashboard (+shell data), settings (versioned, locks, audit, plan usage), search, audit log, health, metrics. Homework, exams, staff, admissions, invoices, reports, messages, events, data requests and the family API for the app (`/v1/f/*`). Permission guard (`@Require`) and module guard (`@RequireModule`, which also honours kill switches). 57 tests on a real PostgreSQL. |
 | Console API | `apps/console-api` | Auth (password + code, sessions), schools, plans, catalog, **wizard** (drafts, review, dry run, launch), **provisioning** (blueprints + drivers `local`, `free-test`, `aws-cell`; runs with per-step logs, retry, skip optional), **actions** (suspend, resume, erase, push entitlements, run migrations, set domain, build app, backup) with **second-person approval** and typed confirmation, **releases** in waves with auto-halt and rollback, migrations view, health prober and incidents, support sessions (read-only signed token for one school), flags, billing (monthly invoices, idempotent), team, audit (filterable per school), policy (approvals, waves, halt thresholds, freeze), sandbox message inbox, build callback, demo seed on first start, cells, compliance desk. 29 tests. |
 | Server | `apps/server` | One process: both APIs, and (if `apps/admin/dist` and `apps/console/dist` exist) serves the admin at `/` and the console at `/console/` with SPA fallback and long caching for hashed files. |
 | School admin | `apps/admin` | Sign-in, dashboard (widgets can be hidden), students, timetable, attendance roll call, fees, **invoices and receipts, homework, exams with a marks grid and results, staff, admissions board, reports with CSV, messages inbox, events calendar**, notices, phone home and dock, design-system page, support banner, a public status page at `/status`. Settings: General, Modules, **App layout, Roles and access, Notifications, Message templates, Privacy and consent**, Audit log. |
 | Console | `apps/console` | Fleet, school (Overview/Entitlements/Versions/Health/Audit), onboarding (list + 7-step wizard with drafts), **cells (add, manage, close to new schools, move a school)**, releases (**editable waves**), migrations, mobile builds, flags (**with kill switches**), blueprints (**new blueprint, step parameters, rollout rules, maintenance window**), health, approvals, support, test inbox, billing, **compliance desk (agreements, 72-hour breach clock, sub-processors)**, team, an alerts dialog on the bell. |
-| Mobile app | `lib/` | Original demo app. Built with `--dart-define=SCHOOL=<slug> --dart-define=API_BASE_URL=<address>` it runs on **the school's real data**: `ApiClient` (token, `X-School`, one refresh), real password + code sign-in, and every Remote repository reads the family API (`/v1/f/*`, section 9.3). Without those defines it is the demo app on mock JSON. |
-| Tooling | `tools/` | `audit-ui.mjs`, `e2e-flows.mjs`, `e2e-onboard.mjs`, `shot.mjs`, `dev-reset.sh`, `provision-demo.mjs`, plus one-time conversion scripts (section 5). |
+| Mobile app | `lib/` | Always built with `--dart-define=SCHOOL=<slug> --dart-define=API_BASE_URL=<address>` (it refuses to start without them) and runs on **the school's data**: `ApiClient` (token, `X-School`, one refresh), real password + code sign-in, and every Remote repository reads the family API (`/v1/f/*`, section 9.3). There is no sample content; its tests read the local test school (`docs/test-school.md`). |
+| Tooling | `tools/` | `dataset/` (the test school: `school.mjs` writes its files, `load.mjs` moves it in through the console, `build.mjs` in-process for the API tests, `session.mjs` signs people in with codes from the Test inbox, `app-sessions.mjs` for the app's tests), `audit-ui.mjs`, `e2e-flows.mjs`, `e2e-onboard.mjs`, `shot.mjs`, `dev-reset.sh`, plus one-time conversion scripts (section 5). |
 | Delivery | `render.yaml`, `.github/workflows/ci.yml`, `mobile-build.yml`, `.node-version` | Render blueprint; CI (platform build+types+tests, Flutter analyze+test; green on GitHub); Android build workflow started by the console. |
 
 ### 2.3 How the pieces behave (the parts that are not obvious)
 
 - **Tenant selection.** School API calls carry `X-School: <slug>`. The admin gets the slug from the URL: `/s/<slug>/...` (router basepath), or `<slug>.<VITE_BASE_DOMAIN>` if that build variable is set, or `VITE_DEFAULT_SCHOOL`. A bare host name is **not** treated as a school (that was a deployed bug, section 8.4).
-- **Sign-in.** `POST /v1/auth/login` returns either `{step:'otp', challenge}` or tokens (when the school turned two-step off). The code goes to the **sandbox inbox** (console → Test inbox). Demo schools (setting `demo.mode`) also return `demoCode` so the page can offer "Type the demo code". The console never returns the code in production (`NODE_ENV=production`), so on a hosted test track the code is the owner's `DEMO_CODE` environment value.
+- **Sign-in.** `POST /v1/auth/login` returns either `{step:'otp', challenge}` or tokens (when the school turned two-step off). The code goes to the **sandbox inbox** (console → Test inbox). The console never returns the code in production (`NODE_ENV=production`), so on a hosted test track the code is the owner's `DEMO_CODE` environment value.
 - **Settings.** Versioned: a save sends `expectedVersion`; a stale one gets a conflict. Locked keys (set by the platform per school) are read-only in the UI and refused by the API. The admin never writes `modules.enabled` outside the plan (`closeModules` + entitlement check).
 - **Roles.** Permissions are strings (`students.read`, `settings.write`...). A role template bundles them; users get roles. The UI hides or disables what a permission does not allow and the API enforces it.
 - **Support sessions.** The console issues a JWT with `support: true`, the school as audience, read permissions only and 30 minutes (display says one hour max). The admin reads it from `#support=<token>`, shows a red frame and "End session", and the API refuses non-GET requests from it.
@@ -83,7 +83,7 @@ What "the entire plan" means in practice: the plan's build order (section 24) ha
 | **Phone: a different home screen plus a dock; other pages stack** | The canvas has a phone board with a dock. `useIsPhone()` swaps the dashboard for `PhoneDashboard`; the dock and a "More" sheet replace the side menu under 900 px on every page. |
 | **Menu is sticky** (`.fr{overflow:clip}`, `.sb{position:sticky}`) | On a long page the menu used to scroll away. `overflow:hidden` would break sticky; `clip` keeps the rounded frame. |
 | **Settings page saves only changed keys with the version** | Prevents clobbering, and gives a precise audit entry. |
-| **Seed demo school on first start** (`SEED_DEMO=true`) | A hosted test track must have something to show without anyone running a script. |
+| **No demo school: the test school moves in from its files** (`tools/dataset`) | A seeded school tested the seed, not onboarding. Sunrise Valley goes through the wizard and the import engine like a real school, so every test reads data shaped as schools bring it. |
 | **Console never returns the sign-in code in production** | Otherwise the code would add no security on a public host. |
 | **UI checks are scripts, not screenshots by eye** | The owner does not want a debugging arc. `audit-ui.mjs` finds overflow/clipping/errors across 4 widths × 2 themes; `e2e-flows.mjs` clicks the real flows. They found real bugs (stale memo hid the search box, clipped buttons, dead layout at 360 px). Keep them green. |
 
@@ -103,12 +103,11 @@ Tangent Hue's boards, spec and empty states are in [`design/hue/`](../design/hue
 
 Commands are in the README. Practical notes learned the hard way:
 
-- `bash tools/dev-reset.sh` **hangs in the foreground of some shells**: run it in the background and poll `/tmp/reset.log` for "Greenfield is live".
+- `bash tools/dev-reset.sh` **hangs in the foreground of some shells**: run it in the background and poll `/tmp/reset.log` for "has moved in". Run one at a time: two resets at once restart each other's server and the load stops with `fetch failed`.
 - The dev server (`tsx src/main.ts`) imports `@tangent/api` and `@tangent/console-api` **from their `dist/`**. After changing either, run `pnpm --filter @tangent/api build` (or `console-api`) and restart, or you are testing old code.
 - Editing frontend files while the page checks run against Vite triggers hot reload and false "hook order" errors. Finish edits, then check; or check the built apps the server serves (`ADMIN=http://127.0.0.1:4000 CONSOLE=http://127.0.0.1:4000/console`), as CI does.
-- `e2e-flows.mjs` changes demo data (approves, publishes, adds a student). Re-run `dev-reset.sh` before the next full run; `ONLY="text"` runs matching flows.
+- `e2e-flows.mjs` changes the school's data (approves, publishes, adds a student). Re-run `dev-reset.sh` before the next full run; `ONLY="text"` runs matching flows.
 - Git Bash rewrites values starting with `/` (`CONSOLE_BASE=/console/` becomes a Windows path): prefix `MSYS_NO_PATHCONV=1`. Large quote-heavy heredocs in some tool shells fail: write files with an editor tool.
-- Running a second server against the **same dev PostgreSQL** with a new registry and `SEED_DEMO=true` re-creates the role `school_greenfield_app` with a new password and breaks the local demo school. Use `dev-reset.sh` afterwards.
 - Vite dev: admin proxies `/v1` to port 4000; console proxies `/console` and `/v1`.
 - The Flutter SDK on the owner's machine is `D:\dev\flutter` (`docs/dev-environment.md`).
 
@@ -135,7 +134,7 @@ One Render web service `tangent` (free, Singapore, auto-deploys from `main`; wor
 | `JWT_SECRET` | Signs tokens. Changing it signs everyone out. |
 | `BOOTSTRAP_EMAIL`, `BOOTSTRAP_PASSWORD` | The first console super admin (created only when no console user exists). Changing the password later does nothing; use the console's Team page. |
 | `DEMO_CODE` | The six-digit second step for console sign-in. |
-| `SEED_DEMO=true`, `ALLOW_DEMO=true` | Creates the Greenfield demo school if missing. Production refuses `SEED_DEMO` and `DEMO_CODE` unless `ALLOW_DEMO=true`, which only the test track sets. |
+| `ALLOW_DEMO=true` | Marks the console as the test track: the free test hosting target and the console's fixed `DEMO_CODE`. Production refuses `DEMO_CODE` unless it is set, which only the test track does. Schools have no demo code. |
 | `TENANT_MAX_POOLS`, `TENANT_PER_POOL` | Connection pools: schools held open × connections each (defaults 20 × 3). |
 
 Everything else outside Tangent is a connection in the console's **Integrations** (n8n-style: pick a provider, fill its template, Test, go live): team alerts (Slack, Discord, e-mail), file scanning (ClamAV), app builds (GitHub), the app stores (Google Play, App Store Connect), school databases (Postgres server, Neon), hosting (Render), file storage, messaging and payments. The messaging mode (test inbox or real delivery) is a console switch under Integrations, not a variable.
@@ -143,7 +142,7 @@ Everything else outside Tangent is a connection in the console's **Integrations*
 
 ### 8.3 Free-tier behaviour
 
-Sleeps after 15 minutes idle; the first request takes about a minute (the pages show skeletons meanwhile). Neon free: 0.5 GB. Anyone with the address can open the demo school (public demo credentials). A restart interrupts a school setup in progress; the console shows it failed and offers Retry.
+Sleeps after 15 minutes idle; the first request takes about a minute (the pages show skeletons meanwhile). Neon free: 0.5 GB. Anyone with the address and the test passwords can open the test school, so keep real data out. A restart interrupts a school setup in progress; the console shows it failed and offers Retry.
 
 ### 8.4 The first-deploy black screen (fixed) and what it teaches
 
@@ -166,7 +165,7 @@ Why not done: the plan describes a production system for 500 schools over eleven
 Built on 2026-10-18: homework, exams (marks grid, ranks, publish), staff, admissions (enquiry → applied → test → offer → enrolled), invoices and receipts, reports (7, with CSV), messages (family inbox), events (calendar and replies), data requests. Backend: `apps/api/src/school/{learning,people,office,family}.service.ts` with controllers in `modules.controllers.ts` and `family.controller.ts`; migrations `0001`–`0003` under `packages/db/migrations/school/`; sample content in `packages/db/src/seed/modules.ts` (also applied to an existing demo school at start, `Bootstrap.upgradeDemo`). To add another page:
 
 1. **Contracts first** (`packages/contracts/src/modules.ts`, permissions in `permissions.ts`).
-2. **Migration:** a new SQL file (kind header; never edit an applied file), the Drizzle table in `schema.ts`, and demo content in `seed/modules.ts` (guarded so it can run twice).
+2. **Migration:** a new SQL file (kind header; never edit an applied file) and the Drizzle table in `schema.ts`. Its data comes in through the import engine (an `IMPORT_KINDS` entry, section 15), and the test school's file for it in `tools/dataset/school.mjs`.
 3. **Service + controller** with `@RequireModule`, `@Require`, `ZodPipe`, audit entries; tests in `apps/api/test/modules.test.ts`.
 4. **api-client** method, then the page (copy `HomeworkPage.tsx` or `InvoicesPage.tsx`: `Page`, shared blocks, `EmptyCard`, `Dialog`, `Segmented`, kit helpers in `app/kit.tsx`), route in `router.tsx`, menu entry in `app/nav.ts`, module manifest in `config-engine/src/modules.ts`.
 5. Add the route to `tools/lib/pages.mjs` (the page checks) and a flow to `tools/e2e-flows.mjs`. Pages without a canvas board still need the owner's design review (none of the pages above has had one).
@@ -178,7 +177,7 @@ All built (`apps/admin/src/pages/settings/panels.tsx`). Roles and access edits `
 
 ### 9.3 The mobile app on real data
 
-Done: the family API (`apps/api/src/school/family.{service,controller}.ts`, `/v1/f/*`, tested in `apps/api/test/family.test.ts`) answers in the shapes the app's models already parse, scoped to the signed-in parent or teacher. `lib/core/network/api_client.dart` is the real client (tests in `test/remote_api_test.dart`); `RemoteAuthRepository` signs in with password then code (`OtpRequired`), and the demo cards work against a demo school because it hands out its code. `test/tool/live_probe_test.dart` reads every screen's data from a running school and parses it with the app's models (run it after `dev-reset.sh`, see its header). Demo family on Greenfield: parent Priya (children Aarav and Ananya) and teacher Kavita; password `nest2026`, code `424242`. Students and drivers sign in when the console turns their role on (`app.roles`); `test/live_api_test.dart` (`--dart-define=LIVE_API=http://localhost:4000`) signs in as parent and teacher and reads every screen.
+Done: the family API (`apps/api/src/school/family.{service,controller}.ts`, `/v1/f/*`, tested in `apps/api/test/family.test.ts`) answers in the shapes the app's models already parse, scoped to the signed-in parent or teacher. `lib/core/network/api_client.dart` is the real client (tests in `test/remote_api_test.dart`); `RemoteAuthRepository` signs in with password then code (`OtpRequired`),. `test/live_api_test.dart` reads every screen's data from a running school and parses it with the app's models (run it after `dev-reset.sh`, see its header). On the test school the people are in `.tangent-data/manifest.json` (`docs/test-school.md`): staff with `TEST_PASSWORD` and a code, families with a code, every code from the Test inbox. Students and drivers sign in when the console turns their role on (`app.roles`); `test/live_api_test.dart` (`--dart-define=LIVE_API=http://localhost:4000`) signs in as parent and teacher and reads every screen.
 
 Not done *(now: the shell follows `/v1/config`: tabs, Home, quick buttons, profile tiles, languages, consent)*: library (only loans, no catalogue or reservations), gallery (empty), transport (route only, no stops or live position), assistant, push registration, offline store, deep links; moving `lib/` to `apps/mobile`, the Tangent picker app, store pipelines and code push (plan section 19). A real phone was not checked *(the liquid glass shader is no longer used: `Glass` is a solid fill)*.
 
@@ -192,7 +191,7 @@ Done: access JWT (15 min, HS256, `iss`/`aud`/`alg`/`typ` checked, key derived pe
 
 Still open: passkeys; SSO (the sign-in buttons are disabled placeholders); CSP nonces, Trusted Types and SRI; penetration test. *(now done: TOTP for console staff, password reset by code, a cap of five codes per account in fifteen minutes, consent in the app, data requests including erasure, full export.)*
 
-Remove the public demo credentials from any environment with real data; keep `DEMO_CODE`/`SEED_DEMO` off (production refuses them unless `ALLOW_DEMO=true`).
+Keep `DEMO_CODE` off in any environment with real data (production refuses it unless `ALLOW_DEMO=true`); schools never had a fixed code.
 
 ### 9.6 Console gaps
 
@@ -205,7 +204,7 @@ Still open: a move that copies data between servers (aws-cell), catalog "update 
 - Run the owner's review on every page that has no board; adjust spacing/wording on request.
 - Screen-reader pass; keyboard-only pass of the wizard and dialogs; Hindi/Marathi strings for admin and console (the sign-in language switch only stores the choice; admin text is English).
 - Per-surface `PRODUCT.md`/`DESIGN.md` (plan step 0).
-- Small known items: the Greenfield seed's homework "handed in" times can be later than the latest school day; `package` unit tests for `apps/admin` and `apps/console` do not exist (the browser scripts cover them).
+- Small known items: `package` unit tests for `apps/admin` and `apps/console` do not exist (the browser scripts cover them).
 
 ## 10. Things that went wrong (so they are not repeated)
 
@@ -214,7 +213,7 @@ Still open: a move that copies data between servers (aws-cell), catalog "update 
 - Class-name collisions between pages and `nest.css` (`.roll`, `.sm`, `.err`, `.big`, `.act`, `.sw`) collapsed layouts. Scope page CSS; check new class names with a search in `nest.css`.
 - Case-insensitive file systems: `roll.ts` vs `Roll.tsx` collided on Windows (renamed `digits.ts`).
 - Dev tooling: see section 6.
-- A flaky assumption in tests: the demo code only exists for demo schools. A real new school's code is in the test inbox (`e2e-onboard.mjs` reads it from there).
+- Every code is random: a test reads it from the Test inbox (`harness.codeSentTo` in the API tests, `tools/dataset/session.mjs` for the tools).
 
 ## 11. If you only have an hour
 
@@ -290,11 +289,11 @@ The plan at the time was the production plan, since replaced (today: `docs/one-s
 
 Branch `feat/finish-phases-0-3`. The aim was to leave in Phases 0 to 3 only what needs the owner (accounts, vendors, decisions, design review) or belongs to a later phase; each such item is now in `docs/one-shot-plan.md` (section 10 for what needs the owner).
 
-- **Codes are capped per account** (`auth.service.ts`, `OTP_SENDS`): five sign-in or reset codes in fifteen minutes, outside demo mode, on top of the per-device rate limit. Families sign in only by code, so without the cap a phone number could be guessed against and, once SMS is real, run up the bill.
+- **Codes are capped per account** (`auth.service.ts`, `OTP_SENDS`): five sign-in or reset codes in fifteen minutes, on top of the per-device rate limit. Families sign in only by code, so without the cap a phone number could be guessed against and, once SMS is real, run up the bill. The tools keep sessions for ten minutes (`.tangent-data/sessions.json`) to stay under it.
 - **Alerts** (`packages/nest-kit/src/alerts.ts`): `alert(text)` logs and sends through the console's Alerts connections (Slack, Discord, e-mail; `PlatformHub.alert`). A new error fingerprint alerts once (`recordError` returns whether the row is new); probes alert when a school stops and starts answering; backups, drills and start-up migrations alert on failure. Production logs are JSON (`ConsoleLogger({ json: true })`), and the exception filter logs school and request ID.
 - **Restore drills and bring-forward** (`apps/console-api/src/backups.ts`, `packages/db/src/backup.ts`): the drill takes a fresh backup of a random live school, reads it back from the backup store and restores it into a scratch database (`tangent_scratch_*` on the registry's server, dropped afterwards), weekly through the `jobs` table and from Health. `restoreDatabase` refuses a backup taken at another migration version, so a restore now first brings an older backup forward (`bringForward`: migrate a scratch database up to the backup's version, restore, migrate the rest, back up again). Registry `0010_restore_drills`.
 - **Start-up migration** runs four schools at a time (`upgradeSchools`), so deploy time no longer grows one school at a time.
-- **Release apps carry no sample content:** `mobile-build.yml` strips `assets/mock/` and `InitialBinding` compiles the mock branch out in release.
+- **No app carries sample content:** there is none; every build is for a school (`AppConfig.assertSchool`).
 - **Configuration reaching the screens:** brand colour on the school's mark (`markStyle` in web-ui, `SchoolMark` in the app); privacy notice on the sign-in pages (`/v1/brand` carries it) and in the app's Settings; consent (`POST /v1/f/consent`, school `0010_family_consent`, counted per class in Moving in); Home in the console's order (`homeSections` in `dashboard_view.dart`) with `QuickRow`; offered languages; vocabulary in the admin menu and the Students page (`plural` in contracts); new settings `fees.receiptNote`, `fees.paymentMethods` (checked on `POST /v1/fees/payments`), `app.languages`, `app.teachers` (mobile staff sign-in refused when off).
 - **Catalogue honesty:** Transport, Library and Gallery are `beta` with blurbs that say what works; plans can carry `features` (registry `0011_plan_features`).
 - **Go-live:** Migration's readiness reconciles open dues against the old system's total (`PATCH …/import/readiness`), and adds the timetable and two items the team ticks.
@@ -378,7 +377,7 @@ The owner's audit (`docs/product-map.md`) found pages in the wrong place, half-b
 - **Live.** `GET /v1/f/stream` (SSE over PostgreSQL LISTEN/NOTIFY) carries chat messages, typing, read receipts, notifications and the bus. The app's `LiveStream` reconnects on its own and stops at sign-out.
 - **Console.** Navigation is grouped (Schools, Product, Platform, Business, Console) and every tab is a route (`apps/console/src/app/nav.ts`; `tools/lib/pages.mjs` reads it for the audits). Plans are edited in the console, role templates live in Blueprints → Starting roles, team members join by link (`/join`), invoices are sent and marked paid, compliance items need the signed file. `schools.went_live_at` (registry 0015) ends the school's Moving in.
 - **Admin.** Families' and staff invites live on Students → On the app and Staff; Moving in holds only files and imports. Approvals have one page; decline needs a note.
-- **Not built (needs the owner):** push notifications on the phone (Firebase project files), real file pick and share in the app, the student demo card, and the "Which school?" picture and gallery empty art (waiting for the design system).
+- **Not built (needs the owner):** real file pick and share in the app, and the "Which school?" picture and gallery empty art (waiting for the design system). Push notifications work once the Firebase connection is set in the console (`docs/integrations.md`).
 
 ## 23. After the one-pass (2026-11-12): the direction changed
 

@@ -73,7 +73,14 @@ class SchoolClass {
   final String room;
   final List<String> studentIds;
 
-  String get label => '$name $section';
+  /// A class as the school writes it: "8 A", "Year 7 Blue", "Grade 3 – Rose". The section is added only when the name does not
+  /// end with it already ("8 A" with section A stays "8 A"); nothing is stripped from the school's own name.
+  String get label {
+    final n = name.trim();
+    final s = section.trim();
+    if (s.isEmpty || n.toLowerCase().endsWith(s.toLowerCase())) return n;
+    return n.isEmpty ? s : '$n $s';
+  }
 
   Map<String, dynamic> toJson() => _$SchoolClassToJson(this);
 }
@@ -139,15 +146,4 @@ class SchoolInfo {
   final String about;
 
   Map<String, dynamic> toJson() => _$SchoolInfoToJson(this);
-}
-
-/// A class as the school writes it: "8 A", "Year 7 Blue", "Grade 3 – Rose". The section is added only when the name does not
-/// end with it already; nothing is stripped from the school's own name.
-extension SchoolClassLabel on SchoolClass {
-  String get label {
-    final n = name.trim();
-    final s = section.trim();
-    if (s.isEmpty || n.toLowerCase().endsWith(s.toLowerCase())) return n;
-    return n.isEmpty ? s : '$n $s';
-  }
 }

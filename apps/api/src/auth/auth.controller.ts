@@ -147,7 +147,8 @@ export class MeController {
   /** The settings the apps and admin start from: platform defaults, plan, locks and school choices, cut to this user. */
   @Get('config')
   async config(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser): Promise<EffectiveConfig> {
-    return { ...(await this.settings.effective(t, u.permissions)), timetable: await this.settings.timetableDays(t) };
+    const subjects = (await t.pool.query<{ id: string; name: string }>('select id, name from subjects')).rows;
+    return { ...(await this.settings.effective(t, u.permissions)), timetable: await this.settings.timetableDays(t), subjects: Object.fromEntries(subjects.map((s) => [s.id.replace(/^sub_/, ''), s.name])) };
   }
 
   /** Branding for the sign-in page, before anyone has signed in. */
@@ -156,7 +157,7 @@ export class MeController {
     const cfg = await this.settings.effective(t);
     const hue = hueOf(cfg.school.color || DEFAULT_BRAND);
     return {
-      ...cfg.school, logoUrl: await this.files.logoUrl(t), demoMode: t.info.demo, hue, palette: { light: appTokens(hue, 'light'), dark: appTokens(hue, 'dark'), amoled: appTokens(hue, 'amoled') },
+      ...cfg.school, logoUrl: await this.files.logoUrl(t), hue, palette: { light: appTokens(hue, 'light'), dark: appTokens(hue, 'dark'), amoled: appTokens(hue, 'amoled') },
       privacy: cfg.privacy,
     };
   }

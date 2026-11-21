@@ -1,10 +1,8 @@
-# Mock data schema
+# The app's data shapes
 
-All demo data lives in `assets/mock/`. `MockJsonDataSource` loads each file once, resolves relative dates, and keeps the result in memory for the session. Writes (pay a fee, submit homework, mark attendance, send a chat, RSVP, post a notice, apply for leave, reserve a book, dismiss a notification) mutate that memory and bump `SessionBus`. Nothing is written back to disk.
-
-## Relative dates
-
-Any string matching `today`, `today+N`, `today-N`, or the same forms with `Thh:mm` is rewritten to an ISO date (or `YYYY-MM-DDThh:mm:00`) before JSON models are parsed. `today` is the local calendar day when the file is loaded, so the demo stays current.
+The JSON the family API (`/v1/f/*`) answers and the app's models (`lib/data/models`) read: field names, enum values and how a
+few values are worked out on the phone. The app has no data of its own; everything comes from the school
+(`docs/API_CONTRACT.md` for the routes, `docs/test-school.md` for the school the tests read).
 
 ## Computed fee status
 
@@ -42,12 +40,11 @@ Aarav (`stu_aarav`) has an overdue lab fee and a Term 2 fee inside the due windo
 | `notifications.json` | array | In-app notifications |
 | `school_life.json` | object | Staff day and leave, diary entries, meetings, gate passes and pick-up people, invited visitors and certificates, in the family API's shapes (`staff`, `diary`, `diaryClasses`, `diaryKinds`, `classDiary`, `meetings`, `teacherMeetings`, `gatePass`, `purposes`, `invites`, `certificates`) |
 | `school_info.json` | object | Greenfield International School, Pune |
-| `demo_accounts.json` | array | The three cards on the login screen |
 
 ## Enums (JSON values)
 
 - Role: `student`, `parent`, `teacher`
-- Attendance: `present`, `absent`, `late`, `holiday` (today is left unmarked so a teacher can mark it; Sundays and `today-16` are holidays)
+- Attendance: `present`, `absent`, `late`, `holiday`
 - Period kind: `class`, `break`, `recess`
 - Homework status: `pending`, `submitted`, `graded`
 - Exam status: `upcoming`, `completed`

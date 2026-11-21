@@ -20,14 +20,16 @@ describe('console authenticator', () => {
     const first = (await login('kaushal@tangent.app', 'nest2026')).json.challenge;
     expect(first).toMatchObject({ channel: 'app', enroll: { uri: expect.stringContaining('otpauth://totp/') } });
     expect((await verify(first.challengeId, '000000')).status).toBe(401);
-    const ok = await verify(first.challengeId, totp(first.enroll.secret));
+    const used = totp(first.enroll.secret);
+    const ok = await verify(first.challengeId, used);
     expect(ok.status).toBe(200);
     admin = ok.json.accessToken;
     const again = (await login('kaushal@tangent.app', 'nest2026')).json.challenge;
     expect(again.channel).toBe('app');
     expect(again.enroll).toBeUndefined();
     // A code already used is refused (no replay); the authenticator's next code works (the window allows one step ahead).
-    expect((await verify(again.challengeId, totp(first.enroll.secret))).status).toBe(401);
+    // The very code used, not one worked out again: a new 30-second step in between would make a fresh, valid code.
+    expect((await verify(again.challengeId, used)).status).toBe(401);
     expect((await verify(again.challengeId, totp(first.enroll.secret, Date.now() + 30_000))).status).toBe(200);
     const team = (await h.c('GET', '/console/v1/team', { token: admin })).json;
     expect(team.find((m: { email: string }) => m.email === 'kaushal@tangent.app').authenticator).toBe(true);

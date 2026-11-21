@@ -68,12 +68,22 @@ Set SPF and DKIM for the sending domain first, or mail lands in spam. Emails go 
 | **Amazon SES** | Region, access key ID and secret (an IAM user allowed `ses:SendEmail`), From address on a verified domain. Ask AWS to take the account out of the SES sandbox. |
 | **SMTP** | Host, port, TLS (465) or STARTTLS (587), user, password, From. |
 | **Resend** | API key, From on a verified domain. |
+| **Brevo** | API key (Brevo → SMTP & API → API keys, starts with `xkeysib-`), From: a sender verified under Senders, domains and IPs. The free plan sends 300 emails a day. |
+
+**Setting up Brevo, step by step.** (1) In Brevo, Senders, domains and IPs → Domains → add the sending domain and add the DNS records it gives (SPF, DKIM, DMARC); or, to start, verify one sender address under Senders. (2) SMTP & API → API keys → Generate a new API key. (3) Console → Integrations → Add a connection → Brevo: paste the key, type the From address (`Sunrise Valley <office@sunrisevalley.example>` takes a name), Save, then **Test** with your own address. (4) Route **Email** to it (Tangent-wide, or for one school). (5) While Integrations is in **sandbox** mode, email still goes to the Test inbox unless the address is on the allow-list: add yours to see real mail, and go **live** (a second person approves) when schools should receive it.
 
 ### Phone notifications
 
-**Firebase Cloud Messaging**: the Firebase project ID and a **service account key** (Firebase → Project settings → Service accounts → Generate new private key; paste the whole JSON file). The app registers each phone at `POST /v1/f/devices` after sign-in; a token Google calls unregistered is forgotten. Each notification carries the screen it opens (`/fees`, `/homework`, `/chat/<id>`…).
+**Firebase Cloud Messaging** sends the app's notifications. One Firebase project serves every school; each school's app is an app in it.
 
-The app does not include Firebase yet: it needs the project's `google-services.json` (Android) and `GoogleService-Info.plist` (iOS) from the owner, then `firebase_messaging` added to the app and the token posted to `/v1/f/devices`. Until then notifications are listed in the app (from `message_log`) but not pushed.
+1. console.firebase.google.com → Add project (Google Analytics is not needed). Note its **project ID**.
+2. Add an **Android app** with each school's package name: `com.tangent.<slug>` without dashes (Sunrise Valley is `com.tangent.sunrisevalley`), or the store ID set for the school. Download **google-services.json**: it lists every Android app of the project, so download it again after adding a school.
+3. Add an **iOS app** with the same ID as the bundle ID and download **GoogleService-Info.plist**. For iOS, also upload an APNs key (Apple Developer → Keys → a key with Apple Push Notifications) under Project settings → Cloud Messaging → Apple app configuration.
+4. Project settings → Service accounts → **Generate new private key**: a JSON file.
+5. Console → Integrations → Add a connection → Firebase Cloud Messaging: the project ID, the service account file, google-services.json and GoogleService-Info.plist. Save, **Test** (it asks Google for a token), then route **Phone notifications** to it.
+6. Build the school's app from the console (Schools → a school → Technical → App builds): the build takes both app files from this connection, and refuses to start when google-services.json has no Android app with the school's package name.
+
+After sign-in the app registers the phone at `POST /v1/f/devices`; a token Google calls unregistered is forgotten. Each notification carries the screen it opens (`/fees`, `/homework`, `/chat/<id>`…). A build without the Firebase files (a developer's local run) gets no push; notifications are still listed in the app.
 
 ### Payments
 

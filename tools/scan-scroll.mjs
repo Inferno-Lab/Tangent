@@ -4,29 +4,23 @@
 import { chromium } from '@playwright/test';
 import * as scans from './lib/scans.mjs';
 import { adminPaths, consolePaths } from './lib/pages.mjs';
+import { SCHOOL, adminKey, consoleKey } from './dataset/session.mjs';
 
 const args = process.argv.slice(2);
 const val = (n) => (args.includes(n) ? args[args.indexOf(n) + 1] : undefined);
 const only = val('--only');
 const SIZES = (val('--sizes') ?? '1440x900,390x844').split(',').map((s) => s.split('x').map(Number));
-const API = process.env.API ?? 'http://localhost:4000';
 const ADMIN = process.env.ADMIN ?? 'http://127.0.0.1:5173';
 const CONSOLE = process.env.CONSOLE ?? 'http://127.0.0.1:5174';
-const slug = process.env.SCHOOL ?? 'greenfield';
-const post = async (path, body, headers = {}) => (await fetch(`${API}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) })).json();
+const slug = SCHOOL;
 
 const jobs = [];
 if (only !== 'console') {
-  const h = { 'x-school': slug };
-  const a = await post('/v1/auth/login', { identifier: 'neha.menon@greenfield.edu.in', password: 'nest2026' }, h);
-  const t = await post('/v1/auth/verify', { challengeId: a.challenge.challengeId, code: '424242' }, h);
-  const key = [`tangent.admin.${slug}`, JSON.stringify({ user: t.user }), t.accessToken];
+  const key = await adminKey();
   for (const p of adminPaths) jobs.push({ name: `admin${p || '/'}`, url: `${ADMIN}/s/${slug}${p}`, key });
 }
 if (only !== 'admin') {
-  const a = await post('/console/v1/auth/login', { identifier: 'kaushal@tangent.app', password: 'nest2026' });
-  const t = await post('/console/v1/auth/verify', { challengeId: a.challenge.challengeId, code: '424242' });
-  const key = ['tangent.console', JSON.stringify({ user: t.user }), t.accessToken];
+  const { key } = await consoleKey();
   for (const p of consolePaths('').filter((p) => !p.startsWith('/schools/'))) jobs.push({ name: `console${p}`, url: `${CONSOLE}${p}`, key });
 }
 

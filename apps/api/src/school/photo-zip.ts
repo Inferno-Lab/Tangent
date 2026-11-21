@@ -18,8 +18,10 @@ const typeOf = (b: Buffer) => (b[0] === 0xff && b[1] === 0xd8 ? 'image/jpeg' : b
   : b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP' ? 'image/webp' : null);
 
 /**
- * Students' photos from one zip (Moving in): each photo is named by the student's admission number, in any folder. A background
- * job matches them and makes each the student's photo; names matching nobody, and files that are not photos, are listed.
+ * Students' photos and documents from one zip (Moving in): each file is named by the student's admission number, in any folder.
+ * A photo becomes the student's photo; a PDF (a report card, a transfer certificate, a birth certificate) is added to the
+ * student's documents under the rest of its name ("2019-0412 Report card Term 1.pdf"). Names matching nobody, and files that
+ * are neither, are listed.
  */
 @Injectable()
 export class PhotoZipService implements OnModuleInit {
@@ -65,15 +67,33 @@ export class PhotoZipService implements OnModuleInit {
     const r = await this.hubs.hub.resolve('storage', s.id, s.slug);
     let entries: Map<string, Buffer>;
     try { entries = unzip(await r.adapter.storage!.get(r.ctx, f.storage_key)); } catch { return fail(tx('This is not a zip Tangent can read.')); }
-    // Photos only: folders, hidden files and the Mac's copies are left out.
-    const photos = [...entries].filter(([name, data]) => data.length && !/(^|\/)(__MACOSX|\.)/.test(name) && /\.(jpe?g|png|webp)$/i.test(name));
+    // Photos and PDFs: folders, hidden files and the Mac's copies are left out.
+    const photos = [...entries].filter(([name, data]) => data.length && !/(^|\/)(__MACOSX|\.)/.test(name) && /\.(jpe?g|png|webp|pdf)$/i.test(name));
     const students = new Map((await s.pool.query<{ id: string; admission_no: string }>("select id, admission_no from students where admission_no <> ''")).rows.map((x) => [norm(x.admission_no), x.id]));
     await s.pool.query('update photo_imports set total = $2 where id = $1', [imp.id, photos.length]);
     const unmatched: string[] = [];
     let matched = 0;
     let done = 0;
+    const ids = new Map(students);
     for (const [name, data] of photos) {
       const base = name.split('/').pop()!.replace(/\.[^.]+$/, '');
+      if (/\.pdf$/i.test(name)) {
+        // The admission number is the name's first words; what follows names the document.
+        const words = base.split(/[\s_]+/).filter(Boolean);
+        const k = words.map((_, i) => words.length - i).find((n) => ids.has(norm(words.slice(0, n).join(''))));
+        const student = k ? ids.get(norm(words.slice(0, k).join(''))) : undefined;
+        if (!student || data.subarray(0, 5).toString('latin1') !== '%PDF-' || data.length > 15 * MB) unmatched.push(!student ? base : `${base} (${data.length > 15 * MB ? tx('over 15 MB') : tx('not a PDF')})`);
+        else {
+          const id = newId('fil');
+          const label = words.slice(k).join(' ') || base;
+          await r.adapter.storage!.put(r.ctx, `schools/${s.slug}/student_document/${id}/${base.replace(/[^\w.-]+/g, '_').slice(-80)}.pdf`, data, 'application/pdf');
+          await s.pool.query("insert into files (id, kind, owner_id, name, mime, bytes, storage_key, status) values ($1,'student_document',$2,$3,'application/pdf',$4,$5,'clean')",
+            [id, student, `${label}.pdf`, data.length, `schools/${s.slug}/student_document/${id}/${base.replace(/[^\w.-]+/g, '_').slice(-80)}.pdf`]);
+          matched++;
+        }
+        if (++done % 20 === 0) await s.pool.query('update photo_imports set done = $2, matched = $3 where id = $1', [imp.id, done, matched]);
+        continue;
+      }
       const student = students.get(norm(base));
       const mime = typeOf(data);
       if (!student || !mime || data.length > 5 * MB) unmatched.push(!student ? base : `${base} (${!mime ? tx('not a photo') : tx('over 5 MB')})`);
@@ -90,7 +110,8 @@ export class PhotoZipService implements OnModuleInit {
       if (++done % 20 === 0) await s.pool.query('update photo_imports set done = $2, matched = $3 where id = $1', [imp.id, done, matched]);
     }
     await s.pool.query("update photo_imports set status = 'done', done = $2, matched = $3, unmatched = $4, done_at = now() where id = $1", [imp.id, done, matched, JSON.stringify(unmatched.slice(0, 500))]);
-    return `${matched} of ${photos.length} photos matched.`;
+    const pdfs = photos.filter(([name]) => /\.pdf$/i.test(name)).length;
+    return `${matched} of ${photos.length} ${!pdfs ? 'photos' : pdfs === photos.length ? 'documents' : 'photos and documents'} matched.`;
   }
 }
 

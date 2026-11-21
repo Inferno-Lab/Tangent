@@ -53,26 +53,43 @@ jobs:
   flutter:
     name: Flutter app (analyze, test)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos lib test
+      # The app's tests read a real school: the server, with Sunrise Valley moved in from its files.
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Start the database and the server, and move Sunrise Valley in from its files
+        run: bash tools/dev-reset.sh
+      - run: node tools/dataset/app-sessions.mjs
       - run: flutter test
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-test-logs
+          path: /tmp/*.log
 
   # The browser checks run against the built admin and console the server serves, as on Render (not Vite's dev servers,
   # which compile each page on first visit and sent no Content-Security-Policy, so a blocked font never showed).
   flows:
     name: Browser flows (admin, console)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
-      ADMIN: http://127.0.0.1:4000
-      CONSOLE: http://127.0.0.1:4000/console
+      # The host the server names in its own links (API_BASE_URL), so files it serves, like student photos, are its own origin.
+      ADMIN: http://localhost:4000
+      CONSOLE: http://localhost:4000/console
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -83,10 +100,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: CONSOLE_BASE=/console/ pnpm build
       - run: pnpm exec playwright install --with-deps chromium
-      - name: Start the database, the server and the demo school
+      - name: Start the database and the server, and move Sunrise Valley in from its files
         run: bash tools/dev-reset.sh
       - name: The server serves the built admin and console
-        run: for u in / /s/greenfield /console/ /console/schools /theme.js /console/theme.js; do curl -sf -o /dev/null http://127.0.0.1:4000$u || { echo "GET $u failed"; tail -20 /tmp/server.log; exit 1; }; done
+        run: for u in / /s/sunrise-valley /console/ /console/schools /theme.js /console/theme.js; do curl -sf -o /dev/null http://127.0.0.1:4000$u || { echo "GET $u failed"; tail -20 /tmp/server.log; exit 1; }; done
       - run: node tools/e2e-flows.mjs /tmp/e2e
       - if: failure()
         uses: actions/upload-artifact@v4
@@ -99,10 +116,11 @@ jobs:
   pages:
     name: Every page (four widths, light and dark)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
-      ADMIN: http://127.0.0.1:4000
-      CONSOLE: http://127.0.0.1:4000/console
+      # The host the server names in its own links (API_BASE_URL), so files it serves, like student photos, are its own origin.
+      ADMIN: http://localhost:4000
+      CONSOLE: http://localhost:4000/console
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -113,7 +131,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: CONSOLE_BASE=/console/ pnpm build
       - run: pnpm exec playwright install --with-deps chromium
-      - name: Start the database, the server and the demo school
+      - name: Start the database and the server, and move Sunrise Valley in from its files
         run: bash tools/dev-reset.sh
       - run: node tools/check-pages.mjs --full --workers 4
       - if: failure()

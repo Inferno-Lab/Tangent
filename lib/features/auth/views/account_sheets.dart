@@ -5,7 +5,6 @@ import 'package:get/get.dart';
 import 'package:tangent/core/utils/validators.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/utils/app_exception.dart';
 import 'package:tangent/core/utils/extensions.dart';
 import 'package:tangent/core/widgets/glass_controls.dart';
@@ -20,12 +19,8 @@ Future<void> showContactChange() => showSheet<void>(const _ContactSheet());
 /// Settings → Signed-in devices: where this account is signed in, each signed out on its own.
 Future<void> showDevices() => showSheet<void>(const _DevicesSheet());
 
-/// A call the sample app cannot make: it says so instead (sample data has no accounts to change).
+/// A call to the school; its refusal is said in a toast.
 Future<dynamic> _call(Future<dynamic> Function(RemoteDataSource r) fn) async {
-  if (!AppConfig.live) {
-    ToastHelper.show('common.sample_only');
-    return null;
-  }
   try {
     return await fn(Get.find<RemoteDataSource>()) ?? true;
   } on AppException catch (e) {
@@ -58,7 +53,7 @@ class _ContactSheetState extends State<_ContactSheet> {
       _busy = false;
       if (json is Map) {
         _challenge = json['challengeId'] as String?;
-        _sentTo = '${json['maskedTo'] ?? ''}${json['demoCode'] == null ? '' : ' · ${json['demoCode']}'}';
+        _sentTo = '${json['maskedTo'] ?? ''}';
       }
     });
   }

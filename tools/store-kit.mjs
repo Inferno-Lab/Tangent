@@ -2,13 +2,13 @@
 // The app-store kit for one school's app (docs/one-shot-plan.md §5.3.4): Apple's App Privacy answers, Google Play's Data safety
 // answers, and the review notes with a demo account for the reviewers. Written from the one list below of what the app
 // collects; change the list when the app changes, never the outputs by hand. The build workflow runs it per school.
-// Usage: node tools/store-kit.mjs --school "Greenfield School" [--out store] [--demo-user reviewer@example.org --demo-code 424242]
+// Usage: node tools/store-kit.mjs --school "Sunrise Valley School" [--out store] [--demo-user reviewer@example.org --demo-code 424242]
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 const arg = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : fallback; };
 const school = arg('school', '');
-if (!school) throw new Error('Name the school: --school "Greenfield School".');
+if (!school) throw new Error('Name the school: --school "Sunrise Valley School".');
 const out = path.resolve(arg('out', 'store'));
 const demoUser = arg('demo-user', process.env.STORE_DEMO_USER ?? '');
 const demoCode = arg('demo-code', process.env.STORE_DEMO_CODE ?? '');

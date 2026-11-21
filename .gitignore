@@ -76,3 +76,5 @@ design/hue/canvas/
 design/hue/preview/
 design/hue/shots/
 .i18n-skipped.txt
+# The browser flows' screenshots (tools/e2e-flows.mjs)
+e2e-shots/

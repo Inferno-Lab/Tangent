@@ -5,9 +5,19 @@ import { startHarness, type Harness } from './harness.js';
 
 let h: Harness;
 let token: string;
+let maths: string;
+let english: string;
+/** 8 A and how many are in it. */
+let cls: string;
+let inClass: number;
 beforeAll(async () => {
   h = await startHarness();
   token = await h.login();
+  const subject = async (name: string) => (await h.schoolSql('select id from subjects where name = $1', [name]))[0].id as string;
+  maths = await subject('Mathematics');
+  english = await subject('English');
+  cls = await h.classId('8 A');
+  inClass = Number((await h.schoolSql("select count(*) n from students where class_id = $1 and status = 'active'", [cls]))[0].n);
 }, 240_000);
 afterAll(async () => {
   await h?.close();
@@ -19,9 +29,9 @@ const send = (method: string, url: string, body?: unknown) => h.call(method, url
 describe('homework', () => {
   it('sets homework for a class, records hand-ins and checks marks against the maximum', async () => {
     const due = addDays(schoolToday(), 3);
-    const made = await send('POST', '/v1/homework', { classId: 'cls_8a', subjectId: 'sub_maths', title: 'Quadratic practice', dueOn: due, maxMarks: 10 });
+    const made = await send('POST', '/v1/homework', { classId: cls, subjectId: maths, title: 'Quadratic practice', dueOn: due, maxMarks: 10 });
     expect(made.status).toBe(201);
-    expect(made.json.total).toBe(36);
+    expect(made.json.total).toBe(inClass);
     expect(made.json.handedIn).toBe(0);
     const first = made.json.students[0].studentId;
     const marked = await send('PUT', `/v1/homework/${made.json.id}/marks`, { marks: [{ studentId: first, handed: true, score: 9, feedback: 'Neat work' }] });
@@ -33,12 +43,12 @@ describe('homework', () => {
     expect(tooHigh.status).toBe(400);
     const undo = await send('PUT', `/v1/homework/${made.json.id}/marks`, { marks: [{ studentId: first, handed: false }] });
     expect(undo.json.handedIn).toBe(0);
-    expect((await send('POST', '/v1/homework', { classId: 'cls_8a', subjectId: 'sub_maths', title: 'Late one', dueOn: addDays(schoolToday(), -1) })).status).toBe(400);
-    expect((await get('/v1/homework?classId=cls_8a')).json.some((x: any) => x.id === made.json.id)).toBe(true);
+    expect((await send('POST', '/v1/homework', { classId: cls, subjectId: maths, title: 'Late one', dueOn: addDays(schoolToday(), -1) })).status).toBe(400);
+    expect((await get(`/v1/homework?classId=${cls}`)).json.some((x: any) => x.id === made.json.id)).toBe(true);
     expect((await send('DELETE', `/v1/homework/${made.json.id}`)).status).toBe(204);
   });
   it('is refused for a role without the permission', async () => {
-    const teacher = await h.login('kavita.iyer@greenfield.edu.in');
+    const teacher = await h.login(h.people.classTeacher.email);
     expect((await h.call('POST', '/v1/admissions', { token: teacher, body: { childName: 'Nope Nope', gradeSought: 2, guardianName: 'Nope', phone: '+91 98000 00000' } })).status).toBe(403);
     expect((await h.call('GET', '/v1/homework', { token: teacher })).status).toBe(200);
   });
@@ -47,24 +57,26 @@ describe('homework', () => {
 describe('exams', () => {
   it('goes from schedule to marks to published results with ranks', async () => {
     const day = addDays(schoolToday(), -1);
-    const made = await send('POST', '/v1/exams', { name: 'Class test', classId: 'cls_8a', startsOn: day, endsOn: day, subjects: [{ subjectId: 'sub_maths', onDate: day, maxMarks: 50 }, { subjectId: 'sub_english', maxMarks: 50 }] });
+    const made = await send('POST', '/v1/exams', { name: 'Class test', classId: cls, startsOn: day, endsOn: day, subjects: [{ subjectId: maths, onDate: day, maxMarks: 50 }, { subjectId: english, maxMarks: 50 }] });
     expect(made.status).toBe(201);
-    expect(made.json.expected).toBe(72);
+    expect(made.json.expected).toBe(inClass * 2);
     const id = made.json.id;
+    // Written yesterday: it is being marked, not coming up, though no mark is in yet.
+    expect((await get(`/v1/exams?classId=${cls}`)).json.find((e: any) => e.id === id).status).toBe('marking');
     const view = (await get(`/v1/exams/${id}/marks`)).json;
-    expect(view.students).toHaveLength(36);
+    expect(view.students).toHaveLength(inClass);
     expect((await send('POST', `/v1/exams/${id}/publish`)).status).toBe(409);
     const marks = view.students.flatMap((s: any, i: number) => [
-      { studentId: s.studentId, subjectId: 'sub_maths', score: i === 0 ? 50 : 20 + (i % 20), absent: false },
-      { studentId: s.studentId, subjectId: 'sub_english', score: i === 1 ? null : 30, absent: i === 1 },
+      { studentId: s.studentId, subjectId: maths, score: i === 0 ? 50 : 20 + (i % 20), absent: false },
+      { studentId: s.studentId, subjectId: english, score: i === 1 ? null : 30, absent: i === 1 },
     ]);
     const put = await send('PUT', `/v1/exams/${id}/marks`, { marks });
     expect(put.status).toBe(200);
     expect(put.json.exam.status).toBe('marking');
-    expect((await send('PUT', `/v1/exams/${id}/marks`, { marks: [{ studentId: view.students[0].studentId, subjectId: 'sub_maths', score: 51, absent: false }] })).status).toBe(400);
+    expect((await send('PUT', `/v1/exams/${id}/marks`, { marks: [{ studentId: view.students[0].studentId, subjectId: maths, score: 51, absent: false }] })).status).toBe(400);
     const res = (await get(`/v1/exams/${id}/results`)).json;
     expect(res.rows[0]).toMatchObject({ studentId: view.students[0].studentId, total: 80, max: 100, pct: 80, rank: 1 });
-    expect(res.rows.length).toBe(36);
+    expect(res.rows.length).toBe(inClass);
     const pub = await send('POST', `/v1/exams/${id}/publish`);
     expect(pub.status).toBe(200);
     expect(pub.json.exam.status).toBe('published');
@@ -72,7 +84,7 @@ describe('exams', () => {
     expect(detail.id).toBe(view.students[0].studentId);
     expect((await send('DELETE', `/v1/exams/${id}`)).status).toBe(409);
     // Published marks are locked: they are reopened first, saying why, so families never see a number changed behind their back.
-    const fix = { marks: [{ studentId: view.students[2].studentId, subjectId: 'sub_maths', score: 10, absent: false }] };
+    const fix = { marks: [{ studentId: view.students[2].studentId, subjectId: maths, score: 10, absent: false }] };
     expect((await send('PUT', `/v1/exams/${id}/marks`, fix)).status).toBe(423);
     const reopened = await send('POST', `/v1/exams/${id}/reopen`, { note: 'A paper was added up wrong' });
     expect(reopened.json).toMatchObject({ status: 'marking', reopenedNote: 'A paper was added up wrong' });
@@ -80,29 +92,31 @@ describe('exams', () => {
   });
   it('rejects an exam that ends before it starts or names an unknown subject', async () => {
     const d = schoolToday();
-    expect((await send('POST', '/v1/exams', { name: 'Odd exam', classId: 'cls_8a', startsOn: d, endsOn: addDays(d, -2), subjects: [{ subjectId: 'sub_maths', maxMarks: 20 }] })).status).toBe(400);
-    expect((await send('POST', '/v1/exams', { name: 'Odd exam', classId: 'cls_8a', startsOn: d, endsOn: d, subjects: [{ subjectId: 'sub_nope', maxMarks: 20 }] })).status).toBe(400);
+    expect((await send('POST', '/v1/exams', { name: 'Odd exam', classId: cls, startsOn: d, endsOn: addDays(d, -2), subjects: [{ subjectId: maths, maxMarks: 20 }] })).status).toBe(400);
+    expect((await send('POST', '/v1/exams', { name: 'Odd exam', classId: cls, startsOn: d, endsOn: d, subjects: [{ subjectId: 'sub_nope', maxMarks: 20 }] })).status).toBe(400);
   });
-  it('has sample exams on the demo school', async () => {
-    const list = (await get('/v1/exams?classId=cls_8a')).json;
-    expect(list.map((e: any) => e.status).sort()).toEqual(expect.arrayContaining(['published', 'upcoming']));
-    const ut = list.find((e: any) => e.name === 'Unit test 1');
-    const res = (await get(`/v1/exams/${ut.id}/results`)).json;
-    expect(res.rows.find((r: any) => r.name === 'Aarav Sharma').pct).toBe(91);
+  it('keeps the exams and marks the old system held, published', async () => {
+    const list = (await get(`/v1/exams?classId=${cls}`)).json;
+    const held = list.filter((e: any) => h.manifest.expect.exams.includes(e.name));
+    expect(held.map((e: any) => e.name).sort()).toEqual([...h.manifest.expect.exams].sort());
+    expect(held.every((e: any) => e.status === 'published')).toBe(true);
+    const res = (await get(`/v1/exams/${held[0].id}/results`)).json;
+    expect(res.rows.length).toBeGreaterThan(0);
+    expect(res.rows.every((r: any) => r.pct >= 0 && r.pct <= 100)).toBe(true);
   });
 });
 
 describe('staff and roles', () => {
   it('adds a teacher, sends the invite to the sandbox and lets them sign in with the temporary password', async () => {
-    const made = await send('POST', '/v1/staff', { name: 'Pooja Rane', email: 'pooja.rane@greenfield.edu.in', phone: '+91 98765 43210', designation: 'Teacher', subjectIds: ['sub_maths'], roleId: 'role_teacher' });
+    const made = await send('POST', '/v1/staff', { name: 'Pooja Rane', email: 'pooja.rane@sunrisevalley.example', phone: '+91 98765 43210', designation: 'Teacher', subjectIds: [maths], roleId: 'role_teacher' });
     expect(made.status).toBe(201);
-    expect(made.json).toMatchObject({ name: 'Pooja Rane', subjects: [{ id: 'sub_maths' }], roles: [{ id: 'role_teacher' }] });
-    const dup = await send('POST', '/v1/staff', { name: 'Pooja Rane', email: 'POOJA.RANE@greenfield.edu.in', phone: '+91 98765 43211', roleId: 'role_teacher' });
+    expect(made.json).toMatchObject({ name: 'Pooja Rane', subjects: [{ id: maths }], roles: [{ id: 'role_teacher' }] });
+    const dup = await send('POST', '/v1/staff', { name: 'Pooja Rane', email: 'POOJA.RANE@sunrisevalley.example', phone: '+91 98765 43211', roleId: 'role_teacher' });
     expect(dup.status).toBe(400);
-    const inbox = await h.registry.query("select body from sandbox_messages where school_slug = 'greenfield' and channel = 'email' and subject = 'Staff invite' order by created_at desc limit 1");
+    const inbox = await h.registry.query("select body from sandbox_messages where school_slug = $1 and channel = 'email' and subject = 'Staff invite' order by created_at desc limit 1", [h.slug]);
     const temp = /password (\S+?)(?:,| then)/.exec(inbox.rows[0].body)?.[1];
     expect(temp).toBeTruthy();
-    const step1 = await h.call('POST', '/v1/auth/login', { body: { identifier: 'pooja.rane@greenfield.edu.in', password: temp } });
+    const step1 = await h.call('POST', '/v1/auth/login', { body: { identifier: 'pooja.rane@sunrisevalley.example', password: temp } });
     expect(step1.status).toBe(200);
   });
   it('lets the principal change a role but never their own, and switches a person off', async () => {
@@ -123,19 +137,19 @@ describe('staff and roles', () => {
     await h.setSettings({ 'roles.schoolEdits': true });
   }, 30_000);
   it('imports staff from a sheet, invites one who never signed in, edits their email, and exports everyone', async () => {
-    const r = await send('POST', '/v1/staff/import', { csv: 'name,email,phone,designation,role\nSam Okafor,sam.okafor@greenfield.edu.in,+91 90000 55555,Teacher,Teacher' });
+    const r = await send('POST', '/v1/staff/import', { csv: 'name,email,phone,designation,role\nSam Okafor,sam.okafor@sunrisevalley.example,+91 90000 55555,Teacher,Teacher' });
     expect(r.json).toMatchObject({ created: 1, skipped: 0 });
     const sam = (await get('/v1/staff?query=Okafor')).json[0];
     expect(sam).toMatchObject({ access: 'none', roles: [{ id: 'role_teacher' }] });
-    expect((await send('PATCH', `/v1/staff/${sam.id}`, { email: 'sam.o@greenfield.edu.in', name: 'Sam Okafor-Reid' })).json).toMatchObject({ email: 'sam.o@greenfield.edu.in', name: 'Sam Okafor-Reid' });
-    expect((await send('POST', `/v1/staff/${sam.id}/invite`)).json).toEqual({ to: 'sam.o@greenfield.edu.in' });
+    expect((await send('PATCH', `/v1/staff/${sam.id}`, { email: 'sam.o@sunrisevalley.example', name: 'Sam Okafor-Reid' })).json).toMatchObject({ email: 'sam.o@sunrisevalley.example', name: 'Sam Okafor-Reid' });
+    expect((await send('POST', `/v1/staff/${sam.id}/invite`)).json).toEqual({ to: 'sam.o@sunrisevalley.example' });
     expect((await get('/v1/staff?query=Okafor')).json[0].access).toBe('invited');
     const csv = (await get('/v1/staff/export')).text;
     expect(csv.split('\n')[0]).toContain('email');
-    expect(csv).toContain('sam.o@greenfield.edu.in');
+    expect(csv).toContain('sam.o@sunrisevalley.example');
   }, 30_000);
   it('lets the school edit its own timetable until the console locks it, and still lets it cover a lesson', async () => {
-    const slot = (await get('/v1/timetable?classId=cls_8a')).json.slots[0];
+    const slot = (await get(`/v1/timetable?classId=${cls}`)).json.slots[0];
     expect((await send('PATCH', '/v1/timetable/slots/' + slot.id, { room: 'R-12' })).status).toBe(204);
     await h.setSettings({ 'timetable.schoolEdits': false });
     const locked = await send('PATCH', '/v1/timetable/slots/' + slot.id, { room: 'R-13' });
@@ -162,12 +176,12 @@ describe('admissions', () => {
     expect((await send('PATCH', `/v1/admissions/${made.json.id}`, { score: 'A' })).status).toBe(400);
     expect((await send('PATCH', `/v1/admissions/${made.json.id}`, { stage: 'enrolled' })).status).toBe(400);
     const before = (await get('/v1/students/summary')).json.total;
-    const enrolled = await send('POST', `/v1/admissions/${made.json.id}/enrol`, { classId: 'cls_4a', dob: '2016-05-12' });
+    const enrolled = await send('POST', `/v1/admissions/${made.json.id}/enrol`, { classId: await h.classId('4 A'), dob: '2016-05-12' });
     expect(enrolled.status).toBe(200);
     expect(enrolled.json.name).toBe('Anvi Kulkarni');
     expect((await get('/v1/students/summary')).json.total).toBe(before + 1);
     expect((await get('/v1/admissions')).json.find((e: any) => e.id === made.json.id)).toMatchObject({ stage: 'enrolled', studentId: enrolled.json.id });
-    expect((await send('POST', `/v1/admissions/${made.json.id}/enrol`, { classId: 'cls_4a', dob: '2016-05-12' })).status).toBe(409);
+    expect((await send('POST', `/v1/admissions/${made.json.id}/enrol`, { classId: await h.classId('4 A'), dob: '2016-05-12' })).status).toBe(409);
   });
   it('edits an enquiry, steps it back, and keeps to the stages the console switched on', async () => {
     const made = (await send('POST', '/v1/admissions', { childName: 'Mia Lopez', gradeSought: 0, guardianName: 'Ana Lopez', phone: '+44 7700 900777' })).json;
@@ -246,10 +260,13 @@ describe('money lists and reports', () => {
     expect(overdue.summary.outstanding).toBeGreaterThan(0);
     const paid = (await get('/v1/fees/invoice-list?status=paid&head=tuition&limit=3')).json;
     expect(paid.items.every((i: any) => i.status === 'paid' && i.outstanding === 0)).toBe(true);
-    const search = (await get('/v1/fees/invoice-list?query=Aarav')).json;
-    expect(search.items.every((i: any) => i.studentName.includes('Aarav'))).toBe(true);
-    const receipts = (await get('/v1/fees/receipts?query=Aarav')).json;
-    expect(receipts.items.some((r: any) => r.receiptNo === 'RCPT-2026-08812')).toBe(true);
+    // A family who paid, and the receipt numbers the old system gave them.
+    const [payer] = await h.schoolSql('select s.name, p.receipt_no from payments p join fee_invoices i on i.id = p.invoice_id join students s on s.id = i.student_id order by p.receipt_no limit 1');
+    const search = (await get(`/v1/fees/invoice-list?query=${encodeURIComponent(payer.name)}`)).json;
+    expect(search.items.length).toBeGreaterThan(0);
+    expect(search.items.every((i: any) => i.studentName === payer.name)).toBe(true);
+    const receipts = (await get(`/v1/fees/receipts?query=${encodeURIComponent(payer.name)}`)).json;
+    expect(receipts.items.some((r: any) => r.receiptNo === payer.receipt_no)).toBe(true);
   });
   it('builds every report and exports it as a CSV', async () => {
     const list = (await get('/v1/reports')).json;
@@ -262,24 +279,36 @@ describe('money lists and reports', () => {
       expect(csv.text.split('\n')[0]).toContain(data.json.columns[0].label);
     }
     const strength = (await get('/v1/reports/strength')).json;
-    expect(strength.rows).toHaveLength(42);
+    expect(strength.rows).toHaveLength(h.manifest.expect.classes);
     // Narrowed to a class and a period, and named after them.
-    const low = await get(`/v1/reports/attendance-class?classId=cls_8a&from=${addDays(schoolToday(), -10)}&to=${schoolToday()}`);
+    const low = await get(`/v1/reports/attendance-class?classId=${cls}&from=${addDays(schoolToday(), -10)}&to=${schoolToday()}`);
     expect(low.json.rows).toHaveLength(1);
     expect(low.json.scope).toMatch(/^8 A, /);
-    expect((await get('/v1/reports/attendance-low/csv?classId=cls_8a')).headers['content-disposition']).toMatch(/Low attendance - 8 A/);
+    expect((await get(`/v1/reports/attendance-low/csv?classId=${cls}`)).headers['content-disposition']).toMatch(/Low attendance - 8 A/);
     expect((await get('/v1/reports/nope')).status).toBe(404);
   });
 });
 
 describe('messages', () => {
+  // The school's old system kept no conversations: the school starts one, and the family answers in the app.
+  let thread: string;
+  it('starts a conversation with a family', async () => {
+    const child = h.people.parentOfTwo.children![0]!;
+    const stu = (await get(`/v1/students?query=${encodeURIComponent(child.admissionNo)}&limit=1`)).json.items[0];
+    const made = await send('POST', '/v1/messages', { studentId: stu.id, subject: 'Parent meeting', body: 'Could you come on Friday at 3?' });
+    expect(made.status).toBe(201);
+    expect(made.json).toMatchObject({ subject: 'Parent meeting', studentName: child.name, status: 'open' });
+    thread = made.json.id;
+    const parent = await h.login(h.people.parentOfTwo.phone);
+    const answered = await h.call('POST', `/v1/f/threads/${thread}/messages`, { token: parent, body: { text: 'Yes, Friday at 3 works for us.' } });
+    expect(answered.status, answered.text).toBe(200);
+  });
   it('lists conversations, marks them read when opened and lets staff reply', async () => {
     const list = (await get('/v1/messages')).json;
-    expect(list.length).toBeGreaterThanOrEqual(8);
-    const unread = list.find((t: any) => t.unread > 0);
-    expect(unread).toBeTruthy();
+    const unread = list.find((t: any) => t.id === thread);
+    expect(unread.unread).toBeGreaterThan(0);
     const opened = (await get(`/v1/messages/${unread.id}`)).json;
-    expect(opened.messages.length).toBeGreaterThan(0);
+    expect(opened.messages.length).toBeGreaterThan(1);
     expect((await get('/v1/messages')).json.find((t: any) => t.id === unread.id).unread).toBe(0);
     const replied = await send('POST', `/v1/messages/${unread.id}/reply`, { body: 'Thanks, we will sort this out today.' });
     expect(replied.json.messages.at(-1)).toMatchObject({ from: 'staff', body: 'Thanks, we will sort this out today.' });
@@ -287,25 +316,21 @@ describe('messages', () => {
     const closed = await send('PATCH', `/v1/messages/${unread.id}`, { status: 'closed' });
     expect(closed.json.status).toBe('closed');
   });
-  it('starts a conversation with a family', async () => {
-    const stu = (await get('/v1/students?query=Aarav%20Sharma&limit=1')).json.items[0];
-    const made = await send('POST', '/v1/messages', { studentId: stu.id, subject: 'Parent meeting', body: 'Could you come on Friday at 3?' });
-    expect(made.status).toBe(201);
-    expect(made.json).toMatchObject({ subject: 'Parent meeting', studentName: 'Aarav Sharma', status: 'open' });
-  });
 });
 
 describe('events', () => {
   it('adds, changes and removes an event, and counts replies', async () => {
     const at = new Date(Date.now() + 5 * 86_400_000).toISOString();
-    const made = await send('POST', '/v1/events', { title: 'Book fair', startsAt: at, kind: 'event', venue: 'Library', audience: 'everyone' });
+    const made = await send('POST', '/v1/events', { title: 'Book fair', startsAt: at, kind: 'event', venue: 'Library', audience: 'everyone', needsRsvp: true });
     expect(made.status).toBe(201);
+    const parent = await h.login(h.people.parentOfOne.phone);
+    expect((await h.call('POST', `/v1/f/events/${made.json.id}/rsvp`, { token: parent, body: { status: 'going', adults: 1 } })).status).toBe(200);
+    expect((await get('/v1/events')).json.find((e: any) => e.id === made.json.id).going).toBeGreaterThan(0);
     const edit = await send('PUT', `/v1/events/${made.json.id}`, { title: 'Book fair, day 1', startsAt: at, kind: 'event', venue: 'Library hall', audience: 'parents' });
     expect(edit.json).toMatchObject({ title: 'Book fair, day 1', venue: 'Library hall', audience: 'parents' });
     expect((await send('PUT', `/v1/events/${made.json.id}`, { title: 'Backwards', startsAt: at, endsAt: new Date(Date.now()).toISOString(), kind: 'event' })).status).toBe(400);
-    expect((await get('/v1/events')).json.find((e: any) => e.title === 'Sports day').going).toBeGreaterThan(0);
     expect((await send('DELETE', `/v1/events/${made.json.id}`)).status).toBe(204);
-    expect((await send('DELETE', '/v1/events/evt_assembly')).status).toBe(404);
+    expect((await send('DELETE', '/v1/events/evt_nobody')).status).toBe(404);
   });
 });
 
@@ -318,30 +343,33 @@ describe('privacy and templates', () => {
     expect((await send('POST', `/v1/privacy/requests/${made.json.id}/decision`, { status: 'declined' })).status).toBe(409);
   });
   it('sends school messages with the wording and channels the school chose', async () => {
-    const stu = (await get('/v1/students?query=Anika%20Rao&limit=1')).json.items[0];
+    const child = h.people.parentOfOne.children![0]!;
+    const stu = (await get(`/v1/students?query=${encodeURIComponent(child.admissionNo)}&limit=1`)).json.items[0];
     await h.setSettings({
       'templates.messages': { 'fees.reminder': 'Hello! {student} has a fee waiting. Please pay soon. {school}' },
       'notify.rules': { 'fees.reminder': { push: false, sms: true, email: false } },
     });
-    const before = Number((await h.registry.query("select count(*) n from sandbox_messages where school_slug = 'greenfield'")).rows[0].n);
+    const before = Number((await h.registry.query("select count(*) n from sandbox_messages where school_slug = $1", [h.slug])).rows[0].n);
     const r = await send('POST', '/v1/fees/reminders', { ids: [stu.id] });
-    expect(r.json.sent).toBe(1);
-    const rows = (await h.registry.query("select channel, body from sandbox_messages where school_slug = 'greenfield' order by created_at desc limit 1")).rows;
-    expect(rows[0]).toMatchObject({ channel: 'sms', body: 'Hello! Anika Rao has a fee waiting. Please pay soon. Greenfield' });
-    expect(Number((await h.registry.query("select count(*) n from sandbox_messages where school_slug = 'greenfield'")).rows[0].n)).toBe(before + 1);
-    // A parent who reads Hindi (set on their record by the office) gets it in Hindi: the school's Hindi wording, else the usual one translated.
-    const to = (await h.registry.query("select to_addr from sandbox_messages where school_slug = 'greenfield' order by created_at desc limit 1")).rows[0].to_addr;
-    await h.schoolSql("update guardians set language = 'hi' where phone = $1", [to]);
-    const last = async () => (await h.registry.query("select body from sandbox_messages where school_slug = 'greenfield' order by created_at desc limit 1")).rows[0].body;
+    // Each grown-up who gets the child's bills (both parents, where the school has both) is reminded once.
+    const [{ n: billed }] = await h.schoolSql<{ n: number }>('select count(*)::int n from student_guardians where student_id = $1 and gets_bills', [stu.id]);
+    expect(r.json.sent).toBe(billed);
+    const rows = (await h.registry.query("select channel, body from sandbox_messages where school_slug = $1 order by created_at desc limit 1", [h.slug])).rows;
+    expect(rows[0]).toMatchObject({ channel: 'sms', body: `Hello! ${child.name} has a fee waiting. Please pay soon. ${h.manifest.school.shortName}` });
+    expect(Number((await h.registry.query("select count(*) n from sandbox_messages where school_slug = $1", [h.slug])).rows[0].n)).toBe(before + billed);
+    // Parents who read Hindi (set on their record by the office) get it in Hindi: the school's Hindi wording, else the usual one translated.
+    const family = 'select guardian_id from student_guardians where student_id = $1';
+    await h.schoolSql(`update guardians set language = 'hi' where id in (${family})`, [stu.id]);
+    const last = async () => (await h.registry.query("select body from sandbox_messages where school_slug = $1 order by created_at desc limit 1", [h.slug])).rows[0].body;
     await h.setSettings({ 'templates.messages': { 'fees.reminder': { en: 'Hello! {student} has a fee waiting.', hi: 'नमस्ते! {student} की फ़ीस बाकी है। {school}' } } });
     await send('POST', '/v1/fees/reminders', { ids: [stu.id] });
-    expect(await last()).toBe('नमस्ते! Anika Rao की फ़ीस बाकी है। Greenfield');
+    expect(await last()).toBe(`नमस्ते! ${child.name} की फ़ीस बाकी है। ${h.manifest.school.shortName}`);
     await h.registry.query(`insert into translations (lang, surface, key, text, updated_by) values ('hi', 'text', 'Reminder: fees for {student} are due. Pay in the Tangent app to get an instant receipt.', '{student} की फ़ीस देय है। तुरंत रसीद के लिए Tangent ऐप में भुगतान करें।', 'test')`);
     await refreshTranslations(h.registry);
     await h.setSettings({ 'templates.messages': {} });
     await send('POST', '/v1/fees/reminders', { ids: [stu.id] });
-    expect(await last()).toBe('Anika Rao की फ़ीस देय है। तुरंत रसीद के लिए Tangent ऐप में भुगतान करें।');
-    await h.schoolSql('update guardians set language = null where phone = $1', [to]);
+    expect(await last()).toBe(`${child.name} की फ़ीस देय है। तुरंत रसीद के लिए Tangent ऐप में भुगतान करें।`);
+    await h.schoolSql(`update guardians set language = null where id in (${family})`, [stu.id]);
   });
   it('puts each role’s app layout and the console flags into the config the apps fetch', async () => {
     await h.setSettings({ 'app.layout': { parent: { dock: ['home', 'fees', 'nonsense', 'trips'], home: [], quick: ['payFees'] }, student: { dock: [], home: [], quick: [] }, teacher: { dock: ['home', 'classes'], home: [], quick: [] }, driver: { dock: [], home: [], quick: [] } } });

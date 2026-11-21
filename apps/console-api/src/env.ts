@@ -20,10 +20,8 @@ const Env = z.object({
   BOOTSTRAP_EMAIL: z.string().default('kaushal@tangent.app'),
   BOOTSTRAP_NAME: z.string().default('Kaushal Bhatt'),
   BOOTSTRAP_PASSWORD: z.string().default('nest2026'),
-  /** Fixed sign-in code for the demo console. Never set in a real deployment. */
+  /** A fixed second step for console sign-in on local and test tracks, which have no email service. Never set in production. */
   DEMO_CODE: z.string().regex(/^\d{6}$/).optional(),
-  /** Creates the Greenfield demo school on first start when there is none. */
-  SEED_DEMO: z.enum(['true', 'false']).default('false'),
   ALLOW_DEMO: z.enum(['true', 'false']).default('false'),
   PROBE_SECONDS: z.coerce.number().int().default(60),
   STEP_PAUSE_MS: z.coerce.number().int().default(350),
@@ -32,8 +30,9 @@ const Env = z.object({
 });
 export type Env = z.infer<typeof Env>;
 
-/** Demo data (the demo school, a test school's sample records) belongs to development and the test track, never production. */
-export const demosAllowed = (env: Env) => env.NODE_ENV !== 'production' || env.ALLOW_DEMO === 'true';
+
+/** Local development or the hosted test track (ALLOW_DEMO): where the free test hosting and the fixed console code are allowed. */
+export const testTrack = (env: Env) => env.NODE_ENV !== 'production' || env.ALLOW_DEMO === 'true';
 
 export function loadEnv(source: Record<string, string | undefined> = process.env): Env {
   const parsed = Env.safeParse(source);
@@ -51,7 +50,6 @@ export function loadEnv(source: Record<string, string | undefined> = process.env
     if (env.SECRETS_KEY.length < 32) problems.push('SECRETS_KEY must be at least 32 characters.');
     if (env.JWT_SECRET === env.SECRETS_KEY) problems.push('JWT_SECRET and SECRETS_KEY must be different.');
     if (env.CORS_ORIGINS === '*') problems.push('CORS_ORIGINS must list the admin and console origins, not *.');
-    if (env.SEED_DEMO === 'true' && env.ALLOW_DEMO !== 'true') problems.push('SEED_DEMO is not allowed in production unless ALLOW_DEMO=true.');
     if (env.DEMO_CODE && env.ALLOW_DEMO !== 'true') problems.push('DEMO_CODE is not allowed in production unless ALLOW_DEMO=true.');
     if (problems.length) throw new Error(`The console is not configured correctly:\n${problems.map((p) => `  ${p}`).join('\n')}`);
   }

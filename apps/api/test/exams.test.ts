@@ -13,24 +13,24 @@ afterAll(async () => {
 });
 
 const call = (method: string, path: string, body?: unknown) => h.call(method, path, { token, body });
-const staffId = async (q: string) => (await call('GET', `/v1/staff?query=${q}`)).json[0].id as string;
 const subjects = async () => (await call('GET', '/v1/subjects')).json.map((s: any) => s.id) as string[];
 
 describe('exams the school’s way', () => {
   it('takes its kind from the school’s list and keeps an invigilator to one room at a time', async () => {
     const [a, b] = await subjects();
     const day = addDays(schoolToday(), 20);
-    const kavita = await staffId('Kavita');
-    const exam = (kind: string, papers: unknown[]) => call('POST', '/v1/exams', { name: `Check ${kind || 'none'} ${Math.random().toString(36).slice(2, 6)}`, kind, classId: 'cls_7a', startsOn: day, endsOn: day, subjects: papers });
+    const kavita = await h.userId(h.people.classTeacher.email);
+    const cls7a = await h.classId('7 A');
+    const exam = (kind: string, papers: unknown[]) => call('POST', '/v1/exams', { name: `Check ${kind || 'none'} ${Math.random().toString(36).slice(2, 6)}`, kind, classId: cls7a, startsOn: day, endsOn: day, subjects: papers });
     expect((await exam('nonsense', [{ subjectId: a, onDate: day, maxMarks: 50 }])).status).toBe(400);
     const twice = [{ subjectId: a, onDate: day, startsAt: '09:00', endsAt: '10:00', invigilatorId: kavita }, { subjectId: b, onDate: day, startsAt: '09:30', endsAt: '10:30', invigilatorId: kavita }];
     expect((await exam('term', twice)).status).toBe(409);
     const made = await exam('term', [{ subjectId: a, onDate: day, startsAt: '09:00', endsAt: '10:00', invigilatorId: kavita }]);
     expect(made.status).toBe(201);
     expect(made.json).toMatchObject({ kind: 'term' });
-    expect(made.json.subjects[0]).toMatchObject({ invigilatorId: kavita, invigilatorName: expect.stringContaining('Kavita') });
+    expect(made.json.subjects[0]).toMatchObject({ invigilatorId: kavita, invigilatorName: expect.stringContaining(h.people.classTeacher.name.split(' ')[0]!) });
     // Another exam that day cannot take her at the same time.
-    expect((await call('POST', '/v1/exams', { name: 'Clash', classId: 'cls_7b', startsOn: day, endsOn: day, subjects: [{ subjectId: a, onDate: day, startsAt: '09:45', endsAt: '10:15', invigilatorId: kavita }] })).status).toBe(409);
+    expect((await call('POST', '/v1/exams', { name: 'Clash', classId: await h.classId('7 B'), startsOn: day, endsOn: day, subjects: [{ subjectId: a, onDate: day, startsAt: '09:45', endsAt: '10:15', invigilatorId: kavita }] })).status).toBe(409);
     await call('DELETE', `/v1/exams/${made.json.id}`);
   });
 
@@ -39,7 +39,7 @@ describe('exams the school’s way', () => {
     await h.setSettings({ 'grading.schemes': [{ key: 'early', name: 'Early years', kind: 'bands', passPct: 40, entry: 'grade', subjects: [b], bands: [{ grade: 'Exceeding', minPct: 80 }, { grade: 'Expected', minPct: 50 }, { grade: 'Emerging', minPct: 0 }] }] });
     try {
       const day = addDays(schoolToday(), -2);
-      const e = (await call('POST', '/v1/exams', { name: `Mixed ${Date.now()}`, classId: 'cls_6b', startsOn: day, endsOn: day, subjects: [{ subjectId: a, maxMarks: 50 }, { subjectId: b, maxMarks: 50 }] })).json;
+      const e = (await call('POST', '/v1/exams', { name: `Mixed ${Date.now()}`, classId: await h.classId('6 B'), startsOn: day, endsOn: day, subjects: [{ subjectId: a, maxMarks: 50 }, { subjectId: b, maxMarks: 50 }] })).json;
       expect(e.subjects.find((s: any) => s.subjectId === b).grades).toEqual(['Exceeding', 'Expected', 'Emerging']);
       const stu = (await call('GET', `/v1/exams/${e.id}/marks`)).json.students[0].studentId;
       expect((await call('PUT', `/v1/exams/${e.id}/marks`, { marks: [{ studentId: stu, subjectId: b, score: 40 }] })).status).toBe(400);
@@ -65,7 +65,7 @@ describe('exams the school’s way', () => {
       criteria: [{ key: 'a', name: 'Knowing', max: 8 }, { key: 'b', name: 'Inquiring', max: 8 }], bands: [{ grade: '7', minPct: 85 }, { grade: '4', minPct: 50 }, { grade: '1', minPct: 0 }] }] });
     try {
       const day = addDays(schoolToday(), -2);
-      const e = (await call('POST', '/v1/exams', { name: `Rubric ${Date.now()}`, classId: 'cls_6a', startsOn: day, endsOn: day, subjects: [{ subjectId: a, maxMarks: 40 }] })).json;
+      const e = (await call('POST', '/v1/exams', { name: `Rubric ${Date.now()}`, classId: await h.classId('6 A'), startsOn: day, endsOn: day, subjects: [{ subjectId: a, maxMarks: 40 }] })).json;
       expect(e.subjects[0].criteria.map((c: any) => c.key)).toEqual(['a', 'b']);
       const stu = (await call('GET', `/v1/exams/${e.id}/marks`)).json.students[0].studentId;
       const put = (criteria: Record<string, number>) => call('PUT', `/v1/exams/${e.id}/marks`, { marks: [{ studentId: stu, subjectId: a, score: null, criteria }] });
@@ -86,7 +86,7 @@ describe('exams the school’s way', () => {
     const [a] = await subjects();
     const day = addDays(schoolToday(), -3);
     const name = `Year check ${Date.now()}`;
-    const made = (await call('POST', '/v1/exams', { name, kind: 'term', classId: 'cls_9a', alsoClassIds: ['cls_9b'], startsOn: day, endsOn: day, subjects: [{ subjectId: a, maxMarks: 10 }] })).json;
+    const made = (await call('POST', '/v1/exams', { name, kind: 'term', classId: await h.classId('9 A'), alsoClassIds: [await h.classId('9 B')], startsOn: day, endsOn: day, subjects: [{ subjectId: a, maxMarks: 10 }] })).json;
     const ids = (await call('GET', '/v1/exams')).json.filter((x: any) => x.name === name).map((x: any) => x.id);
     expect(ids).toHaveLength(2);
     for (const [i, id] of ids.entries()) {
@@ -107,12 +107,12 @@ describe('exams the school’s way', () => {
     for (const id of ids) await call('POST', `/v1/exams/${id}/publish`);
     await h.setSettings({ 'exams.weights': { term: 2, unit: 1 } });
     try {
-      const r = (await call('GET', '/v1/reports/results-year?classId=cls_9b')).json;
+      const r = (await call('GET', `/v1/reports/results-year?classId=${await h.classId('9 B')}`)).json;
       expect(r.columns.map((c: any) => c.key)).toEqual(['student', 'class', 'exams', 'pct', 'grade']);
       expect(r.rows.length).toBeGreaterThan(10);
       // Only the best term exam counts: every 9B student scored full marks in this one.
       await h.setSettings({ 'exams.weights': { term: 1 }, 'exams.bestOf': { term: 1 }, 'results.decimals': 1 });
-      const best = (await call('GET', '/v1/reports/results-year?classId=cls_9b')).json;
+      const best = (await call('GET', `/v1/reports/results-year?classId=${await h.classId('9 B')}`)).json;
       expect(best.rows.filter((x: any) => x.pct !== '–').every((x: any) => x.pct === '100%')).toBe(true);
     } finally {
       await h.setSettings({ 'exams.weights': {}, 'exams.bestOf': {}, 'results.decimals': 0 });
@@ -120,23 +120,28 @@ describe('exams the school’s way', () => {
   });
 
   it('takes marks from the teachers’ app: absent as -1 both ways, a half mark kept when the app sends it back rounded, grades for a graded subject', async () => {
-    const teacher = await h.login('kavita.iyer@greenfield.edu.in');
+    // The teacher who teaches 8 A its maths, on the aSc timetable the school brought.
+    const cls = await h.classId('8 A');
+    const [{ id: maths }] = await h.schoolSql("select id from subjects where name = 'Mathematics'");
+    const [{ email }] = await h.schoolSql('select u.email from timetable_slots s join users u on u.id = s.teacher_id where s.class_id = $1 and s.subject_id = $2 limit 1', [cls, maths]);
+    const teacher = await h.login(email);
+    const key = maths.replace(/^sub_/, '');
     const app = (method: string, path: string, body?: unknown) => h.call(method, `/v1/f${path}`, { token: teacher, body });
     const day = addDays(schoolToday(), -1);
-    const e = (await call('POST', '/v1/exams', { name: `App marks ${Date.now()}`, classId: 'cls_8a', startsOn: day, endsOn: day, subjects: [{ subjectId: 'sub_maths', maxMarks: 50 }] })).json;
+    const e = (await call('POST', '/v1/exams', { name: `App marks ${Date.now()}`, classId: cls, startsOn: day, endsOn: day, subjects: [{ subjectId: maths, maxMarks: 50 }] })).json;
     const [a, b] = (await call('GET', `/v1/exams/${e.id}/marks`)).json.students.map((s: any) => s.studentId);
-    expect((await app('POST', '/classes/cls_8a/marks', { subject: 'maths', values: { [a]: -1, [b]: 40 } })).status).toBe(200);
-    expect((await app('GET', '/classes/cls_8a/marks?subject=maths')).json.marks).toMatchObject({ [a]: -1, [b]: 40 });
-    await call('PUT', `/v1/exams/${e.id}/marks`, { marks: [{ studentId: b, subjectId: 'sub_maths', score: 45.5 }] });
-    expect((await app('GET', '/classes/cls_8a/marks?subject=maths')).json.marks[b]).toBe(46);
-    await app('POST', '/classes/cls_8a/marks', { subject: 'maths', values: { [b]: 46 } });
-    expect((await call('GET', `/v1/exams/${e.id}/marks`)).json.students.find((s: any) => s.studentId === b).marks.sub_maths.score).toBe(45.5);
-    await h.setSettings({ 'grading.schemes': [{ key: 'm', name: 'Maths', kind: 'bands', passPct: 40, entry: 'grade', subjects: ['sub_maths'], bands: [{ grade: 'Secure', minPct: 60 }, { grade: 'Developing', minPct: 0 }] }] });
+    expect((await app('POST', `/classes/${cls}/marks`, { subject: key, values: { [a]: -1, [b]: 40 } })).status).toBe(200);
+    expect((await app('GET', `/classes/${cls}/marks?subject=${key}`)).json.marks).toMatchObject({ [a]: -1, [b]: 40 });
+    await call('PUT', `/v1/exams/${e.id}/marks`, { marks: [{ studentId: b, subjectId: maths, score: 45.5 }] });
+    expect((await app('GET', `/classes/${cls}/marks?subject=${key}`)).json.marks[b]).toBe(46);
+    await app('POST', `/classes/${cls}/marks`, { subject: key, values: { [b]: 46 } });
+    expect((await call('GET', `/v1/exams/${e.id}/marks`)).json.students.find((s: any) => s.studentId === b).marks[maths].score).toBe(45.5);
+    await h.setSettings({ 'grading.schemes': [{ key: 'm', name: 'Maths', kind: 'bands', passPct: 40, entry: 'grade', subjects: [maths], bands: [{ grade: 'Secure', minPct: 60 }, { grade: 'Developing', minPct: 0 }] }] });
     try {
-      const draft = (await app('GET', '/classes/cls_8a/marks?subject=maths')).json;
+      const draft = (await app('GET', `/classes/${cls}/marks?subject=${key}`)).json;
       expect(draft.grades).toEqual(['Secure', 'Developing']);
-      expect((await app('POST', '/classes/cls_8a/marks', { subject: 'maths', values: {}, grades: { [b]: 'secure' } })).status).toBe(200);
-      expect((await app('GET', '/classes/cls_8a/marks?subject=maths')).json.gradeMarks[b]).toBe('Secure');
+      expect((await app('POST', `/classes/${cls}/marks`, { subject: key, values: {}, grades: { [b]: 'secure' } })).status).toBe(200);
+      expect((await app('GET', `/classes/${cls}/marks?subject=${key}`)).json.gradeMarks[b]).toBe('Secure');
     } finally {
       await h.setSettings({ 'grading.schemes': [] });
       await call('DELETE', `/v1/exams/${e.id}`);

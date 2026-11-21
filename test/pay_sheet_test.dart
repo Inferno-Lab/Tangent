@@ -1,17 +1,29 @@
+@Tags(['school'])
+library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
+import 'package:tangent/data/models/campus.dart';
 import 'package:tangent/data/models/user.dart';
 import 'package:tangent/features/fees/controllers/fees_controller.dart';
 import 'package:tangent/features/fees/views/fees_view.dart';
 
 import 'support/harness.dart';
 
+/// The family's real fees; the payment provider's checkout (a page outside the app) answers paid at once, as in its test mode.
+class _Checkout extends FeesController {
+  @override
+  Future<Receipt?> pay(Installment item, String method) async => Receipt(
+    id: 'rcp_test', installmentId: item.id, title: item.title, amount: item.amount, paidOn: DateTime.now(), method: method, reference: 'TEST',
+  );
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() async {
-    await bootMock();
+    await bootLive();
     Get.testMode = false;
   });
 
@@ -19,7 +31,10 @@ void main() {
 
   Future<void> openSheet(WidgetTester tester) async {
     await real(tester, () => signIn(UserRole.parent));
-    final fees = Get.put(FeesController());
+    // The office bills a fee that is still to pay (a family may have paid everything the old system billed).
+    final due = DateTime.now().add(const Duration(days: 10)).toIso8601String().substring(0, 10);
+    await real(tester, () => admin('POST', '/v1/students/assign-fee', {'ids': [childId], 'head': 'activities', 'title': 'Science fair kit', 'amount': 750, 'dueOn': due}));
+    final fees = await put<FeesController>(tester, _Checkout.new);
     await real(tester, fees.load);
     await tester.pumpWidget(testApp(home: Scaffold(body: SingleChildScrollView(child: PaySheet(item: fees.next!)))));
     await tester.pump(const Duration(milliseconds: 100));

@@ -8,25 +8,25 @@ Keep each change small and complete, and commit each step that works (AGENTS.md,
 2. **View** `views/<name>_view.dart`: `GetView<X>` returning `Obx(() => PageFrame(children: [ViewStateView(state: …, emptyArt: …, emptyTitle: …, emptyBody: …, emptyHint: …, emptyActions: […], child: …)]))`. Read an observable inside the `Obx`.
 3. **Route**: constant in `AppRoutes`, entry in `AppPages.pages` with a `Binding` (`Get.lazyPut(X.new)`). Tab screens bind in `ShellBinding`.
 4. **Copy**: keys in `en_redesign.dart`; use `'x.y'.tr` or `'x.y'.trp({'name': v})`.
-5. **Mock data** if needed (`assets/mock/*.json`, update `docs/MOCK_SCHEMA.md`).
+5. **Test data** if needed: the dataset school (`tools/dataset/school.mjs`, `docs/test-school.md`); a new JSON shape goes in `docs/APP_MODELS.md`.
 6. **Tests**: add the route to `test/screens_smoke_test.dart` (it runs every role at phone, small and tablet sizes).
 
 ## A repository
 
-1. In `data/repositories/<area>_repository.dart` add `abstract class XRepository`, `MockXRepository(MockJsonDataSource)` using `_ds.guard(() => …)` (adds the mock latency and the simulate-errors switch), and `RemoteXRepository(RemoteDataSource)` calling `_remote.get/post`.
-2. Register **both** in `InitialBinding` (mock branch and remote branch).
-3. Describe the HTTP shape in `docs/API_CONTRACT.md`. Writes in the mock must bump the session so open screens reload.
-4. Test the mock adapter; `test/remote_binding_test.dart` covers the remote registrations.
+1. In `data/repositories/<area>_repository.dart` add `abstract class XRepository` and `RemoteXRepository(RemoteDataSource)` calling `_remote.get/post`.
+2. Register it in `InitialBinding`, and in `bootLive` (`test/support/harness.dart`).
+3. Describe the HTTP shape in `docs/API_CONTRACT.md`. A write bumps the session so open screens reload.
+4. Test it against the local school (a test tagged `school`, like `test/live_api_test.dart`); `test/remote_binding_test.dart` covers the registration.
 
 ## A model
 
-`data/models/<name>.dart`, with a `fromJson` tolerant of missing optional fields. Dates arrive as ISO strings (mock relative dates are resolved before parsing).
+`data/models/<name>.dart`, with a `fromJson` tolerant of missing optional fields. Dates arrive as ISO strings.
 
 ## An AI feature (chatbot, summaries, smart replies)
 
 The seam exists: `AssistantRepository.ask(userId, prompt, history) → AssistantReply(text, suggestions, route)` in `data/repositories/assistant_repository.dart`.
 
-1. **UI and controllers depend on the interface only.** Build the screen against `MockAssistantRepository` first, and extend its canned answers so the design can be judged.
+1. **UI and controllers depend on the interface only.** Build the screen against `RemoteAssistantRepository` and the school's assistant route; in a widget test, a small class implementing `AssistantRepository` stands in for the answers.
 2. **The app never holds a model key.** The backend owns the provider, prompts, retrieval over school data and guardrails (children's data, no cross-school access). `RemoteAssistantRepository` calls `POST /users/:userId/assistant`.
 3. **Another provider, or an on-device model,** is another class implementing `AssistantRepository`, chosen in `InitialBinding`. No screen changes.
 4. **Gate it**: entry points check `AppConfig.assistantEnabled` (`--dart-define=ASSISTANT=true`). Unfinished AI never reaches families by default.

@@ -31,7 +31,7 @@ export class ChatService {
     const files = fileIds.length ? (await t.pool.query<{ id: string }>("select id from files where id = any($1) and status = 'clean' and deleted_at is null and kind = 'chat'", [fileIds])).rows.map((r) => r.id) : [];
     if (files.length !== fileIds.length) throw new ApiError('validation', 'One of the files is still being checked or did not arrive. Try again in a moment.');
     const id = newId('tmsg');
-    // Seeded demo threads can sit later today than the clock; a new message stays last. A message waits unread until the other side opens it.
+    // A thread brought in from another system can sit later today than the clock; a new message stays last. A message waits unread until the other side opens it.
     await t.pool.query(
       `insert into thread_messages (id, thread_id, from_kind, sender_name, sender_id, body, file_ids, created_at)
        values ($1,$2,$3,$4,$5,$6,$7, greatest(now(), coalesce((select max(created_at) + interval '1 millisecond' from thread_messages where thread_id = $2), now())))`,

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { startHarness, type Harness } from './harness.js';
+import { startHarness, type Harness, type Person } from './harness.js';
 
 let h: Harness;
 let principal: string;
@@ -36,7 +36,7 @@ describe('names', () => {
 
 describe('households', () => {
   it('lets both parents get the messages and the bills, refuses a student nobody hears about, and the same phone twice', async () => {
-    const stu = (await call('GET', '/v1/students?query=Aarav')).json.items[0].id as string;
+    const stu = (await call('GET', `/v1/students?query=${encodeURIComponent(h.people.parentOfTwo.children![0]!.admissionNo)}`)).json.items[0].id as string;
     const before = (await call('GET', `/v1/students/${stu}`)).json.guardians;
     const first = before.find((g: any) => g.isPrimary);
     const base = { id: first.id, name: first.name, phone: first.phone, email: first.email, relation: first.relation, canCollect: true, isPrimary: true };
@@ -56,7 +56,7 @@ describe('households', () => {
 
 describe('leave and leaving', () => {
   it('records leave the office gives, refuses leave that overlaps, and lets two halves of one day be', async () => {
-    const stu = (await call('GET', '/v1/students?query=Diya')).json.items[0].id as string;
+    const stu = (await call('GET', `/v1/students?query=${encodeURIComponent(h.people.parentOfTwo.children![1]!.admissionNo)}`)).json.items[0].id as string;
     const day = '2031-05-12';
     expect((await call('POST', `/v1/students/${stu}/leave`, { from: day, to: '2031-05-10', reason: 'Unwell' })).status).toBe(400);
     expect((await call('POST', `/v1/students/${stu}/leave`, { from: day, to: '2031-05-14', reason: 'Unwell' })).status).toBe(201);
@@ -68,7 +68,7 @@ describe('leave and leaving', () => {
   });
 
   it('says why a student left, needs the new school for a transfer, and forgets both when they rejoin', async () => {
-    const stu = (await call('GET', '/v1/students?query=Kabir')).json.items[0].id as string;
+    const stu = (await call('GET', `/v1/students?query=${encodeURIComponent(h.people.parentOfOne.children![0]!.admissionNo)}`)).json.items[0].id as string;
     expect((await call('POST', '/v1/year/leavers', { studentId: stu, leftOn: '2026-11-01', reason: 'Family moved', kind: 'transferred' })).status).toBe(400);
     expect((await call('POST', '/v1/year/leavers', { studentId: stu, leftOn: '2026-11-01', reason: 'Family moved', kind: 'transferred', transferTo: 'Riverside School' })).status).toBe(204);
     expect((await call('GET', `/v1/students/${stu}`)).json.left).toMatchObject({ kind: 'transferred', transferTo: 'Riverside School' });
@@ -80,15 +80,20 @@ describe('leave and leaving', () => {
 
 describe('line managers', () => {
   it('refuses a loop, and sends a step to the line manager of whoever asked', async () => {
-    const find = async (q: string) => (await call('GET', `/v1/staff?query=${q}`)).json[0];
-    const kavita = await find('Kavita'), meera = await find('Meera');
+    const find = async (p: Person) => (await call('GET', `/v1/staff?query=${encodeURIComponent(p.name)}`)).json.find((x: any) => x.name === p.name);
+    // A class teacher whose line manager is the office manager.
+    const kavita = await find(h.people.classTeacher), meera = await find(h.people.office);
     expect((await call('PATCH', `/v1/staff/${kavita.id}`, { managerId: kavita.id })).status).toBe(400);
     expect((await call('PATCH', `/v1/staff/${kavita.id}`, { managerId: meera.id })).json.managerName).toBe(meera.name);
     expect((await call('PATCH', `/v1/staff/${meera.id}`, { managerId: kavita.id })).status).toBe(400);
     const view = (await call('GET', '/v1/settings/edit')).json;
     await call('PATCH', '/v1/settings', { expectedVersion: view.version, changes: { 'workflows.steps': { staff_leave: [{ key: 'manager', name: 'Line manager', who: 'lineManager' }] } } });
-    const office = await h.login('meera.nair@greenfield.edu.in');
-    const decide = (token: string, decision: string) => call('POST', '/v1/approvals/apr_leave_kavita/decision', { decision }, token);
+    const office = await h.login(h.people.office.email);
+    const day = await h.openDay(45);
+    const asked = await call('POST', '/v1/f/staff/leave', { type: 'casual', from: day, to: day, reason: 'A school visit', halfDay: null }, await h.login(h.people.classTeacher.email));
+    expect(asked.status, asked.text).toBe(200);
+    const leave = (await h.schoolSql("select id from approvals where kind = 'staff_leave' order by created_at desc limit 1"))[0].id;
+    const decide = (token: string, decision: string) => call('POST', `/v1/approvals/${leave}/decision`, { decision }, token);
     expect((await decide(principal, 'approve')).status).toBe(403);
     expect((await decide(office, 'approve')).json.status).toBe('approved');
     await decide(principal, 'undo');

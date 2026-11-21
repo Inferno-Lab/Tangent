@@ -13,9 +13,8 @@ describe('console loadEnv in production', () => {
   it('starts when secrets are long, different, and CORS is a list', () => {
     expect(() => loadEnv(base)).not.toThrow();
   });
-  it('refuses a wildcard CORS list and demo switches unless ALLOW_DEMO is on', () => {
+  it('refuses a wildcard CORS list, and the fixed code unless ALLOW_DEMO is on', () => {
     expect(() => loadEnv({ ...base, CORS_ORIGINS: '*' })).toThrow(/CORS_ORIGINS/);
-    expect(() => loadEnv({ ...base, SEED_DEMO: 'true' })).toThrow(/SEED_DEMO/);
     expect(() => loadEnv({ ...base, DEMO_CODE: '424242' })).toThrow(/DEMO_CODE/);
     expect(() => loadEnv({ ...base, DEMO_CODE: '424242', ALLOW_DEMO: 'true' })).not.toThrow();
   });

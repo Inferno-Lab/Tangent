@@ -9,7 +9,6 @@ import type { Db, reg } from '../core.js';
 import type { Env } from '../env.js';
 import type { Sandbox } from '../sandbox.js';
 import type { Hub } from '@tangent/integrations';
-import { fmtNumber } from '@tangent/contracts';
 
 type SchoolRecord = typeof reg.schools.$inferSelect;
 
@@ -146,10 +145,9 @@ const keysStorage: Driver = {
   },
 };
 
-let demoHash: Promise<string> | undefined;
 
 const migrateSeed: Driver = {
-  describe: (c) => `Run every migration, then roles, periods and templates${c.payload.data.start === 'demo' ? ', plus the demo school' : ''}`,
+  describe: (c) => `Run every migration, then roles${c.payload.data.start === 'import' ? '' : ', a starter bell'} and the starter settings`,
   run: async (c) => {
     const school = await c.reload();
     if (!school.dbUrlSealed) throw new Error('The database step has not run yet.');
@@ -160,14 +158,13 @@ const migrateSeed: Driver = {
       const seeded = await pool.query("select to_regclass('public.meta') is not null and exists (select 1 from meta where key = 'seeded.mode') as done").then((r) => r.rows[0]?.done === true).catch(() => false);
       let tail = 'roles, periods and templates already in place';
       if (!seeded) {
-        demoHash ??= hashPassword('nest2026');
         const p = c.payload;
         const report = await seedSchool(pool, {
           school: { name: p.basics.name, shortName: p.basics.shortName, tagline: p.branding.tagline, place: [p.basics.board, p.basics.city].filter(Boolean).join(' · '), phone: p.basics.contactPhone, country: p.basics.country, timezone: p.basics.timezone, locale: p.basics.locale, currency: p.basics.currency, email: p.basics.contactEmail, address: [p.basics.address, p.basics.city].filter(Boolean).join(', '), color: p.branding.color, logoText: p.branding.logoText, language: p.basics.language },
           admin: { name: p.admin.name, email: p.admin.email, phone: p.admin.phone, passwordHash: '!' },
-          modules: closeModules(p.plan.modules), data: p.data.start === 'demo' ? 'demo' : 'empty', demoPasswordHash: await demoHash, roleTemplates: c.roles, curriculum: p.basics.board,
+          modules: closeModules(p.plan.modules), data: p.data.start === 'import' ? 'import' : 'empty', roleTemplates: c.roles, curriculum: p.basics.board,
         });
-        tail = report.students ? `roles, periods and templates, then ${fmtNumber(report.students)} sample students in ${report.classes} classes` : 'roles, periods and templates';
+        tail = p.data.start === 'import' ? 'roles and the starter settings, ready for the school’s files' : 'roles, a starter bell and the starter settings';
         c.log('info', `seeded in ${report.ms} ms`);
       }
       return { detail: `${applied.length ? `${applied.length} ${applied.length === 1 ? "migration" : "migrations"}` : "All migrations"}, then ${tail}` };
@@ -210,13 +207,10 @@ const admin: Driver = {
     const school = await c.reload();
     const pool = new pg.Pool({ connectionString: unseal(school.dbUrlSealed!, c.env.SECRETS_KEY), max: 2 });
     try {
-      const demo = p.data.start === 'demo';
-      const password = demo ? 'nest2026' : tempPassword();
+      const password = tempPassword();
       await pool.query('update users set password_hash = $2, invited_at = now() where lower(email) = lower($1)', [p.admin.email, await hashPassword(password)]);
       const url = adminUrlFor(c.env, school.slug, school.addressing, school.customDomain);
-      const text = demo
-        ? `Welcome to ${p.basics.shortName} on Tangent. Sign in at ${url} with ${p.admin.email} and the password ${password}. The demo sign-in code is 424242.`
-        : `Welcome to ${p.basics.shortName} on Tangent. Sign in at ${url} with ${p.admin.email} and the temporary password ${password}. Change it after you sign in.`;
+      const text = `Welcome to ${p.basics.shortName} on Tangent. Sign in at ${url} with ${p.admin.email} and the temporary password ${password}. Change it after you sign in.`;
       if (p.admin.invite !== 'sms') await c.sandbox.put({ schoolSlug: school.slug, channel: 'email', to: p.admin.email, subject: `Your ${p.basics.shortName} admin on Tangent`, body: text });
       if (p.admin.invite !== 'email') await c.sandbox.put({ schoolSlug: school.slug, channel: 'sms', to: p.admin.phone, body: text });
     } finally {

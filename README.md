@@ -7,7 +7,7 @@ Tangent is a school platform with four parts that work together:
 | **School admin** | The website a school's office and principal use: dashboard, students, attendance, fees, notices, timetable, its classes and calendar, moving in, and a read-only view of how Tangent set the school up. | `apps/admin` |
 | **Console** | Tangent's own control room: onboard a school, set its modules, configuration and roles, move its data in, roll out releases, watch health and backups, give support, bill, manage the team. | `apps/console` |
 | **Backend** | Two NestJS APIs (one for schools, one for the console) in one process, with a PostgreSQL database per school. | `apps/api`, `apps/console-api`, `apps/server`, `packages/*` |
-| **Mobile app** | A Flutter app for parents and teachers, and for students and bus drivers where the school turns them on ("Chalk & Glass" look). Built for a school (`SCHOOL` and `API_BASE_URL`), it signs in for real and reads that school's data through the family API (`/v1/f/*`); built without them, it runs on demo content. | `lib/`, `android/`, `ios/` |
+| **Mobile app** | A Flutter app for parents and teachers, and for students and bus drivers where the school turns them on ("Chalk & Glass" look). Built for a school (`SCHOOL` and `API_BASE_URL`), it signs in for real and reads that school's data through the family API (`/v1/f/*`); every build is for a school. | `lib/`, `android/`, `ios/` |
 
 Start here depending on who you are:
 
@@ -39,22 +39,24 @@ Needs Node 24 and pnpm 10 (`corepack enable`). No Docker: a throwaway PostgreSQL
 ```bash
 pnpm install
 pnpm build                          # once, builds the shared packages
-bash tools/dev-reset.sh &           # starts PostgreSQL (port 54329), the server (4000) and creates the Greenfield demo school; takes ~1 minute
-pnpm --filter @tangent/admin dev    # http://localhost:5173/s/greenfield
+bash tools/dev-reset.sh &           # starts PostgreSQL (port 54329) and the server (4000), and moves Sunrise Valley in from its files; a few minutes
+pnpm --filter @tangent/admin dev    # http://localhost:5173/s/sunrise-valley
 pnpm --filter @tangent/console dev  # http://localhost:5174
 ```
 
-Sign in:
+There is no demo school and no sample content. The test school is **Sunrise Valley School**, moved in from the files its old
+systems wrote ([`docs/test-school.md`](docs/test-school.md): what is in it, where each file comes from, who signs in as whom).
 
 | Where | Address | Credentials |
 | --- | --- | --- |
-| School admin (demo school) | `http://localhost:5173/s/greenfield` | `neha.menon@greenfield.edu.in` / `nest2026`, then press "Type the demo code" (`424242`) |
-| Console | `http://localhost:5174` | `kaushal@tangent.app` / `nest2026`, code `424242` |
-| Phone app on the demo school | a build with `SCHOOL=greenfield` | parent `priya.sharma@example.com`, teacher `kavita.iyer@greenfield.edu.in`; password `nest2026`, code `424242` |
+| Console | `http://localhost:5174` | `BOOTSTRAP_EMAIL` / `BOOTSTRAP_PASSWORD` from `.env`, then the console's test-track code `DEMO_CODE` |
+| School admin | `http://localhost:5173/s/sunrise-valley` | `principal@sunrisevalley.example` and `TEST_PASSWORD` from `.env`, then the code from the console's Test inbox |
+| Phone app | a build with `SCHOOL=sunrise-valley API_BASE_URL=http://10.0.2.2:4000` | a parent's phone (in `.tangent-data/manifest.json`), then the code from the Test inbox |
 
-On the hosted test track (`https://tangent.onrender.com`) the school logins are the same. The console there uses `BOOTSTRAP_PASSWORD` and `DEMO_CODE` from Render's Environment page.
+Every school code is real and random. On a local or test track it lands in the console's **Test inbox** (Integrations → Test inbox).
+On the hosted test track (`https://tangent.onrender.com`) the console uses `BOOTSTRAP_PASSWORD` and `DEMO_CODE` from Render's Environment page.
 
-Texts and emails are never sent for real yet: they land in the console's **Test inbox**. That is where a new school's invite and sign-in codes appear. A real SMS provider (with DLT registration) is the step that lets real families sign in; see `docs/integrations.md` and section 10 of `docs/one-shot-plan.md`.
+In sandbox mode texts and emails land in the console's **Test inbox**, except to the addresses on its allow-list. Email goes out for real through a Brevo (or SES, SMTP, Resend…) connection, phone notifications through Firebase Cloud Messaging, both set in the console's Integrations with no change to the code ([`docs/integrations.md`](docs/integrations.md) has the steps). A real SMS provider (with DLT registration) is the step that lets families without email sign in from anywhere.
 
 Operations: every school is backed up daily and a weekly restore drill puts one back into a scratch database (console → Health). Add an Alerts connection (Slack, Discord or e-mail) under the console's Integrations to hear about new errors, a school not answering, a failed backup or drill.
 
@@ -63,7 +65,7 @@ Operations: every school is backed up daily and a weekly restore drill puts one 
 ```bash
 pnpm typecheck && pnpm test         # types and the unit and API tests (the API tests start a real PostgreSQL)
 node tools/audit-ui.mjs             # every page, 4 widths, light and dark: errors, overflow, clipped text
-node tools/e2e-flows.mjs            # 50 click-through flows in a real browser (run after dev-reset; it changes demo data)
+node tools/e2e-flows.mjs            # 60 click-through flows in a real browser (run after dev-reset; it changes the school's data)
 node tools/scan-cutoff.mjs          # text cut by an ellipsis, hidden scrollbars, clipped boxes (the audit does not see these)
 node tools/scan-gaps.mjs            # side-by-side columns that end unevenly, blank inside cards, content short of the edge
 node tools/scan-fit.mjs             # tab knobs off their tab, text wrapping in pills or spilling out, 'undefined' on screen
@@ -88,7 +90,7 @@ apps/
 packages/
   contracts/      zod schemas and types shared by every app (the API's language)
   config-engine/  modules, plans, layered settings, locks
-  db/             Drizzle schemas, reviewed SQL migrations, migrator, backups and restore, the import engine, Greenfield demo seed, dev PostgreSQL
+  db/             Drizzle schemas, reviewed SQL migrations, migrator, backups and restore, the import engine, a new school's starter seed, dev PostgreSQL
   security/       scrypt passwords, AES-GCM sealing, JWT
   tenancy/        registry lookup and bounded pool manager
   nest-kit/       shared Nest pieces (errors, validation pipe, exception filter, error reports, alerts, rate limits)
@@ -108,11 +110,11 @@ The free test track is one Render web service plus a free Neon database: [`docs/
 
 ## The Flutter app
 
-The app (parents and teachers; Chalk & Glass; sample content in `assets/mock` for development only) lives at the repository root. Release builds talk only to a school: they refuse to start without `SCHOOL` and `API_BASE_URL`, and the console's build workflow leaves the sample content out. How to run it, the demo accounts, its architecture and rules are in [`AGENTS.md`](AGENTS.md); machine setup is in [`docs/dev-environment.md`](docs/dev-environment.md). In short:
+The app (parents and teachers; Chalk & Glass) lives at the repository root. Every build talks to a school: it refuses to start without `SCHOOL` and `API_BASE_URL`. How to run it, its architecture and rules are in [`AGENTS.md`](AGENTS.md); machine setup is in [`docs/dev-environment.md`](docs/dev-environment.md). In short:
 
 ```bash
-flutter pub get && flutter run          # demo content, no backend needed
-flutter run --dart-define=SCHOOL=greenfield --dart-define=API_BASE_URL=https://tangent.onrender.com   # the demo school's real data (password nest2026, code 424242)
+flutter pub get
+flutter run --dart-define=SCHOOL=sunrise-valley --dart-define=API_BASE_URL=http://10.0.2.2:4000   # the local test school (an Android emulator reaches the computer at 10.0.2.2)
 ```
 
-Demo accounts on demo content (password `demo123`, OTP `123456`): parent Priya Sharma, teacher Kavita Iyer. On a school build the same people sign in with `nest2026` and code `424242`. Students and drivers sign in once the console turns their role on and the admin invites them.
+Families sign in with their phone and the code from the Test inbox; staff with `TEST_PASSWORD` and a code. Students and drivers sign in once the console turns their role on and the admin invites them.

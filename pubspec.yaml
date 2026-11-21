@@ -41,7 +41,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/mock/
     # The app's words in each language (the built-in English is in lib/core/translations).
     - assets/i18n/
   fonts:

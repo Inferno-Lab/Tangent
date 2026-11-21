@@ -6,7 +6,7 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ensureDatabase, startDevPostgres, type DevPostgres } from '../dev.js';
 import { migrate } from '../migrate.js';
-import { seedSchool } from '../seed/greenfield.js';
+import { seedSchool } from '../seed/school.js';
 import { IMPORT_KINDS, setLocaleSource } from '@tangent/contracts';
 import { commitImport, exportAll, listBatches, previewImport, templateXlsx, undoBatch } from './engine.js';
 import { parseCsv, readTable, readXlsx } from './files.js';
@@ -246,3 +246,56 @@ describe('value mapping', () => {
     expect(fixed.rows[0]!.values.status).toBe('active');
   });
 });
+
+describe('files as other systems and offices write them', () => {
+  it('finds the header row under a title and a date, as a school’s own spreadsheet has them', async () => {
+    const csv = 'Riverside School · Holiday list\nAs approved by the committee\n\nOccasion,From Date,To Date\nTitle row check,15/08/2026,\n';
+    const p = await previewImport(pool, { kind: 'holidays', csv, fileName: 'holidays.csv' });
+    expect(p.missing).toEqual([]);
+    expect(p.rows).toHaveLength(1);
+    expect(p.rows[0]!.values).toMatchObject({ name: 'Title row check', starts_on: '15/08/2026' });
+  });
+
+  it('makes a Fedena export’s father and mother two guardians, not one', async () => {
+    const csv = 'Admission no,First name,Last name,Batch name,Date of birth,Father name,Father mobile phone,Mother name,Mother mobile phone\nFD/1,Ira,Rao,5-A,02/03/2016,Anil Rao,98450 11111,Meera Rao,98450 22222\n';
+    const p = await previewImport(pool, { kind: 'students', csv, fileName: 'fedena.csv' });
+    expect(p.mapping).toMatchObject({ 'Father name': 'guardian_name', 'Mother name': 'guardian2_name', 'Mother mobile phone': 'guardian2_phone' });
+    expect(p.rows[0]!.values).toMatchObject({ guardian_name: 'Anil Rao', guardian2_name: 'Meera Rao' });
+  });
+
+  it('reads an aSc Timetables XML export as lessons, each period by its start time', () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><timetable importtype="database"><periods><period name="1" period="1" starttime="8:30" endtime="9:10"/><period name="2" period="2" starttime="9:10" endtime="9:50"/></periods>
+      <subjects><subject id="S1" name="Mathematics" short="Ma"/></subjects><teachers><teacher id="T1" name="Asha Rao" email="asha@riverside.test"/></teachers>
+      <classrooms><classroom id="R1" name="Room 5A"/></classrooms><classes><class id="C1" name="5 A"/><class id="C2" name="5 B"/></classes>
+      <lessons><lesson id="L1" classids="C1,C2" subjectid="S1" teacherids="T1" classroomids="R1"/></lessons><cards><card lessonid="L1" period="2" days="101000"/></cards></timetable>`;
+    expect(readTable(xml)).toEqual([['class', 'day', 'period', 'subject', 'teacher', 'room'], ['5 A', 'Monday', '9:10', 'Mathematics', 'asha@riverside.test', 'Room 5A'], ['5 A', 'Wednesday', '9:10', 'Mathematics', 'asha@riverside.test', 'Room 5A'],
+      ['5 B', 'Monday', '9:10', 'Mathematics', 'asha@riverside.test', 'Room 5A'], ['5 B', 'Wednesday', '9:10', 'Mathematics', 'asha@riverside.test', 'Room 5A']]);
+    expect(() => readTable('<timetable><lessons/></timetable>')).toThrow(/no lessons/);
+  });
+
+  it('reads a Koha MARC export as the catalogue: title, author, ISBN, subject and a copy per holding', () => {
+    const record = marcRecord([['020', '  \x1fa9789351234567'], ['100', '1 \x1faNarayan, R. K.,'], ['245', '10\x1faMalgudi days /'], ['650', ' 0\x1faFiction'],
+      ['952', '  \x1foFIC-3\x1fpRV00001\x1fyBK'], ['952', '  \x1foFIC-3\x1fpRV00002\x1fyBK']]);
+    const rows = readTable(`data:application/marc;base64,${Buffer.concat([record, record]).toString('base64')}`);
+    expect(rows).toHaveLength(3);
+    expect(rows[1]).toEqual(['Malgudi days', 'Narayan, R. K', '9789351234567', 'Fiction', 'FIC-3', '2', 'Book', 'RV00001']);
+  });
+
+  it('places a timetable row by its period’s start time as well as its number', async () => {
+    await commitImport(pool, { kind: 'periods', csv: 'number,label,starts_at,ends_at,kind\n1,Period 1,08:00,08:40,\n2,Break,08:40,09:00,break\n3,Period 2,09:00,09:40,\n', fileName: 'bell.csv' }, 'Migration team');
+    const p = await previewImport(pool, { kind: 'timetable', csv: 'class,day,period,subject,teacher,room\nNoClass,Monday,9:00,Mathematics,nobody@riverside.test,\n', fileName: 'tt.csv' });
+    expect(p.rows[0]!.errors.join(' ')).not.toMatch(/Period .* is not set up/);
+    const q = await previewImport(pool, { kind: 'timetable', csv: 'class,day,period,subject,teacher,room\nNoClass,Monday,9:20,Mathematics,nobody@riverside.test,\n', fileName: 'tt.csv' });
+    expect(q.rows[0]!.errors.join(' ')).toMatch(/Period 9:20 is not set up/);
+  });
+});
+
+/** One MARC 21 record (ISO 2709) from its fields: the leader, the directory, then each field ended by 0x1e. */
+function marcRecord(fields: [string, string][]): Buffer {
+  const bodies = fields.map(([tag, v]) => [tag, Buffer.from(`${v}\x1e`, 'utf8')] as const);
+  let at = 0;
+  const dir = bodies.map(([tag, b]) => { const e = `${tag}${String(b.length).padStart(4, '0')}${String(at).padStart(5, '0')}`; at += b.length; return e; }).join('');
+  const base = 24 + dir.length + 1;
+  const leader = `${String(base + at + 1).padStart(5, '0')}nam a22${String(base).padStart(5, '0')} a 4500`;
+  return Buffer.concat([Buffer.from(leader + dir, 'latin1'), Buffer.from([0x1e]), ...bodies.map(([, b]) => b), Buffer.from([0x1d])]);
+}

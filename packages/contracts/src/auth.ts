@@ -19,8 +19,6 @@ export const LoginChallenge = z.object({
   expiresInSeconds: z.number().int(),
   /** When another code may be asked for: a short wait, longer once several were sent. */
   resendInSeconds: z.number().int().optional(),
-  /** Present only on schools in demo mode, so the sign-in page can offer to fill it in. */
-  demoCode: z.string().optional(),
 });
 export type LoginChallenge = z.infer<typeof LoginChallenge>;
 

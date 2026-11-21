@@ -1,6 +1,4 @@
 import 'package:tangent/core/utils/app_exception.dart';
-import 'package:tangent/data/datasources/mock_json_datasource.dart';
-import 'package:tangent/data/datasources/mock_writes.dart';
 import 'package:tangent/data/datasources/remote_datasource.dart';
 import 'package:tangent/data/models/campus.dart';
 import 'package:tangent/data/models/student.dart';
@@ -15,33 +13,6 @@ abstract class FeeRepository {
     required String installmentId,
     required String method,
   });
-}
-
-class MockFeeRepository implements FeeRepository {
-  MockFeeRepository(this._ds);
-
-  final MockJsonDataSource _ds;
-
-  @override
-  Future<FeeAccount?> forStudent(String studentId) => _ds.guard(() {
-    for (final account in _ds.fees) {
-      if (account.studentId == studentId) return account;
-    }
-    return null;
-  });
-
-  @override
-  Future<Receipt?> pay({
-    required String studentId,
-    required String installmentId,
-    required String method,
-  }) => _ds.guard(
-    () => _ds.payInstallment(
-      studentId: studentId,
-      installmentId: installmentId,
-      method: method,
-    ),
-  );
 }
 
 class RemoteFeeRepository implements FeeRepository {
@@ -91,29 +62,6 @@ abstract class NoticeRepository {
   Future<void> acknowledge(String id);
 }
 
-class MockNoticeRepository implements NoticeRepository {
-  MockNoticeRepository(this._ds);
-
-  final MockJsonDataSource _ds;
-
-  @override
-  Future<List<Notice>> all() => _ds.guard(() => [..._ds.notices]);
-
-  @override
-  Future<void> post(Notice notice, {String? classId}) => _ds.guard(() => _ds.addNotice(notice));
-
-  @override
-  Future<void> read(String id) => _ds.guard(() {});
-
-  @override
-  Future<void> acknowledge(String id) => _ds.guard(() {
-    final i = _ds.notices.indexWhere((n) => n.id == id);
-    if (i < 0) return;
-    final n = _ds.notices[i];
-    _ds.notices[i] = Notice(id: n.id, title: n.title, body: n.body, category: n.category, audience: n.audience, pinned: n.pinned, date: n.date, author: n.author, attachments: n.attachments, needsAck: n.needsAck, acked: true);
-  });
-}
-
 class RemoteNoticeRepository implements NoticeRepository {
   RemoteNoticeRepository(this._remote);
 
@@ -155,24 +103,6 @@ abstract class EventRepository {
     required String userId,
     required RsvpStatus status,
   });
-}
-
-class MockEventRepository implements EventRepository {
-  MockEventRepository(this._ds);
-
-  final MockJsonDataSource _ds;
-
-  @override
-  Future<List<SchoolEvent>> all() => _ds.guard(() => [..._ds.events]);
-
-  @override
-  Future<void> rsvp({
-    required String eventId,
-    required String userId,
-    required RsvpStatus status,
-  }) => _ds.guard(
-    () => _ds.rsvp(eventId: eventId, userId: userId, status: status),
-  );
 }
 
 class RemoteEventRepository implements EventRepository {
@@ -230,68 +160,6 @@ abstract class ChatRepository {
 
   /// Opens (or finds) a one-to-one thread with [teacher]; returns its id.
   Future<String> start({required String userId, required Teacher teacher});
-}
-
-class MockChatRepository implements ChatRepository {
-  MockChatRepository(this._ds);
-
-  final MockJsonDataSource _ds;
-
-  @override
-  Future<List<ChatThread>> threadsFor(String userId) => _ds.guard(
-    () => _ds.threads
-        .where((thread) => thread.participantIds.contains(userId))
-        .toList(),
-  );
-
-  @override
-  Future<List<ChatMessage>> messages(String threadId) => _ds.guard(() {
-    final items =
-        _ds.messages.where((item) => item.threadId == threadId).toList()
-          ..sort((a, b) => a.sentAt.compareTo(b.sentAt));
-    return items;
-  });
-
-  @override
-  Future<({List<ChatThread> threads, List<ChatMessage> messages})> inbox(
-    String userId,
-  ) => _ds.guard(() {
-    final threads = _ds.threads
-        .where((thread) => thread.participantIds.contains(userId))
-        .toList();
-    final ids = threads.map((thread) => thread.id).toSet();
-    final messages = _ds.messages
-        .where((item) => ids.contains(item.threadId))
-        .toList();
-    return (threads: threads, messages: messages);
-  });
-
-  @override
-  Future<void> send({
-    required String threadId,
-    required String senderId,
-    required String text,
-    List<String> fileIds = const [],
-  }) => _ds.guard(
-    () => _ds.sendMessage(threadId: threadId, senderId: senderId, text: text),
-  );
-
-  @override
-  Future<void> typing(String threadId) => _ds.guard(() {});
-
-  @override
-  Future<void> delete(String messageId) => _ds.guard(() => _ds.messages.removeWhere((m) => m.id == messageId));
-
-  @override
-  Future<void> report(String messageId, String reason) => _ds.guard(() {});
-
-  @override
-  Future<void> markRead({required String threadId, required String userId}) =>
-      _ds.guard(() => _ds.markThreadRead(threadId: threadId, userId: userId));
-
-  @override
-  Future<String> start({required String userId, required Teacher teacher}) =>
-      _ds.guard(() => _ds.startThread(userId: userId, teacher: teacher));
 }
 
 class RemoteChatRepository implements ChatRepository {
@@ -378,22 +246,6 @@ abstract class LibraryRepository {
   Future<void> renew(String bookId);
 }
 
-class MockLibraryRepository implements LibraryRepository {
-  MockLibraryRepository(this._ds);
-
-  final MockJsonDataSource _ds;
-
-  @override
-  Future<List<LibraryBook>> all() => _ds.guard(() => [..._ds.books]);
-
-  @override
-  Future<void> reserve({required String bookId, required String studentId}) =>
-      _ds.guard(() => _ds.reserveBook(bookId: bookId, studentId: studentId));
-
-  @override
-  Future<void> renew(String bookId) => _ds.guard(() => _ds.renewBook(bookId));
-}
-
 class RemoteLibraryRepository implements LibraryRepository {
   RemoteLibraryRepository(this._remote);
 
@@ -423,20 +275,6 @@ abstract class TransportRepository {
   Future<TransportInfo?> forStudent(String studentId);
 }
 
-class MockTransportRepository implements TransportRepository {
-  MockTransportRepository(this._ds);
-
-  final MockJsonDataSource _ds;
-
-  @override
-  Future<TransportInfo?> forStudent(String studentId) => _ds.guard(() {
-    for (final route in _ds.transport) {
-      if (route.studentId == studentId) return route;
-    }
-    return null;
-  });
-}
-
 class RemoteTransportRepository implements TransportRepository {
   RemoteTransportRepository(this._remote);
 
@@ -464,37 +302,6 @@ abstract class LeaveRepository {
 
   /// Takes back a request the school has not answered yet.
   Future<void> withdraw(String id);
-}
-
-class MockLeaveRepository implements LeaveRepository {
-  MockLeaveRepository(this._ds);
-
-  final MockJsonDataSource _ds;
-
-  @override
-  Future<List<LeaveRequest>> forStudent(String studentId) => _ds.guard(
-    () => _ds.leaves.where((item) => item.studentId == studentId).toList(),
-  );
-
-  @override
-  Future<void> apply(LeaveRequest request) =>
-      _ds.guard(() => _ds.applyLeave(request));
-
-  @override
-  Future<void> withdraw(String id) => _ds.guard(() {
-    final i = _ds.leaves.indexWhere((l) => l.id == id);
-    if (i >= 0) _ds.leaves[i] = _ds.leaves[i].copyWith(status: LeaveStatus.withdrawn);
-  });
-
-  @override
-  Future<void> review({
-    required String id,
-    required LeaveStatus status,
-    required String reviewer,
-    String? note,
-  }) => _ds.guard(
-    () => _ds.reviewLeave(id: id, status: status, reviewer: reviewer, note: note),
-  );
 }
 
 class RemoteLeaveRepository implements LeaveRepository {
@@ -535,15 +342,6 @@ abstract class GalleryRepository {
   Future<List<GalleryAlbum>> all();
 }
 
-class MockGalleryRepository implements GalleryRepository {
-  MockGalleryRepository(this._ds);
-
-  final MockJsonDataSource _ds;
-
-  @override
-  Future<List<GalleryAlbum>> all() => _ds.guard(() => [..._ds.albums]);
-}
-
 class RemoteGalleryRepository implements GalleryRepository {
   RemoteGalleryRepository(this._remote);
 
@@ -568,31 +366,6 @@ abstract class NotificationRepository {
   Future<void> restore(String id);
 
   Future<void> markAllRead(String userId);
-}
-
-class MockNotificationRepository implements NotificationRepository {
-  MockNotificationRepository(this._ds);
-
-  final MockJsonDataSource _ds;
-
-  @override
-  Future<List<AppNotification>> forUser(String userId) => _ds.guard(() {
-    final items =
-        _ds.notifications.where((item) => item.userId == userId).toList()
-          ..sort((a, b) => b.date.compareTo(a.date));
-    return items;
-  });
-
-  @override
-  Future<void> dismiss(String id) =>
-      _ds.guard(() => _ds.dismissNotification(id));
-
-  @override
-  Future<void> restore(String id) => _ds.guard(() {});
-
-  @override
-  Future<void> markAllRead(String userId) =>
-      _ds.guard(() => _ds.markNotificationsRead(userId));
 }
 
 class RemoteNotificationRepository implements NotificationRepository {

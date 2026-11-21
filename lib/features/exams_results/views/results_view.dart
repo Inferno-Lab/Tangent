@@ -29,20 +29,23 @@ class ResultsView extends GetView<ResultsController> {
         leading: const BackGlass(),
         actions: [
           if (controller.exams.isNotEmpty)
-            GlassPress(
-              onTap: () => unawaited(_pickExam(context)),
-              child: Glass(
-                height: 44,
-                radius: 22,
-                onPigment: true,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(controller.exam?.name ?? '', maxLines: 1, style: AppText.ts(color: context.app.onDeep, height: 1)),
-                    const SizedBox(width: 6),
-                    Icon(PhosphorIconsBold.caretDown, size: 13, color: context.app.onDeep),
-                  ],
+            // An exam's name can be long ("Half-Yearly Examination"): it shortens before the row runs off a small phone.
+            Flexible(
+              child: GlassPress(
+                onTap: () => unawaited(_pickExam(context)),
+                child: Glass(
+                  height: 44,
+                  radius: 22,
+                  onPigment: true,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(child: Text(controller.exam?.name ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.ts(color: context.app.onDeep, height: 1))),
+                      const SizedBox(width: 6),
+                      Icon(PhosphorIconsBold.caretDown, size: 13, color: context.app.onDeep),
+                    ],
+                  ),
                 ),
               ),
             ),

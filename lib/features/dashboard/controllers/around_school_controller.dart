@@ -1,5 +1,4 @@
 import 'package:get/get.dart';
-import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/data/datasources/remote_datasource.dart';
 import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/services/school_config.dart';
@@ -95,7 +94,7 @@ class AroundSchoolController extends GetxController {
           ..sort((a, b) => b.date.compareTo(a.date));
         g.album = all.firstOrNull;
       }),
-      read(on: AppConfig.live && auth.role != UserRole.student, f: () async {
+      read(on: auth.role != UserRole.student, f: () async {
         final json = await Get.find<RemoteDataSource>().get('/v1/f/forms');
         g.formsWaiting = [for (final f in json as List) f].where((f) => ((f as Map)['pending'] as List? ?? const []).isNotEmpty).length;
       }),

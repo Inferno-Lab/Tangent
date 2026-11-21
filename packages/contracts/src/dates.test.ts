@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, hasReachedAge, isSchoolDay, latestSchoolDay, plural, schoolDaysEnding, weekday } from './dates.js';
+import { addDays, firstName, hasReachedAge, initials, isSchoolDay, latestSchoolDay, plural, schoolDaysEnding, weekday } from './dates.js';
 
 describe('dates', () => {
   it('knows the weekday (14 Oct 2026 is a Wednesday)', () => {
@@ -24,5 +24,12 @@ describe('a birthday', () => {
     expect(hasReachedAge('2008-11-18', '2026-11-17', 18)).toBe(false);
     expect(hasReachedAge('2008-02-29', '2026-02-28', 18)).toBe(false);
     expect(hasReachedAge('2008-02-29', '2026-03-01', 18)).toBe(true);
+  });
+  it('greets and marks a person by their own name, not the title written before it', () => {
+    expect(firstName('Dr. Meenakshi Raghavan')).toBe('Meenakshi');
+    expect(initials('Dr. Meenakshi Raghavan')).toBe('MR');
+    expect(firstName('Smt Aditi Patil')).toBe('Aditi');
+    expect(firstName('Arnav Thomas')).toBe('Arnav');
+    expect(initials('Dr.')).toBe('D');
   });
 });

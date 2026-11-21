@@ -33,9 +33,7 @@ services:
       # The six-digit code the console asks for after the password. There is no email service on the test track, so you choose it.
       - key: DEMO_CODE
         sync: false
-      - key: SEED_DEMO
-        value: "true"
-      # Production refuses SEED_DEMO and DEMO_CODE unless this says the service is a demo/test track.
+      # Production refuses DEMO_CODE unless this says the service is the test track.
       - key: ALLOW_DEMO
         value: "true"
       # No CORS_ORIGINS here: the server always allows its own Render address (RENDER_EXTERNAL_URL), whatever the service is called.

@@ -1,76 +1,85 @@
-// Reads every app endpoint from a running school API through the app's own repositories, as a parent and as a teacher, so a
-// change in what the server sends shows up as a failure here instead of on a phone. Skipped unless LIVE_API is set:
-//   flutter test test/live_api_test.dart --dart-define=LIVE_API=http://localhost:4000 --dart-define=LIVE_SCHOOL=greenfield
+// Reads every app endpoint from the school through the app's own repositories, as a parent and as a teacher, so a change
+// in what the server sends shows up as a failure here instead of on a phone (test/support/harness.dart: the running school).
+@Tags(['school'])
+library;
+
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tangent/core/network/api_client.dart';
-import 'package:tangent/core/services/storage_service.dart';
-import 'package:tangent/data/datasources/remote_datasource.dart';
+import 'package:get/get.dart';
+import 'package:tangent/core/utils/app_exception.dart';
+import 'package:tangent/data/models/academics.dart';
 import 'package:tangent/data/models/user.dart';
 import 'package:tangent/data/repositories/academic_repository.dart';
-import 'package:tangent/data/repositories/auth_repository.dart';
 import 'package:tangent/data/repositories/campus_repository.dart';
 import 'package:tangent/data/repositories/directory_repository.dart';
 
-const _base = String.fromEnvironment('LIVE_API');
-const _school = String.fromEnvironment('LIVE_SCHOOL', defaultValue: 'greenfield');
+import 'support/harness.dart';
 
-Future<(RemoteDataSource, AppUser)> _signIn(String email) async {
-  final remote = RemoteDataSource(ApiClient(storage: StorageService(memory: <String, dynamic>{}), base: _base, school: _school));
-  final auth = RemoteAuthRepository(remote);
+/// Chat may be paused for every school (the console's kill.chat); a paused module answers that it is, and nothing else.
+Future<void> unlessPaused(Future<Object?> Function() read) async {
   try {
-    return (remote, await auth.login(email: email, password: 'nest2026'));
-  } on OtpRequired catch (otp) {
-    return (remote, await auth.loginWithOtp(email: email, otp: otp.demoCode ?? '424242'));
+    await read();
+  } on AppException catch (e) {
+    expect(e.message, contains('paused'));
   }
 }
 
 void main() {
-  final skip = _base.isEmpty ? 'set LIVE_API to a running school API' : null;
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(bootLive);
+  tearDown(Get.reset);
 
   test('a parent reads everything the app shows', () async {
-    final (remote, me) = await _signIn('priya.sharma@example.com');
+    final me = await signIn(UserRole.parent);
     expect(me.role, UserRole.parent);
-    final dir = RemoteDirectoryRepository(remote);
-    await dir.school();
-    await dir.teachers();
+    expect(me.childIds, hasLength(2));
+    final dir = Get.find<DirectoryRepository>();
+    expect((await dir.school()).name, 'Sunrise Valley School');
+    expect(await dir.teachers(), isNotEmpty);
     for (final id in me.childIds) {
       final child = await dir.student(id);
-      await dir.schoolClass(child.classId);
-      await RemoteAttendanceRepository(remote).forStudent(id);
-      await RemoteAttendanceRepository(remote).summary(id);
-      await RemoteTimetableRepository(remote).forClass(child.classId);
-      await RemoteHomeworkRepository(remote).forClass(child.classId);
-      await RemoteExamRepository(remote).forClass(child.classId);
-      await RemoteExamRepository(remote).resultsFor(id);
-      await RemoteFeeRepository(remote).forStudent(id);
-      await RemoteTransportRepository(remote).forStudent(id);
-      await RemoteLeaveRepository(remote).forStudent(id);
+      final cls = await dir.schoolClass(child.classId);
+      expect(cls.label, '8 A');
+      // Since April: the attendance register, the aSc week with its breaks, and the old system's published exams.
+      expect(await Get.find<AttendanceRepository>().forStudent(id), isNotEmpty);
+      await Get.find<AttendanceRepository>().summary(id);
+      final week = await Get.find<TimetableRepository>().forClass(child.classId);
+      expect(week.first.periods.any((p) => p.kind == PeriodKind.breakTime), isTrue);
+      await Get.find<HomeworkRepository>().forClass(child.classId);
+      final exams = await Get.find<ExamRepository>().forClass(child.classId);
+      final done = exams.firstWhere((e) => e.status == ExamStatus.completed);
+      final result = await Get.find<ExamRepository>().result(examId: done.id, studentId: id);
+      expect(result!.overallPercent, inInclusiveRange(0, 100));
+      expect(await Get.find<ExamRepository>().resultsFor(id), isNotEmpty);
+      expect((await Get.find<FeeRepository>().forStudent(id))!.installments, isNotEmpty);
+      await Get.find<TransportRepository>().forStudent(id);
+      await Get.find<LeaveRepository>().forStudent(id);
     }
-    await RemoteNoticeRepository(remote).all();
-    await RemoteEventRepository(remote).all();
-    await RemoteChatRepository(remote).threadsFor(me.id);
-    await RemoteChatRepository(remote).inbox(me.id);
-    await RemoteLibraryRepository(remote).all();
-    await RemoteGalleryRepository(remote).all();
-    await RemoteNotificationRepository(remote).forUser(me.id);
-  }, skip: skip, timeout: const Timeout(Duration(minutes: 2)));
+    await Get.find<NoticeRepository>().all();
+    await Get.find<EventRepository>().all();
+    await unlessPaused(() => Get.find<ChatRepository>().inbox(me.id));
+    // The Koha catalogue.
+    expect(await Get.find<LibraryRepository>().all(), isNotEmpty);
+    await Get.find<GalleryRepository>().all();
+    await Get.find<NotificationRepository>().forUser(me.id);
+  });
 
   test('a teacher reads everything the app shows', () async {
-    final (remote, me) = await _signIn('kavita.iyer@greenfield.edu.in');
+    final me = await signIn(UserRole.teacher);
     expect(me.role, UserRole.teacher);
-    final dir = RemoteDirectoryRepository(remote);
+    final dir = Get.find<DirectoryRepository>();
     final classes = await dir.classesForTeacher(me.id);
-    expect(classes, isNotEmpty);
+    expect(classes.map((c) => c.label), contains(person('classTeacher')['class']));
     for (final c in classes) {
       final students = await dir.studentsIn(c.id);
-      await RemoteAttendanceRepository(remote).todayForClass([for (final s in students) s.id]);
-      await RemoteHomeworkRepository(remote).forClass(c.id);
-      await RemoteExamRepository(remote).forClass(c.id);
-      await RemoteTimetableRepository(remote).forClass(c.id);
+      expect(students, isNotEmpty);
+      await Get.find<AttendanceRepository>().todayForClass([for (final s in students) s.id]);
+      await Get.find<HomeworkRepository>().forClass(c.id);
+      await Get.find<ExamRepository>().forClass(c.id);
+      expect(await Get.find<TimetableRepository>().forClass(c.id), isNotEmpty);
     }
-    await RemoteNoticeRepository(remote).all();
-    await RemoteChatRepository(remote).inbox(me.id);
-    await RemoteLibraryRepository(remote).all();
-    await RemoteNotificationRepository(remote).forUser(me.id);
-  }, skip: skip, timeout: const Timeout(Duration(minutes: 2)));
+    await Get.find<NoticeRepository>().all();
+    await unlessPaused(() => Get.find<ChatRepository>().inbox(me.id));
+    await Get.find<LibraryRepository>().all();
+    await Get.find<NotificationRepository>().forUser(me.id);
+  });
 }

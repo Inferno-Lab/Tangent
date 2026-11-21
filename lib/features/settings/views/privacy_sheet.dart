@@ -23,7 +23,7 @@ Future<void> showPrivacy() => showSheet<void>(const PrivacySheet());
 /// Nothing to ask on sample content.
 Future<void> askConsentIfNeeded() async {
   final role = Get.find<AuthService>().role;
-  if (!AppConfig.live || !SchoolConfig.consentRequired || (role != UserRole.parent && role != UserRole.student)) return;
+  if (!SchoolConfig.consentRequired || (role != UserRole.parent && role != UserRole.student)) return;
   try {
     final me = Map<String, dynamic>.from(await Get.find<RemoteDataSource>().get('/v1/f/me') as Map);
     if (me['consentedAt'] != null || me['consentFor'] == 'guardian') return;
@@ -50,7 +50,7 @@ class _PrivacySheetState extends State<PrivacySheet> {
   /// Families and students change their answers here once they have agreed (live accounts only).
   bool get _yours {
     final role = Get.find<AuthService>().role;
-    return !widget.consent && AppConfig.live && (role == UserRole.parent || role == UserRole.student);
+    return !widget.consent && (role == UserRole.parent || role == UserRole.student);
   }
 
   @override

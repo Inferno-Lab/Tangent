@@ -4,7 +4,7 @@ import { fmtNumber, BlueprintInput, PlanSave, STEP_LABELS, WIZARD_STEPS, WizardP
 import { newId } from '@tangent/db';
 import { ApiError, ZodPipe, notFound } from '@tangent/nest-kit';
 import { Db, Me, Needs, type ConsoleUser, type reg } from './core.js';
-import { ENV, demosAllowed, type Env } from './env.js';
+import { ENV, type Env } from './env.js';
 import { driversFor } from './provisioning/drivers.js';
 import { Blueprints, Provisioner } from './provisioning/provisioner.js';
 import { Policy } from './policy.js';
@@ -108,7 +108,6 @@ export class Wizard {
     if (taken.rowCount) problems.push(`The address “${payload.basics.slug}” is already used by another school.`);
     const plan = (await this.plans()).find((p) => p.key === payload.plan.plan);
     if (!plan) problems.push(`Plan “${payload.plan.plan}” does not exist.`);
-    if (payload.data.start === 'demo' && !demosAllowed(this.env)) problems.push('The demo school is only for the test track. Start this school empty or from an import.');
     const cell = await this.db.pool.query<{ key: string; target: string; max_schools: number; accepting: boolean; n: string }>(
       'select c.key, c.target, c.max_schools, c.accepting, (select count(*) from schools s where s.cell = c.key and s.deleted_at is null) n from cells c where c.key = $1', [payload.placement.cell]);
     const c = cell.rows[0];
@@ -138,7 +137,7 @@ export class Wizard {
         { label: 'Plan', detail: `${plan?.name ?? payload.plan.plan} · ${closeModules(payload.plan.modules).length} modules · up to ${fmtNumber(payload.plan.students)} students` },
         { label: 'Where', detail: `${payload.placement.target} · cell ${payload.placement.cell} · ${payload.placement.addressing === 'path' ? 'a path on the test site' : 'its own subdomain'}${payload.placement.customDomain ? ` and ${payload.placement.customDomain}` : ''}` },
         { label: 'First admin', detail: `${payload.admin.name} · ${payload.admin.email}` },
-        { label: 'Starting data', detail: payload.data.start === 'demo' ? 'The demo school with sample students' : payload.data.start === 'import' ? 'Empty, ready for an import' : 'Empty' },
+        { label: 'Starting data', detail: payload.data.start === 'import' ? 'Empty, ready for the school’s files' : 'Empty, with a starter bell' },
       ],
       willDo,
       capacity: { cell: payload.placement.cell, schools: Number(c?.n ?? 0), max: c?.max_schools ?? 0, ok: !!c && Number(c.n) < c.max_schools },
@@ -158,11 +157,11 @@ export class Wizard {
     const id = newId('sch');
     const entitlement = { modules: closeModules(payload.plan.modules), features: plan.features ?? {}, limits: plan.limits, locks: payload.plan.locks, overrides: {}, version: 1 };
     const school = (await this.db.query<typeof reg.schools.$inferSelect>(
-      `insert into schools (id, slug, name, short_name, color, logo_text, status, plan, cell, target, region, entitlement, contact, gstin, board, address, addressing, custom_domain, app_name, created_by, ring, api_version, admin_version, demo, country, timezone, locale, currency)
-       values ($1,$2,$3,$4,$5,$6,'onboarding',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'rest',$20,$20,$21,$22,$23,$24,$25) returning *`,
+      `insert into schools (id, slug, name, short_name, color, logo_text, status, plan, cell, target, region, entitlement, contact, gstin, board, address, addressing, custom_domain, app_name, created_by, ring, api_version, admin_version, country, timezone, locale, currency)
+       values ($1,$2,$3,$4,$5,$6,'onboarding',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'rest',$20,$20,$21,$22,$23,$24) returning *`,
       [id, payload.basics.slug, payload.basics.name, payload.basics.shortName, payload.branding.color, payload.branding.logoText, payload.plan.plan, payload.placement.cell, payload.placement.target, cell.region,
         JSON.stringify(entitlement), JSON.stringify({ name: payload.basics.contactName, phone: payload.basics.contactPhone, email: payload.basics.contactEmail }), payload.basics.gstin, payload.basics.board,
-        [payload.basics.address, payload.basics.city].filter(Boolean).join(', '), payload.placement.addressing, payload.placement.customDomain, payload.branding.appName, user.email, this.env.APP_VERSION, payload.data.start === 'demo', payload.basics.country, payload.basics.timezone, payload.basics.locale, payload.basics.currency])).rows[0]!;
+        [payload.basics.address, payload.basics.city].filter(Boolean).join(', '), payload.placement.addressing, payload.placement.customDomain, payload.branding.appName, user.email, this.env.APP_VERSION, payload.basics.country, payload.basics.timezone, payload.basics.locale, payload.basics.currency])).rows[0]!;
     if (opts.dryRun) {
       // A dry run needs a school record to read from; it is removed as soon as the run has finished.
       try {

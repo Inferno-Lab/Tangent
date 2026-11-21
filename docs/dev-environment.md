@@ -20,7 +20,7 @@ flutter build apk --release --target-platform android-arm64,android-arm  # phone
 
 - `android/gradle.properties` sets `kotlin.incremental=false`: the repo and the pub cache sit on different drives and incremental Kotlin fails across them.
 - Release builds take 5–10 minutes. Run them in the background and poll for an explicit `EXIT=` marker in the log; never wait on a file a failed build will not create.
-- Per-school release signing and store accounts belong to the platform plan; the current APK is debug-signed for demos.
+- Per-school release signing and store accounts belong to the platform plan; a local APK is debug-signed, for testing.
 
 ## Windows scripting pitfalls
 
@@ -31,6 +31,6 @@ flutter build apk --release --target-platform android-arm64,android-arm  # phone
 ## Platform (admin, console, backend)
 
 - Node 24 (`.node-version`) and pnpm 10 (`corepack enable`). No Docker: tests and `tools/dev-reset.sh` start a throwaway PostgreSQL from an npm package with `pg_ctl` (it refuses to run as an administrator on Windows).
-- `bash tools/dev-reset.sh` in the background; `/tmp/reset.log` ends with "Greenfield is live". Ports: PostgreSQL 54329, server 4000, admin 5173, console 5174.
+- `bash tools/dev-reset.sh` in the background; `/tmp/reset.log` ends with "Sunrise Valley School has moved in". Ports: PostgreSQL 54329, server 4000, admin 5173, console 5174.
 - Playwright (Chromium) is a root dev dependency for `tools/audit-ui.mjs`, `e2e-*.mjs` and `shot.mjs`; run `npx playwright install chromium` once.
 - Git Bash rewrites env values that start with `/`: use `MSYS_NO_PATHCONV=1`. More traps: `docs/HANDOFF.md` section 6.

@@ -3,24 +3,17 @@
 // Usage: node tools/shot.mjs <url> <out.png> [width] [height] [--dark] [--school slug] [--console] [--full] [--audit] [--do '[{"click":"text=Modules"},{"fill":["sel","text"]},{"wait":300}]']
 import { chromium } from '@playwright/test';
 import { auditPage } from './lib/audit.mjs';
+import { SCHOOL, adminKey, consoleKey } from './dataset/session.mjs';
 
 const args = process.argv.slice(2);
 const flag = (n) => args.includes(n);
 const val = (n) => (args.includes(n) ? args[args.indexOf(n) + 1] : undefined);
 const [url, out, w = '1440', h = '900'] = args.filter((a, i) => !a.startsWith('--') && !['--school', '--do', '--wait'].includes(args[i - 1]));
-const api = process.env.API ?? 'http://localhost:4000';
-const slug = val('--school') ?? 'greenfield';
+const slug = val('--school') ?? SCHOOL;
 
 async function tokens() {
-  if (flag('--console')) {
-    const a = await (await fetch(`${api}/console/v1/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ identifier: 'kaushal@tangent.app', password: 'nest2026' }) })).json();
-    const t = await (await fetch(`${api}/console/v1/auth/verify`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ challengeId: a.challenge.challengeId, code: '424242' }) })).json();
-    return { key: 'tangent.console', value: JSON.stringify({ user: t.user }), token: t.accessToken };
-  }
-  const h = { 'content-type': 'application/json', 'x-school': slug };
-  const a = await (await fetch(`${api}/v1/auth/login`, { method: 'POST', headers: h, body: JSON.stringify({ identifier: 'neha.menon@greenfield.edu.in', password: 'nest2026' }) })).json();
-  const t = await (await fetch(`${api}/v1/auth/verify`, { method: 'POST', headers: h, body: JSON.stringify({ challengeId: a.challenge.challengeId, code: '424242' }) })).json();
-  return { key: `tangent.admin.${slug}`, value: JSON.stringify({ user: t.user }), token: t.accessToken };
+  const [key, value, token] = flag('--console') ? (await consoleKey(slug)).key : await adminKey(slug);
+  return { key, value, token };
 }
 
 const browser = await chromium.launch();

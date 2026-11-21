@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
-import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/utils/app_exception.dart';
 import 'package:tangent/core/utils/loadable.dart';
 import 'package:tangent/core/widgets/toast.dart';
@@ -83,7 +82,7 @@ class DriverController extends GetxController with Loadable {
   /// Sends the bus's position at most every 20 seconds while the trip runs. Without permission the trip still runs; families
   /// then see the bus from its tracker, or not at all, and the driver is told.
   Future<void> _share(String tripId) async {
-    if (!AppConfig.live || _gps != null) return;
+    if (_gps != null) return;
     var allowed = await Geolocator.checkPermission();
     if (allowed == LocationPermission.denied) allowed = await Geolocator.requestPermission();
     if (allowed == LocationPermission.denied || allowed == LocationPermission.deniedForever || !await Geolocator.isLocationServiceEnabled()) {

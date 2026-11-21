@@ -7,8 +7,8 @@ let parent: string;
 let teacher: string;
 beforeAll(async () => {
   h = await startHarness();
-  parent = await h.login('priya.sharma@example.com');
-  teacher = await h.login('kavita.iyer@greenfield.edu.in');
+  parent = await h.login(h.people.parentOfOne.phone);
+  teacher = await h.login(h.people.classTeacher.email);
 }, 240_000);
 afterAll(async () => {
   await h?.close();
@@ -24,21 +24,22 @@ describe('the account', () => {
   });
 
   it('changes an email only with the code sent to the new one, and never to one someone else has', async () => {
-    const taken = (await h.schoolSql("select email from users where kind = 'staff' and email is not null and email <> 'kavita.iyer@greenfield.edu.in' limit 1"))[0].email;
+    const taken = (await h.schoolSql("select email from users where kind = 'staff' and email is not null and email <> $1 limit 1", [h.people.classTeacher.email]))[0].email;
     expect((await call(teacher, 'POST', '/v1/me/contact', { email: taken })).status).toBe(409);
-    expect((await call(teacher, 'POST', '/v1/me/contact', { email: 'kavita.iyer@greenfield.edu.in' })).status).toBe(400);
+    expect((await call(teacher, 'POST', '/v1/me/contact', { email: h.people.classTeacher.email })).status).toBe(400);
     expect((await call(teacher, 'POST', '/v1/me/contact', { phone: '+14155550111', email: 'x@example.org' })).status).toBe(400);
     const ch = (await call(teacher, 'POST', '/v1/me/contact', { email: 'kavita.new@example.org' })).json;
     expect(ch).toMatchObject({ channel: 'email', maskedTo: expect.stringMatching(/@example\.org$/), resendInSeconds: expect.any(Number) });
-    // The demo school's code is fixed; a sign-in code cannot stand in for it, nor can someone else use it.
-    const wrong = await call(parent, 'POST', '/v1/f/me/contact/confirm', { challengeId: ch.challengeId, code: ch.demoCode });
+    // Someone else cannot use the code sent to the new address.
+    const wrong = await call(parent, 'POST', '/v1/f/me/contact/confirm', { challengeId: ch.challengeId, code: await h.codeSentTo('kavita.new@example.org') });
     expect(wrong.status, JSON.stringify(wrong.json)).toBe(401);
     expect((await call(teacher, 'POST', '/v1/me/contact/confirm', { challengeId: ch.challengeId, code: '000000' })).status).toBe(401);
     const ch2 = (await call(teacher, 'POST', '/v1/me/contact', { email: 'kavita.new@example.org' })).json;
-    expect((await call(teacher, 'POST', '/v1/me/contact/confirm', { challengeId: ch2.challengeId, code: ch2.demoCode })).status).toBe(204);
+    const code = await h.codeSentTo('kavita.new@example.org');
+    expect((await call(teacher, 'POST', '/v1/me/contact/confirm', { challengeId: ch2.challengeId, code })).status).toBe(204);
     expect((await h.schoolSql("select email from users where email = 'kavita.new@example.org'"))).toHaveLength(1);
     // Spent: the same code does nothing twice.
-    expect((await call(teacher, 'POST', '/v1/me/contact/confirm', { challengeId: ch2.challengeId, code: ch2.demoCode })).status).toBe(401);
+    expect((await call(teacher, 'POST', '/v1/me/contact/confirm', { challengeId: ch2.challengeId, code })).status).toBe(401);
   });
 
   it('changes a parent’s phone on the family’s record too', async () => {
@@ -46,8 +47,8 @@ describe('the account', () => {
     expect(r0.status, JSON.stringify(r0.json)).toBe(200);
     const ch = r0.json;
     expect(ch.channel).toBe('sms');
-    expect((await call(parent, 'POST', '/v1/f/me/contact/confirm', { challengeId: ch.challengeId, code: ch.demoCode })).status).toBe(204);
-    const g = await h.schoolSql("select g.phone from guardians g join users u on u.id = g.user_id where u.email = 'priya.sharma@example.com'");
+    expect((await call(parent, 'POST', '/v1/f/me/contact/confirm', { challengeId: ch.challengeId, code: await h.codeSentTo('+919822055555') })).status).toBe(204);
+    const g = await h.schoolSql("select g.phone from guardians g join users u on u.id = g.user_id where u.phone = '+919822055555'");
     expect(g[0].phone).toBe('+919822055555');
   });
 

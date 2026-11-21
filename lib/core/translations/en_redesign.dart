@@ -14,7 +14,7 @@ const enRedesign = <String, String>{
   'common.logout': 'Sign out',
   'errors.cant_open': "Couldn't open that on this phone",
   'common.copied': 'Copied. Paste it into any app to share it.',
-  'common.sample_only': 'This opens from the school’s server; sample content has none.',
+  'common.file_missing': 'This file is not available any more.',
   'homework.due_title': 'Hand in: @title',
   'errors.didnt_load': "This didn't load",
   'time.today': 'today',
@@ -81,7 +81,6 @@ const enRedesign = <String, String>{
   'auth.hide_password': 'Hide password',
   'auth.show_password': 'Show password',
   'auth.use_code': 'Use a one-time code',
-  'auth.or_demo': 'or explore a demo',
   'auth.trouble': 'Trouble signing in?',
   'auth.contact_office': 'Contact the school office',
   'auth.enter_code': 'Enter the code',
@@ -91,10 +90,7 @@ const enRedesign = <String, String>{
   'auth.resend_in': 'Resend in',
   'auth.code_note': 'The code fills in automatically when the SMS arrives. Codes expire after 10 minutes.',
   'auth.verify': 'Verify',
-  'auth.demo_line_pick': 'Pick a role to look around with sample data. Nothing is saved.',
-  'auth.demo_line_parent': 'Signs in as Priya, parent of Aarav and Ananya, with sample data. Nothing is saved.',
   'errors.student_login': 'Students sign in through a parent account.',
-  'auth.demo_line_teacher': 'Signs in as Kavita Iyer, class teacher of 8 A, with sample data. Nothing is saved.',
 
   // home
   'home.now': 'Now',

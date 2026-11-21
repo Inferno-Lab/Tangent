@@ -11,7 +11,7 @@ import 'support/harness.dart';
 /// The consent step must show "I agree" on a small phone however long the school's privacy notice is.
 void main() {
   testWidgets('consent keeps I agree in view on a small phone', (tester) async {
-    await bootMock();
+    await bootApp();
     Get.testMode = false;
     tester.view.physicalSize = const Size(360 * 2.0, 640 * 2.0);
     tester.view.devicePixelRatio = 2;

@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
-import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/data/datasources/remote_datasource.dart';
 
 /// One event from the school, by its type (chat.message, chat.typing, chat.read, notification, bus.position, bus.trip).
@@ -34,7 +33,7 @@ class LiveStream extends GetxService {
 
   /// Called once the person has signed in (the shell), and stopped at sign-out.
   void start() {
-    if (!AppConfig.live || _wanted) return;
+    if (_wanted) return;
     _wanted = true;
     unawaited(_open());
   }

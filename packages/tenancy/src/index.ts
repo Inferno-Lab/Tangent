@@ -24,8 +24,6 @@ export interface TenantInfo {
   apiVersion: string;
   /** Console flags that apply to this school (its own value beats the fleet-wide one). */
   flags: Record<string, boolean>;
-  /** A demo school: demo sign-in cards and the demo code work. */
-  demo: boolean;
   /** Tangent pressed Go live: the school has moved in. */
   wentLive: boolean;
   /** Where the school is (ISO 3166 country), its IANA time zone, BCP 47 locale and ISO 4217 currency. */
@@ -89,7 +87,6 @@ export class Registry {
         configVersion: row.configVersion,
         apiVersion: row.apiVersion,
         flags: Object.fromEntries(fl.rows.map((f) => [f.key, f.enabled])),
-        demo: row.demo,
         wentLive: !!row.wentLiveAt,
         country: row.country, timezone: row.timezone, locale: row.locale, currency: row.currency,
       };

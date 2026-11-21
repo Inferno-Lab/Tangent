@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/utils/app_exception.dart';
@@ -11,9 +10,8 @@ import 'package:tangent/data/models/user.dart';
 import 'package:tangent/data/repositories/auth_repository.dart';
 
 class LoginController extends GetxController {
-  // Sample content starts filled in; a real school starts empty.
-  final email = TextEditingController(text: AppConfig.live ? '' : 'priya.sharma@tangent.app');
-  final password = TextEditingController(text: AppConfig.live ? '' : AppConfig.demoPassword);
+  final email = TextEditingController();
+  final password = TextEditingController();
   final otp = TextEditingController();
   final formKey = GlobalKey<FormState>();
   final loading = false.obs;
@@ -23,8 +21,6 @@ class LoginController extends GetxController {
   final resendIn = 30.obs;
   /// True when the person asked for a code instead of typing a password (families have no password).
   var _codeOnly = false;
-  /// Demo role picked on the login shelf; none until the user taps one.
-  final demoRole = Rxn<UserRole>();
 
   /// "Use a code instead" and "Resend": a fresh code, by the same route the person started on.
   Future<void> requestCode() {
@@ -37,10 +33,6 @@ class LoginController extends GetxController {
   }
 
   Future<void> resend() => _codeOnly ? requestCode() : _enter(() => Get.find<AuthRepository>().login(email: email.text, password: password.text));
-
-  Future<void> demo(UserRole role) => _enter(
-    () => Get.find<AuthRepository>().loginAs(role),
-  );
 
   Future<void> submit() async {
     if (formKey.currentState?.validate() != true) return;
@@ -75,8 +67,7 @@ class LoginController extends GetxController {
       useOtp.value = true;
       resendIn.value = sent.resendIn;
       resendIn.refresh();
-      final hint = sent.demoCode;
-      ToastHelper.show(sent.message, body: hint == null ? sent.sentTo : '${sent.sentTo} · $hint');
+      ToastHelper.show(sent.message, body: sent.sentTo);
     } on AppException catch (error) {
       ToastHelper.show(error.message, kind: ToastKind.error);
     } finally {

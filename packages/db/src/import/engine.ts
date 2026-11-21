@@ -27,7 +27,13 @@ function readInput(kind: ImportKind, input: Pick<ImportInput, 'csv' | 'rows'>): 
     const headers = kind.columns.map((c) => c.key);
     return { headers, data: input.rows.map((r) => headers.map((h) => (r[h] ?? '').trim())).filter((r) => r.some(Boolean)) };
   }
-  const [headers = [], ...data] = readTable(input.csv ?? '');
+  const table = readTable(input.csv ?? '');
+  // A school's spreadsheet often has a title, a date or a blank line above its headers: the header row is the one among the
+  // first ten whose cells name the most of this kind's columns (the first row when none names any).
+  const named = (row: string[]) => Object.values(autoMap(kind, row, detectSource(kind, row))).filter(Boolean).length;
+  const top = table.slice(0, 10).map(named);
+  const at = top.indexOf(Math.max(0, ...top));
+  const [headers = [], ...data] = table.slice(Math.max(0, at));
   return { headers, data };
 }
 
@@ -41,11 +47,16 @@ function detectSource(kind: ImportKind, headers: string[]): string {
 function autoMap(kind: ImportKind, headers: string[], source: string): Record<string, string> {
   const preset = SOURCES.find((s) => s.key === source)?.aliases ?? {};
   const out: Record<string, string> = {};
+  const taken = new Set<string>();
   for (const h of headers) {
     const n = norm(h);
-    const hit = kind.columns.find((c) => norm(c.key) === n || norm(c.label) === n || norm(rawOf(c).label) === n || (c.aliases ?? []).some((a) => norm(a) === n))?.key
-      ?? (kind.columns.some((c) => c.key === preset[n]) ? preset[n] : undefined)
+    // A known system's own columns first (its "Mother name" is the second guardian); then the first column this header
+    // names that no earlier header took, so "Father name" and "Mother name" in one file become two guardians, not one.
+    const named = kind.columns.filter((c) => norm(c.key) === n || norm(c.label) === n || norm(rawOf(c).label) === n || (c.aliases ?? []).some((a) => norm(a) === n));
+    const hit = (kind.columns.some((c) => c.key === preset[n]) ? preset[n] : undefined)
+      ?? (named.find((c) => !taken.has(c.key)) ?? named[0])?.key
       ?? (n === 'firstname' || n === 'middlename' || n === 'lastname' ? kind.columns.find((c) => c.key === 'name')?.key : undefined);
+    if (hit) taken.add(hit);
     out[h] = hit ?? '';
   }
   return out;

@@ -1,11 +1,7 @@
 import 'package:tangent/core/services/school_config.dart';
-import 'package:tangent/core/utils/extensions.dart';
 import 'package:tangent/core/utils/status.dart';
-import 'package:tangent/data/datasources/mock_json_datasource.dart';
-import 'package:tangent/data/datasources/mock_writes.dart';
 import 'package:tangent/data/datasources/remote_datasource.dart';
 import 'package:tangent/data/models/academics.dart';
-import 'package:tangent/core/utils/clock.dart';
 
 abstract class AttendanceRepository {
   Future<List<AttendanceDay>> forStudent(String studentId);
@@ -15,47 +11,6 @@ abstract class AttendanceRepository {
   Future<Map<String, AttendanceStatus>> todayForClass(List<String> studentIds);
 
   Future<void> markToday(Map<String, AttendanceStatus> byStudent);
-}
-
-class MockAttendanceRepository implements AttendanceRepository {
-  MockAttendanceRepository(this._ds);
-
-  final MockJsonDataSource _ds;
-
-  @override
-  Future<List<AttendanceDay>> forStudent(String studentId) => _ds.guard(
-    () => _ds.attendance.where((day) => day.studentId == studentId).toList(),
-  );
-
-  @override
-  Future<AttendanceSummary> summary(String studentId, {DateTime? month}) {
-    return _ds.guard(() {
-      final days = _ds.attendance.where((day) {
-        if (day.studentId != studentId) return false;
-        if (month == null) return true;
-        return day.date.year == month.year && day.date.month == month.month;
-      });
-      return AttendanceSummary.from(days.toList());
-    });
-  }
-
-  @override
-  Future<Map<String, AttendanceStatus>> todayForClass(List<String> studentIds) {
-    return _ds.guard(() {
-      final today = Clock.now().dateOnly;
-      final map = <String, AttendanceStatus>{};
-      for (final day in _ds.attendance) {
-        if (!studentIds.contains(day.studentId)) continue;
-        if (day.date.dateOnly != today) continue;
-        map[day.studentId] = day.status;
-      }
-      return map;
-    });
-  }
-
-  @override
-  Future<void> markToday(Map<String, AttendanceStatus> byStudent) =>
-      _ds.guard(() => _ds.markAttendance(byStudent));
 }
 
 class RemoteAttendanceRepository implements AttendanceRepository {
@@ -101,17 +56,6 @@ abstract class TimetableRepository {
   Future<List<TimetableDay>> forClass(String classId);
 }
 
-class MockTimetableRepository implements TimetableRepository {
-  MockTimetableRepository(this._ds);
-
-  final MockJsonDataSource _ds;
-
-  @override
-  Future<List<TimetableDay>> forClass(String classId) => _ds.guard(
-    () => _ds.timetable.where((day) => day.classId == classId).toList(),
-  );
-}
-
 class RemoteTimetableRepository implements TimetableRepository {
   RemoteTimetableRepository(this._remote);
 
@@ -148,60 +92,6 @@ abstract class HomeworkRepository {
   });
 
   Future<void> assign(Homework homework);
-}
-
-class MockHomeworkRepository implements HomeworkRepository {
-  MockHomeworkRepository(this._ds);
-
-  final MockJsonDataSource _ds;
-
-  @override
-  Future<List<Homework>> forClass(String classId) => _ds.guard(
-    () => _ds.homework.where((item) => item.classId == classId).toList(),
-  );
-
-  @override
-  Future<Homework?> byId(String id) => _ds.guard(() {
-    for (final item in _ds.homework) {
-      if (item.id == id) return item;
-    }
-    return null;
-  });
-
-  @override
-  Future<void> submit({
-    required String homeworkId,
-    required String studentId,
-    required String fileName,
-    String? filePath,
-  }) => _ds.guard(
-    () => _ds.submitHomework(
-      homeworkId: homeworkId,
-      studentId: studentId,
-      fileName: fileName,
-    ),
-  );
-
-  @override
-  Future<void> grade({
-    required String homeworkId,
-    required String studentId,
-    required int marks,
-    required String grade,
-    required String feedback,
-  }) => _ds.guard(
-    () => _ds.gradeHomework(
-      homeworkId: homeworkId,
-      studentId: studentId,
-      marks: marks,
-      grade: grade,
-      feedback: feedback,
-    ),
-  );
-
-  @override
-  Future<void> assign(Homework homework) =>
-      _ds.guard(() => _ds.addHomework(homework));
 }
 
 class RemoteHomeworkRepository implements HomeworkRepository {
@@ -276,47 +166,6 @@ abstract class ExamRepository {
     required Map<String, int> values,
     Map<String, String> grades = const {},
   });
-}
-
-class MockExamRepository implements ExamRepository {
-  MockExamRepository(this._ds);
-
-  final MockJsonDataSource _ds;
-
-  @override
-  Future<List<Exam>> forClass(String classId) => _ds.guard(
-    () => _ds.exams.where((exam) => exam.classId == classId).toList(),
-  );
-
-  @override
-  Future<ExamResult?> result({
-    required String examId,
-    required String studentId,
-  }) => _ds.guard(() {
-    for (final item in _ds.results) {
-      if (item.examId == examId && item.studentId == studentId) return item;
-    }
-    return null;
-  });
-
-  @override
-  Future<List<ExamResult>> resultsFor(String studentId) => _ds.guard(
-    () => _ds.results.where((item) => item.studentId == studentId).toList(),
-  );
-
-  @override
-  Future<({Map<String, int> marks, int maxMarks, List<String> grades, Map<String, String> gradeMarks})> marksDraft(String classId, String subject) =>
-      _ds.guard(() => (marks: {...?_ds.marks['$classId|$subject']}, maxMarks: SchoolConfig.defaultMaxMarks, grades: const <String>[], gradeMarks: const <String, String>{}));
-
-  @override
-  Future<void> saveMarks({
-    required String classId,
-    required String subject,
-    required Map<String, int> values,
-    Map<String, String> grades = const {},
-  }) => _ds.guard(
-    () => _ds.saveMarks(classId: classId, subject: subject, values: values),
-  );
 }
 
 class RemoteExamRepository implements ExamRepository {

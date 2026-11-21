@@ -23,8 +23,8 @@ describe('scheduled reports', () => {
   });
 
   it('goes only to staff who may read reports, once on its day, as email', async () => {
-    const me = (await h.schoolSql("select id from users where email = 'principal@greenfield.edu.in' or (kind = 'staff' and id in (select user_id from user_roles ur join roles r on r.id = ur.role_id where r.locked)) limit 1"))[0].id;
-    const teacher = (await h.schoolSql("select id from users where email = 'kavita.iyer@greenfield.edu.in'"))[0].id;
+    const me = await h.userId(h.people.principal.email);
+    const teacher = await h.userId(h.people.classTeacher.email);
     const add = (b: Record<string, unknown>) => h.call('POST', '/v1/reports/schedules', { token: admin, body: { reportId: 'attendance-class', every: 'week', day: 1, ...b } });
     expect((await add({ to: [teacher] })).status).toBe(400);
     expect((await add({ to: [me], every: 'week', day: 9 })).status).toBe(400);

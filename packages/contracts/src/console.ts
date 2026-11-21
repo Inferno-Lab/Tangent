@@ -201,7 +201,7 @@ export const WizardAdmin = z.object({
   roles: z.array(z.string()).default(['principal']),
 });
 
-export const WizardData = z.object({ start: z.enum(['empty', 'demo', 'import']).default('demo') });
+export const WizardData = z.object({ start: z.enum(['empty', 'import']).default('empty') });
 
 export const WizardPayload = z.object({
   basics: WizardBasics,

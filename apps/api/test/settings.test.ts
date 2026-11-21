@@ -7,7 +7,7 @@ let teacher: string;
 beforeAll(async () => {
   h = await startHarness();
   principal = await h.login();
-  teacher = await h.login('kavita.iyer@greenfield.edu.in');
+  teacher = await h.login(h.people.classTeacher.email);
 }, 240_000);
 afterAll(async () => {
   await h?.close();
@@ -67,9 +67,9 @@ describe('the school changes its own settings', () => {
     const self = await h.call('POST', `/v1/approvals/${r.json.approvalId}/decision`, { token: principal, body: { decision: 'approve' } });
     expect(self.status).toBe(403);
     const staff = (await h.call('GET', '/v1/staff', { token: principal })).json;
-    const sunita = (Array.isArray(staff) ? staff : staff.items).find((s: any) => s.email === 'sunita.desai@greenfield.edu.in');
+    const sunita = (Array.isArray(staff) ? staff : staff.items).find((s: any) => s.email === h.people.mathsTeacher.email);
     expect((await h.call('PATCH', `/v1/staff/${sunita.id}`, { token: principal, body: { roleId: 'role_principal' } })).status).toBe(200);
-    const second = await h.login('sunita.desai@greenfield.edu.in');
+    const second = await h.login(h.people.mathsTeacher.email);
     const ok = await h.call('POST', `/v1/approvals/${r.json.approvalId}/decision`, { token: second, body: { decision: 'approve' } });
     expect(ok.status).toBe(200);
     expect((await view()).json.values['privacy.retentionMonths']).toBe(48);
@@ -84,14 +84,14 @@ describe('the school changes its own settings', () => {
     // A list without a mark for present, or with two of the same key, is refused.
     expect((await change({ 'attendance.statuses': marks.filter((m) => m.meaning !== 'present') })).status).toBe(400);
     const date = new Date().toISOString().slice(0, 10);
-    const day = (await h.call('GET', `/v1/attendance/day?classId=cls_8a&date=${date}`, { token: principal })).json;
+    const day = (await h.call('GET', `/v1/attendance/day?classId=${await h.classId('8 A')}&date=${date}`, { token: principal })).json;
     const first = day.marks[0].studentId;
-    const put = await h.call('PUT', '/v1/attendance/day', { token: principal, body: { classId: 'cls_8a', date, marks: day.marks.map((m: any, i: number) => ({ studentId: m.studentId, status: i === 0 ? 'medical' : 'present' })) } });
+    const put = await h.call('PUT', '/v1/attendance/day', { token: principal, body: { classId: await h.classId('8 A'), date, marks: day.marks.map((m: any, i: number) => ({ studentId: m.studentId, status: i === 0 ? 'medical' : 'present' })) } });
     expect(put.status).toBe(200);
     expect(put.json.marks.find((m: any) => m.studentId === first).status).toBe('medical');
     // A mark the school does not use is refused; the meaning's own name (as the app sends it) still works.
-    expect((await h.call('PUT', '/v1/attendance/day', { token: principal, body: { classId: 'cls_8a', date, marks: [{ studentId: first, status: 'holiday' }] } })).status).toBe(400);
-    expect((await h.call('PUT', '/v1/attendance/day', { token: principal, body: { classId: 'cls_8a', date, marks: day.marks.map((m: any) => ({ studentId: m.studentId, status: m.studentId === first ? 'medical' : 'present' })) } })).status).toBe(200);
+    expect((await h.call('PUT', '/v1/attendance/day', { token: principal, body: { classId: await h.classId('8 A'), date, marks: [{ studentId: first, status: 'holiday' }] } })).status).toBe(400);
+    expect((await h.call('PUT', '/v1/attendance/day', { token: principal, body: { classId: await h.classId('8 A'), date, marks: day.marks.map((m: any) => ({ studentId: m.studentId, status: m.studentId === first ? 'medical' : 'present' })) } })).status).toBe(200);
   });
 
   it('reads phone numbers the school’s country way, and finds a family however they type their number', async () => {
@@ -99,7 +99,8 @@ describe('the school changes its own settings', () => {
     await h.registry.query("update schools set country = 'AE' where slug = $1", [h.slug]);
     await h.entitle({});
     try {
-      const add = (phone: string) => h.call('POST', '/v1/students', { token: principal, body: { name: 'Layla Haddad', classId: 'cls_8a', dob: '2014-03-01', guardianName: 'Omar Haddad', guardianPhone: phone } });
+      const classId = await h.classId('8 A');
+      const add = (phone: string) => h.call('POST', '/v1/students', { token: principal, body: { name: 'Layla Haddad', classId, dob: '2014-03-01', guardianName: 'Omar Haddad', guardianPhone: phone } });
       const short = await add('050 123');
       expect(short.status).toBe(400);
       expect(short.json.fields.guardianPhone).toContain('+971');
@@ -124,7 +125,7 @@ describe('the school’s own fields on its records', () => {
       { key: 'diet', label: 'Diet', kind: 'choice', options: [{ key: 'veg', name: 'Vegetarian' }, { key: 'any', name: 'No restriction' }] },
     ] };
     expect((await change({ 'fields.custom': fields })).status).toBe(200);
-    const body = { name: 'Field Child', classId: 'cls_8a', dob: '2014-03-04', guardianName: 'Field Parent', guardianPhone: '9822099301' };
+    const body = { name: 'Field Child', classId: await h.classId('8 A'), dob: '2014-03-04', guardianName: 'Field Parent', guardianPhone: '9822099301' };
     // A choice not on the field's list is refused with the field named.
     const bad = await h.call('POST', '/v1/students', { token: principal, body: { ...body, custom: { diet: 'Halal' } } });
     expect(bad.status).toBe(400);
@@ -145,27 +146,38 @@ describe('the school’s own fields on its records', () => {
   });
 
   it('shows a family only the fields the school marks for the app, in the reader’s words', async () => {
-    const parent = await h.login('priya.sharma@example.com');
+    const parent = await h.login(h.people.parentOfTwo.phone);
     await change({ 'fields.custom': { student: [
       { key: 'bus_pass', label: 'Bus pass', kind: 'yesno', app: true },
       { key: 'note', label: 'Office note', kind: 'text' },
     ] } });
-    await h.call('PATCH', '/v1/students/stu_aarav', { token: principal, body: { custom: { bus_pass: true, note: 'Private' } } });
-    const s = (await h.call('GET', '/v1/f/students/stu_aarav', { token: parent })).json;
+    const child = (await h.schoolSql('select id from students where admission_no = $1', [h.people.parentOfTwo.children![0]!.admissionNo]))[0].id;
+    await h.call('PATCH', `/v1/students/${child}`, { token: principal, body: { custom: { bus_pass: true, note: 'Private' } } });
+    const s = (await h.call('GET', `/v1/f/students/${child}`, { token: parent })).json;
     expect(s.fields).toEqual({ 'Bus pass': 'Yes' });
     await change({ 'fields.custom': {} });
   });
 });
 
 describe('the school’s own steps for a request', () => {
+  // The class teacher asks for a day off in the app; the school's own steps take it from there.
+  let leave: string;
+  beforeAll(async () => {
+    const day = await h.openDay(40);
+    const asked = await h.call('POST', '/v1/f/staff/leave', { token: teacher, body: { type: 'casual', from: day, to: day, reason: 'A family wedding', halfDay: null } });
+    expect(asked.status, asked.text).toBe(200);
+    leave = (await h.schoolSql("select id from approvals where kind = 'staff_leave' order by created_at desc limit 1"))[0].id;
+  });
+  const decide0 = (token: string) => h.call('POST', `/v1/approvals/${leave}/decision`, { token, body: { decision: 'undo' } });
+
   it('takes a leave request through the office and then the head, each a different person, and undoes back to the start', async () => {
-    const office = await h.login('meera.nair@greenfield.edu.in');
+    const office = await h.login(h.people.office.email);
     await change({ 'workflows.steps': { staff_leave: [{ key: 'office', name: 'Office checks', who: 'role', ref: 'office' }, { key: 'head', name: 'Head decides', who: 'permission' }] } });
-    const decide = (token: string, decision: string, note?: string) => h.call('POST', '/v1/approvals/apr_leave_kavita/decision', { token, body: { decision, note } });
+    const decide = (token: string, decision: string, note?: string) => h.call('POST', `/v1/approvals/${leave}/decision`, { token, body: { decision, note } });
     // The first step is the office's: the principal waits for it.
     expect((await decide(principal, 'approve')).status).toBe(403);
     const waiting = (await h.call('GET', '/v1/approvals?view=waiting', { token: office })).json;
-    expect(waiting.find((a: any) => a.id === 'apr_leave_kavita').step).toMatchObject({ at: 1, of: 2, name: 'Office checks' });
+    expect(waiting.find((a: any) => a.id === leave).step).toMatchObject({ at: 1, of: 2, name: 'Office checks' });
     const one = await decide(office, 'approve', 'Cover arranged');
     expect(one.json).toMatchObject({ status: 'pending', step: { at: 2, of: 2, name: 'Head decides' } });
     // The one who took a step does not take the next.
@@ -182,20 +194,19 @@ describe('the school’s own steps for a request', () => {
     const { ApprovalsService } = await import('../src/school/approvals.service.js');
     const { TenantService } = await import('../src/tenancy/tenant.js');
     const t = await h.app.get(TenantService).resolve(h.slug);
-    await t.pool.query("update approvals set step_at = now() - interval '3 days' where id = 'apr_leave_kavita'");
+    await t.pool.query("update approvals set step_at = now() - interval '3 days' where id = $1", [leave]);
     expect(await h.app.get(ApprovalsService).timeLimits(t)).toMatch(/1 approved/);
-    expect((await t.pool.query("select status from approvals where id = 'apr_leave_kavita'")).rows[0].status).toBe('approved');
+    expect((await t.pool.query('select status from approvals where id = $1', [leave])).rows[0].status).toBe('approved');
     await decide0(principal);
     await change({ 'workflows.steps': {} });
   });
 });
-const decide0 = (token: string) => h.call('POST', '/v1/approvals/apr_leave_kavita/decision', { token, body: { decision: 'undo' } });
 
 describe('addresses written the country’s way', () => {
   it('keeps an address in the country’s parts, checks its postcode, and writes it as one line', async () => {
     const { COUNTRY_PACKS } = await import('@tangent/contracts');
     expect((await change({ 'people.addressFormat': COUNTRY_PACKS.GB!['people.addressFormat'] })).status).toBe(200);
-    const body = { name: 'Address Child', classId: 'cls_8a', dob: '2014-05-06', guardianName: 'Address Parent', guardianPhone: '9822099401' };
+    const body = { name: 'Address Child', classId: await h.classId('8 A'), dob: '2014-05-06', guardianName: 'Address Parent', guardianPhone: '9822099401' };
     const bad = await h.call('POST', '/v1/students', { token: principal, body: { ...body, addressParts: { line1: '10 High Street', postcode: '12345' } } });
     expect(bad.status).toBe(400);
     expect(bad.json.fields['address.postcode']).toBe('Like SW1A 1AA.');
@@ -210,11 +221,13 @@ describe('grading the school’s way', () => {
   it('gives a GPA where the year group is graded with points', async () => {
     const scheme = { key: 'gpa', name: 'GPA', kind: 'points', passPct: 40, grades: [8], bands: [{ grade: 'A', minPct: 80, points: 4 }, { grade: 'B', minPct: 60, points: 3 }, { grade: 'C', minPct: 0, points: 2 }] };
     expect((await change({ 'grading.schemes': [scheme] })).status).toBe(200);
-    const r = (await h.call('GET', '/v1/exams/exm_8a_ut1/results', { token: principal })).json;
+    // The first test of the year in 8 A, as the old system's marks brought it.
+    const [{ id: exam }] = await h.schoolSql("select id from exams where class_id = $1 and name = 'Periodic Test 1'", [await h.classId('8 A')]);
+    const r = (await h.call('GET', `/v1/exams/${exam}/results`, { token: principal })).json;
     expect(r.rows[0].gpa).toBeGreaterThanOrEqual(2);
     expect(['A', 'B', 'C']).toContain(r.rows[0].grade);
     await change({ 'grading.schemes': [] });
-    expect((await h.call('GET', '/v1/exams/exm_8a_ut1/results', { token: principal })).json.rows[0].gpa).toBeNull();
+    expect((await h.call('GET', `/v1/exams/${exam}/results`, { token: principal })).json.rows[0].gpa).toBeNull();
   });
 });
 
@@ -228,13 +241,10 @@ describe('the school’s own printed documents', () => {
     // A block that is not a block is refused before anything prints.
     expect((await h.call('POST', '/v1/school/documents/preview', { token: principal, body: { kind: 'receipt', template: { blocks: [{ kind: 'banner' }] } } })).status).toBe(400);
     expect((await h.call('POST', '/v1/school/documents/preview', { token: teacher, body: { kind: 'receipt', template: receipt } })).status).toBe(403);
-    const pay = (await h.call('GET', '/v1/fees/invoices?studentId=stu_aarav', { token: principal })).json.find((i: any) => i.paid > 0);
-    if (pay) {
-      const pool = (await h.app.get((await import('../src/tenancy/tenant.js')).TenantService).resolve(h.slug)).pool;
-      const id = (await pool.query('select id from payments where invoice_id = $1 limit 1', [pay.id])).rows[0].id;
-      const pdf = await h.call('GET', `/v1/fees/payments/${id}/receipt.pdf`, { token: principal });
-      expect(pdf.headers['content-type']).toContain('application/pdf');
-    }
+    // A receipt the old system wrote, printed on the school's own template.
+    const [{ id }] = await h.schoolSql('select id from payments order by receipt_no limit 1');
+    const pdf = await h.call('GET', `/v1/fees/payments/${id}/receipt.pdf`, { token: principal });
+    expect(pdf.headers['content-type']).toContain('application/pdf');
     await change({ 'documents.templates': {} });
   });
 });

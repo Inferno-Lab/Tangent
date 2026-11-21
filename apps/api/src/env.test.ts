@@ -24,11 +24,6 @@ describe('loadEnv in production', () => {
     expect(loadEnv({ ...base, CORS_ORIGINS: undefined, RENDER_EXTERNAL_URL: own }).CORS_ORIGINS).toBe(own);
     expect(loadEnv({ ...base, CORS_ORIGINS: 'https://old-name.onrender.com', RENDER_EXTERNAL_URL: own }).CORS_ORIGINS.split(',')).toEqual(['https://old-name.onrender.com', own]);
   });
-  it('refuses demo switches unless ALLOW_DEMO is on', () => {
-    expect(() => loadEnv({ ...base, SEED_DEMO: 'true' })).toThrow(/SEED_DEMO/);
-    expect(() => loadEnv({ ...base, DEMO_CODE: '424242' })).toThrow(/DEMO_CODE/);
-    expect(() => loadEnv({ ...base, SEED_DEMO: 'true', ALLOW_DEMO: 'true' })).not.toThrow();
-  });
 });
 
 describe('Limiter', () => {

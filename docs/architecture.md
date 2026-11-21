@@ -7,25 +7,25 @@
 | View | `features/*/views`, `core/widgets` | its controller, design-system widgets, `.tr` | call a repository, hold business logic |
 | Controller | `features/*/controllers` | repositories, services, `Loadable` | build widgets, read `BuildContext` (toasts and routes go through helpers) |
 | Repository | `data/repositories` | a data source | know about GetX state or widgets |
-| Data source | `data/datasources` | JSON assets, `ApiClient` | be called from a controller |
+| Data source | `data/datasources` | `ApiClient` | be called from a controller |
 
-Each repository file holds the **interface**, the **Mock** adapter and the **Remote** adapter for one area (`academic`, `campus`, `directory`, `auth`, `assistant`). One adapter would be a guess; two (mock + remote) is the real seam, so keep both honest.
+Each repository file holds the **interface** and the **Remote** adapter for one area (`academic`, `campus`, `directory`, `auth`, `assistant`). Controllers depend on the interface; the tests run the same Remote adapters against the local test school.
 
 ## Data flow of a screen
 
 1. A route in `app_pages.dart` creates the controller (a `Binding`, or the shell binding for tab screens).
 2. `Loadable.onInit` calls `load()`; `run(...)` flips `state` between loading, success, empty and error. `isEmpty:` decides when the empty design shows.
 3. The view reads `controller.state` in an `Obx` and hands it to `ViewStateView`.
-4. A write (pay, send, submit) goes through the repository; the mock bumps `SessionBus.revision`, and every open `Loadable` controller reloads itself.
+4. A write (pay, send, submit) goes through the repository and bumps `SessionBus.revision`, and every open `Loadable` controller reloads itself; a push or a live event does the same.
 5. Changing the active child (`AuthService.activeStudentId`) reloads them as well.
 
 ## Dependency injection
 
-`lib/core/bindings/initial_binding.dart` registers repositories lazily (`fenix: true`, so they rebuild after a `Get.delete`). Mock when `AppConfig.useMockData`, Remote otherwise. Tests build their own graph in `test/support/harness.dart` (`bootMock`).
+`lib/core/bindings/initial_binding.dart` registers repositories lazily (`fenix: true`, so they rebuild after a `Get.delete`). Every repository is its Remote adapter. Tests build their own graph in `test/support/harness.dart` (`bootLive` against the local school, `bootApp` for widgets that read nothing).
 
-## Feature switches and demo modes
+## Feature switches
 
-`AppConfig` is the only place for them: `useMockData`, `emptyData` (new-school demo), `slowNetwork`, `simulateErrors`, `assistantEnabled` (compile-time, `--dart-define=ASSISTANT=true`). A school build profile can change per-school values (name, tagline, logo). Anything user-facing that is unfinished sits behind a flag until its screen and backend exist.
+`AppConfig` is the only place for them: `assistantEnabled` (compile-time, `--dart-define=ASSISTANT=true`). A school build profile can change per-school values (name, tagline, logo). Anything user-facing that is unfinished sits behind a flag until its screen and backend exist.
 
 ## Roles
 
@@ -50,4 +50,4 @@ This file describes the Flutter app. The rest of the repository is a TypeScript 
  Flutter app    ─┘                ─►  console API (/console/v1)             ─►  registry database (schools, plans, runs, releases)
 ```
 
-How the app meets it today: repositories are interfaces with Mock and Remote adapters. A build with the dart-defines `SCHOOL` and `API_BASE_URL` sets `AppConfig.live`, which turns `useMockData` off, so `InitialBinding` registers the Remote adapters. They call the family API (`/v1/f/*`, `docs/API_CONTRACT.md`) through `lib/core/network/api_client.dart`, which adds `X-School`, the bearer token and one token renewal on a 401. Sign-in is the platform's password then code (`RemoteAuthRepository`, `OtpRequired`). `SchoolProfileService` also replaces `AppConfig.schoolName` and `schoolTagline` with the school's own from `GET /v1/brand`. A build without the defines runs on `assets/mock`.
+How the app meets it: every build has the dart-defines `SCHOOL` and `API_BASE_URL` (`AppConfig.assertSchool` refuses to start without them), and `InitialBinding` registers the Remote adapters. They call the family API (`/v1/f/*`, `docs/API_CONTRACT.md`) through `lib/core/network/api_client.dart`, which adds `X-School`, the bearer token and one token renewal on a 401. Sign-in is the platform's password then code (`RemoteAuthRepository`, `OtpRequired`). `SchoolProfileService` also replaces `AppConfig.schoolName` and `schoolTagline` with the school's own from `GET /v1/brand`.

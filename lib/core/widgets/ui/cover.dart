@@ -56,7 +56,7 @@ class Cover extends StatelessWidget {
       ),
       foregroundDecoration: const _SpineDecoration(),
       child: Text(
-        label ?? subjectAbbr[subject] ?? subject.substring(0, 2).toUpperCase(),
+        label ?? subjectAbbr[subject] ?? _abbr(subjectName(subject)),
         style: hueText(large ? 13 : 11, 760, width: 122, height: 1, em: .05, color: pigment.on),
         maxLines: 1,
       ),
@@ -152,4 +152,11 @@ class CellArt extends StatelessWidget {
 
     return width != null ? grid(width!) : LayoutBuilder(builder: (context, box) => grid(box.maxWidth));
   }
+}
+
+/// "Mathematics" → "MAT", "Social Science" → "SS": a school's own subject, as a cover's short label.
+String _abbr(String name) {
+  final words = name.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+  if (words.length > 1) return words.take(3).map((w) => w[0]).join().toUpperCase();
+  return name.length <= 3 ? name.toUpperCase() : name.substring(0, 3).toUpperCase();
 }

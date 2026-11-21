@@ -152,11 +152,18 @@ class PageFrame extends StatelessWidget {
               child: Row(
                 children: [
                   ?leading,
-                  const Spacer(),
-                  for (var i = 0; i < actions.length; i++) ...[
-                    if (i > 0) const SizedBox(width: 10),
-                    actions[i],
-                  ],
+                  // The actions take what the back button leaves; one wrapped in Flexible (a long name) shrinks to fit.
+                  Expanded(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        for (var i = 0; i < actions.length; i++) ...[
+                          if (i > 0) const SizedBox(width: 10),
+                          actions[i],
+                        ],
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
