@@ -166,6 +166,8 @@ export class LearningService {
   // Exams
 
   async exams(t: TenantCtx, classId?: string): Promise<ExamRow[]> {
+    // An exam that has begun is being marked, whether or not a mark is in yet (it is never "coming up" once written).
+    const today = schoolToday();
     const { rows } = await t.pool.query<{ id: string; name: string; kind: string; class_id: string; class_name: string; grade: number; starts_on: string; ends_on: string; status: ExamRow['status']; students: string; reopened_note: string }>(
       `select e.id, e.name, e.kind, e.class_id, c.name class_name, c.grade, e.starts_on::text, e.ends_on::text, e.status, e.reopened_note,
          (select count(*) from students s where s.class_id = e.class_id and s.status = 'active') students
@@ -189,7 +191,7 @@ export class LearningService {
         return { subjectId: s.subject_id, name: s.name, onDate: s.on_date, maxMarks: s.max_marks, startsAt: s.starts_at, endsAt: s.ends_at, room: s.room, invigilatorId: s.invigilator_id, invigilatorName: s.invigilator, grades: scheme.entry === 'grade' ? gradesOf(scheme) : [],
           criteria: scheme.kind === 'rubric' ? scheme.criteria ?? [] : [] };
       });
-      return { id: r.id, name: r.name, kind: r.kind, classId: r.class_id, className: r.class_name, startsOn: r.starts_on, endsOn: r.ends_on, status: r.status, subjects, entered: enteredBy.get(r.id) ?? 0, expected: Number(r.students) * subjects.length, reopenedNote: r.reopened_note };
+      return { id: r.id, name: r.name, kind: r.kind, classId: r.class_id, className: r.class_name, startsOn: r.starts_on, endsOn: r.ends_on, status: r.status === 'upcoming' && r.starts_on <= today ? 'marking' : r.status, subjects, entered: enteredBy.get(r.id) ?? 0, expected: Number(r.students) * subjects.length, reopenedNote: r.reopened_note };
     });
   }
 

@@ -61,6 +61,8 @@ describe('exams', () => {
     expect(made.status).toBe(201);
     expect(made.json.expected).toBe(inClass * 2);
     const id = made.json.id;
+    // Written yesterday: it is being marked, not coming up, though no mark is in yet.
+    expect((await get(`/v1/exams?classId=${cls}`)).json.find((e: any) => e.id === id).status).toBe('marking');
     const view = (await get(`/v1/exams/${id}/marks`)).json;
     expect(view.students).toHaveLength(inClass);
     expect((await send('POST', `/v1/exams/${id}/publish`)).status).toBe(409);
