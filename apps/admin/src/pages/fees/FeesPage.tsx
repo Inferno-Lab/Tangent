@@ -101,7 +101,7 @@ function Overview({ tabs }: { tabs: React.ReactNode }) { const app = useApp();
                     );
                   })}
                 </div>
-              ) : <p className="t2" style={{ fontSize: 14 }}>{t('admin.fees_page.payments_appear_here_day_by')}</p>}
+              ) : <EmptyNote icon="payments" title={t('admin.fees_page.no_payments_yet')} body={t('admin.fees_page.payments_appear_here_day_by')} />}
             </section>
             <section className="card">
               <div className="ch"><h2>{t('admin.fees_page.by_kind_of_fee')}</h2><small>{s.monthLabel}</small></div>

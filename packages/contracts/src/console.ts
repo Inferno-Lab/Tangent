@@ -772,7 +772,7 @@ export const appIdFor = (slug: string, prefix = 'com.tangent.') => `${prefix.end
 /** Console history in words: each entry's action key as people read it (every console page shows these, never the key). */
 const AUDIT_WORDS: Record<string, string> = {
   'auth.authenticator_added': 'Added an authenticator', 'auth.authenticator_reset': 'Reset their authenticator', 'auth.password_changed': 'Changed their password',
-  'auth.password_reset': 'Reset their password', 'auth.refresh_replayed': 'A stolen sign-in was stopped', 'billing.generated': 'Created the month’s invoices',
+  'auth.password_reset': 'Reset their password', 'auth.refresh_replayed': 'A stolen sign-in was stopped', 'auth.signed_in': 'Signed in', 'billing.generated': 'Created the month’s invoices',
   'blueprint.activated': 'Switched a blueprint on', 'blueprint.saved': 'Saved a blueprint', 'build.requested': 'Asked for an app build', 'cell.changed': 'Changed a cell',
   'cell.created': 'Added a cell', 'cell.removed': 'Removed a cell', 'checklist.changed': 'Changed an app store step', 'config.changed': 'Changed settings', 'flag.removed': 'Removed a flag',
   'flag.set': 'Switched a flag', 'import.committed': 'Imported records', 'import.file_set_aside': 'Set a school’s file aside', 'import.sample_loaded': 'Loaded a test school',

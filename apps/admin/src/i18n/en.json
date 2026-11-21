@@ -722,6 +722,7 @@
  "admin.fees_page.open": "Open {name}",
  "admin.fees_page.overdue": "Overdue",
  "admin.fees_page.parent": "{@Guardian}",
+ "admin.fees_page.no_payments_yet": "No payments yet",
  "admin.fees_page.payments_appear_here_day_by": "Payments appear here, day by day, as {@fees} are collected.",
  "admin.fees_page.period": "Period",
  "admin.fees_page.previous": "Previous",
