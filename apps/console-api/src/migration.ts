@@ -182,6 +182,8 @@ export class Migration implements OnModuleInit {
   }
 
   async undo(id: string, batchId: string, by: string): Promise<ImportBatchRow[]> {
+    // A running import becomes the newest batch; undoing under it would wait on its lock, then undo what is no longer the newest.
+    if ((await this.db.pool.query("select 1 from import_runs where school_id = $1 and status = 'running'", [id])).rowCount) throw new ApiError('conflict', tx('Undo once the imports running now have finished.'));
     return this.with(id, async (pool) => {
       await undoBatch(pool, batchId);
       await pool.query("update import_uploads set status = 'new', batch_id = null where batch_id = $1", [batchId]);

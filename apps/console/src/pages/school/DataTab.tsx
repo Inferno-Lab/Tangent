@@ -46,6 +46,8 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
       else say(tr('console.data_tab.run_did_not_finish', { file: r.fileName, error: r.error ?? '' }), 'bad');
     }
   }, [v?.runs]);
+  // An import still running becomes the newest batch, and only the newest can be undone: undo waits until the queue is empty.
+  const running = (v?.runs ?? []).some((r) => r.status === 'running');
   const kind = v?.kinds.find((k) => k.key === (kindKey || v.kinds[0]?.key));
   const input = (): ImportInputIn | null => (!src || !kind ? null : src.kind === 'file'
     ? { kind: kind.key, csv: src.content, fileName: src.fileName, uploadId: src.uploadId, mapping, values }
@@ -106,7 +108,7 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
             <b><span className={`chip ${r.status === 'done' ? 'g' : r.status === 'failed' ? 'c' : 'a'}`}>{r.status === 'running' ? (v.runs.slice(i + 1).some((o) => o.status === 'running') ? tr('console.data_tab.waiting_turn') : tr('console.data_tab.running')) : r.status === 'done' ? tr('console.data_tab.run_done', { created: r.created ?? 0, updated: r.updated ?? 0, skipped: r.skipped ?? 0 }) : tr('console.data_tab.run_failed')}</span></b>
           </div>
         ))}
-        {v.batches.length === 0 ? <div style={{ marginTop: 10 }}><EmptyNote icon="upload" title={tr('console.data_tab.nothing_imported_yet')} body={tr('console.data_tab.each_import_shows_here_with')} /></div> : v.batches.map((b) => <BatchRow key={b.id} b={b} kinds={v.kinds} canUndo={can && b.canUndo} busy={undo.isPending} onUndo={() => setUndoing(b)} />)}
+        {v.batches.length === 0 ? <div style={{ marginTop: 10 }}><EmptyNote icon="upload" title={tr('console.data_tab.nothing_imported_yet')} body={tr('console.data_tab.each_import_shows_here_with')} /></div> : v.batches.map((b) => <BatchRow key={b.id} b={b} kinds={v.kinds} canUndo={can && b.canUndo} busy={undo.isPending || running} onUndo={() => setUndoing(b)} />)}
         {undoing && (
           <Dialog title={tr('console.data_tab.undo_this_import')} tag={{ text: v.kinds.find((k) => k.key === undoing.kind)?.label ?? undoing.kind, tone: 'a' }} onClose={() => setUndoing(null)} width={460}>
             <p style={{ marginTop: 0 }}>{tr('console.data_tab.it_updated_go_back_to', { created: undoing.created, updated: undoing.updated })}</p>
@@ -175,7 +177,7 @@ function BatchRow({ b, kinds, canUndo, busy, onUndo }: { b: ImportBatchRow; kind
         <span className="chip g">{b.created} {tr('console.data_tab.added')}</span><span className="chip">{b.updated} {tr('console.data_tab.updated')}</span>{b.skipped > 0 && <span className="chip a">{b.skipped} {tr('console.data_tab.left_out')}</span>}
         {b.totals.map((t) => <span key={t.label} className="chip">{t.label}: {t.value}</span>)}
       </span>
-      <span>{b.undoneAt ? <span className="chip">{tr('console.data_tab.undone')}</span> : canUndo ? <button className="btn sm" disabled={busy} onClick={onUndo}>{tr('console.data_tab.undo')}</button> : null}</span>
+      <span>{b.undoneAt ? <span className="chip">{tr('console.data_tab.undone')}</span> : canUndo ? <button className="btn sm" disabled={busy} data-tip={busy ? tr('console.data_tab.undo_after_imports') : undefined} onClick={onUndo}>{tr('console.data_tab.undo')}</button> : null}</span>
     </div>
   );
 }
