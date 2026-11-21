@@ -76,23 +76,23 @@ Future<void> bootLive() async {
     permanent: true,
   );
   Get
-    ..put<AuthRepository>(RemoteAuthRepository(remote), permanent: true)
-    ..put<DirectoryRepository>(RemoteDirectoryRepository(remote), permanent: true)
-    ..put<AttendanceRepository>(RemoteAttendanceRepository(remote), permanent: true)
-    ..put<TimetableRepository>(RemoteTimetableRepository(remote), permanent: true)
-    ..put<HomeworkRepository>(RemoteHomeworkRepository(remote), permanent: true)
-    ..put<ExamRepository>(RemoteExamRepository(remote), permanent: true)
-    ..put<FeeRepository>(RemoteFeeRepository(remote), permanent: true)
-    ..put<NoticeRepository>(RemoteNoticeRepository(remote), permanent: true)
-    ..put<EventRepository>(RemoteEventRepository(remote), permanent: true)
-    ..put<ChatRepository>(RemoteChatRepository(remote), permanent: true)
-    ..put<LibraryRepository>(RemoteLibraryRepository(remote), permanent: true)
-    ..put<TransportRepository>(RemoteTransportRepository(remote), permanent: true)
-    ..put<DriverRepository>(RemoteDriverRepository(remote), permanent: true)
-    ..put<LeaveRepository>(RemoteLeaveRepository(remote), permanent: true)
-    ..put<GalleryRepository>(RemoteGalleryRepository(remote), permanent: true)
-    ..put<SchoolLifeRepository>(RemoteSchoolLifeRepository(remote), permanent: true)
-    ..put<NotificationRepository>(RemoteNotificationRepository(remote), permanent: true);
+    ..put<AuthRepository>(AuthRepository(remote), permanent: true)
+    ..put<DirectoryRepository>(DirectoryRepository(remote), permanent: true)
+    ..put<AttendanceRepository>(AttendanceRepository(remote), permanent: true)
+    ..put<TimetableRepository>(TimetableRepository(remote), permanent: true)
+    ..put<HomeworkRepository>(HomeworkRepository(remote), permanent: true)
+    ..put<ExamRepository>(ExamRepository(remote), permanent: true)
+    ..put<FeeRepository>(FeeRepository(remote), permanent: true)
+    ..put<NoticeRepository>(NoticeRepository(remote), permanent: true)
+    ..put<EventRepository>(EventRepository(remote), permanent: true)
+    ..put<ChatRepository>(ChatRepository(remote), permanent: true)
+    ..put<LibraryRepository>(LibraryRepository(remote), permanent: true)
+    ..put<TransportRepository>(TransportRepository(remote), permanent: true)
+    ..put<DriverRepository>(DriverRepository(remote), permanent: true)
+    ..put<LeaveRepository>(LeaveRepository(remote), permanent: true)
+    ..put<GalleryRepository>(GalleryRepository(remote), permanent: true)
+    ..put<SchoolLifeRepository>(SchoolLifeRepository(remote), permanent: true)
+    ..put<NotificationRepository>(NotificationRepository(remote), permanent: true);
 }
 
 Future<T?> real<T>(WidgetTester tester, Future<T> Function() body) {
