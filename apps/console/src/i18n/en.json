@@ -1722,6 +1722,7 @@
  "console.wizard_page.gstin_optional": "Tax number (optional)",
  "console.wizard_page.holds": "holds",
  "console.wizard_page.homework": "{@Homework}",
+ "console.wizard_page.in_every_plan": "Comes with every plan: the school’s own pages, settings and year.",
  "console.wizard_page.in_sandbox_it_lands_in": " (in sandbox, it lands in the Test inbox)",
  "console.wizard_page.its_own_subdomain": "Its own subdomain",
  "console.wizard_page.launch": "Launch",

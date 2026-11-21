@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
 import { HttpError } from '@tangent/api-client';
-import { closeModules } from '@tangent/config-engine';
+import { CORE_MODULES, closeModules } from '@tangent/config-engine';
 import { packSettings, curriculaFor, countryName, ZONES, LOCALES, COUNTRY_DEFAULTS, COUNTRIES, DEFAULT_BRAND, DEPLOY_TARGET_LABELS, LANGUAGES, readableOn, WizardAdmin, WizardBasics, WizardBranding, WizardData, WizardPayload, WizardPlacement, WizardPlan, type ProvisionRunRow, type WizardReview } from '@tangent/contracts';
 import { ColourField, Field, FilePick, NumberField, SelectField, useShake, Icon, t as tr, listOf, dayOf } from '@tangent/web-ui';
 import { Card, Page, useToast } from '../../app/Page';
@@ -191,13 +191,15 @@ export function WizardPage() {
           <div className="lbl" style={{ margin: '20px 0 8px' }}>{tr('console.wizard_page.modules')}</div>
           <div className="two">
             {(catalog.data?.modules ?? []).filter((m) => m.state !== 'planned').map((m) => {
-              const inPlan = plan?.modules.includes(m.key) ?? false;
-              const on = mods.includes(m.key);
+              // A core module (the school itself) comes with every plan and cannot be left out.
+              const core = CORE_MODULES.includes(m.key);
+              const inPlan = core || (plan?.modules.includes(m.key) ?? false);
+              const on = core || mods.includes(m.key);
               return (
-                <button key={m.key} type="button" className={`opt ${on ? 'on' : ''}`} aria-pressed={on} disabled={!inPlan} style={{ padding: 12, opacity: inPlan ? 1 : 0.45 }}
+                <button key={m.key} type="button" className={`opt ${on ? 'on' : ''}`} aria-pressed={on} disabled={!inPlan || core} style={{ padding: 12, opacity: inPlan ? 1 : 0.45 }}
                   onClick={() => set('plan', 'modules', on ? mods.filter((x) => x !== m.key) : closeModules([...mods, m.key]))}>
                   <span className="rd"><Icon name="check" /></span>
-                  <span><b>{m.name}</b><small>{inPlan ? m.blurb : tr('console.wizard_page.not_in_this_plan')}</small></span>
+                  <span><b>{m.name}</b><small>{core ? tr('console.wizard_page.in_every_plan') : inPlan ? m.blurb : tr('console.wizard_page.not_in_this_plan')}</small></span>
                 </button>
               );
             })}
