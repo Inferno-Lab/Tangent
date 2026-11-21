@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DEFAULT_LEAVE_TYPES, DEFAULT_STAFF_MARKS, addDays, schoolToday, type AttendanceMarkDef, type LeaveType, type StaffDayRow, type StaffLeaveRow } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, EmptyNote, Field, MonthField, NumberField, Segmented, Select, SelectField, useShake, t } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, EmptyNote, EmptyState, Field, MonthField, NumberField, Segmented, Select, SelectField, useShake, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { AddBtn, dateLabel, problem, stamp, useSetting } from '../../app/kit';
@@ -90,10 +90,13 @@ function Leave({ canManage, say, onRecord }: { canManage: boolean; say: Say; onR
   const cancel = useMutation({ mutationFn: () => app.api.staffTime.cancel(cancelling!.id, note), onSuccess: () => { setCancelling(null); setNote(''); void qc.invalidateQueries({ queryKey: ['staff-leave'] }); say(t('admin.staff_time.leave_cancelled')); },
     onError: (e) => say((e as Error).message, 'bad') });
   const rows = q.data ?? [];
+  // Nothing waiting is not the same as no leave at all: the scene shows only when the school has no leave on record.
+  const any = useQuery({ queryKey: ['staff-leave', 'all'], queryFn: () => app.api.staffTime.leave(undefined), enabled: !!q.data && !rows.length && status !== 'all' });
+  const none = !!q.data && !rows.length && (status === 'all' || (any.data && !any.data.length));
   return <>
     <div style={{ marginBottom: 12 }}><Segmented label={t('admin.staff_time.show')} value={status} onChange={setStatus}
       options={[{ value: 'pending', label: t('admin.staff_time.waiting') }, { value: 'approved', label: t('admin.staff_time.approved') }, { value: 'all', label: t('admin.staff_time.all') }]} /></div>
-    <Card style={{ padding: 0 }}>
+    {none ? <EmptyState scene="staffleave" onAction={canManage ? onRecord : undefined} /> : <Card style={{ padding: 0 }}>
       {!rows.length ? <div style={{ padding: 20 }}><EmptyNote icon="calendar" title={status === 'pending' ? t('admin.staff_time.nothing_waiting') : t('admin.staff_time.no_leave_yet')}
         body={t('admin.staff_time.leave_empty_body')} action={canManage ? <button className="btn sm" onClick={onRecord}>{t('admin.staff_time.record_leave')}</button> : undefined} /></div>
         : <div className="lscroll">{rows.map((r) => (
@@ -110,7 +113,7 @@ function Leave({ canManage, say, onRecord }: { canManage: boolean; say: Say; onR
             {canManage && (r.status === 'approved' || r.status === 'pending') && r.to >= schoolToday() && <button className="btn sm" onClick={() => setCancelling(r)}>{t('admin.staff_time.cancel')}</button>}
           </div>
         ))}</div>}
-    </Card>
+    </Card>}
     {cancelling && (
       <Dialog title={t('admin.staff_time.cancel_leave')} onClose={() => setCancelling(null)} width={460}>
         <p className="help" style={{ marginTop: 0 }}>{t('admin.staff_time.cancel_leave_body', { name: cancelling.name })}</p>

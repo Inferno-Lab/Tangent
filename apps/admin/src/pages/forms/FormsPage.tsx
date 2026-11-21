@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FORM_AUDIENCES, FormInput, listLabel, schoolToday, type FieldDef, type FormCondition, type FormRow } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, EmptyNote, Field, FieldListEditor, Segmented, Select, SelectField, currentLanguage, useShake, t } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, EmptyNote, EmptyState, Field, FieldListEditor, Segmented, Select, SelectField, currentLanguage, useShake, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { AddBtn, AreaField, problem, stamp, useSetting } from '../../app/kit';
@@ -26,11 +26,8 @@ export function FormsPage() { const app = useApp();
         {editing && <FormDialog form={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onDone={done} />}
         {reading && <Answers form={reading} onClose={() => setReading(null)} say={say} />}
       </>}>
-      <Card style={{ padding: 0 }}>
-        {!(list.data ?? []).length ? (
-          <div style={{ padding: 20 }}><EmptyNote icon="file" title={t('admin.forms_page.no_forms_yet')} body={t('admin.forms_page.no_forms_body')}
-            action={<button className="btn sm" onClick={() => setEditing('new')}>{t('admin.forms_page.make_a_form')}</button>} /></div>
-        ) : (list.data ?? []).map((f) => (
+      {!(list.data ?? []).length ? <EmptyState scene="forms" onAction={() => setEditing('new')} /> : <Card style={{ padding: 0 }}>
+        {(list.data ?? []).map((f) => (
           <div key={f.id} className="rw" style={{ display: 'flex', gap: 10, alignItems: 'center', height: 'auto', minHeight: 56, padding: '10px 20px', flexWrap: 'wrap' }}>
             <span style={{ flex: 1, minWidth: 200 }}>
               <b style={{ font: '700 14px/1.3 var(--fb)' }}>{f.title}</b>
@@ -42,7 +39,7 @@ export function FormsPage() { const app = useApp();
             <button className="btn sm" onClick={() => setEditing(f)}>{t('admin.forms_page.edit')}</button>
           </div>
         ))}
-      </Card>
+      </Card>}
     </Page>
   );
 }

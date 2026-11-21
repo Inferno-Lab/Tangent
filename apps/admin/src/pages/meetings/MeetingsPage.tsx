@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MEETING_MODES, MeetingInput, schoolToday, type MeetingRow, type MeetingSlotRow } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, EmptyNote, Field, NumberField, Segmented, SelectField, TimeField, useShake, t } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, EmptyNote, Field, NumberField, Segmented, SelectField, TimeField, useShake, t, EmptyState } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { AddBtn, dateLabel, problem, stamp } from '../../app/kit';
@@ -28,10 +28,8 @@ export function MeetingsPage() { const app = useApp();
         {editing && <MeetingDialog meeting={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onDone={done} />}
         {open && <SlotsDialog meeting={open} canManage={canManage} onClose={() => setOpen(null)} say={say} />}
       </>}>
-      <Card style={{ padding: 0 }}>
-        {!rows.length ? <div style={{ padding: 20 }}><EmptyNote icon="calendarAdd" title={t('admin.meetings.no_meetings')} body={t('admin.meetings.no_meetings_body')}
-          action={canManage ? <button className="btn sm" onClick={() => setEditing('new')}>{t('admin.meetings.plan_a_meeting')}</button> : undefined} /></div>
-          : rows.map((m) => (
+      {!rows.length ? <EmptyState scene="meetings" onAction={canManage ? () => setEditing('new') : undefined} /> : <Card style={{ padding: 0 }}>
+        {rows.map((m) => (
             <div key={m.id} className="rw" style={{ display: 'flex', gap: 10, alignItems: 'center', height: 'auto', minHeight: 56, padding: '10px 20px', flexWrap: 'wrap' }}>
               <span style={{ flex: 1, minWidth: 220 }}>
                 <b style={{ font: '700 14px/1.3 var(--fb)' }}>{m.title}</b>
@@ -42,7 +40,7 @@ export function MeetingsPage() { const app = useApp();
               {canManage && <button className="btn sm" onClick={() => setEditing(m)}>{t('admin.meetings.edit')}</button>}
             </div>
           ))}
-      </Card>
+      </Card>}
     </Page>
   );
 }

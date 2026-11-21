@@ -132,7 +132,7 @@ export const MODULES: ModuleManifest[] = localized([
     pages: [
       P('dash', 'Dashboard', 'dashboard', 'G D', '/', 'Home', []),
       P('appr', 'Approvals', 'approvals', 'G Q', '/approvals', 'Home', ['approvals.read'], { settings: ['workflows.steps'], tabs: [{ key: 'waiting', label: 'Waiting for me' }, { key: 'sent', label: 'Sent by me' }, { key: 'decided', label: 'Decided' }] }),
-      P('forms', 'Forms', 'file', 'G K', '/forms', 'Home', ['forms.manage']),
+      P('forms', 'Forms', 'forms', 'G K', '/forms', 'Home', ['forms.manage']),
       P('rep', 'Reports', 'reports', 'G R', '/reports', 'Home', ['reports.read'], { tabs: [{ key: 'attendance', label: 'Attendance', feature: 'attendance' }, { key: 'money', label: 'Money', feature: 'fees' }, { key: 'learning', label: 'Learning' }, { key: 'people', label: 'People' }] }),
       P('year', 'Academic year', 'year', 'G Y', '/year', 'School', ['settings.read', 'setup.write', 'year.manage'], {
         settings: ['calendar.weeklyOff', 'calendar.weekStarts', 'dashboard.rollClasses', 'classes.schoolEdits', 'calendar.schoolEdits'],
@@ -372,7 +372,7 @@ export const MODULES: ModuleManifest[] = localized([
     key: 'staffAttendance', state: 'live', addOnPerStudentYear: 20, requires: ['people'], backend: true,
     name: 'Staff attendance and leave', blurb: 'Staff check in from the app or are marked by the office; leave types, balances and requests.',
     features: [],
-    pages: [P('sat', 'Staff attendance', 'time', 'G .', '/staff-attendance', 'People', ['staffAttendance.read'], {
+    pages: [P('sat', 'Staff attendance', 'staffTime', 'G .', '/staff-attendance', 'People', ['staffAttendance.read'], {
       tabs: [{ key: 'today', label: 'Today' }, { key: 'leave', label: 'Leave' }, { key: 'balances', label: 'Balances' }, { key: 'month', label: 'Month' }],
     })],
     app: [A('home', 'checkIn', 'Check in', ['teacher', 'driver']), A('quick', 'staffLeave', 'Ask for leave', ['teacher', 'driver'])],
@@ -389,7 +389,7 @@ export const MODULES: ModuleManifest[] = localized([
     key: 'diary', state: 'live', addOnPerStudentYear: 20, requires: ['people'], backend: true,
     name: 'Class diary', blurb: 'What was done in class, what to bring and notes to families, with remarks for one child and families’ acknowledgements.',
     features: [],
-    pages: [P('diary', 'Diary', 'edit', 'G W', '/diary', 'Teach', ['diary.read', 'diary.write'])],
+    pages: [P('diary', 'Diary', 'diary', 'G W', '/diary', 'Teach', ['diary.read', 'diary.write'])],
     app: [A('dock', 'diary', 'Diary', FAMILY), A('home', 'diary', 'Today’s diary', FAMILY), A('quick', 'writeDiary', 'Write the diary', ['teacher'])],
     settings: ['diary.kinds', 'diary.writers', 'diary.ack'],
     permissions: ['diary.read', 'diary.write'],
@@ -403,7 +403,7 @@ export const MODULES: ModuleManifest[] = localized([
     key: 'ptm', state: 'live', addOnPerStudentYear: 10, requires: ['people'], backend: true,
     name: 'Parent-teacher meetings', blurb: 'Meeting days with each teacher’s slots, booked by families in the app, in person or online, with reminders.',
     features: [],
-    pages: [P('ptm', 'Meetings', 'calendarAdd', 'G Z', '/meetings', 'Reach', ['meetings.read'])],
+    pages: [P('ptm', 'Meetings', 'meetings', 'G Z', '/meetings', 'Reach', ['meetings.read'])],
     app: [A('quick', 'bookMeeting', 'Book a meeting', ['parent']), A('quick', 'mySlots', 'My meeting slots', ['teacher'])],
     settings: ['ptm.remind', 'ptm.familiesCancel'],
     permissions: ['meetings.read', 'meetings.manage'],
@@ -417,7 +417,7 @@ export const MODULES: ModuleManifest[] = localized([
     key: 'visitors', state: 'live', addOnPerStudentYear: 20, requires: ['people'], backend: true,
     name: 'Visitors and gate pass', blurb: 'The visitor log and invitations, gate passes for leaving early, who may collect a child, late arrivals and the emergency roll call.',
     features: [],
-    pages: [P('vis', 'Visitors', 'shield', 'G I', '/visitors', 'Campus', ['visitors.read'], {
+    pages: [P('vis', 'Visitors', 'visitors', 'G I', '/visitors', 'Campus', ['visitors.read'], {
       tabs: [{ key: 'today', label: 'On site' }, { key: 'expected', label: 'Expected' }, { key: 'passes', label: 'Gate passes' }, { key: 'pickup', label: 'Pick-up' }, { key: 'late', label: 'Late arrivals' }, { key: 'roll', label: 'Roll call' }],
     })],
     app: [A('quick', 'gatePass', 'Leave early and pick-up', ['parent']), A('quick', 'inviteVisitor', 'Invite a visitor', ['teacher'])],
@@ -433,7 +433,7 @@ export const MODULES: ModuleManifest[] = localized([
     key: 'certificates', state: 'live', addOnPerStudentYear: 10, requires: ['people'], backend: true,
     name: 'Certificates and ID cards', blurb: 'Certificates in the school’s own words, asked for by families, checked and numbered, each with a QR code to prove it; ID cards for students and staff.',
     features: [],
-    pages: [P('cert', 'Certificates', 'card', 'G C', '/certificates', 'People', ['certificates.read'], { tabs: [{ key: 'requests', label: 'Requests' }, { key: 'register', label: 'Issued' }, { key: 'cards', label: 'ID cards' }] })],
+    pages: [P('cert', 'Certificates', 'certificates', 'G C', '/certificates', 'People', ['certificates.read'], { tabs: [{ key: 'requests', label: 'Requests' }, { key: 'register', label: 'Issued' }, { key: 'cards', label: 'ID cards' }] })],
     app: [A('quick', 'certificates', 'Certificates', ['parent'])],
     settings: ['certificates.types', 'certificates.number'],
     permissions: ['certificates.read', 'certificates.issue'],

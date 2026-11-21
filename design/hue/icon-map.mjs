@@ -16,6 +16,7 @@ export const PAGES = {
   billing: 'bank', compliance: 'shield-check', team: 'users-three', languages: 'translate',
   // school admin pages added since the boards
   audit: 'list-magnifying-glass', privacy: 'lock-key',
+  forms: 'clipboard-text', staffTime: 'clock-user', diary: 'book-open-text', meetings: 'handshake', visitors: 'door-open', certificates: 'certificate',
   // app tabs and header
   home: 'house', classes: 'chalkboard-teacher', profile: 'user-circle', notifications: 'bell',
 };

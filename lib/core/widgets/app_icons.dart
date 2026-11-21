@@ -46,6 +46,12 @@ abstract final class AppIcons {
   static const IconData languages = PhosphorIconsRegular.translate;
   static const IconData audit = PhosphorIconsRegular.listMagnifyingGlass;
   static const IconData privacy = PhosphorIconsRegular.lockKey;
+  static const IconData forms = PhosphorIconsRegular.clipboardText;
+  static const IconData staffTime = PhosphorIconsRegular.clockUser;
+  static const IconData diary = PhosphorIconsRegular.bookOpenText;
+  static const IconData meetings = PhosphorIconsRegular.handshake;
+  static const IconData visitors = PhosphorIconsRegular.doorOpen;
+  static const IconData certificates = PhosphorIconsRegular.certificate;
   static const IconData home = PhosphorIconsRegular.house;
   static const IconData classes = PhosphorIconsRegular.chalkboardTeacher;
   static const IconData profile = PhosphorIconsRegular.userCircle;
@@ -93,6 +99,12 @@ abstract final class AppIcons {
   static const IconData languagesOn = PhosphorIconsFill.translate;
   static const IconData auditOn = PhosphorIconsFill.listMagnifyingGlass;
   static const IconData privacyOn = PhosphorIconsFill.lockKey;
+  static const IconData formsOn = PhosphorIconsFill.clipboardText;
+  static const IconData staffTimeOn = PhosphorIconsFill.clockUser;
+  static const IconData diaryOn = PhosphorIconsFill.bookOpenText;
+  static const IconData meetingsOn = PhosphorIconsFill.handshake;
+  static const IconData visitorsOn = PhosphorIconsFill.doorOpen;
+  static const IconData certificatesOn = PhosphorIconsFill.certificate;
   static const IconData homeOn = PhosphorIconsFill.house;
   static const IconData classesOn = PhosphorIconsFill.chalkboardTeacher;
   static const IconData profileOn = PhosphorIconsFill.userCircle;
