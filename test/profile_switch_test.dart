@@ -1,3 +1,6 @@
+@Tags(['school'])
+library;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:tangent/core/services/auth_service.dart';
@@ -15,7 +18,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() async {
-    await bootMock();
+    await bootLive();
     Get.testMode = false;
   });
 
@@ -25,9 +28,9 @@ void main() {
     final user = (await real(tester, () => signIn(UserRole.parent)))!;
     final auth = Get.find<AuthService>();
     await real(tester, () => auth.setSession(user.copyWith(avatarUrl: '')));
-    final dash = Get.put(DashboardController());
+    final dash = await put(tester, DashboardController.new);
     await real(tester, dash.load);
-    final profile = Get.put(ProfileController());
+    final profile = await put(tester, ProfileController.new);
     await real(tester, profile.load);
     await tester.pumpWidget(testApp(home: const ProfileView()));
     // Let the entrances finish (each part rises 12 pt as it arrives).
@@ -50,5 +53,6 @@ void main() {
     }
     expect(find.byType(IdBadge), findsOneWidget);
     expect(tester.getTopLeft(find.text('Your account')).dy, before);
+    await settle(tester);
   });
 }

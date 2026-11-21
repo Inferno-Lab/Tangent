@@ -11,7 +11,7 @@ import 'support/harness.dart';
 
 /// A page's field that takes focus is scrolled above the keyboard, not left under it (it was, on every page form).
 void main() {
-  setUpAll(bootMock);
+  setUpAll(bootApp);
 
   testWidgets('a focused field on a long page ends above the keyboard', (tester) async {
     const keyboard = 320.0;

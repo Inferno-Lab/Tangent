@@ -1,6 +1,9 @@
-// Renders screens to PNG for visual review. Not part of the normal suite:
+// Renders screens of the running school (test/support/harness.dart) to PNG for visual review. Not part of the normal suite:
 //   flutter test test/tool/shoot_test.dart --dart-define=SHOOT_DIR=out --dart-define=SHOOT_ROLE=teacher
 // Glass uses its blur fallback here (no GPU shader in tests).
+@Tags(['school'])
+library;
+
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -8,13 +11,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
-import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/routes/app_pages.dart';
 import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/theme/app_theme.dart';
 import 'package:tangent/core/translations/app_translations.dart';
 import 'package:tangent/core/widgets/toast.dart';
-import 'package:tangent/data/datasources/mock_json_datasource.dart';
 import 'package:tangent/data/models/user.dart';
 import 'package:tangent/features/auth/views/welcome_overlay.dart';
 import 'package:tangent/features/dashboard/widgets/child_switcher.dart';
@@ -25,7 +26,6 @@ import '../support/harness.dart';
 const _enabled = String.fromEnvironment('SHOOT_DIR') != '';
 const _dir = String.fromEnvironment('SHOOT_DIR', defaultValue: 'build/shots');
 const _roleName = String.fromEnvironment('SHOOT_ROLE', defaultValue: 'parent');
-const _empty = bool.fromEnvironment('EMPTY_DATA');
 const _dark = bool.fromEnvironment('SHOOT_DARK');
 const _width = int.fromEnvironment('SHOOT_W', defaultValue: 390);
 const _height = int.fromEnvironment('SHOOT_H', defaultValue: 844);
@@ -33,14 +33,10 @@ const _height = int.fromEnvironment('SHOOT_H', defaultValue: 844);
 const _family = [
   AppRoutes.attendance,
   AppRoutes.homework,
-  '/homework/hw_linear',
   AppRoutes.timetable,
   AppRoutes.results,
   AppRoutes.notices,
-  '/notices/nt_mid',
   AppRoutes.events,
-  '/events/ev_science',
-  '/chat/th_kavita_priya',
   AppRoutes.library,
   AppRoutes.transport,
   AppRoutes.gallery,
@@ -59,10 +55,8 @@ const _family = [
 ];
 
 const _teacher = [
-  '/teacher/attendance/cls_8a',
   AppRoutes.teacherAssign,
   AppRoutes.teacherGrade,
-  '/teacher/marks/cls_8a',
   AppRoutes.teacherNotice,
   AppRoutes.staffMe,
   AppRoutes.teacherDiary,
@@ -188,8 +182,10 @@ Future<void> _popups(WidgetTester tester, UserRole role) async {
   }
 }
 
+/// Lets the screen's calls to the school come back (real time) and draws its frames (the test's time).
 Future<void> _settle(WidgetTester tester) async {
   for (var i = 0; i < 14; i++) {
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 40)));
     await tester.pump(const Duration(milliseconds: 120));
   }
 }
@@ -201,14 +197,12 @@ void main() {
   testWidgets('shoot $_roleName', skip: !_enabled, (tester) async {
     final guest = _roleName == 'guest';
     final role = guest ? UserRole.parent : UserRole.values.byName(_roleName);
-    await bootMock();
-    AppConfig.emptyData.value = _empty;
+    await bootLive();
     Get.testMode = false;
     tester.view.physicalSize = Size(_width * 1.5, _height * 1.5);
     tester.view.devicePixelRatio = 1.5;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.runAsync(() => Get.find<MockJsonDataSource>().ensureLoaded());
     if (!guest) await real(tester, () => signIn(role));
     // Home itself, not the one-time welcome over it.
     if (!guest) await real(tester, markWelcomeSeen);
@@ -262,6 +256,6 @@ void main() {
     if (const bool.fromEnvironment('SHOOT_POPUPS')) await _popups(tester, role);
     // Let screens' delayed work (toasts, autosave) finish, so the run ends without pending timers.
     await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump(const Duration(seconds: 10));
+    await tester.pump(const Duration(seconds: 30));
   });
 }

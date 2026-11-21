@@ -154,7 +154,7 @@ void main() {
     test('a right password asks for the code, and the code opens the app as the person', () async {
       await expectLater(
         auth.login(email: 'priya@example.com', password: 'right'),
-        throwsA(isA<OtpRequired>().having((e) => e.demoCode, 'demo code', '424242').having((e) => e.sentTo, 'sent to', contains('98'))),
+        throwsA(isA<OtpRequired>().having((e) => e.sentTo, 'sent to', contains('98'))),
       );
       final user = await auth.loginWithOtp(email: 'priya@example.com', otp: '424242');
       expect(user.role, UserRole.parent);

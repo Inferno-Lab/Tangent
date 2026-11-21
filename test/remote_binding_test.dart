@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:tangent/core/bindings/initial_binding.dart';
-import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/services/storage_service.dart';
 import 'package:tangent/data/repositories/academic_repository.dart';
 import 'package:tangent/data/repositories/auth_repository.dart';
@@ -10,15 +9,11 @@ import 'package:tangent/data/repositories/directory_repository.dart';
 import 'package:tangent/data/repositories/school_life_repository.dart';
 
 void main() {
-  tearDown(() {
-    AppConfig.useMockData = true;
-    Get.reset();
-  });
+  tearDown(Get.reset);
 
-  test('useMockData false resolves every remote repository', () {
+  test('the binding resolves every repository to the school', () {
     Get.testMode = true;
     Get.put(StorageService(memory: <String, dynamic>{}));
-    AppConfig.useMockData = false;
     InitialBinding().dependencies();
 
     expect(Get.find<AuthRepository>(), isA<RemoteAuthRepository>());

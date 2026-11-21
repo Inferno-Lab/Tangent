@@ -23,7 +23,7 @@ void main() {
   }
 
   testWidgets('the first run goes from the splash to the three steps', (tester) async {
-    await bootMock();
+    await bootApp();
     Get.testMode = false;
     await real(tester, () => Get.find<StorageService>().write(StorageKeys.onboardingSeen, false));
     await splash(tester);
@@ -32,7 +32,7 @@ void main() {
   });
 
   testWidgets('once the steps are seen, the splash goes to sign-in', (tester) async {
-    await bootMock();
+    await bootApp();
     Get.testMode = false;
     await real(tester, () => Get.find<StorageService>().write(StorageKeys.onboardingSeen, true));
     await splash(tester);
@@ -50,7 +50,7 @@ void main() {
   }
 
   testWidgets('Next walks the steps, Back returns, Skip reaches sign-in', (tester) async {
-    await bootMock();
+    await bootApp();
     Get.testMode = false;
     await tester.pumpWidget(steps());
     await tester.pump();
@@ -72,7 +72,7 @@ void main() {
   });
 
   testWidgets('the last step says Get started and has no Skip', (tester) async {
-    await bootMock();
+    await bootApp();
     Get.testMode = false;
     await tester.pumpWidget(steps());
     await tester.pump();
@@ -90,7 +90,7 @@ void main() {
   });
 
   testWidgets('the steps fit a small phone', (tester) async {
-    await bootMock();
+    await bootApp();
     tester.view.physicalSize = const Size(320, 640);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);

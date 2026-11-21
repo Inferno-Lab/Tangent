@@ -1,5 +1,5 @@
-import 'dart:convert';
 import 'dart:io';
+
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tangent/core/translations/app_translations.dart';
@@ -19,18 +19,14 @@ void main() {
     expect(missing, isEmpty);
   });
 
-  test('keys built from data exist: weekdays and every subject in the timetable', () {
+  test('keys built from data exist: weekdays and the subjects a new school starts with', () {
     final english = AppTranslations().keys['en']!;
+    // A school's own subjects are named by the school (SchoolConfig.subjectNameOf); a new school's starter subjects are the
+    // app's own words (packages/db/src/seed/school.ts, SUBJECTS).
     final missing = <String>{
       for (final d in ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']) 'day.$d',
+      for (final s in ['maths', 'english', 'science', 'hindi', 'social', 'computer', 'pe']) ...['subject.$s', 'subject_short.$s'],
     };
-    final timetable = jsonDecode(File('assets/mock/timetable.json').readAsStringSync()) as List;
-    for (final row in timetable) {
-      for (final p in (row as Map)['periods'] as List) {
-        final subject = (p as Map)['subject'] as String;
-        if (p['kind'] == 'class') missing.addAll(['subject.$subject', 'subject_short.$subject']);
-      }
-    }
     expect(missing.where((k) => !english.containsKey(k)), isEmpty);
   });
 }
