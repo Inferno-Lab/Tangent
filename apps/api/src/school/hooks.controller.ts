@@ -130,7 +130,8 @@ export class HooksController {
     const { rows } = await this.hubs.hub.o.pool.query('select mime, data from sandbox_files where key = $1', [d.key]);
     if (!rows[0]) { void reply.code(404).send('Not found'); return; }
     if (d.name) void reply.header('content-disposition', `attachment; filename="${d.name.replace(/["\\\r\n]/g, '')}"`);
-    void reply.header('cache-control', 'private, max-age=300').type(rows[0].mime).send(rows[0].data);
+    // A signed link is its own permission: the admin, the app and a printed page may show it from another address.
+    void reply.header('cross-origin-resource-policy', 'cross-origin').header('cache-control', 'private, max-age=300').type(rows[0].mime).send(rows[0].data);
   }
 
   @Put('sandbox-storage/:token') @HttpCode(200)

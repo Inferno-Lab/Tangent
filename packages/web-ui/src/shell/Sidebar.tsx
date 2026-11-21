@@ -110,9 +110,12 @@ export function Sidebar({ label, collapsed, groups, active, onNavigate, header, 
 
 /** The school block at the top of the admin menu, and the button that collapses the menu. */
 export function SchoolHeader({ logo, logoUrl, name, place, color, onToggle, collapsed }: { logo: string; logoUrl?: string | null; name: string; place: string; color?: string; onToggle: () => void; collapsed: boolean }) {
+  // An image that cannot load (an expired link, storage down) shows the school's letters, never a broken picture.
+  const [failed, setFailed] = useState('');
+  const img = logoUrl && failed !== logoUrl ? logoUrl : null;
   return (
     <div className="ws">
-      <span className="lg" style={logoUrl ? undefined : markStyle(color)}>{logoUrl ? <img className="lgi" src={logoUrl} alt="" /> : logo}</span>
+      <span className="lg" style={img ? undefined : markStyle(color)}>{img ? <img className="lgi" src={img} alt="" onError={() => setFailed(img)} /> : logo}</span>
       <div className="fade"><b>{name}</b><small>{place}</small></div>
       <button className="colb" onClick={onToggle} aria-label={collapsed ? t('ui.sidebar.expand_the_menu') : t('ui.sidebar.collapse_the_menu')}>
         <Icon name="sidebar" size={20} />
