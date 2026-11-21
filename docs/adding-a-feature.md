@@ -1,6 +1,6 @@
 # Adding things
 
-Keep each change small and complete, and commit each step that works (AGENTS.md, How work ships). Before pushing, `pnpm check`; then look at the screen (headless shot; emulator for glass).
+Keep each change small and complete, and commit each step that works (AGENTS.md, How work ships). Before pushing, `pnpm check`; then look at the screen (a headless shot at minimum). Before any of it, find everything the change reaches (AGENTS.md, Work in depth).
 
 ## A screen
 
@@ -13,7 +13,7 @@ Keep each change small and complete, and commit each step that works (AGENTS.md,
 
 ## A repository
 
-1. In `data/repositories/<area>_repository.dart` add `abstract class XRepository` and `RemoteXRepository(RemoteDataSource)` calling `_remote.get/post`.
+1. In `data/repositories/<area>_repository.dart` add `class XRepository` taking a `RemoteDataSource` and calling `_remote.get/post` (no interface: a seam with one implementation is only added where another is planned, like `AssistantRepository`).
 2. Register it in `InitialBinding`, and in `bootLive` (`test/support/harness.dart`).
 3. Describe the HTTP shape in `docs/API_CONTRACT.md`. A write bumps the session so open screens reload.
 4. Test it against the local school (a test tagged `school`, like `test/live_api_test.dart`); `test/remote_binding_test.dart` covers the registration.
@@ -40,13 +40,13 @@ Add `static const fooEnabled = bool.fromEnvironment('FOO');` to `AppConfig`, che
 
 ## Copy in another language
 
-Add the key to the `_hi` / `_mr` maps in `app_translations.dart`; anything missing falls back to English.
+The English is in `en_redesign.dart`; every other language is `assets/i18n/<lang>.json`, kept on the console's Languages page and served to the phone (a word a language lacks reads in English). After changing the English, write `assets/i18n/en.json` again: `flutter test test/i18n_assets_test.dart --dart-define=UPDATE_I18N=true`.
 
 ## An admin or console page (platform)
 
 The steps and the reasons are in `docs/HANDOFF.md` section 9.1; in short:
 
-1. Contracts (`packages/contracts`), then a new SQL migration (`packages/db/migrations/school/`, never edit an applied one) and the schema, then the seed so the demo school has data on every weekday.
+1. Contracts (`packages/contracts`), then a new SQL migration (`packages/db/migrations/school/`, never edit an applied one), then its import kind (`IMPORT_KINDS`, `packages/db/src/import/kinds.ts`) and the test school's file for it (`tools/dataset/school.mjs`) so Sunrise Valley brings its data in.
 2. Service + controller in `apps/api/src/school/` with `@RequireModule` and `@Require`, audit entries for writes, tests in `apps/api/test/modules.test.ts` (or `api.test.ts` for the core areas, `family.test.ts` for the app's API). Rebuild the package (`pnpm --filter @tangent/api build`) before the dev server sees it.
-3. Method in `packages/api-client`, then the page: copy `apps/admin/src/pages/fees/FeesPage.tsx` (or a console page such as `apps/console/src/pages/flags/FlagsPage.tsx`), use `Page`, the shared blocks and `EmptyCard`; give it loading, empty, error and read-only states. Route in `router.tsx`, menu entry in `app/nav.ts`.
+3. Method in `packages/api-client`, then the page: copy `apps/admin/src/pages/fees/FeesPage.tsx` (or a console page such as `apps/console/src/pages/flags/FlagsPage.tsx`), use `Page`, the shared blocks and `EmptyState`/`EmptyNote`/`EmptyCard`; give it loading, empty, error and read-only states. Route in `router.tsx`, menu entry in `app/nav.ts`.
 4. Look at it against `docs/DESIGN.md`, then add its address to `tools/lib/pages.mjs` (the page checks) and a flow to `tools/e2e-flows.mjs`. Pages without a canvas board need the owner's design review.

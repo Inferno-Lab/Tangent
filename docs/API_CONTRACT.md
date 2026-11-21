@@ -1,8 +1,8 @@
 # API contract
 
-> **Status:** implemented. The school API serves these calls under the prefix `/v1/f` (for example `GET /v1/f/students/:id/fees`), scoped to the signed-in person, in the shapes below (`apps/api/src/school/family.controller.ts`, tests in `apps/api/test/family.test.ts`). The app's `ApiClient` adds the prefix, the `X-School` header and the token. Sign-in is the platform's own two steps, `POST /v1/auth/login` then `POST /v1/auth/verify`, not the `/auth/*` calls in the next section. Differences from the tables: leave requests, attendance marks and homework hand-ins are stored in the same tables the admin uses; gallery is empty; library lists loans only (reserve answers 409); transport has the route only; notifications are the messages the school sent to the person's phone (read and dismiss state is kept per person).
+> **Status:** implemented. The school API serves these calls under the prefix `/v1/f` (for example `GET /v1/f/students/:id/fees`), scoped to the signed-in person, in the shapes below (`apps/api/src/school/family.controller.ts`, tests in `apps/api/test/family.test.ts`). The app's `ApiClient` adds the prefix, the `X-School` header and the token. Sign-in is the platform's own two steps, `POST /v1/auth/login` then `POST /v1/auth/verify`, not the `/auth/*` calls in the next section. Differences from the tables: leave requests, attendance marks and homework hand-ins are stored in the same tables the admin uses; library lists loans only (reserve answers 409); transport has the route only; notifications are the messages the school sent to the person's phone (read and dismiss state is kept per person).
 
-Each repository method maps to one REST call. `Remote*Repository` calls these paths through `RemoteDataSource` and `ApiClient` (`lib/core/network/api_client.dart`). A build without `SCHOOL` and `API_BASE_URL` keeps `AppConfig.useMockData` on and never touches the network; a build with them uses these calls.
+Each repository method maps to one REST call. The repositories call these paths through `RemoteDataSource` and `ApiClient` (`lib/core/network/api_client.dart`). Every build has `SCHOOL` and `API_BASE_URL` and refuses to start without them; there is no offline or sample mode.
 
 JSON bodies and responses use the shapes in [APP_MODELS.md](APP_MODELS.md). Dates on the wire are ISO-8601. Enum fields use the JSON values listed there (`late`, not the Dart name `lateArrival`; `class`, not `klass`).
 
@@ -28,7 +28,7 @@ The phone app (`client: "mobile"`) gets `refreshToken` in the body, keeps both t
 
 The websites (`client: "web"`) keep the refresh token in an httpOnly cookie (`gd_rt_<slug>` locally, `__Secure-gd_rt_<slug>` in production, `Path=/v1/auth`, `SameSite=Strict`). The body has no refresh token. Refresh and logout send that cookie, an allowed `Origin`, and `x-csrf` matching the readable `gd_csrf` cookie. Web sessions last 7 days. `POST /v1/auth/logout-all` ends every session for that person.
 
-Every later request sends `Authorization: Bearer <accessToken>` and `X-School: <slug>`. The access JWT is 15 minutes, bound to the school (`aud`), and carries `sid` and `ver` (`users.token_version`). A revoked session, a role change, deactivation, or logout-all is refused on the next request (cached about 30 seconds). The app then reads the person from `GET /v1/f/me`, which also carries `consentedAt` and `photoConsent`; a family consents once with `POST /v1/f/consent` `{ "photos"? }` (answers `{ "consentedAt", "photoConsent" }`; a second call changes nothing but the photo answer). The table below is the demo app's original shape; the mock still uses it.
+Every later request sends `Authorization: Bearer <accessToken>` and `X-School: <slug>`. The access JWT is 15 minutes, bound to the school (`aud`), and carries `sid` and `ver` (`users.token_version`). A revoked session, a role change, deactivation, or logout-all is refused on the next request (cached about 30 seconds). The app then reads the person from `GET /v1/f/me`, which also carries `consentedAt` and `photoConsent`; a family consents once with `POST /v1/f/consent` `{ "photos"? }` (answers `{ "consentedAt", "photoConsent" }`; a second call changes nothing but the photo answer).
 
 ## Pagination
 
@@ -44,8 +44,9 @@ Remote parsers currently expect the raw array (or a single object). When a backe
 
 | Method | Call |
 | --- | --- |
-| `login` | `POST /auth/login` `{ "email", "password" }` → user |
-| `loginWithOtp` | `POST /auth/otp` `{ "email", "otp" }` → user |
+| `login` | `POST /v1/auth/login` `{ "identifier", "password", "client": "mobile" }` → the code challenge (`OtpRequired`), or the tokens when the school switched the code off; then `GET /me` |
+| `loginWithOtp` | `POST /v1/auth/verify` `{ "challengeId", "code", "client": "mobile" }` → the tokens; then `GET /me` |
+| `requestCode` | `POST /v1/auth/code` `{ "identifier", "client": "mobile" }` → the code challenge (families, no password) |
 
 ## Directory
 
@@ -101,7 +102,7 @@ Remote parsers currently expect the raw array (or a single object). When a backe
 | `reserve` | `POST /library/books/:bookId/reserve` `{ "studentId" }` → reservation |
 | `renew` | `POST /library/books/:bookId/renew` `{}` (the child's open loan of that book) |
 | `TransportRepository.forStudent` | `GET /students/:studentId/transport` → transport (stops with `reached`, the bus's ETA when it is live) |
-| driver | `GET /bus/routes` (routes this staff member drives), `POST /bus/:routeId/position` `{ "lat", "lng" }` |
+| `DriverRepository` | `GET /driver/day` (the routes this staff member drives today); `POST /driver/trips` starts a trip; `POST /driver/trips/:id/position` `{ "lat", "lng" }`, `/marks`, `/delay`, `/end` (`transport.liveBus`) |
 | `LeaveRepository.forStudent` | `GET /students/:studentId/leave` → leave[] |
 | `apply` | `POST /leave` → leave object |
 | `GalleryRepository.all` | `GET /gallery` → album[] (shared albums; photo `url`s last five minutes; photos with a child without photo consent are left out) |
@@ -129,12 +130,10 @@ Staff attendance and leave, the class diary, parent-teacher meetings, leave earl
 | `invites` | `GET /visitors` → `{ visitors, purposes }` (staff); `POST /visitors` `{ name, phone, purpose, expectedOn }`; `POST /visitors/:id/cancel` |
 | `certificates` | `GET /certificates` → `{ types: [{ key, name, fee }], certificates }` (parents); `POST /certificates` `{ type, studentId, purpose }`; `POST /certificates/:id/cancel`; `POST /certificates/:id/link` → `{ url }` (the issued PDF, ten minutes) |
 
-## Plug-ins (not built)
+## Push, payments and the bus
 
-These stay behind their own interfaces, so a screen never pretends to talk to a vendor.
+**Push.** `PushService` (`lib/core/services/push_service.dart`) registers the phone with `POST /devices` once the school has connected Firebase Cloud Messaging in the console (Integrations) and the build workflow put its files into the school's build; a build without them gets no push. Tapping a push opens the `route` stored on its notification; the in-app list is `NotificationRepository`.
 
-**Push.** `PushGateway.register(token)` and `PushGateway.revoke()`. The server stores the device token on `POST /devices`. Tapping a push opens the `route` already stored on a notification. The in-app list remains `NotificationRepository`.
+**Payments.** `FeeRepository.pay` asks for an order (`POST /fees/:installmentId/order`), opens the provider's checkout that the school's payment provider in the Hub returned, and asks `GET /orders/:orderId` until it is settled (`fees.onlinePayment`).
 
-**Payments.** `PaymentGateway.checkout({ installmentId, method, amount })` returns `{ status, reference }`. `FeeRepository.pay` calls it, then `POST /fees/:installmentId/pay` with that reference. UPI, card, and net banking in the sheet are labels only until a gateway is chosen.
-
-**Live GPS.** `BusTracker.watch(busNo)` is a stream of `{ lat, lng, heading, etaMinutes }`. `TransportRepository.forStudent` stays the snapshot (route, stops, driver). The painted map would subscribe to the stream instead of the mock `progress` animation.
+**The bus.** The driver's phone sends its position (`POST /driver/trips/:id/position`); families receive it on the live stream (`GET /v1/f/stream`) and `TransportRepository.forStudent` is the snapshot (route, stops, driver, the bus's ETA when it is live).

@@ -13,34 +13,6 @@ few values are worked out on the phone. The app has no data of its own; everythi
 - `due` when unpaid and the due date is today or within 21 days
 - `upcoming` otherwise
 
-Aarav (`stu_aarav`) has an overdue lab fee and a Term 2 fee inside the due window, so the home banner shows. Ananya (`stu_ananya`) is paid up except a costume fee far in the future, so the banner hides when a parent switches child. Receipts for a payment are created in memory at pay time; they are not a separate JSON file.
-
-## Files
-
-| File | Root | What it is |
-| --- | --- | --- |
-| `users.json` | array | Login accounts |
-| `students.json` | array | Student profiles |
-| `classes.json` | array | Class sections |
-| `teachers.json` | array | Staff |
-| `attendance.json` | array | One row per student per day |
-| `timetable.json` | array | One row per class per weekday |
-| `homework.json` | array | Assignments plus per-student submissions |
-| `exams.json` | array | Exam papers |
-| `results.json` | array | Published marks |
-| `fees.json` | array | One account per student |
-| `notices.json` | array | School notices |
-| `events.json` | array | Events plus RSVP |
-| `chat_threads.json` | array | Conversations |
-| `messages.json` | array | Messages |
-| `library_books.json` | array | Catalogue |
-| `transport.json` | array | One route per student |
-| `leave_requests.json` | array | Leave applications |
-| `gallery.json` | array | Albums with photos |
-| `notifications.json` | array | In-app notifications |
-| `school_life.json` | object | Staff day and leave, diary entries, meetings, gate passes and pick-up people, invited visitors and certificates, in the family API's shapes (`staff`, `diary`, `diaryClasses`, `diaryKinds`, `classDiary`, `meetings`, `teacherMeetings`, `gatePass`, `purposes`, `invites`, `certificates`) |
-| `school_info.json` | object | Greenfield International School, Pune |
-
 ## Enums (JSON values)
 
 - Role: `student`, `parent`, `teacher`
@@ -53,10 +25,10 @@ Aarav (`stu_aarav`) has an overdue lab fee and a Term 2 fee inside the due windo
 
 ## Relationships
 
-- `users.studentId` → `students.id` (`stu_aarav`, `stu_ananya`)
-- `users.teacherId` → `teachers.id` (`tch_kavita`)
-- `users.childIds[]` → `students.id` (Priya: Aarav and Ananya)
-- `students.classId` → `classes.id` (`cls_8a` is Class 8 A, `cls_5b` is Class 5 B)
+- `users.studentId` → `students.id`
+- `users.teacherId` → `teachers.id`
+- `users.childIds[]` → `students.id`
+- `students.classId` → `classes.id`
 - `classes.classTeacherId` → class teacher
 - `attendance.studentId` → `students.id`
 - `timetable.classId` → `classes.id`; each period's `teacherId` → `teachers.id`
