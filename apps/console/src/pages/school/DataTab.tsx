@@ -87,7 +87,8 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
         <div className="ch"><h2>{tr('console.data_tab.imports')}</h2><span className="chip">{v.batches.length}</span></div>
         <div className="help">{tr('console.data_tab.each_import_is_one_batch')}</div>
         {v.runs.map((r) => (
-          <div key={r.id} className="kv" style={{ alignItems: 'center' }}>
+          // A big file's result ("129,942 added, 0 changed, 0 left out") goes under its name on a phone instead of off the edge.
+          <div key={r.id} className="kv" style={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 8 }}>
             <span>{IMPORT_KINDS.find((k) => k.key === r.kind)?.label ?? r.kind} · {r.fileName} · {tr('console.data_tab.rows_n', { n: r.rows })}<small style={{ display: 'block', color: r.error ? 'var(--bad)' : 'var(--ink3)' }}>{r.error ?? `${r.by} · ${when(r.startedAt)}`}</small></span>
             <b><span className={`chip ${r.status === 'done' ? 'g' : r.status === 'failed' ? 'c' : 'a'}`}>{r.status === 'running' ? tr('console.data_tab.running') : r.status === 'done' ? tr('console.data_tab.run_done', { created: r.created ?? 0, updated: r.updated ?? 0, skipped: r.skipped ?? 0 }) : tr('console.data_tab.run_failed')}</span></b>
           </div>
