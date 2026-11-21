@@ -138,7 +138,7 @@ export const fit = () => {
     for (const t of seg.querySelectorAll('button')) { const r = t.getBoundingClientRect(); if (r.right > s.right + 1 && getComputedStyle(seg).overflowX === 'visible') { out.push(`tab outside its track: ${nm(t)}`); break; } }
   }
   // 4. words that only appear when a value is missing
-  const tw = document.createTreeWalker(document.querySelector('.mn') ?? document.body, NodeFilter.SHOW_TEXT);
+  const tw = document.createTreeWalker((window.__scanRoot ?? document.querySelector('.mn') ?? document.body), NodeFilter.SHOW_TEXT);
   // The Languages page shows catalogue texts as written, and some start with a separator.
   for (let t = location.pathname.endsWith('/languages') ? null : tw.nextNode(); t; t = tw.nextNode()) {
     const s = t.parentElement.textContent.trim();
@@ -212,7 +212,7 @@ export const tight = () => {
     return (!!bg && !/rgba\(0, 0, 0, 0\)|transparent/.test(bg)) || (parseFloat(cs.borderTopWidth) > 0 && cs.borderTopStyle !== 'none' && parseFloat(cs.borderTopLeftRadius) >= 8);
   };
   const texty = (el) => !boxed(el) && !el.querySelector('input,textarea,table,button,.fld,.inp') && (el.textContent ?? '').trim().length > 2 && /^(H[1-6]|P|SMALL|LABEL|SPAN|B|DIV)$/.test(el.tagName);
-  const main = document.querySelector('.mn') ?? document.body;
+  const main = (window.__scanRoot ?? document.querySelector('.mn') ?? document.body);
   for (const p of [main, ...main.querySelectorAll('*')]) {
     const cs = getComputedStyle(p);
     const column = cs.display === 'block' || (cs.display.includes('flex') && cs.flexDirection.startsWith('column')) || cs.display.includes('grid');
@@ -227,6 +227,74 @@ export const tight = () => {
       if (gap >= 6) continue;
       if ((texty(a) && boxed(b)) || (boxed(a) && texty(b))) out.push(`${gap}px between ${nm(a)} “${(a.textContent ?? '').trim().slice(0, 30)}” and ${nm(b)}`);
     }
+  }
+  return [...new Set(out)];
+};
+
+/** Rows that repeat (the same parts in each, one under the other) whose parts do not start on the same line across rows. */
+export const align = () => {
+  const out = [];
+  const nm = (el) => `${el.tagName.toLowerCase()}${typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : ''}`;
+  const shown = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).display !== 'none'; };
+  const sig = (el) => [...el.children].filter(shown).map(nm).join('|');
+  const main = (window.__scanRoot ?? document.querySelector('.mn') ?? document.body);
+  for (const p of [main, ...main.querySelectorAll('*')]) {
+    if (p.closest('.popm,.sxp,.toast,.tgrow,svg')) continue;
+    const rows = [...p.children].filter((k) => shown(k) && getComputedStyle(k).display.includes('flex') && !getComputedStyle(k).flexDirection.startsWith('column') && getComputedStyle(k).flexWrap !== 'wrap-reverse');
+    const groups = new Map();
+    for (const r of rows) { const s = sig(r); if (s.split('|').length >= 2) groups.set(s, [...(groups.get(s) ?? []), r]); }
+    for (const [s, g] of groups) {
+      if (g.length < 2) continue;
+      // Only rows stacked one under the other, the same width, and laid out on one line each.
+      const w = Math.round(g[0].getBoundingClientRect().width);
+      const x0 = Math.round(g[0].getBoundingClientRect().left);
+      const same = g.filter((r) => Math.abs(r.getBoundingClientRect().width - w) < 2 && Math.abs(r.getBoundingClientRect().left - x0) < 2 && new Set([...r.children].filter(shown).map((c) => Math.round(c.getBoundingClientRect().top / 6))).size === 1);
+      if (same.length < 2) continue;
+      // A part lines up when its left edges, right edges or centres do (a value set to the end of a row lines up on the right).
+      const boxes = same.map((r) => [...r.children].filter(shown).map((c) => c.getBoundingClientRect()));
+      for (let i = 1; i < boxes[0].length; i++) {
+        const sp = (f) => { const xs = boxes.map((b) => f(b[i])); return Math.max(...xs) - Math.min(...xs); };
+        const spread = Math.min(sp((b) => b.left), sp((b) => b.right), sp((b) => b.left + b.width / 2));
+        if (spread > 3) { out.push(`${nm(p)}: part ${i + 1} of ${same.length} rows (${s.split('|')[i]}) starts ${Math.round(spread)}px apart`); break; }
+      }
+    }
+  }
+  return [...new Set(out)];
+};
+
+/** A list that runs on: more than 25 rows straight down the page, not inside a box that scrolls and with no pages. */
+export const long = () => {
+  const out = [];
+  const nm = (el) => `${el.tagName.toLowerCase()}${typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : ''}`;
+  const main = (window.__scanRoot ?? document.querySelector('.mn') ?? document.body);
+  const scrolls = (el) => { for (let a = el; a && a !== main; a = a.parentElement) { const cs = getComputedStyle(a); if (/auto|scroll/.test(cs.overflowY) && a.scrollHeight > a.clientHeight + 4) return true; } return false; };
+  for (const p of [main, ...main.querySelectorAll('*')]) {
+    if (p.closest('.popm,.sxp,.toast,svg,select')) continue;
+    const kids = [...p.children].filter((k) => k.getBoundingClientRect().height > 0);
+    if (kids.length <= 25) continue;
+    const byTag = new Map();
+    for (const k of kids) byTag.set(nm(k), (byTag.get(nm(k)) ?? 0) + 1);
+    const [tag, count] = [...byTag].sort((a, b) => b[1] - a[1])[0];
+    if (count <= 25) continue;
+    // rows one under the other (a wrapping grid of chips or tiles is a different thing)
+    const tops = new Set(kids.map((k) => Math.round(k.getBoundingClientRect().top)));
+    if (tops.size <= 25) continue;
+    if (p.getBoundingClientRect().height < 900 || scrolls(p)) continue;
+    out.push(`${count} × ${tag} in ${nm(p)}, ${Math.round(p.getBoundingClientRect().height)}px tall, no scroll or pages`);
+  }
+  return out;
+};
+
+/** A bare line that says a list is empty, outside the empty-state parts. */
+export const empty = () => {
+  const out = [];
+  const main = (window.__scanRoot ?? document.querySelector('.mn') ?? document.body);
+  const parts = '.es-host,.en,.es,[data-empty]';
+  for (const el of main.querySelectorAll('p,div,small,span,td,li')) {
+    if (el.children.length || el.closest(parts) || el.closest('.popm,.sxp,.toast,option,button,label')) continue;
+    const t = (el.textContent ?? '').trim();
+    if (t.length < 4 || t.length > 160) continue;
+    if (/^(no|nothing|nobody|none|there (are|is) no|not any)\b/i.test(t) && el.getBoundingClientRect().height > 0) out.push(`“${t.slice(0, 70)}”`);
   }
   return [...new Set(out)];
 };

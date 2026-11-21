@@ -7,7 +7,8 @@
 //   node tools/check-pages.mjs --changed       only pages whose files changed since origin/main
 //   node tools/check-pages.mjs --full          360, 390, 768 and 1440, light and dark     (CI; also `audit-ui.mjs`)
 //   options: --only admin|console  --sizes 1440x900,390x844  --dark|--light|--both  --rtl  --workers 6
-//            --scans gaps,fit,cutoff,scroll,tight|all (reported; they fail the run only with --strict)  --shots dir
+//            --scans gaps,fit,cutoff,scroll,tight,align,long,empty|all (reported; they fail the run only with --strict)  --shots dir
+//            --popups: also opens each page's drawers and dialogs (its first row, its Add/New/Edit… buttons) and checks inside them
 import { chromium } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
@@ -89,6 +90,42 @@ for (const dark of THEMES) for (const size of SIZES) for (const j of jobs) items
 const started = Date.now();
 console.log(`${jobs.length} pages × ${SIZES.length} sizes × ${THEMES.length} themes = ${items.length} loads on ${WORKERS} workers${SCANS.length ? `, with ${SCANS.join(', ')}` : ''}`);
 
+// Buttons that open a popup without changing anything; anything that sends, deletes or pays is never pressed.
+const OPENS = /^(add|new|edit|record|invite|ask|collect|message|change|create|set up|plan|book|issue|mark|upload|import|filter|more|view|open|choose|assign|move|log|write|compose|schedule|request|apply|enter|details)\b/i;
+const NEVER = /delete|remove|send|publish|approve|reject|sign out|archive|undo|pay|refund|go live|run |export|print|download|erase|leave|reset|revoke|suspend|cancel/i;
+const POP = '.mod .dlg, .drw, .popm';
+async function popups(page, url) {
+  const out = [];
+  const openers = await page.evaluate(([o, n]) => {
+    const main = document.querySelector('.mn');
+    if (!main) return [];
+    const ok = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !el.disabled; };
+    const pick = [];
+    const rows = [...main.querySelectorAll('.rw, tr')];
+    const row = rows.find((r) => ok(r) && getComputedStyle(r).cursor === 'pointer');
+    if (row) pick.push({ row: rows.indexOf(row) });
+    [...main.querySelectorAll('button')].forEach((b, i) => { const t = (b.textContent ?? '').trim(); if (ok(b) && new RegExp(o, 'i').test(t) && !new RegExp(n, 'i').test(t)) pick.push({ i, t }); });
+    return pick.slice(0, 8);
+  }, [OPENS.source, NEVER.source]);
+  for (const op of openers) {
+    const target = op.row !== undefined ? page.locator('.mn').locator('.rw, tr').nth(op.row) : page.locator('.mn button').nth(op.i);
+    await target.click({ timeout: 2000 }).catch(() => undefined);
+    await page.waitForTimeout(450);
+    if (!page.url().startsWith(url.split('?')[0])) { await page.goto(url, { waitUntil: 'networkidle' }).catch(() => undefined); continue; }
+    if (await page.locator(POP).count()) {
+      const label = op.t ? `“${op.t.slice(0, 24)}”` : 'its first row';
+      for (const f of await auditPage(page).catch(() => [])) out.push(`popup from ${label}: ${f}`);
+      await page.evaluate((sel) => { window.__scanRoot = [...document.querySelectorAll(sel)].at(-1); }, POP);
+      for (const s of ['align', 'empty', 'cutoff']) for (const f of await page.evaluate(scans[s]).catch(() => [])) out.push(`popup from ${label}: ${s}: ${f}`);
+      await page.evaluate(() => { delete window.__scanRoot; });
+    }
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(350);
+    if (await page.locator(POP).count()) await page.goto(url, { waitUntil: 'networkidle' }).catch(() => undefined);
+  }
+  return [...new Set(out)];
+}
+
 const browser = await chromium.launch();
 let problems = 0, scanned = 0, next = 0;
 async function worker() {
@@ -118,6 +155,7 @@ async function worker() {
     if (over.sw > over.cw + 1) found.unshift(`page scrolls sideways: ${over.sw} > ${over.cw}`);
     const noted = [];
     for (const s of SCANS) for (const f of await page.evaluate(scans[s]).catch(() => [])) noted.push(`${s}: ${f}`);
+    if (has('--popups')) for (const f of await popups(page, it.url)) found.push(f);
     if (shots) await page.screenshot({ path: `${shots}/${it.name.replace(/[/]/g, '_')}-${w}-${it.dark ? 'dark' : 'light'}.png` });
     const all = [...errors.map((e) => `error: ${e.slice(0, 160)}`), ...found];
     if (all.length) problems++;

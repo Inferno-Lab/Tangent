@@ -4,7 +4,12 @@
 // Usage: node tools/e2e-onboard.mjs [outDir]   (needs the server on :4000, console on :5174, admin on :5173)
 import { chromium } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
-import { adminPaths } from './lib/pages.mjs';
+import { adminPaths, consolePaths } from './lib/pages.mjs';
+import * as scans from './lib/scans.mjs';
+
+// Every page of an empty school is read for a bare "No …" line instead of an empty state, rows out of line and cut-off text.
+const notes = [];
+const scan = async (pg, name) => { for (const k of ['empty', 'align', 'cutoff']) for (const f of await pg.evaluate(scans[k]).catch(() => [])) notes.push(`${name}: ${k}: ${f}`); };
 
 const out = process.argv[2] ?? 'e2e-shots';
 mkdirSync(out, { recursive: true });
@@ -32,6 +37,12 @@ step('open the wizard');
 await page.goto(`${CONSOLE}/onboarding/new`, { waitUntil: 'networkidle' });
 await page.getByLabel('School name').fill('Banyan Ridge School');
 await page.getByLabel('Address name').fill(slug);
+// The school's country sets how its phones, dates and money are read; a select opens, takes typing and Enter.
+const pick = async (label, text) => { await page.getByLabel(label, { exact: true }).click(); await page.keyboard.type(text); await page.keyboard.press('Enter'); await page.waitForTimeout(200); };
+await pick('Country', 'India');
+if (/Choose/.test(await page.getByLabel('Time zone', { exact: true }).innerText())) await pick('Time zone', 'Kolkata');
+if (/Choose/.test(await page.getByLabel('Dates and numbers written as', { exact: true }).innerText())) await pick('Dates and numbers written as', 'India');
+if (!(await page.getByLabel('Currency', { exact: true }).inputValue())) await page.getByLabel('Currency', { exact: true }).fill('INR');
 await page.getByLabel('Contact name').fill('Mira Joshi');
 await page.getByLabel('Phone').fill('9820011223');
 await page.getByLabel('Email').fill('principal@banyanridge.in');
@@ -91,8 +102,17 @@ for (const [name, path] of adminPaths.map((p) => [p.slice(1).replace(/\//g, '-')
   const o = await ap.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
   if (o.sw > o.cw + 1) errors.push(`overflow on ${name}: ${o.sw} > ${o.cw}`);
   await ap.screenshot({ path: `${out}/admin-${name}.png`, fullPage: false });
+  await scan(ap, `admin/${name}`);
   step(`captured ${name}`);
 }
+// The console's own tabs for the new school, read the same way.
+const sid = (await (await fetch(`${API}/console/v1/schools`, { headers: { authorization: `Bearer ${t.accessToken}` } })).json()).find((x) => x.slug === slug)?.id;
+for (const path of consolePaths(sid).filter((x) => x.includes(sid))) {
+  await page.goto(`${CONSOLE}${path}`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(800);
+  await scan(page, `console${path.replace(sid, 'new')}`);
+}
+for (const n of notes) console.log(`· ${n}`);
 console.log(JSON.stringify({ slug, errors }, null, 2));
 await browser.close();
 process.exit(errors.length ? 1 : 0);
