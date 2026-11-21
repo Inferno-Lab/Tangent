@@ -101,7 +101,7 @@ export async function startHarness(): Promise<Harness> {
         });
       }
       // No quiet hours unless a test sets them: messages are held in quiet hours, so results would depend on the clock. The
-      // school is open every day for the same reason (AGENTS rule 12: any day of the week must work); a test sets its own week.
+      // school is open every day for the same reason (AGENTS.md: any day of the week must work); a test sets its own week.
       // Two-step sign-in is off so a test signs in with one call; the sign-in tests turn it on.
       await pool.query(`insert into settings (key, value) values ('notify.quietFrom', '"00:00"'), ('notify.quietTo', '"00:00"'), ('calendar.weeklyOff', '[]'), ('security.twoFactor', 'false')
         on conflict (key) do update set value = excluded.value`);
