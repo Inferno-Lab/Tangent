@@ -1,5 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
+import { brevo } from './providers/email.js';
 import { customHttp } from './providers/generic.js';
 import { razorpay } from './providers/payments.js';
 import { checkoutCom, gocardless, nagerDate, stripe, vonage } from './providers/regional.js';
@@ -110,6 +111,21 @@ describe('public holidays', () => {
     expect(await nagerDate.holidays!(ctx(), 'GB', 2026)).toEqual([{ date: '2026-12-25', name: 'Christmas Day' }]);
     vi.stubGlobal('fetch', reply({ title: 'Not Found' }, 404));
     expect(await nagerDate.holidays!(ctx(), 'ZZ', 2026)).toEqual([]);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe('Brevo', () => {
+  it('sends with the key in its header and the sender named as the From says', async () => {
+    const sent = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({ messageId: '<m1@brevo>' }), { status: 201 }));
+    vi.stubGlobal('fetch', sent);
+    const c = ctx({ from: 'Sunrise Valley <office@sunrisevalley.example>' }, { apiKey: 'xkeysib-abc' });
+    const r = await brevo.email!(c, { to: 'parent@example.org', subject: 'Fees', text: 'A fee is due.', vars: {}, messageKey: 'fees.reminder' });
+    expect(r.providerId).toBe('<m1@brevo>');
+    const [url, init] = sent.mock.calls[0]!;
+    expect(url).toBe('https://api.brevo.com/v3/smtp/email');
+    expect((init!.headers as Record<string, string>)['api-key']).toBe('xkeysib-abc');
+    expect(JSON.parse(String(init!.body))).toMatchObject({ sender: { name: 'Sunrise Valley', email: 'office@sunrisevalley.example' }, to: [{ email: 'parent@example.org' }], subject: 'Fees', textContent: 'A fee is due.' });
     vi.unstubAllGlobals();
   });
 });
