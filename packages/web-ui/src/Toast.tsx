@@ -13,20 +13,21 @@ export interface ToastProps {
   close?: () => void;
 }
 
-/** How long a toast stays: a confirmation 4 s, one with an action 6 s. An error stays until it is closed. */
+/** How long a toast stays: a confirmation 4 s, one with an action 6 s, an error 8 s (it also has a close button). */
 export const TOAST_MS = 4000;
 export const TOAST_ACTION_MS = 6000;
+export const TOAST_ERROR_MS = 8000;
 
-/** `say("Saved")` shows a toast; `say("Couldn’t save", 'bad')` one that waits to be closed. Timers stop with the page. */
+/** `say("Saved")` shows a toast; `say("Couldn’t save", 'bad')` an error that stays a little longer. Timers stop with the page. */
 export function useToast(): { toast: ToastProps | null; say: (text: ReactNode, tone?: 'ok' | 'bad', action?: ToastProps['action']) => void; clear: () => void } {
   const [toast, setToast] = useState<ToastProps | null>(null);
   const t = useRef<ReturnType<typeof setTimeout>>(undefined);
   const ms = useRef(0);
   useEffect(() => () => clearTimeout(t.current), []);
   const clear = useCallback(() => { clearTimeout(t.current); setToast(null); }, []);
-  const arm = useCallback(() => { clearTimeout(t.current); if (ms.current) t.current = setTimeout(() => setToast(null), ms.current); }, []);
+  const arm = useCallback(() => { clearTimeout(t.current); t.current = setTimeout(() => setToast(null), ms.current); }, []);
   const say = useCallback((text: ReactNode, tone: 'ok' | 'bad' = 'ok', action?: ToastProps['action']) => {
-    ms.current = tone === 'bad' ? 0 : action ? TOAST_ACTION_MS : TOAST_MS;
+    ms.current = tone === 'bad' ? TOAST_ERROR_MS : action ? TOAST_ACTION_MS : TOAST_MS;
     setToast({ text, tone, action, hold: (on) => (on ? clearTimeout(t.current) : arm()), close: clear });
     arm();
   }, [arm, clear]);
