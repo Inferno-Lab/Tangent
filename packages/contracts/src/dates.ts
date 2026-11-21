@@ -62,10 +62,15 @@ export function dayLabel(day: string): string {
 export const plural = (word: string): string =>
   /(s|x|z|ch|sh)$/i.test(word) ? `${word}es` : /[^aeiou]y$/i.test(word) ? `${word.slice(0, -1)}ies` : `${word}s`;
 
+// ponytail: the titles schools write in English and in India; another country's go here when its schools use them.
+const TITLE = /^(dr|mr|mrs|ms|mx|miss|prof|sir|smt|shri|sri|kum)\.?$/i;
+/** A person's own names, without the title written before them ("Dr. Meenakshi Raghavan" → ["Meenakshi", "Raghavan"]). */
+const ownNames = (name: string): string[] => { const words = name.split(/\s+/).filter(Boolean); const at = words.findIndex((w) => !TITLE.test(w)); return at < 0 ? words : words.slice(at); };
+/** The name to greet someone by: their first own name, not their title. */
+export const firstName = (name: string): string => ownNames(name)[0] ?? '';
+
 export function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
+  return ownNames(name)
     .slice(0, 2)
     .map((w) => w[0]!.toUpperCase())
     .join('');

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { rollDigits } from '../digits';
 import { markStyle } from '../shell/Sidebar';
 import { catalogueLanguages, chooseLanguage, currentLanguage, t as tr } from '../i18n';
-import { languageOf } from '@tangent/contracts';
+import { firstName, languageOf } from '@tangent/contracts';
 
 const EYE_ON = 'show';
 const EYE_OFF = 'hide';
@@ -185,6 +185,6 @@ export function useLogin(c: LoginController, themeCls: string) {
       fill.current = setInterval(() => { k++; setCode(full.slice(0, k)); if (k >= 6) { clearInterval(fill.current); setTimeout(() => void verifyNow(full), 350); } }, 140);
     },
     verify: () => void verifyNow(code),
-    firstName: name.split(/[ @.]/)[0] || 'there', goName: c.goName, enter: c.enter,
+    firstName: (name.includes('@') ? name.split(/[@.]/)[0] : firstName(name)) || 'there', goName: c.goName, enter: c.enter,
   };
 }
