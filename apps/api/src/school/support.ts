@@ -19,7 +19,8 @@ export class AuditService {
 
   async list(t: TenantCtx, limit = 50): Promise<AuditRow[]> {
     const { rows } = await t.pool.query<{ id: string; at: Date; actor_name: string; action: string; entity: string; detail: Record<string, unknown> }>(
-      'select id, at, actor_name, action, entity, detail from audit_log order by at desc limit $1', [limit]);
+      // Only what the school's own people did: Tangent's set-up, console changes and its jobs have no user of this school.
+      "select a.id, a.at, a.actor_name, a.action, a.entity, a.detail from audit_log a join users u on u.id = a.actor_id where a.action <> 'school.created' order by a.at desc limit $1", [limit]);
     return rows.map((r) => ({ id: r.id, at: r.at.toISOString(), actor: r.actor_name, action: r.action, entity: r.entity, detail: Object.entries(r.detail).map(([k, v]) => `${k}: ${String(v)}`).join(' · ') }));
   }
 }

@@ -180,7 +180,7 @@ function Start({ onClose, onDone }: { onClose: () => void; onDone: (t: ThreadDet
         ) : (
           <div className="fld">
             <Field label={tr('admin.messages_page.to_the_family_of')} value={q} onChange={(v) => { setQ(v); setErr({ ...err, studentId: '' }); }} error={err.studentId} placeholder={tr('admin.messages_page.type_a_student_s_name')} />
-            {found.data?.items.length ? <div className="pks">{found.data.items.map((s) => <button key={s.id} className="pk" onClick={() => setStu({ id: s.id, name: s.name, className: s.className })}><Avatar name={s.name} size={28} /><span><b>{s.name}</b><small>{tr('admin.messages_page.class_3')}{' '}{s.className} · {s.guardianName}</small></span></button>)}</div> : term.length >= 2 && found.data ? <div className="help">{tr('admin.messages_page.no_student_found')}</div> : null}
+            {found.data?.items.length ? <div className="pks">{found.data.items.map((s) => <button key={s.id} className="pk" onClick={() => setStu({ id: s.id, name: s.name, className: s.className })}><Avatar name={s.name} size={28} /><span><b>{s.name}</b><small>{tr('admin.messages_page.class_3')}{' '}{s.className} · {s.guardianName}</small></span></button>)}</div> : term.length >= 2 && found.data ? <EmptyNote icon="search" title={tr('admin.messages_page.no_student_found')} /> : null}
           </div>
         )}
         <Field label={tr('admin.messages_page.subject')} value={subject} onChange={(v) => { setSubject(v); setErr({ ...err, subject: '' }); }} error={err.subject} maxLength={100} />

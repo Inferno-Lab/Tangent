@@ -42,7 +42,13 @@ export function toE164(raw: string, country: string): string | null {
   const digits = s.replace(/\D/g, '');
   if (s.startsWith('+') || s.startsWith('00')) {
     const d = s.startsWith('00') ? digits.slice(2) : digits;
-    return d.length >= 8 && d.length <= 15 ? `+${d}` : null;
+    if (d.length < 8 || d.length > 15) return null;
+    // A known calling code holds the number to that country's lengths (+91 takes ten digits, never thirteen).
+    const { code, national } = splitE164(d);
+    const lens = Object.keys(CALLING_CODES).filter((c) => CALLING_CODES[c] === code && LENGTHS[c]).map((c) => LENGTHS[c]!);
+    if (!lens.length) return `+${d}`;
+    const rest = !Object.keys(CALLING_CODES).some((c) => CALLING_CODES[c] === code && KEEPS_ZERO.has(c)) ? national.replace(/^0+/, '') : national;
+    return lens.some(([min, max]) => rest.length >= min && rest.length <= max) ? `+${code}${rest}` : null;
   }
   const code = CALLING_CODES[country];
   if (!code) return null;

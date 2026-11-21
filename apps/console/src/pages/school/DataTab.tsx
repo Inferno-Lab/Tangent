@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ImportInputIn } from '@tangent/api-client';
 import { IMPORT_KINDS, IMPORT_SOURCES, type ImportBatchRow, type ImportColumn, type ImportKind, type ImportPreview, type MigrationView, type SchoolDetail } from '@tangent/contracts';
 import { Dialog, EmptyCard, Field, FilePick, Select, EmptyNote, t as tr } from '@tangent/web-ui';
@@ -40,8 +40,10 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
     ? { kind: kind.key, csv: src.content, fileName: src.fileName, uploadId: src.uploadId, mapping, values }
     : { kind: kind.key, rows: src.rows, fileName: src.fileName, uploadId: src.uploadId });
   const preview = useQuery({
-    queryKey: ['import-preview', schoolId, kind?.key, job.rev], enabled: !!src && !!kind,
-    queryFn: () => app.api.migration.preview(schoolId, input()!), retry: false, staleTime: Infinity, placeholderData: keepPreviousData,
+    queryKey: ['import-preview', schoolId, kind?.key, src?.fileName, job.rev], enabled: !!src && !!kind,
+    // The last preview stays on screen only while the same file of the same kind is checked again, never under another file.
+    queryFn: () => app.api.migration.preview(schoolId, input()!), retry: false, staleTime: Infinity,
+    placeholderData: (prev, last) => (last?.queryKey[2] === kind?.key && last?.queryKey[3] === src?.fileName ? prev : undefined),
   });
   const refresh = (next?: Partial<MigrationView>) => { if (next && v) qc.setQueryData(['migration', schoolId], { ...v, ...next }); void qc.invalidateQueries({ queryKey: ['migration', schoolId] }); void qc.invalidateQueries({ queryKey: ['school', schoolId] }); };
   const fail = (e: unknown) => say((e as Error).message, 'bad');
@@ -223,7 +225,8 @@ function PreviewPanel({ kind: base, src, preview: p, loading, error, onMap, onVa
                   {shown.map((r) => (
                     <div key={r.i} className="grd rw" style={{ ...grid, height: 'auto', padding: '6px 0', gap: 6 }}>
                       <span style={{ font: '700 12px var(--fb)', color: 'var(--ink3)' }}>{r.line}</span>
-                      {kind.columns.map((c) => <input key={c.key} className={`hws ${r.errors.length && c.required && !r.values[c.key] ? 'bad' : ''}`} style={{ width: '100%', textAlign: 'start' }} aria-label={tr('console.data_tab.line_2', { line: r.line, label: c.label })} placeholder={c.example} defaultValue={r.values[c.key] ?? ''}
+                      {/* Keyed by the value too: a box typed in keeps nothing from another file's row at the same place. */}
+                      {kind.columns.map((c) => <input key={`${c.key}|${r.values[c.key] ?? ''}`} className={`hws ${r.errors.length && c.required && !r.values[c.key] ? 'bad' : ''}`} style={{ width: '100%', textAlign: 'start' }} aria-label={tr('console.data_tab.line_2', { line: r.line, label: c.label })} placeholder={c.example} defaultValue={r.values[c.key] ?? ''}
                         onBlur={(e) => { if (e.target.value !== (r.values[c.key] ?? '')) edit(r.i, c.key, e.target.value); }} />)}
                       <span style={{ font: '600 12px var(--fb)', color: r.errors.length ? 'var(--bad)' : 'var(--ok)' }}>{r.errors.length ? r.errors.join(' ') : r.action === 'update' ? tr('console.data_tab.updates_what_is_there') : tr('console.data_tab.new')}</span>
                     </div>

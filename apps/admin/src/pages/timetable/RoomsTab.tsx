@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { dayLabel, schoolToday, type RoomRow } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, EmptyCard, ErrorLine, Field, NumberField, TimeField, useShake, t } from '@tangent/web-ui';
+import { EmptyNote, Checkbox, DateField, Dialog, EmptyCard, ErrorLine, Field, NumberField, TimeField, useShake, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { AddBtn, problem } from '../../app/kit';
@@ -51,14 +51,14 @@ export function RoomsTab({ tabs }: { tabs: React.ReactNode }) {
               {day.isError ? <ErrorLine>{(day.error as Error).message}</ErrorLine> : <>
                 <div className="lbl" style={{ marginTop: 12 }}>{t('admin.rooms_tab.lessons_in_it')}</div>
                 {day.data?.lessons.length ? day.data.lessons.map((l) => <div key={`${l.start}${l.label}`} className="kv"><span>{l.start}–{l.end}</span><b>{l.label}</b></div>)
-                  : <p className="help">{t('admin.rooms_tab.no_lessons_that_day')}</p>}
+                  : <EmptyNote icon="timetable" title={t('admin.rooms_tab.no_lessons_that_day')} />}
                 <div className="lbl" style={{ marginTop: 12 }}>{t('admin.rooms_tab.bookings')}</div>
                 {day.data?.bookings.length ? day.data.bookings.map((b) => (
                   <div key={b.id} className="kv" style={{ alignItems: 'center', gap: 12 }}>
                     <span>{b.start}–{b.end}</span><b style={{ flex: 1 }}>{b.purpose}<small style={{ display: 'block', color: 'var(--ink3)' }}>{b.bookedBy}</small></b>
                     {(b.mine || canEdit) && <button className="btn sm" disabled={cancel.isPending} onClick={() => cancel.mutate(b.id)}>{t('admin.rooms_tab.cancel_booking')}</button>}
                   </div>
-                )) : <p className="help">{t('admin.rooms_tab.no_bookings')}</p>}
+                )) : <EmptyNote icon="calendar" title={t('admin.rooms_tab.no_bookings')} />}
                 {cur.bookable && date >= schoolToday() && <BookForm roomId={cur.id} date={date} onDone={() => after(t('admin.rooms_tab.room_booked', { room: cur.name }))} />}
               </>}
             </Card>

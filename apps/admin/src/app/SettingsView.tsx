@@ -86,7 +86,7 @@ export function SettingsTab({ path }: { path: string }) {
   const page = shell?.menu.flatMap((g) => g.pages).find((p) => p.href === path);
   return (
     <Page title={page?.label ?? t('admin.settings_view.settings')} sub={t('admin.settings_view.how_this_part_of_the')} toast={toast} tabs={tabs}>
-      <div style={{ maxWidth: 760 }}><SettingsEditor keys={page?.settings ?? []} say={say} /></div>
+      <SettingsEditor keys={page?.settings ?? []} say={say} />
     </Page>
   );
 }

@@ -2,6 +2,7 @@ import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react
 import { RouterProvider } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { quietFields } from '@tangent/web-ui';
 import { readSupportHash } from './app/client';
 import { resolveSchool } from './app/school';
 import { makeRouter } from './router';
@@ -16,6 +17,7 @@ const queryClient: QueryClient = new QueryClient({
 });
 const { slug, basepath } = resolveSchool();
 
+quietFields();
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     {window.location.pathname.replace(/\/$/, '') === '/status' ? (

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fmtMoneyShort, fmtMoney, type StudentDetail } from '@tangent/contracts';
-import { Dialog, EmptyState, Icon, Roll, Select, rollDigits, t } from '@tangent/web-ui';
+import { EmptyNote, Dialog, EmptyState, Icon, Roll, Select, rollDigits, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { StudentPick } from '../../app/kit';
@@ -121,7 +121,7 @@ function Overview({ tabs }: { tabs: React.ReactNode }) { const app = useApp();
           </div>
           <section className="card flush">
             <div className="ch" style={{ padding: '20px 20px 8px' }}><h2>{t('admin.fees_page.overdue')}</h2><small>{t('admin.fees_page.n_families', { n: overdue.data?.total ?? 0 })} {t('admin.fees_page.largest_first')}</small></div>
-            {rows.length === 0 && !overdue.isLoading ? <p className="t2" style={{ fontSize: 14, padding: '0 20px 20px' }}>{t('admin.fees_page.nobody_is_overdue_families_with')}</p> : (
+            {rows.length === 0 && !overdue.isLoading ? <div style={{ padding: '0 20px 20px' }}><EmptyNote icon="checkCircle" title={t('admin.fees_page.nobody_is_overdue_families_with')} /></div> : (
               <div className="scroll-x" data-fill="">
                 <div style={{ minWidth: 620 }}>
                   <div className="trow h" style={{ '--cols': 'minmax(0,1.6fr) 70px minmax(0,1.2fr) 110px 110px' } as React.CSSProperties}><span>{t('admin.fees_page.student')}</span><span>{t('admin.fees_page.class')}</span><span>{t('admin.fees_page.parent')}</span><span className="r">{t('admin.fees_page.amount')}</span><span /></div>

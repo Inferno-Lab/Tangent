@@ -60,6 +60,9 @@ export class Registry {
       connectionTimeoutMillis: 10_000,
       application_name: 'tangent-registry',
     });
+    // A dropped connection, idle or in use, fails its query, never the process.
+    this.pool.on('error', () => undefined);
+    this.pool.on('connect', (c) => c.on('error', () => undefined));
     this.db = drizzle(this.pool);
     // Translations kept on the console's Languages page reach every page and message within a minute.
     watchTranslations(this.pool);
@@ -149,6 +152,8 @@ export class PoolManager {
       application_name: `tangent-${slug}`.slice(0, 63),
     });
     pool.on('error', () => undefined); // a dropped idle connection must not crash the process
+    // Nor one in use (a long import's): its query fails with the error, and the client's own event has a listener.
+    pool.on('connect', (c) => c.on('error', () => undefined));
     this.pools.set(slug, { pool, lastUsed: Date.now(), url });
     this.evictOverflow();
     return pool;

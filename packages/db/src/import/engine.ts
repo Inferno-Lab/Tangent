@@ -267,7 +267,10 @@ export async function undoBatch(pool: pg.Pool, id: string): Promise<void> {
       }
     }
     await client.query('update import_batches set undone_at = now() where id = $1', [id]);
+    // The school's file it came from waits to be imported again, so the admin's Moving in no longer says it is in.
+    await client.query("update import_uploads set status = 'new', batch_id = null where batch_id = $1", [id]);
     await client.query('commit');
+    await freshStats(pool, changes.map((c) => c.table));
   } catch (err) {
     await client.query('rollback').catch(() => undefined);
     throw err;

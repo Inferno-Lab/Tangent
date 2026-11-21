@@ -17,6 +17,12 @@ describe('phone numbers anywhere', () => {
   it('refuses what cannot be a phone number, and says what the country expects', () => {
     expect(toE164('12345', 'IN')).toBeNull();
     expect(toE164('', 'IN')).toBeNull();
+    // Written with its calling code, a number still has to have that country's length.
+    expect(toE164('+91 98220 412001', 'IN')).toBeNull();
+    expect(toE164('+91 98220 4120', 'AE')).toBeNull();
+    expect(toE164('+44 (0)7911 123456', 'IN')).toBe('+447911123456');
+    expect(toE164('+7 912 345 6789', 'IN')).toBe('+79123456789');
+    expect(toE164('98220412001', 'IN')).toBeNull();
     expect(phoneProblem('12345', 'IN')).toContain('10-digit');
     expect(phoneProblem('050 123 4567', 'AE')).toBeNull();
   });

@@ -401,7 +401,7 @@ function RouteDialog({ view, schools, capability, schoolId, route, onClose, onDo
   const unroute = useMutation({ mutationFn: () => app.api.integrations.unroute(route!.id), onSuccess: () => onDone(tr('console.integrations_page.no_longer_has_its_own', { who, p1: CAPABILITY_LABELS[capability].toLowerCase() })), onError: (e) => setErr(fields(e)) });
   return (
     <Dialog title={`${CAPABILITY_LABELS[capability]} · ${who}`} onClose={onClose} width={520} shake={shake.cls}>
-      {!fit.length ? <p className="help" style={{ margin: 0 }}>{tr('console.integrations_page.no_connection_can_do_this')}{' '}{who} {tr('console.integrations_page.yet_add_one_under_connections')}</p> : (
+      {!fit.length ? <EmptyNote icon="integrations" title={`${tr('console.integrations_page.no_connection_can_do_this')} ${who} ${tr('console.integrations_page.yet_add_one_under_connections')}`} /> : (
         <div className="stack">
           <SelectField label={tr('console.integrations_page.connection')} value={conn} onChange={setConn} error={err.connectionId} options={fit.map((c) => ({ value: c.id, label: `${c.name} · ${STATE[c.state].text}` }))} />
           <SelectField label={tr('console.integrations_page.when_it_fails_try')} value={fallback} onChange={setFallback} error={err.fallbackId} options={[{ value: '', label: tr('console.integrations_page.nothing_retry_later') }, ...fit.filter((c) => c.id !== conn).map((c) => ({ value: c.id, label: c.name }))]} />

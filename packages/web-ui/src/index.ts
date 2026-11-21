@@ -27,6 +27,7 @@ export * from './Presence';
 export * from './Toast';
 export * from './Segmented';
 export * from './Select';
+export * from './quietFields';
 export * from './Menu';
 export * from './Tip';
 export * from './EvenRows';

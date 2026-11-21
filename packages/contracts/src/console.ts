@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { COUNTRIES, isCurrency, isLocale, isZone } from './locale.js';
+import { phoneProblem } from './phones.js';
 import { RESERVED_SLUGS, SLUG_RE } from './common.js';
 import type { Limits, ModuleDates } from './config.js';
 import { localized, localizedLabels } from './i18n.js';
@@ -164,6 +165,10 @@ export const WizardBasics = z.object({
   timezone: z.string().refine(isZone, 'Choose a time zone'),
   locale: z.string().refine(isLocale, 'Choose how dates and numbers are written'),
   currency: z.string().trim().toUpperCase().refine(isCurrency, 'Write a currency code like USD'),
+}).superRefine((b, ctx) => {
+  // A phone is checked against the school's own country: its length and its calling code.
+  const bad = b.contactPhone && phoneProblem(b.contactPhone, b.country);
+  if (bad) ctx.addIssue({ code: 'custom', path: ['contactPhone'], message: bad });
 });
 
 export const WizardPlan = z.object({
@@ -210,6 +215,9 @@ export const WizardPayload = z.object({
   placement: WizardPlacement,
   admin: WizardAdmin,
   data: WizardData,
+}).superRefine((p, ctx) => {
+  const bad = p.admin.phone && phoneProblem(p.admin.phone, p.basics.country);
+  if (bad) ctx.addIssue({ code: 'custom', path: ['admin', 'phone'], message: bad });
 });
 export type WizardPayload = z.infer<typeof WizardPayload>;
 
