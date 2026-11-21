@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DEFAULT_LEAVE_TYPES, DEFAULT_STAFF_MARKS, addDays, schoolToday, type AttendanceMarkDef, type LeaveType, type StaffDayRow, type StaffLeaveRow } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, EmptyNote, Field, MonthField, NumberField, Segmented, Select, SelectField, useShake, t } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, EmptyNote, EmptyState, Field, MonthField, NumberField, Segmented, Select, SelectField, useShake, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { AddBtn, dateLabel, problem, stamp, useSetting } from '../../app/kit';
@@ -59,7 +59,7 @@ function Day({ canManage, say }: { canManage: boolean; say: Say }) { const app =
       <div style={{ width: 170 }}><DateField compact label={t('admin.staff_time.day')} value={day} max={schoolToday()} onChange={(v) => v && setDay(v)} /></div>
       {canManage && <button className="btn sm pri" disabled={!changed || save.isPending} onClick={() => save.mutate()}>{changed ? t('admin.staff_time.save_n', { n: changed }) : t('admin.staff_time.save')}</button>}
     </div>}>
-      {q.isLoading ? null : !rows.length ? <div style={{ padding: 20 }}><EmptyNote icon="staff" title={t('admin.staff_time.no_staff')} body={t('admin.staff_time.no_staff_body')} /></div> : rows.map((r) => (
+      {q.isLoading ? null : !rows.length ? <div style={{ padding: 20 }}><EmptyNote icon="staff" title={t('admin.staff_time.no_staff')} body={t('admin.staff_time.no_staff_body')} /></div> : <div className="lscroll">{rows.map((r) => (
         <div key={r.userId} className="rw" style={{ display: 'flex', gap: 10, alignItems: 'center', height: 'auto', minHeight: 56, padding: '8px 20px', flexWrap: 'wrap' }}>
           <span style={{ flex: 1, minWidth: 180 }}>
             <b style={{ font: '700 14px/1.3 var(--fb)' }}>{r.name}</b>
@@ -76,7 +76,7 @@ function Day({ canManage, say }: { canManage: boolean; say: Say }) { const app =
               options={[{ value: '', label: t('admin.staff_time.not_marked') }, ...marks.map((m) => ({ value: m.key, label: m.code ? `${m.name} (${m.code})` : m.name }))]} />
           </div>
         </div>
-      ))}
+      ))}</div>}
     </Card>
   </>;
 }
@@ -90,13 +90,16 @@ function Leave({ canManage, say, onRecord }: { canManage: boolean; say: Say; onR
   const cancel = useMutation({ mutationFn: () => app.api.staffTime.cancel(cancelling!.id, note), onSuccess: () => { setCancelling(null); setNote(''); void qc.invalidateQueries({ queryKey: ['staff-leave'] }); say(t('admin.staff_time.leave_cancelled')); },
     onError: (e) => say((e as Error).message, 'bad') });
   const rows = q.data ?? [];
+  // Nothing waiting is not the same as no leave at all: the scene shows only when the school has no leave on record.
+  const any = useQuery({ queryKey: ['staff-leave', 'all'], queryFn: () => app.api.staffTime.leave(undefined), enabled: !!q.data && !rows.length && status !== 'all' });
+  const none = !!q.data && !rows.length && (status === 'all' || (any.data && !any.data.length));
   return <>
     <div style={{ marginBottom: 12 }}><Segmented label={t('admin.staff_time.show')} value={status} onChange={setStatus}
       options={[{ value: 'pending', label: t('admin.staff_time.waiting') }, { value: 'approved', label: t('admin.staff_time.approved') }, { value: 'all', label: t('admin.staff_time.all') }]} /></div>
-    <Card style={{ padding: 0 }}>
+    {none ? <EmptyState scene="staffleave" onAction={canManage ? onRecord : undefined} /> : <Card style={{ padding: 0 }}>
       {!rows.length ? <div style={{ padding: 20 }}><EmptyNote icon="calendar" title={status === 'pending' ? t('admin.staff_time.nothing_waiting') : t('admin.staff_time.no_leave_yet')}
         body={t('admin.staff_time.leave_empty_body')} action={canManage ? <button className="btn sm" onClick={onRecord}>{t('admin.staff_time.record_leave')}</button> : undefined} /></div>
-        : rows.map((r) => (
+        : <div className="lscroll">{rows.map((r) => (
           <div key={r.id} className="rw" style={{ display: 'flex', gap: 10, alignItems: 'center', height: 'auto', minHeight: 56, padding: '10px 20px', flexWrap: 'wrap' }}>
             <span style={{ flex: 1, minWidth: 200 }}>
               <b style={{ font: '700 14px/1.3 var(--fb)' }}>{r.name} · {r.typeName}</b>
@@ -109,8 +112,8 @@ function Leave({ canManage, say, onRecord }: { canManage: boolean; say: Say; onR
             {r.status === 'pending' && <a className="btn sm" href={`${app.base}/approvals`}>{t('admin.staff_time.decide')}</a>}
             {canManage && (r.status === 'approved' || r.status === 'pending') && r.to >= schoolToday() && <button className="btn sm" onClick={() => setCancelling(r)}>{t('admin.staff_time.cancel')}</button>}
           </div>
-        ))}
-    </Card>
+        ))}</div>}
+    </Card>}
     {cancelling && (
       <Dialog title={t('admin.staff_time.cancel_leave')} onClose={() => setCancelling(null)} width={460}>
         <p className="help" style={{ marginTop: 0 }}>{t('admin.staff_time.cancel_leave_body', { name: cancelling.name })}</p>
@@ -176,7 +179,7 @@ function Balances({ canManage, say }: { canManage: boolean; say: Say }) { const 
   const rows = q.data?.rows ?? [];
   return <>
     <Card style={{ padding: 0 }} title={q.data ? t('admin.staff_time.leave_year', { year: q.data.year }) : undefined}>
-      {!rows.length ? <div style={{ padding: 20 }}><EmptyNote icon="staff" title={t('admin.staff_time.no_staff')} body={t('admin.staff_time.no_staff_body')} /></div> : rows.map((r) => (
+      {!rows.length ? <div style={{ padding: 20 }}><EmptyNote icon="staff" title={t('admin.staff_time.no_staff')} body={t('admin.staff_time.no_staff_body')} /></div> : <div className="lscroll">{rows.map((r) => (
         <div key={r.userId} className="rw" style={{ display: 'flex', gap: 10, alignItems: 'center', height: 'auto', minHeight: 56, padding: '10px 20px', flexWrap: 'wrap' }}>
           <b style={{ flex: '0 0 180px', font: '700 14px/1.3 var(--fb)' }}>{r.name}</b>
           <span style={{ flex: 1, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -188,7 +191,7 @@ function Balances({ canManage, say }: { canManage: boolean; say: Say }) { const 
           </span>
           {canManage && <button className="btn sm" onClick={() => { setErr({}); setAdjusting(r); }}>{t('admin.staff_time.change_balance')}</button>}
         </div>
-      ))}
+      ))}</div>}
     </Card>
     {adjusting && (
       <Dialog title={t('admin.staff_time.change_balance_of', { name: adjusting.name })} onClose={() => setAdjusting(null)} width={480}>
@@ -230,7 +233,7 @@ function Month({ say }: { say: Say }) { const app = useApp();
       <Checkbox checked={paidOnly} onChange={setPaidOnly} label={t('admin.staff_time.only_absence_or_unpaid')} />
       <button className="btn sm" onClick={() => void download()}>{t('admin.staff_time.download_for_payroll')}</button>
     </div>} title={t('admin.staff_time.the_month')}>
-      {!rows.length ? <div style={{ padding: 20 }}><EmptyNote icon="calendar" title={t('admin.staff_time.nothing_this_month')} body={t('admin.staff_time.nothing_this_month_body')} /></div> : rows.map((r) => (
+      {!rows.length ? <div style={{ padding: 20 }}><EmptyNote icon="calendar" title={t('admin.staff_time.nothing_this_month')} body={t('admin.staff_time.nothing_this_month_body')} /></div> : <div className="lscroll">{rows.map((r) => (
         <div key={r.userId} className="rw" style={{ display: 'flex', gap: 10, alignItems: 'center', height: 'auto', minHeight: 48, padding: '8px 20px', flexWrap: 'wrap' }}>
           <b style={{ flex: '1 1 180px', font: '700 14px/1.3 var(--fb)' }}>{r.name}</b>
           <span className="chip g">{t('admin.staff_time.present_n', { n: r.present, of: r.schoolDays })}</span>
@@ -240,7 +243,7 @@ function Month({ say }: { say: Say }) { const app = useApp();
           {r.leaveUnpaid > 0 && <span className="chip c">{t('admin.staff_time.unpaid_leave_n', { n: r.leaveUnpaid })}</span>}
           {r.unmarked > 0 && <span className="chip">{t('admin.staff_time.unmarked_n', { n: r.unmarked })}</span>}
         </div>
-      ))}
+      ))}</div>}
     </Card>
   );
 }

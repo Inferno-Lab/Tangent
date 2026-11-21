@@ -1,12 +1,16 @@
 /* The dropdown, the tooltip and the switch. Flat and crisp: borders and fills change on hover and focus, nothing glows. */
 
 /* Dropdown button */
-.nest .sx{display:flex;align-items:center;gap:10px;width:100%;height:50px;padding-block:0 0;padding-inline:16px 10px;border-radius:14px;border:1.5px solid var(--field);background:var(--s1);color:var(--ink);font:600 15px var(--fb);text-align:start;cursor:pointer;transition:border-color var(--t1),background var(--t1)}
+/* The height of every field (.inp, .btn: 42px), so a select lines up with the text boxes beside it. */
+.nest .sx{display:flex;align-items:center;gap:10px;width:100%;height:42px;padding-block:0 0;padding-inline:16px 10px;border-radius:14px;border:1.5px solid var(--field);background:var(--s1);color:var(--ink);font:600 15px var(--fb);text-align:start;cursor:pointer;transition:border-color var(--t1),background var(--t1)}
 .nest .sx:hover:not(:disabled){border-color:var(--ink3)}
 .nest .sx:focus-visible,.nest .sx.open{outline:0;border-color:var(--brand)}
 .nest .sx.err{border-color:var(--bad)}
 .nest .sx:disabled{opacity:.5;cursor:not-allowed}
 .nest .sxv{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* In a form a long choice (a fee with its amount and date) takes a second line instead of being cut; toolbars keep one. */
+.nest .fld .sx:not(.sm){height:auto;min-height:42px;padding-block:4px}
+.nest .fld .sx:not(.sm) .sxv{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.3}
 .nest .sxc{width:28px;height:28px;border-radius:50%;background:var(--s2);color:var(--ink2);display:grid;place-items:center;flex:none;transition:background var(--t1),color var(--t1)}
 .nest .sxc svg{width:16px;height:16px;transition:transform var(--t2) var(--e)}
 .nest .sx:hover:not(:disabled) .sxc{color:var(--ink)}

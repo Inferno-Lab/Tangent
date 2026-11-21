@@ -40,6 +40,7 @@ export const BOARDS = [
   ['EmptyAdmin5', 'empty-admin', 5 * G, 0, W, 1700, 'Admin · School'],
   ['EmptyAdmin6', 'empty-admin', 7 * G, 0, W, 1100, 'Admin · added since the approval: audit log and privacy requests'],
   ['EmptyAdmin7', 'empty-admin', 8 * G, 0, W, 4200, 'Admin · every tab: approvals, leave, periods, receipts, library, transport, the app, the year'],
+  ['EmptyAdmin8', 'empty-admin', 9 * G, 0, W, 4800, 'Admin · the newer modules: forms, diary, meetings, certificates, visitors, staff leave'],
   ['EmptyConsole1', 'empty-console', 0, 0, W, 2000, 'Console · Operate', { dark: ['EmptyConsole1Dark', 4 * G, 0, 'Console · Operate, dark'] }],
   ['EmptyConsole2', 'empty-console', G, 0, W, 1700, 'Console · Ship and connect'],
   ['EmptyConsole3', 'empty-console', 2 * G, 0, W, 1700, 'Console · Care'],

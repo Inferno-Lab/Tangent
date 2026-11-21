@@ -79,6 +79,29 @@ export function useLogin(c: LoginController, themeCls: string) {
   // The last step says "Opening…", so it does; the button stays for anyone who wants to skip the wait.
   useEffect(() => { if (step !== 'ok') return; const t = setTimeout(() => enterRef.current(), 1400); return () => clearTimeout(t); }, [step]);
 
+  // On the code step typing always reaches the code, with no click first: a digit, Backspace or a paste made while nothing
+  // else takes text (a click on the page, coming back from the inbox in another tab) goes into the code box.
+  useEffect(() => {
+    if (step !== 'otp') return;
+    const box = () => document.querySelector<HTMLInputElement>('.pg-login .otp input');
+    const free = () => !(document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement);
+    // Focusing the box in the key's own event does not carry the key with it, so the digit is written here.
+    const key = (e: KeyboardEvent) => {
+      if (!free() || e.ctrlKey || e.metaKey || e.altKey || !(/^\d$/.test(e.key) || e.key === 'Backspace')) return;
+      e.preventDefault();
+      box()?.focus();
+      const v = e.key === 'Backspace' ? codeRef.current.slice(0, -1) : (codeRef.current + e.key).slice(0, 6);
+      setCode(v); setOtpErr(false);
+      if (v.length === 6 && e.key !== 'Backspace' && !resetting) setTimeout(() => void verifyRef.current(v), 250);
+    };
+    const paste = (e: ClipboardEvent) => { if (!free()) return; const v = (e.clipboardData?.getData('text') ?? '').replace(/\D/g, '').slice(0, 6); if (v) { e.preventDefault(); box()?.focus(); setCode(v); setOtpErr(false); if (v.length === 6 && !resetting) setTimeout(() => void verifyRef.current(v), 250); } };
+    const back = () => { if (free()) box()?.focus(); };
+    document.addEventListener('keydown', key);
+    document.addEventListener('paste', paste);
+    window.addEventListener('focus', back);
+    return () => { document.removeEventListener('keydown', key); document.removeEventListener('paste', paste); window.removeEventListener('focus', back); };
+  }, [step, resetting]);
+
   const bad = (fn: () => void) => { fn(); setShake((s) => (s === 1 ? 2 : 1)); setBusy(false); };
 
   const next = async () => {
@@ -138,6 +161,11 @@ export function useLogin(c: LoginController, themeCls: string) {
       bad(() => { setOtpErr(true); setOtpMsg(f.message); setCode(''); if (f.attemptsLeft !== undefined) setTries(f.attemptsLeft); else if (f.code === 'locked') setTries(0); });
     }
   };
+
+  const verifyRef = useRef(verifyNow);
+  const codeRef = useRef(code);
+  codeRef.current = code;
+  verifyRef.current = verifyNow;
 
   const boxes = [0, 1, 2, 3, 4, 5].map((i) => ({ v: code[i] || '', c: `${i === code.length && code.length < 6 ? 'cur ' : ''}${i < code.length ? 'f' : ''}` }));
 

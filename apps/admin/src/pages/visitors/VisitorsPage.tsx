@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DEFAULT_ID_TYPES, DEFAULT_VISITOR_PURPOSES, listOptions, schoolInstant, schoolToday, type CustomFieldsSetting, type CustomValues, type GatePassRow, type ListItem, type VisitorInput, type VisitorRow } from '@tangent/contracts';
 import { uploadFile } from '@tangent/api-client';
-import { CustomFieldInputs, DateField, Dialog, EmptyNote, Field, FilePick, PhoneField, SelectField, TimeField, useShake, t } from '@tangent/web-ui';
+import { CustomFieldInputs, DateField, Dialog, EmptyNote, EmptyState, Field, FilePick, PhoneField, SelectField, TimeField, useShake, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { AddBtn, StudentPick, dateLabel, openPdf, problem, stamp, useCountry, useSetting } from '../../app/kit';
@@ -54,6 +54,7 @@ function Visitors({ view, desk, say }: { view: 'today' | 'expected'; desk: boole
   });
   const find = useMutation({ mutationFn: () => app.api.visitors.byCode(code), onSuccess: (v) => { setCode(''); act.mutate({ v, what: 'in' }); }, onError: (e) => say((e as Error).message, 'bad') });
   const rows = list.data ?? [];
+  if (list.data && !rows.length && !q) return <EmptyState scene={view === 'today' ? 'visitors' : 'expected'} />;
   return (
     <Card style={{ padding: 0 }} chip={<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
       <div style={{ width: 200 }}><Field label={t('admin.visitors.search')} value={q} onChange={setQ} maxLength={60} /></div>
@@ -143,6 +144,7 @@ function Passes({ desk, say }: { desk: boolean; say: Say }) { const app = useApp
     onError: (e) => say((e as Error).message, 'bad'),
   });
   const rows = list.data ?? [];
+  if (list.data && !rows.length && day === schoolToday()) return <EmptyState scene="passes" />;
   return (
     <Card style={{ padding: 0 }} title={dateLabel(day)} chip={<div style={{ width: 180 }}><DateField compact label={t('admin.visitors.day')} value={day} onChange={(v) => v && setDay(v)} /></div>}>
       {!rows.length ? <div style={{ padding: 20 }}><EmptyNote icon="shield" title={t('admin.visitors.no_gate_passes')} body={t('admin.visitors.no_gate_passes_body')} /></div> : rows.map((g) => (
@@ -237,7 +239,7 @@ function Pickup({ desk, say }: { desk: boolean; say: Say }) { const app = useApp
       <StudentPick label={t('admin.visitors.student')} value={student} onChange={setStudent} />
       {student && (
         <div className="stack" style={{ marginTop: 10, gap: 0 }}>
-          {!(people.data ?? []).length ? <small className="help">{t('admin.visitors.nobody_named')}</small> : (people.data ?? []).map((p) => (
+          {!(people.data ?? []).length ? <EmptyNote icon="people" title={t('admin.visitors.nobody_named')} /> : (people.data ?? []).map((p) => (
             <div key={p.id} className="rw" style={{ display: 'flex', gap: 8, alignItems: 'center', height: 'auto', minHeight: 44, padding: '4px 0', flexWrap: 'wrap' }}>
               <span style={{ flex: 1 }}>{p.name} · {p.relation}{p.phone ? ` · ${p.phone}` : ''}</span>
               {desk && <button className="btn sm pri" disabled={record.isPending} onClick={() => record.mutate({ studentId: student.id, pickupId: p.id, name: p.name, code: '' })}>{t('admin.visitors.collected_by_them')}</button>}
@@ -247,14 +249,14 @@ function Pickup({ desk, say }: { desk: boolean; say: Say }) { const app = useApp
         </div>
       )}
     </Card>
-    <Card title={t('admin.visitors.collected_today')} style={{ padding: 0 }}>
-      {!(today.data ?? []).length ? <div style={{ padding: 20 }}><EmptyNote icon="students" title={t('admin.visitors.nobody_collected')} /></div> : (today.data ?? []).map((p) => (
+    {today.data && !today.data.length ? <EmptyState scene="pickup" /> : <Card title={t('admin.visitors.collected_today')} style={{ padding: 0 }}>
+      {(today.data ?? []).map((p) => (
         <div key={p.id} className="rw" style={{ display: 'flex', gap: 10, alignItems: 'center', height: 'auto', minHeight: 44, padding: '6px 20px' }}>
           <b style={{ flex: 1 }}>{p.studentName} · {p.className}</b>
           <span>{p.name}</span><small className="help" style={{ margin: 0 }}>{time(p.at)}{p.byCode ? ` · ${t('admin.visitors.with_the_code')}` : ''}</small>
         </div>
       ))}
-    </Card>
+    </Card>}
   </>;
 }
 
@@ -275,13 +277,13 @@ function Late({ desk, say }: { desk: boolean; say: Say }) { const app = useApp()
         </div>
       </Card>
     )}
-    <Card title={t('admin.visitors.late_today')} style={{ padding: 0 }}>
-      {!(list.data ?? []).length ? <div style={{ padding: 20 }}><EmptyNote icon="late" title={t('admin.visitors.nobody_late')} /></div> : (list.data ?? []).map((l) => (
+    {list.data && !list.data.length ? <EmptyState scene="latecomers" /> : <Card title={t('admin.visitors.late_today')} style={{ padding: 0 }}>
+      {(list.data ?? []).map((l) => (
         <div key={l.id} className="rw" style={{ display: 'flex', gap: 10, alignItems: 'center', height: 'auto', minHeight: 44, padding: '6px 20px' }}>
           <b style={{ flex: 1 }}>{l.studentName} · {l.className}</b><span>{time(l.at)}</span>{l.reason && <small className="help" style={{ margin: 0 }}>{l.reason}</small>}
         </div>
       ))}
-    </Card>
+    </Card>}
   </>;
 }
 
@@ -295,16 +297,17 @@ function Roll({ say }: { say: Say }) { const app = useApp();
       <button className="btn" onClick={() => void q.refetch()}>{t('admin.visitors.refresh')}</button>
       {r && <small className="help" style={{ margin: 0, alignSelf: 'center' }}>{t('admin.visitors.as_of', { time: time(r.at) })}</small>}
     </div>
-    {r && <section className="grid" data-even="">
+    {/* One card with three columns: their headings and notes sit on one line whatever each list holds. */}
+    {r && <section className="card rise" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 24, alignItems: 'start' }}>
       {[
-        { title: t('admin.visitors.students_n', { n: r.students.length }), note: r.marked.students ? t('admin.visitors.from_todays_marks') : t('admin.visitors.not_marked_everyone_expected'), items: r.students.map((s) => `${s.name} · ${s.className}`) },
-        { title: t('admin.visitors.staff_n', { n: r.staff.length }), note: r.marked.staff ? t('admin.visitors.from_check_ins') : t('admin.visitors.not_marked_everyone_expected'), items: r.staff.map((s) => s.name) },
-        { title: t('admin.visitors.visitors_n', { n: r.visitors.length }), note: '', items: r.visitors.map((v) => `${v.name}${v.hostName ? ` · ${v.hostName}` : ''}`) },
+        { title: t('admin.visitors.students_n', { n: r.students.length }), note: r.marked.students ? t('admin.visitors.from_todays_marks') : t('admin.visitors.not_marked_everyone_expected'), items: r.students.map((s) => [s.name, s.className]) },
+        { title: t('admin.visitors.staff_n', { n: r.staff.length }), note: r.marked.staff ? t('admin.visitors.from_check_ins') : t('admin.visitors.not_marked_everyone_expected'), items: r.staff.map((s) => [s.name, '']) },
+        { title: t('admin.visitors.visitors_n', { n: r.visitors.length }), note: t('admin.visitors.signed_in_at_the_gate'), items: r.visitors.map((v) => [v.name, v.hostName ?? '']) },
       ].map((g) => (
-        <div key={g.title} className="card s4 rise">
-          <div className="ch"><h2>{g.title}</h2></div>
-          {g.note && <small className="help">{g.note}</small>}
-          {g.items.length ? <div style={{ maxHeight: 360, overflow: 'auto' }} data-even-scroll>{g.items.map((x, i) => <div key={i} style={{ padding: '4px 0' }}>{x}</div>)}</div>
+        <div key={g.title} style={{ minWidth: 0 }}>
+          <h3 style={{ margin: 0 }}>{g.title}</h3>
+          <small className="help" style={{ display: 'block', margin: '2px 0 10px' }}>{g.note}</small>
+          {g.items.length ? <div className="lscroll" style={{ maxHeight: 360 }}>{g.items.map(([name, more], i) => <div key={i} className="kv"><span>{name}</span>{more && <small className="help" style={{ margin: 0 }}>{more}</small>}</div>)}</div>
             : <EmptyNote icon="people" title={t('admin.visitors.nobody_on_site_in_this')} body={t('admin.visitors.the_roll_call_fills_in')} />}
         </div>
       ))}

@@ -138,7 +138,7 @@ function History({ cfg, schoolId, can, say }: { cfg: SchoolConfig; schoolId: str
   return (
     <div className="card s12 rise">
       <div className="ch"><h2>{tr('console.config_tab.history')}</h2><span className="chip">{cfg.versions.length} {tr('console.config_tab.changes')}</span></div>
-      {!cfg.versions.length && <div className="help">{tr('console.config_tab.every_change_made_here_is')}</div>}
+      {!cfg.versions.length && <EmptyNote icon="layers" title={tr('console.config_tab.no_changes_yet')} body={tr('console.config_tab.every_change_made_here_is')} />}
       {cfg.versions.map((v) => (
         <div key={v.id} className="rw" style={{ height: 'auto', padding: '10px 0', display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <span className="chip v">v{v.version}</span>
@@ -176,8 +176,8 @@ function Packs({ cfg, schoolId, can, say }: { cfg: SchoolConfig; schoolId: strin
       <div className="ch"><h2>{tr('console.config_tab.starter_packs')}</h2></div>
       <div className="help">{tr('console.config_tab.starter_packs_help')}</div>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 10 }}>
-        <div style={{ width: 200 }}><SelectField label={tr('console.config_tab.country_pack')} value={country} onChange={(v) => { setCountry(v); setGroups([]); }} options={Object.keys(COUNTRY_PACKS).map((c) => ({ value: c, label: c }))} /></div>
-        <div style={{ width: 260 }}><SelectField label={tr('console.config_tab.curriculum_pack')} value={curriculum} onChange={(v) => { setCurriculum(v); setGroups([]); }}
+        <div style={{ minWidth: 0, maxWidth: '100%' }}><SelectField fit label={tr('console.config_tab.country_pack')} value={country} onChange={(v) => { setCountry(v); setGroups([]); }} options={Object.keys(COUNTRY_PACKS).map((c) => ({ value: c, label: c }))} /></div>
+        <div style={{ minWidth: 0, maxWidth: '100%' }}><SelectField fit label={tr('console.config_tab.curriculum_pack')} value={curriculum} onChange={(v) => { setCurriculum(v); setGroups([]); }}
           options={[{ value: '', label: tr('console.config_tab.none') }, ...curriculaFor(country).map((c) => ({ value: c.key, label: c.name }))]} /></div>
       </div>
       {parts.isLoading ? <div className="skc" style={{ height: 120, borderRadius: 16, marginTop: 12 }} />

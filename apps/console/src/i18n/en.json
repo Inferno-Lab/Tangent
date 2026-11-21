@@ -450,6 +450,10 @@
  "console.data_tab.run_done": "{created} added, {updated} changed, {skipped} left out",
  "console.data_tab.run_failed": "Failed",
  "console.data_tab.running": "Running…",
+ "console.data_tab.waiting_turn": "Next in line",
+ "console.data_tab.undo_after_imports": "Undo once the imports running now have finished",
+ "console.data_tab.run_finished": "{file} is in: {created} added, {updated} changed.",
+ "console.data_tab.run_did_not_finish": "{file} didn’t import: {error}",
  "console.data_tab.set_aside": " · set aside: {setAsideReason}",
  "console.data_tab.set_aside_2": "Set aside",
  "console.data_tab.show_every_row": "Show every row",
@@ -934,7 +938,7 @@
  "console.join_page.this_link_is_incomplete_open": "This link is incomplete. Open the whole link from your invitation email, or ask for a new one.",
  "console.join_page.use_at_least_10_characters": "Use at least 10 characters.",
  "console.join_page.your_password_is_set": "Your password is set",
- "console.languages_page.a_word_in_english_or": "A word in English or the translation",
+ "console.languages_page.a_word_in_english_or": "A word in any language",
  "console.languages_page.all": "All",
  "console.languages_page.approved": "{approved} approved",
  "console.languages_page.approved_2": "Approved",
@@ -1799,5 +1803,10 @@
  "console.wizard_page.works_with_no_domain_s": "Works with no domain: …/s/name",
  "console.wizard_page.would_run": "Would run",
  "console.wizard_page.would_stop_here": "Would stop here",
- "console.wizard_page.your_school": "Your school"
+ "console.wizard_page.your_school": "Your school",
+ "console.approvals_page.nothing_decided_yet": "Nothing decided yet",
+ "console.cells_page.no_database_servers_yet": "No database servers yet",
+ "console.config_tab.no_changes_yet": "No changes yet",
+ "console.data_tab.no_kept_readings_yet": "Nothing kept yet",
+ "console.school.view.no_checklist_yet": "No checklist yet"
 }

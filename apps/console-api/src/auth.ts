@@ -17,6 +17,8 @@ const WEB_DAYS = 7;
 const MOBILE_DAYS = 14;
 let dummy: Promise<string> | undefined;
 const limiter = new Limiter(process.env.NODE_ENV === 'test' ? 10_000 : 30, 60_000);
+// Refreshing is not a guess (the token is 32 random bytes) and happens on every page load: its own cap only stops a flood.
+const refreshLimit = new Limiter(process.env.NODE_ENV === 'test' ? 10_000 : 600, 60_000);
 
 function clientOf(value: ClientKind | undefined): ClientKind {
   return value === 'web' ? 'web' : 'mobile';
@@ -304,7 +306,7 @@ export class AuthController {
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): Promise<ConsoleTokens> {
-    limiter.check(`r|${req.ip}`);
+    refreshLimit.check(req.ip);
     return this.auth.refresh(body.refreshToken, req, reply);
   }
 

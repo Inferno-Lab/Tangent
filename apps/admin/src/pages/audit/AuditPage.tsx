@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useToast, EmptyState, useMore, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page } from '../../app/Page';
-import { fmtDate } from '@tangent/contracts';
+import { auditLabel, fmtDate } from '@tangent/contracts';
 
 /** Who changed what at the school, newest first. */
 export function AuditPage() {
@@ -22,8 +22,8 @@ export function AuditPage() {
           {shown.map((r) => (
             <div key={r.id} className="exr" style={{ padding: '12px 20px' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <b style={{ font: '700 14px var(--fb)', display: 'block', overflowWrap: 'anywhere' }}>{r.actor} · {r.action}</b>
-                <small style={{ display: 'block', overflowWrap: 'anywhere' }}>{r.detail || r.entity}</small>
+                <b style={{ font: '700 14px var(--fb)', display: 'block', overflowWrap: 'anywhere' }}>{r.actor} · {auditLabel(r.action)}</b>
+                {r.detail && <small style={{ display: 'block', overflowWrap: 'anywhere' }}>{r.detail}</small>}
               </div>
               <span className="chip">{fmtDate(r.at, 'stamp')}</span>
             </div>

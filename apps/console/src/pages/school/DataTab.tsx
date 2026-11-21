@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ImportInputIn } from '@tangent/api-client';
 import { IMPORT_KINDS, IMPORT_SOURCES, type ImportBatchRow, type ImportColumn, type ImportKind, type ImportPreview, type MigrationView, type SchoolDetail } from '@tangent/contracts';
@@ -35,6 +35,19 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
   // A new revision on every change: the query key stays small however big the file is.
   const change = (s: Source | null, m?: Record<string, string>, vals?: Record<string, Record<string, string>>) => setJob((j) => ({ src: s, mapping: m, values: vals, rev: j.rev + 1 }));
   const v = q.data;
+  // A background import that finishes while the page is open says so, the way a small one does.
+  const seen = useRef<Record<string, string>>({});
+  useEffect(() => {
+    for (const r of v?.runs ?? []) {
+      const was = seen.current[r.id];
+      seen.current[r.id] = r.status;
+      if (was !== 'running' || r.status === 'running') continue;
+      if (r.status === 'done') say(tr('console.data_tab.run_finished', { file: r.fileName, created: r.created ?? 0, updated: r.updated ?? 0 }));
+      else say(tr('console.data_tab.run_did_not_finish', { file: r.fileName, error: r.error ?? '' }), 'bad');
+    }
+  }, [v?.runs]);
+  // An import still running becomes the newest batch, and only the newest can be undone: undo waits until the queue is empty.
+  const running = (v?.runs ?? []).some((r) => r.status === 'running');
   const kind = v?.kinds.find((k) => k.key === (kindKey || v.kinds[0]?.key));
   const input = (): ImportInputIn | null => (!src || !kind ? null : src.kind === 'file'
     ? { kind: kind.key, csv: src.content, fileName: src.fileName, uploadId: src.uploadId, mapping, values }
@@ -88,14 +101,14 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
       <div className="card s12 rise">
         <div className="ch"><h2>{tr('console.data_tab.imports')}</h2><span className="chip">{v.batches.length}</span></div>
         <div className="help">{tr('console.data_tab.each_import_is_one_batch')}</div>
-        {v.runs.map((r) => (
+        {v.runs.map((r, i) => (
           // A big file's result ("129,942 added, 0 changed, 0 left out") goes under its name on a phone instead of off the edge.
           <div key={r.id} className="kv" style={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 8 }}>
             <span>{IMPORT_KINDS.find((k) => k.key === r.kind)?.label ?? r.kind} · {r.fileName} · {tr('console.data_tab.rows_n', { n: r.rows })}<small style={{ display: 'block', color: r.error ? 'var(--bad)' : 'var(--ink3)' }}>{r.error ?? `${r.by} · ${when(r.startedAt)}`}</small></span>
-            <b><span className={`chip ${r.status === 'done' ? 'g' : r.status === 'failed' ? 'c' : 'a'}`}>{r.status === 'running' ? tr('console.data_tab.running') : r.status === 'done' ? tr('console.data_tab.run_done', { created: r.created ?? 0, updated: r.updated ?? 0, skipped: r.skipped ?? 0 }) : tr('console.data_tab.run_failed')}</span></b>
+            <b><span className={`chip ${r.status === 'done' ? 'g' : r.status === 'failed' ? 'c' : 'a'}`}>{r.status === 'running' ? (v.runs.slice(i + 1).some((o) => o.status === 'running') ? tr('console.data_tab.waiting_turn') : tr('console.data_tab.running')) : r.status === 'done' ? tr('console.data_tab.run_done', { created: r.created ?? 0, updated: r.updated ?? 0, skipped: r.skipped ?? 0 }) : tr('console.data_tab.run_failed')}</span></b>
           </div>
         ))}
-        {v.batches.length === 0 ? <div style={{ marginTop: 10 }}><EmptyNote icon="upload" title={tr('console.data_tab.nothing_imported_yet')} body={tr('console.data_tab.each_import_shows_here_with')} /></div> : v.batches.map((b) => <BatchRow key={b.id} b={b} kinds={v.kinds} canUndo={can && b.canUndo} busy={undo.isPending} onUndo={() => setUndoing(b)} />)}
+        {v.batches.length === 0 ? <div style={{ marginTop: 10 }}><EmptyNote icon="upload" title={tr('console.data_tab.nothing_imported_yet')} body={tr('console.data_tab.each_import_shows_here_with')} /></div> : v.batches.map((b) => <BatchRow key={b.id} b={b} kinds={v.kinds} canUndo={can && b.canUndo} busy={undo.isPending || running} onUndo={() => setUndoing(b)} />)}
         {undoing && (
           <Dialog title={tr('console.data_tab.undo_this_import')} tag={{ text: v.kinds.find((k) => k.key === undoing.kind)?.label ?? undoing.kind, tone: 'a' }} onClose={() => setUndoing(null)} width={460}>
             <p style={{ marginTop: 0 }}>{tr('console.data_tab.it_updated_go_back_to', { created: undoing.created, updated: undoing.updated })}</p>
@@ -164,7 +177,7 @@ function BatchRow({ b, kinds, canUndo, busy, onUndo }: { b: ImportBatchRow; kind
         <span className="chip g">{b.created} {tr('console.data_tab.added')}</span><span className="chip">{b.updated} {tr('console.data_tab.updated')}</span>{b.skipped > 0 && <span className="chip a">{b.skipped} {tr('console.data_tab.left_out')}</span>}
         {b.totals.map((t) => <span key={t.label} className="chip">{t.label}: {t.value}</span>)}
       </span>
-      <span>{b.undoneAt ? <span className="chip">{tr('console.data_tab.undone')}</span> : canUndo ? <button className="btn sm" disabled={busy} onClick={onUndo}>{tr('console.data_tab.undo')}</button> : null}</span>
+      <span>{b.undoneAt ? <span className="chip">{tr('console.data_tab.undone')}</span> : canUndo ? <button className="btn sm" disabled={busy} data-tip={busy ? tr('console.data_tab.undo_after_imports') : undefined} onClick={onUndo}>{tr('console.data_tab.undo')}</button> : null}</span>
     </div>
   );
 }
@@ -279,7 +292,7 @@ function ValueMap({ columns, values, unmatched, onChange }: { columns: ImportCol
       <div className="lbl" style={{ margin: '12px 0 6px' }}>{tr('console.data_tab.values_replaced')}</div>
       <div className="tgrow">
         {kept.map((x) => <button key={`${x.k}|${x.f}`} type="button" className="chip v" data-tip={tr('console.data_tab.remove')} onClick={() => put(x.k, x.f, '')}>{label(x.k)}: {x.f} → {x.v} ×</button>)}
-        {!kept.length && <span className="help" style={{ margin: 0 }}>{tr('console.data_tab.none_yet_values_are_read')}</span>}
+        {!kept.length && <EmptyNote icon="file" title={tr('console.data_tab.no_kept_readings_yet')} body={tr('console.data_tab.none_yet_values_are_read')} />}
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 8 }}>
         <div style={{ width: 180 }}><Select compact aria-label={tr('console.data_tab.column')} value={col} onChange={setCol} options={columns.map((c) => ({ value: c.key, label: c.label }))} /></div>

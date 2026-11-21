@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouteContext } from '@tanstack/react-router';
 import { schoolToday } from '@tangent/contracts';
-import { Checkbox, DateField, EmptyCard, ErrorLine, Field, PhoneField, SelectField, useHue, useShake, t } from '@tangent/web-ui';
+import { Checkbox, DateField, EmptyCard, LogoImage, ErrorLine, Field, PhoneField, SelectField, useHue, useShake, t } from '@tangent/web-ui';
 import { AreaField, fieldsOf, messageOf } from '../../app/kit';
 
 /**
@@ -46,7 +46,7 @@ export function ApplyRoute() {
     <div className="nest" style={{ minHeight: '100dvh', padding: 16, background: 'var(--bg)' }}>
       <main style={{ maxWidth: 640, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16, paddingBlock: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {b?.logoUrl ? <img src={b.logoUrl} alt="" style={{ width: 44, height: 44, borderRadius: 12, objectFit: 'cover' }} /> : null}
+          <LogoImage src={b?.logoUrl} style={{ width: 44, height: 44, borderRadius: 12, objectFit: 'cover' }} />
           <div style={{ minWidth: 0 }}><h1 className="fd" style={{ margin: 0, overflowWrap: 'anywhere' }}>{school}</h1>{b?.tagline && <div className="help" style={{ margin: 0 }}>{b.tagline}</div>}</div>
         </div>
         {body}

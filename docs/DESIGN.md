@@ -127,7 +127,7 @@ page background (flat)
 | **Ticket** `.tkt` | The plan card: flat dark fill, notched sides (CSS mask), dashed perforation, plan name display 23 px, two icon lines, a white pill button, status chip and counts on the right. |
 | **Dialog** `Dialog` | Centered card over a blurred scrim, tag chip above the title, focus trapped, Esc and scrim close, focus returns where it was. Dark variant for dangerous actions (erase). Typed-confirmation input for irreversible actions. Search is the same layer (`SearchDialog`), 18% from the top. |
 | **Panel** `Panel` | A record opened beside its list (student detail): slides in from the right; Esc and scrim close it. |
-| **Toast** `ToastSlot` + `useToast()` | Dark pill, bottom centre (above the dock on a phone), green check or red cross circle + one sentence, optionally one button (Undo). `useToast` times every toast: 4 s, 6 s with an action, held while the pointer is over it; an error stays until its close button. No page keeps its own toast timer (the guard fails on `setToast(`). |
+| **Toast** `ToastSlot` + `useToast()` | Dark pill, bottom centre (above the dock on a phone), green check or red cross circle + one sentence, optionally one button (Undo). `useToast` times every toast: 4 s, 6 s with an action, held while the pointer is over it; an error 8 s, with its close button. No page keeps its own toast timer (the guard fails on `setToast(`). |
 | **Save bar** | Floating dark pill "You have unsaved changes · Discard · Save" when a form is dirty. |
 | **Support frame** | Red inset frame around the window plus a red pill "Tangent support in <school> · read-only · mm:ss left · End session". |
 | **Avatar** `.av` | 34–76 px circle, initials, tint pair; stacks overlap by 8 px with a ring. |

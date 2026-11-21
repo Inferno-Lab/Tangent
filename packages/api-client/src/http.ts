@@ -88,13 +88,16 @@ export function createHttp(opts: HttpOptions): Http {
           if (csrf) headers[CSRF_HEADER] = csrf;
         }
         const body = opts.cookieRefresh ? { client: 'web' } : { refreshToken: t?.refreshToken };
-        const res = await doFetch(url(opts.refreshPath), {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(body),
-          credentials: opts.cookieRefresh ? 'include' : 'same-origin',
-        });
-        if (!res.ok) return false;
+        const once = () => doFetch(url(opts.refreshPath), { method: 'POST', headers, body: JSON.stringify(body), credentials: opts.cookieRefresh ? 'include' : 'same-origin' });
+        // Only the server saying the session is over (4xx) ends it; a busy or unreachable server is asked again, twice, so a
+        // passing hiccup never signs anyone out.
+        let res: Response | null = null;
+        for (const wait of [0, 600, 2000]) {
+          if (wait) await new Promise((ok) => setTimeout(ok, wait));
+          res = await once().catch(() => null);
+          if (res && (res.ok || (res.status < 500 && res.status !== 429))) break;
+        }
+        if (!res?.ok) return false;
         const next = (await res.json()) as Tokens;
         write({ accessToken: next.accessToken, refreshToken: next.refreshToken ?? t?.refreshToken });
         return true;

@@ -211,7 +211,7 @@ function Live({ routes }: { routes: BusRouteRow[] }) {
             <div className="kv">{tr('admin.transport_page.driver')}<b>{r.driverName || tr('admin.transport_page.none_chosen')}</b></div>
             <div className="kv">{tr('admin.transport_page.last_seen')}<b>{r.bus ? `${stamp(r.bus.at)}${isLive(r.bus.at) ? tr('admin.transport_page.live_2') : ''}` : tr('admin.transport_page.not_yet_today')}</b></div>
             <RouteMap id={r.id} at={r.bus?.at ?? ''} />
-            {!r.trips.length && <div className="help" style={{ marginTop: 8 }}>{tr('admin.transport_page.the_driver_starts_each_trip')}</div>}
+            {!r.trips.length && <div style={{ marginTop: 8 }}><EmptyNote icon="route" title={tr('admin.transport_page.no_trips_today')} body={tr('admin.transport_page.the_driver_starts_each_trip')} /></div>}
             {r.trips.map((t) => (
               <div key={t.id} className="kv" style={{ alignItems: 'flex-start', gap: 12 }}>
                 <span style={{ minWidth: 0 }}>{t.name}<small style={{ display: 'block', color: 'var(--ink3)' }}>{stamp(t.startedAt)}{t.endedAt ? tr('admin.transport_page.to', { stamp: stamp(t.endedAt) }) : tr('admin.transport_page.running')}{t.lateMinutes ? tr('admin.transport_page.min_late', { lateMinutes: t.lateMinutes, lateReason: t.lateReason }) : ''}</small></span>

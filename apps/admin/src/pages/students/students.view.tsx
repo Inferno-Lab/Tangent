@@ -244,11 +244,11 @@ export function StudentsView({ v }: { v: any }) {
                   {v.left.back && <button className="btn sm" onClick={v.left.back}>{tr('admin.students.view.bring_back_on_the_roll')}</button>}
                 </div>
               )}
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" } as CSSProperties}>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" } as CSSProperties}>
                 <span className={`fs ${v.d.fcls ?? ""}`}>{v.d.fees}</span>
                 {v.d.house && <span className="chip">{v.d.house} {tr('admin.students.view.house')}</span>}
                 {v.d.route && <span className="chip v">{v.d.route}</span>}
-                {v.certificate && <button className="btn sm" onClick={v.certificate}>{tr('admin.students.view.ask_for_a_certificate')}</button>}
+                {v.certificate && <button className="btn sm" style={{ marginInlineStart: "auto" } as CSSProperties} onClick={v.certificate}>{tr('admin.students.view.ask_for_a_certificate')}</button>}
               </div>
             </div>
             <div className="db">
@@ -323,23 +323,24 @@ export function StudentsView({ v }: { v: any }) {
                 ))}
               </div>
             </div>
-            <div style={{ display: "flex", gap: "10px", padding: "16px 24px 24px", borderTop: "1px solid var(--line)" } as CSSProperties}>
-              <button className="btn pri" style={{ flex: "1" } as CSSProperties} onClick={v.messageOne}>
+            {/* The actions wrap onto a second line in a narrow drawer instead of running off its edge. */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", padding: "16px 24px 24px", borderTop: "1px solid var(--line)" } as CSSProperties}>
+              <button className="btn pri" style={{ flex: "1 1 100%" } as CSSProperties} onClick={v.messageOne}>
                 {tr('admin.students.view.message_guardians')}</button>
               {v.may.edit && (
-                <button className="btn" onClick={v.edit}>
+                <button className="btn" style={{ flex: "1 1 auto" } as CSSProperties} onClick={v.edit}>
                   {tr('admin.students.view.edit')}</button>
               )}
               {v.canCollect && (
-                <button className="btn" onClick={v.collect}>
+                <button className="btn" style={{ flex: "1 1 auto" } as CSSProperties} onClick={v.collect}>
                   {tr('admin.students.view.collect_fee')}</button>
               )}
               {v.may.edit && (
-                <button className="btn" data-tip={tr('admin.students.view.record_days_away')} onClick={v.away}>
+                <button className="btn" style={{ flex: "1 1 auto" } as CSSProperties} data-tip={tr('admin.students.view.record_days_away')} onClick={v.away}>
                   {tr('admin.students.view.record_leave')}</button>
               )}
               {v.may.leave && (
-                <button className="btn" data-tip={tr('admin.students.view.record_that_this_student_left')} onClick={v.leave}>
+                <button className="btn" style={{ flex: "1 1 auto" } as CSSProperties} data-tip={tr('admin.students.view.record_that_this_student_left')} onClick={v.leave}>
                   {tr('admin.students.view.leaving')}</button>
               )}
             </div>

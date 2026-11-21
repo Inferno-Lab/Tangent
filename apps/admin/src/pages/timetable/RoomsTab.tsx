@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { dayLabel, schoolToday, type RoomRow } from '@tangent/contracts';
-import { EmptyNote, Checkbox, DateField, Dialog, EmptyCard, ErrorLine, Field, NumberField, TimeField, useShake, t } from '@tangent/web-ui';
+import { EmptyNote, Checkbox, DateField, Dialog, ErrorLine, Field, NumberField, TimeField, useShake, EmptyState, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { AddBtn, problem } from '../../app/kit';
@@ -32,8 +32,7 @@ export function RoomsTab({ tabs }: { tabs: React.ReactNode }) {
       actions={canEdit ? <AddBtn onClick={() => setEdit('new')}>{t('admin.rooms_tab.add_a_room')}</AddBtn> : undefined}
       overlays={edit && <RoomDialog room={edit === 'new' ? null : edit} onClose={() => setEdit(null)} onDone={(m) => { setEdit(null); after(m); }} />}>
       {!list.length ? (
-        <EmptyCard title={t('admin.rooms_tab.rooms')} chip={{ text: '0', tone: 'v' }} icon="timetable" heading={t('admin.rooms_tab.no_rooms_yet')} body={t('admin.rooms_tab.add_the_rooms_your_school')}
-          actions={canEdit ? <button className="btn pri" onClick={() => setEdit('new')}>{t('admin.rooms_tab.add_a_room')}</button> : undefined} />
+        <EmptyState scene="rooms" onAction={canEdit ? () => setEdit('new') : undefined} />
       ) : (
         <div className="g" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.6fr)', alignItems: 'start' }}>
           <Card title={t('admin.rooms_tab.rooms')} chip={<span className="chip">{list.length}</span>}>

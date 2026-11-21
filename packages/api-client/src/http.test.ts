@@ -35,6 +35,18 @@ describe('createHttp', () => {
     expect(s.tokens()).toEqual({ accessToken: 'new', refreshToken: 'r2' });
   });
 
+  it('asks again when the refresh is turned away for a moment (busy, rate-limited), instead of signing out', async () => {
+    let refreshes = 0, first = true;
+    const s = setup((url) => {
+      if (url.endsWith('/auth/refresh')) return ++refreshes === 1 ? json(429, { code: 'rate_limited' }) : json(200, { accessToken: 'new', refreshToken: 'r2' });
+      if (first) { first = false; return json(401, { code: 'unauthenticated', message: 'expired' }); }
+      return json(200, { n: 1 });
+    });
+    expect(await s.http.get('/v1/me')).toEqual({ n: 1 });
+    expect(refreshes).toBe(2);
+    expect(s.onSignedOut).not.toHaveBeenCalled();
+  });
+
   it('signs out when the refresh is refused', async () => {
     const s = setup((url) => (url.endsWith('/auth/refresh') ? json(401, {}) : json(401, { code: 'unauthenticated', message: 'expired' })));
     await expect(s.http.get('/v1/me')).rejects.toBeInstanceOf(HttpError);

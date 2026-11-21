@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fmtMoney, type CertificateRow } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, EmptyNote, Field, Segmented, SelectField, useShake, t } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, EmptyNote, Field, Segmented, SelectField, useShake, t, EmptyState } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { AddBtn, StudentPick, openPdf, problem, stamp, useOpenParam } from '../../app/kit';
@@ -27,14 +27,14 @@ export function CertificatesPage() { const app = useApp();
     <Page title={t('admin.certificates.certificates')} sub={t('admin.certificates.sub')} toast={toast} tabs={tabs}
       actions={tab === 'requests' ? <AddBtn onClick={() => setAsking(true)}>{t('admin.certificates.ask_for_one')}</AddBtn> : undefined}
       overlays={(asking || !!forStudent) && <AskDialog studentId={forStudent} onClose={close} onDone={(m) => { close(); say(m); }} />}>
-      {tab === 'requests' && <List state="pending" say={say} />}
-      {tab === 'register' && <List state="register" say={say} />}
+      {tab === 'requests' && <List state="pending" say={say} onAsk={() => setAsking(true)} />}
+      {tab === 'register' && <List state="register" say={say} onAsk={() => setAsking(true)} />}
       {tab === 'cards' && <Cards say={say} canPrint={app.user.permissions.includes('certificates.issue')} />}
     </Page>
   );
 }
 
-function List({ state, say }: { state: 'pending' | 'register'; say: Say }) { const app = useApp();
+function List({ state, say, onAsk }: { state: 'pending' | 'register'; say: Say; onAsk: () => void }) { const app = useApp();
   const qc = useQueryClient();
   const [q, setQ] = useState('');
   const list = useQuery({ queryKey: ['certificates', state, q], queryFn: () => app.api.certificates.list({ state: state === 'pending' ? 'pending' : undefined, q }) });
@@ -45,6 +45,8 @@ function List({ state, say }: { state: 'pending' | 'register'; say: Say }) { con
   const cancel = useMutation({ mutationFn: (id: string) => app.api.certificates.cancel(id), onSuccess: () => { refresh(); say(t('admin.certificates.request_cancelled')); }, onError: (e) => say((e as Error).message, 'bad') });
   const revoke = useMutation({ mutationFn: () => app.api.certificates.revoke(revoking!.id, note), onSuccess: () => { setRevoking(null); setNote(''); refresh(); say(t('admin.certificates.revoked_done')); }, onError: (e) => say((e as Error).message, 'bad') });
   const rows = (list.data ?? []).filter((c) => state === 'pending' || c.state === 'issued' || c.state === 'revoked');
+  // Nothing at all (no search typed): the tab's own scene; a search with no match keeps the note in the card.
+  if (list.data && !rows.length && !q) return <EmptyState scene={state === 'pending' ? 'certificates' : 'certregister'} onAction={onAsk} />;
   return <>
     <Card style={{ padding: 0 }} chip={<div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
       <div style={{ width: 220 }}><Field label={t('admin.certificates.search')} value={q} onChange={setQ} maxLength={60} /></div>
@@ -127,10 +129,13 @@ function Cards({ say, canPrint }: { say: Say; canPrint: boolean }) { const app =
     catch (e) { say((e as Error).message, 'bad'); } finally { setBusy(false); }
   };
   if (!canPrint) return <Card><EmptyNote icon="card" title={t('admin.certificates.cards_need_permission')} /></Card>;
+  const whom = <Segmented label={t('admin.certificates.for_whom')} value={who} onChange={setWho} options={[{ value: 'students', label: t('admin.certificates.students') }, { value: 'staff', label: t('admin.certificates.staff') }]} />;
+  // No classes yet: students' cards have nothing to print, so the tab shows its scene; staff cards stay one switch away.
+  if (who === 'students' && classes.data && !classes.data.length) return <div className="stack">{whom}<EmptyState scene="idcards" onAction={() => app.go('/students')} /></div>;
   return (
     <Card title={t('admin.certificates.id_cards')}>
       <div className="stack">
-        <Segmented label={t('admin.certificates.for_whom')} value={who} onChange={setWho} options={[{ value: 'students', label: t('admin.certificates.students') }, { value: 'staff', label: t('admin.certificates.staff') }]} />
+        {whom}
         {who === 'students' && (
           <div className="fld"><label>{t('admin.certificates.classes')}</label>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>{(classes.data ?? []).map((c) => <Checkbox key={c.id} checked={picked.includes(c.id)} label={c.name}

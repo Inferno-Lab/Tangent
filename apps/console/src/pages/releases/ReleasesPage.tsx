@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
-import { Dialog, Field, NumberField, NumberInput, Select, useShake, Icon, EmptyState, t } from '@tangent/web-ui';
+import { Dialog, Field, NumberField, NumberInput, Select, useShake, Icon, EmptyState, t, EmptyNote } from '@tangent/web-ui';
 import type { PolicyDoc, ReleaseRow } from '@tangent/contracts';
 import { Card, Page, Tiles, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
@@ -73,7 +73,7 @@ function ReleasesList({ tabs, toast, say }: { tabs: React.ReactNode; toast: Retu
               {r.waves.map((w) => (
                 <div key={w.name} className="s4" style={{ minWidth: 0 }}>
                   <div className="lbl" style={{ marginBottom: 6 }}>{w.name} · {WAVE[w.status] ?? w.status}</div>
-                  <div className="tgrow">{w.schools.map((s) => <span key={s.id} className={`st ${SCHOOL[s.state]}`}><i></i>{s.name}</span>)}{w.schools.length === 0 && <span className="help">{t('console.releases_page.no_schools_match')}</span>}</div>
+                  <div className="tgrow">{w.schools.map((s) => <span key={s.id} className={`st ${SCHOOL[s.state]}`}><i></i>{s.name}</span>)}{w.schools.length === 0 && <EmptyNote icon="search" title={t('console.releases_page.no_schools_match')} />}</div>
                 </div>
               ))}
             </div>

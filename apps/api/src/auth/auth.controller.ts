@@ -10,6 +10,9 @@ import { AuthService } from './auth.service.js';
 import { Core, CurrentUser, Public } from './guards.js';
 
 const loginLimit = new Limiter(process.env.NODE_ENV === 'test' ? 10_000 : 30, 60_000);
+// A refresh token is 32 random bytes, so there is nothing to guess: its own, much higher cap only stops a flood. Every page
+// load refreshes, and a school's office sits behind one address, so the sign-in cap signed a busy office out.
+const refreshLimit = new Limiter(process.env.NODE_ENV === 'test' ? 10_000 : 600, 60_000);
 
 @Controller('v1/auth')
 @Core()
@@ -63,7 +66,7 @@ export class AuthController {
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): Promise<TokenPair> {
-    loginLimit.check(`${t.info.slug}|${req.ip}|r`);
+    refreshLimit.check(`${t.info.slug}|${req.ip}`);
     return this.auth.refresh(t, body.refreshToken, req, reply);
   }
 

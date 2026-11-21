@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { EmptyState, t } from '@tangent/web-ui';
+import { EmptyState, useMore, t } from '@tangent/web-ui';
 import type { MigrationRow } from '@tangent/contracts';
 import { Card, Page } from '../../app/Page';
 import { useApp } from '../../app/context';
@@ -14,11 +14,13 @@ export function MigrationsTab({ tabs }: { tabs: React.ReactNode }) {
   const app = useApp();
   const q = useQuery({ queryKey: ['migrations'], queryFn: app.api.releases.migrations, refetchInterval: 15_000 });
   const rows = q.data ?? [];
+  // The newest changes first, a dozen at a time: every change ever made would otherwise run the page on for screens.
+  const [shown, more] = useMore([...rows].reverse(), 12);
   return (
     <Page title={t('console.migrations_tab.releases')} sub={t('console.migrations_tab.database_changes_and_which_schools')} tabs={tabs} loading={q.isLoading} error={q.isError ? { message: (q.error as Error).message, retry: () => void q.refetch() } : null}>
       {rows.length === 0 ? (
         <div><EmptyState scene="migrations" onAction={() => app.go('/releases')} /></div>
-      ) : rows.map((m) => {
+      ) : <>{shown.map((m) => {
         const applied = m.schools.filter((s) => s.state === 'applied').length;
         const bad = m.schools.filter((s) => s.state === 'failed');
         return (
@@ -31,7 +33,7 @@ export function MigrationsTab({ tabs }: { tabs: React.ReactNode }) {
             {bad.map((s) => <div key={s.id} className="emsg" role="alert" style={{ marginTop: 10 }}><a href={url(`/schools/${s.id}/technical`)} onClick={(e) => { e.preventDefault(); app.go(`/schools/${s.id}/technical`); }} style={{ color: 'inherit', fontWeight: 700 }}>{s.name}</a>: {s.error ?? 'failed'}</div>)}
           </Card>
         );
-      })}
+      })}{more}</>}
     </Page>
   );
 }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DEFAULT_DIARY_KINDS, addDays, listOptions, schoolToday, type DiaryInput, type DiaryRow, type ListItem } from '@tangent/contracts';
 import { uploadFile } from '@tangent/api-client';
-import { DateField, Dialog, EmptyNote, Select, SelectField, useShake, t } from '@tangent/web-ui';
+import { DateField, Dialog, EmptyNote, EmptyState, Select, SelectField, useShake, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { AddBtn, AreaField, Attach, dateLabel, problem, useSetting } from '../../app/kit';
@@ -37,7 +37,8 @@ export function DiaryPage() { const app = useApp();
           onClose={() => setEditing(null)} onDone={(m) => { setEditing(null); void qc.invalidateQueries({ queryKey: ['diary'] }); say(m); }} />}
         {acks && <AcksDialog entry={acks} onClose={() => setAcks(null)} />}
       </>}>
-      <Card style={{ padding: 0 }}>
+      {/* The scene only on the first view; a chosen class or an earlier week with nothing keeps the note. */}
+      {!rows.length && !classId && from === addDays(schoolToday(), -7) ? <EmptyState scene="diary" onAction={writes && classes.length ? () => setEditing('new') : undefined} /> : <Card style={{ padding: 0 }}>
         {!rows.length ? <div style={{ padding: 20 }}><EmptyNote icon="edit" title={t('admin.diary.nothing_written')} body={t('admin.diary.nothing_written_body')}
           action={writes && classes.length ? <button className="btn sm" onClick={() => setEditing('new')}>{t('admin.diary.write_an_entry')}</button> : undefined} /></div>
           : rows.map((r) => (
@@ -57,7 +58,7 @@ export function DiaryPage() { const app = useApp();
               </>}
             </div>
           ))}
-      </Card>
+      </Card>}
     </Page>
   );
 }

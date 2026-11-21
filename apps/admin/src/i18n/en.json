@@ -722,6 +722,7 @@
  "admin.fees_page.open": "Open {name}",
  "admin.fees_page.overdue": "Overdue",
  "admin.fees_page.parent": "{@Guardian}",
+ "admin.fees_page.no_payments_yet": "No payments yet",
  "admin.fees_page.payments_appear_here_day_by": "Payments appear here, day by day, as {@fees} are collected.",
  "admin.fees_page.period": "Period",
  "admin.fees_page.previous": "Previous",
@@ -1011,7 +1012,7 @@
  "admin.kit.remove": "Remove",
  "admin.kit.something_went_wrong_try_again": "Something went wrong. Try again.",
  "admin.kit.that_file_is_over_15": "That file is over 15 MB.",
- "admin.kit.type_a_name_or_admission": "Type a name or {@admissionNumber}",
+ "admin.kit.type_a_name_or_admission": "Name or {@admissionNumber}",
  "admin.layout.useshellchrome_is_only_available_inside": "useShellChrome is only available inside the signed-in layout.",
  "admin.library_page.a_p_j_abdul_kalam": "Frances Hodgson Burnett",
  "admin.library_page.a_student": "A {@student}",
@@ -1260,7 +1261,7 @@
  "admin.moving_in_page.each_import_with_its_totals": "Each import with its totals. Check them against your old system’s reports; if something is off, tell Tangent and the import can be undone.",
  "admin.moving_in_page.excel_sheets_exports_from_your": "Excel sheets, exports from your old system, or photos of paper registers. Tangent’s team imports them, checks every total with you, and can undo an import for 30 days.",
  "admin.moving_in_page.files": "{length, plural, one {{length} file} other {{length} files}}: {p1}",
- "admin.moving_in_page.for_example_fees_paid_this": "For example: {@fees} paid this year, up to October",
+ "admin.moving_in_page.for_example_fees_paid_this": "For example: {@fees} paid this year",
  "admin.moving_in_page.imported": "Imported",
  "admin.moving_in_page.is_over_18_mb_split": "{name} is over 18 MB. Split it, or save it as CSV.",
  "admin.moving_in_page.left_out": "left out",
@@ -1692,7 +1693,7 @@
  "admin.school_picker.type_your_school_s_tangent": "Type your school's Tangent address, like greenfield. You can find it in the invite email.",
  "admin.school_picker.which_school": "Which school?",
  "admin.settings_view.discard": "Discard",
- "admin.settings_view.for_example_the_board_changed": "For example: the board changed the loan period",
+ "admin.settings_view.for_example_the_board_changed": "For example: a new loan period",
  "admin.settings_view.how_this_part_of_the": "How this part of the school works. Changes apply for everyone at once.",
  "admin.settings_view.nothing_to_set_here": "Nothing to set here",
  "admin.settings_view.save": "Save",
@@ -2510,6 +2511,7 @@
  "admin.visitors.family_code": "Family’s code",
  "admin.visitors.family_to_agree": "Family to agree",
  "admin.visitors.from_check_ins": "From today’s check-ins",
+ "admin.visitors.signed_in_at_the_gate": "Signed in at the gate and not out yet",
  "admin.visitors.from_todays_marks": "From today’s roll calls, less those who left",
  "admin.visitors.gone": "Gone",
  "admin.visitors.has_left": "{name} has left.",
@@ -2660,5 +2662,8 @@
  "admin.year_page.when_each_period_break_and": "When each period, break and lunch begins and ends.",
  "admin.year_page.where_goes": "Where {fromName} goes",
  "admin.year_page.yes": "Yes",
- "admin.year_page.yes_promote": "Yes, promote"
+ "admin.year_page.yes_promote": "Yes, promote",
+ "admin.kit.no_student_found": "No student found",
+ "admin.exams_page.no_results_yet": "No results yet",
+ "admin.transport_page.no_trips_today": "No trips yet today"
 }
