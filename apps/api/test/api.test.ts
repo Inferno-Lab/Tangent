@@ -438,6 +438,9 @@ describe('settings', () => {
     try {
       const cfg = (await h.call('GET', '/v1/config', { token })).json;
       expect(cfg.school.color).toBe('#0E7490');
+      // The school's own subjects, by the key the app uses, so the app names them as the school does.
+      const [maths] = await h.schoolSql("select id from subjects where name = 'Mathematics'");
+      expect(cfg.subjects[maths.id.replace(/^sub_/, '')]).toBe('Mathematics');
       expect(cfg.modules).toEqual(['school', 'people', 'attendance']);
       const labels = cfg.menu.flatMap((g: any) => g.pages.map((p: any) => p.label));
       expect(labels).toContain('Attendance');

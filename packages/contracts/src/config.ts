@@ -480,6 +480,8 @@ export interface EffectiveConfig {
   app: { roles: AppRoleKey[]; layout: Record<AppRoleKey, AppLayout> };
   /** The timetable's days (mon… / mon-a… / d1…), and for a cycle that is not weekly each nearby date's day (the apps' config only). */
   timetable?: { keys: string[]; dates: Record<string, string> | null };
+  /** The school's own subjects, by the key the app's routes use (the id without `sub_`): their names as the school writes them. */
+  subjects?: Record<string, string>;
   privacy: { notice: string; officerName: string; officerEmail: string; officerPhone: string };
   /** Kill switches and rollouts the console set for this school. */
   flags: Record<string, boolean>;

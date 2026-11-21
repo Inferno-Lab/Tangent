@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
 import 'package:tangent/core/theme/tokens.dart';
@@ -19,7 +20,13 @@ const subjectAbbr = {
   'music': 'MU',
 };
 
-String subjectName(String id) => 'subject.$id'.tr;
+/// A subject's name: the app's own words for the usual ones (translated), else the school's own name for it, else what the
+/// server sent (some screens get the name itself).
+String subjectName(String id) {
+  final key = 'subject.$id';
+  final words = key.tr;
+  return words != key ? words : SchoolConfig.subjectNameOf(id) ?? id;
+}
 
 /// Uppercase tracked label ("THURSDAY · 15 OCTOBER").
 class Overline extends StatelessWidget {

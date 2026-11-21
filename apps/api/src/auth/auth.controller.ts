@@ -147,7 +147,8 @@ export class MeController {
   /** The settings the apps and admin start from: platform defaults, plan, locks and school choices, cut to this user. */
   @Get('config')
   async config(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser): Promise<EffectiveConfig> {
-    return { ...(await this.settings.effective(t, u.permissions)), timetable: await this.settings.timetableDays(t) };
+    const subjects = (await t.pool.query<{ id: string; name: string }>('select id, name from subjects')).rows;
+    return { ...(await this.settings.effective(t, u.permissions)), timetable: await this.settings.timetableDays(t), subjects: Object.fromEntries(subjects.map((s) => [s.id.replace(/^sub_/, ''), s.name])) };
   }
 
   /** Branding for the sign-in page, before anyone has signed in. */
