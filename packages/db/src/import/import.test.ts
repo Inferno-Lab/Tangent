@@ -17,6 +17,12 @@ let server: DevPostgres;
 let pool: pg.Pool;
 const school = sampleSchool(300);
 const n = async (sql: string) => Number((await pool.query<{ n: string }>(sql)).rows[0]!.n);
+/** How many rows each table has, to compare the school before its imports and after undoing them. */
+async function census(): Promise<Record<string, number>> {
+  const tables = (await pool.query<{ t: string }>("select tablename t from pg_tables where schemaname = 'public' and tablename not like 'import%' and tablename not in ('schema_migrations', 'audit_log') order by 1")).rows;
+  return Object.fromEntries(await Promise.all(tables.map(async ({ t }) => [t, await n(`select count(*) n from "${t}"`)] as const)));
+}
+let empty: Record<string, number>;
 
 beforeAll(async () => {
   // The school's own country, as the API and console give it: local phone numbers are read as Indian ones.
@@ -29,6 +35,7 @@ beforeAll(async () => {
     school: { name: 'Riverside School', shortName: 'Riverside', tagline: '', phone: '', email: '', address: '', color: '#2F5BD3', logoText: 'R', language: 'en' },
     admin: { name: 'Office Admin', email: 'office@riverside.test', phone: '+91 90000 00001', passwordHash: 'x' }, modules: ['people'], data: 'empty',
   });
+  empty = await census();
 }, 180_000);
 afterAll(async () => { await pool?.end(); await server?.stop(); });
 
@@ -207,6 +214,11 @@ describe('moving a school in', () => {
     await undoBatch(pool, b.id);
     expect(await phone('Mira Qadri')).toBeNull();
   }, 60_000);
+
+  it('undoing every import, newest first, leaves the school exactly as it started', async () => {
+    for (let b = (await listBatches(pool)).find((x) => x.canUndo); b; b = (await listBatches(pool)).find((x) => x.canUndo)) await undoBatch(pool, b.id);
+    expect(await census()).toEqual(empty);
+  }, 120_000);
 });
 
 /** A ZIP with deflated entries, the way Excel writes an .xlsx (the export's own ZIP is stored, so this covers the other path). */
