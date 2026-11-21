@@ -57,6 +57,12 @@ function DashboardDesktop() { const app = useApp();
     qc.setQueryData(['prefs'], { ...prefs.data, 'dashboard.widgets': n });
     void app.api.prefs.put('dashboard.widgets', n).catch(() => say(tr('admin.dashboard_page.your_choice_could_not_be'), 'bad'));
   };
+  // The welcome of a school with no students, once this person puts it away, stays away: the dashboard shows its zeros.
+  const tips = (prefs.data?.['tips.hidden'] as string[] | undefined) ?? [];
+  const hideWelcome = () => { const n = [...new Set([...tips, 'dashboard.welcome'])];
+    qc.setQueryData(['prefs'], { ...prefs.data, 'tips.hidden': n });
+    void app.api.prefs.put('tips.hidden', n).catch(() => say(tr('admin.dashboard_page.your_choice_could_not_be'), 'bad'));
+  };
   // The classes in this person's roll-call widget (up to six); none chosen keeps the school's choice.
   const classes = useQuery({ queryKey: ['classes'], queryFn: app.api.classes, staleTime: 5 * 60_000, enabled: widgets });
   const rollMine = (prefs.data?.['dashboard.rollClasses'] as string[] | undefined) ?? [];
@@ -185,10 +191,10 @@ function DashboardDesktop() { const app = useApp();
     );
   }
   // A school with no students yet: the dashboard has nothing to show, so it says how to start.
-  if (d && d.present.total === 0) { return (
+  if (d && d.present.total === 0 && !tips.includes('dashboard.welcome')) { return (
       <PageScope page="dashboard">
         <main className="mn"><header className="hd"><div><h1>{tr('admin.dashboard_page.dashboard')}</h1></div></header>
-          <EmptyState scene="dashboard" onAction={() => app.go('/year/classes')} onLink={() => app.go('/staff')} />
+          <EmptyState scene="dashboard" onAction={() => app.go('/year/classes')} onLink={() => app.go('/staff')} onClose={hideWelcome} />
         </main>
       </PageScope>
     );

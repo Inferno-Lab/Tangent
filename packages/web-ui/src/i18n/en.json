@@ -20,6 +20,7 @@
  "ui.empty_card.search": "Search",
  "ui.empty_card.the_link_may_be_old": "The link may be old, or the page may have moved. Search finds almost anything: a {@student}, a receipt, a notice, a setting.",
  "ui.empty_card.this_page_isn_t_here": "This page isn’t here",
+ "ui.empty_state.hide": "Hide this",
  "ui.fields.calendar": "Calendar",
  "ui.fields.choose_a_time": "Choose a time",
  "ui.fields.choose_from_a_calendar": "Choose from a calendar",

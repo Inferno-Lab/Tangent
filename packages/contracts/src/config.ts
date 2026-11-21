@@ -501,6 +501,8 @@ export const USER_PREFS = {
   language: z.string().refine(isLanguage, 'Pick a language from the list'),
   /** The app's welcome after the first sign-in has been seen. */
   'welcome.seen': z.boolean(),
+  /** The welcomes and tips this person put away in the admin and the console (their keys), so they stay away. */
+  'tips.hidden': z.array(z.string().max(40)).max(40),
 } as const;
 export type UserPrefKey = keyof typeof USER_PREFS;
 export const UserPrefPut = z.object({ key: z.enum(Object.keys(USER_PREFS) as [UserPrefKey, ...UserPrefKey[]]), value: z.unknown() });

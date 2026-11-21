@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { SPECTRUM_COLOURS, spectrumTokens } from '@tangent/contracts';
 import { SCENE_CSS, SCENES } from './scenes';
+import { Icon } from '../Icon';
+import { t } from '../i18n';
 
 export type EmptyScene = keyof typeof SCENES;
 
@@ -21,7 +23,7 @@ const HOST = SPECTRUM + CARD + '[style*="background:var(--s2)"]:not(.ring){backg
  * empty: loading, errors and a filter with no match keep their own states. Without `onAction` (no permission) the button is
  * left out; `label` renames it where this product's next step differs from the board's.
  */
-export function EmptyState({ scene, onAction, onLink, label }: { scene: EmptyScene; onAction?: () => void; onLink?: () => void; label?: string }) {
+export function EmptyState({ scene, onAction, onLink, label, onClose }: { scene: EmptyScene; onAction?: () => void; onLink?: () => void; label?: string; onClose?: () => void }) {
   const host = useRef<HTMLDivElement>(null);
   const act = useRef({ onAction, onLink });
   act.current = { onAction, onLink };
@@ -43,5 +45,12 @@ export function EmptyState({ scene, onAction, onLink, label }: { scene: EmptySce
     root.addEventListener('click', click);
     return () => root.removeEventListener('click', click);
   }, []);
-  return <div ref={host} className="es-host" />;
+  const card = <div ref={host} className="es-host" />;
+  // A welcome that can be put away (`onClose`): the caller remembers it, so it does not come back on every visit.
+  return onClose ? (
+    <div style={{ position: 'relative' }}>
+      {card}
+      <button className="ibtn" style={{ position: 'absolute', top: 14, insetInlineEnd: 14, zIndex: 1 }} onClick={onClose} aria-label={t('ui.empty_state.hide')} data-tip={t('ui.empty_state.hide')}><Icon name="close" size={18} /></button>
+    </div>
+  ) : card;
 }
