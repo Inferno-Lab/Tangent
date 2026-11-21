@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AdmissionStages, DEFAULT_ADMISSION_STAGES, addDays, schoolToday, stageName, type AdmissionStage, type EnquiryPatch, type EnquiryRow, type EnquiryStage } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, Field, PhoneField, SelectField, currentLanguage, useShake, EmptyState, t } from '@tangent/web-ui';
+import { EmptyNote, Checkbox, DateField, Dialog, Field, PhoneField, SelectField, currentLanguage, useShake, EmptyState, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { AddBtn, AreaField, Avatar, dateLabel, problem, useCountry, useGrades, useSetting } from '../../app/kit';
@@ -81,7 +81,7 @@ export function AdmissionsPage() {
                   <header><b>{c.label}</b><span className="chip">{items.length}</span></header>
                   <small>{c.hint || '\u00a0'}</small>
                   <div className="lscroll admcl">
-                    {items.length === 0 && <div className="admn">{t('admin.admissions_page.nothing_here')}</div>}
+                    {items.length === 0 && <EmptyNote icon="waiting" title={t('admin.admissions_page.nothing_here')} />}
                     {items.map((r) => (
                       <article className="admk" key={r.id}>
                         <button className="admo" onClick={() => setDlg({ kind: 'view', row: r })} aria-label={t('admin.admissions_page.open', { childName: r.childName })}>

@@ -304,7 +304,8 @@ function Roll({ say }: { say: Say }) { const app = useApp();
         <div key={g.title} className="card s4 rise">
           <div className="ch"><h2>{g.title}</h2></div>
           {g.note && <small className="help">{g.note}</small>}
-          <div style={{ maxHeight: 360, overflow: 'auto' }} data-even-scroll>{g.items.map((x, i) => <div key={i} style={{ padding: '4px 0' }}>{x}</div>)}</div>
+          {g.items.length ? <div style={{ maxHeight: 360, overflow: 'auto' }} data-even-scroll>{g.items.map((x, i) => <div key={i} style={{ padding: '4px 0' }}>{x}</div>)}</div>
+            : <EmptyNote icon="people" title={t('admin.visitors.nobody_on_site_in_this')} body={t('admin.visitors.the_roll_call_fills_in')} />}
         </div>
       ))}
     </section>}

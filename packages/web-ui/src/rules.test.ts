@@ -58,6 +58,16 @@ describe('the design system', { timeout: 30_000 }, () => {
     expect(hits(tsx, /<Shell\b|useChrome\(/, (_, f) => !/app[\\/](Layout|useChrome)\.tsx$/.test(f)), 'render pages in PageScope; read the shell with useShellChrome()').toEqual([]);
   });
 
+  it('gives every empty list, tab and card an animated empty state, never a bare line of text', () => {
+    // A block of plain text that says there is nothing ("No bookings", "Nobody is overdue") is an empty state drawn by hand:
+    // use <EmptyState scene> for a page or tab, <EmptyNote> inside a card, <EmptyCard> for a card of its own.
+    const english = Object.assign({}, ...['apps/admin/src/i18n/en.json', 'apps/console/src/i18n/en.json', 'packages/web-ui/src/i18n/en.json']
+      .map((f) => JSON.parse(read(path.join(root, f))) as Record<string, string>));
+    const none = new Set(Object.keys(english).filter((k) => /^(No |Nothing|Nobody)/.test(english[k]!)));
+    const bare = /<(p|div)\b[^>]*className="(help|t2|admn)"[^>]*>\{t?r?\('([\w.]+)'\)\}<\/\1>/g;
+    expect(hits(tsx, /<(p|div)\b/, (line) => /\.length|[?:]\s*<|&&\s*</.test(line) && [...line.matchAll(bare)].some((m) => none.has(m[3]!))), 'use EmptyState, EmptyNote or EmptyCard').toEqual([]);
+  });
+
   it('builds overlays from the shared parts', () => {
     expect(hits(tsx, /className=\{?["'`](scrim|mod|toast|popm|sxp|pvr)\b/), 'use Dialog, SearchDialog, ToastSlot, Menu or Pop from @tangent/web-ui').toEqual([]);
     expect(hits(allTsx.filter((f) => !/Toast\.tsx$/.test(f)), /setToast\(/), 'time toasts with useToast() from @tangent/web-ui').toEqual([]);

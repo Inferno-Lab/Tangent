@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import type { PublicStatus } from '@tangent/contracts';
-import { useTheme, Icon, EmptyNote, t } from '@tangent/web-ui';
+import { useTheme, EmptyNote, t } from '@tangent/web-ui';
 import { fmtDate } from '@tangent/contracts';
 
 const TEXT = { ok: t('admin.status_board.everything_is_working'), degraded: t('admin.status_board.some_things_are_slow'), down: t('admin.status_board.something_is_down') } as const;
@@ -37,7 +37,7 @@ export function StatusBoard() {
             <section className="card">
               <div className="ch"><h2>{t('admin.status_board.recent_incidents')}</h2></div>
               {s.incidents.length === 0 ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}><div style={{ width: 90, flex: 'none' }}><span className="itile"><Icon name="checkCircle" size={24} /></span></div><div className="help">{t('admin.status_board.nothing_in_the_last_7')}</div></div>
+                <EmptyNote icon="checkCircle" title={t('admin.status_board.nothing_in_the_last_7')} />
               ) : s.incidents.map((i) => <div className="kv" key={i.id}><span>{i.title}<br /><small style={{ color: 'var(--ink3)' }}>{fmtDate(i.startedAt, 'stamp')}</small></span><b><span className={`st ${i.open ? 'c' : 'g'}`}><i></i>{i.open ? t('admin.status_board.open') : t('admin.status_board.resolved')}</span></b></div>)}
             </section>
           </>
