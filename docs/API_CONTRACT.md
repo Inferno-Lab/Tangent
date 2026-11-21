@@ -4,7 +4,7 @@
 
 Each repository method maps to one REST call. `Remote*Repository` calls these paths through `RemoteDataSource` and `ApiClient` (`lib/core/network/api_client.dart`). A build without `SCHOOL` and `API_BASE_URL` keeps `AppConfig.useMockData` on and never touches the network; a build with them uses these calls.
 
-JSON bodies and responses use the shapes in [MOCK_SCHEMA.md](MOCK_SCHEMA.md). Dates on the wire are ISO-8601. Enum fields use the JSON values listed there (`late`, not the Dart name `lateArrival`; `class`, not `klass`).
+JSON bodies and responses use the shapes in [APP_MODELS.md](APP_MODELS.md). Dates on the wire are ISO-8601. Enum fields use the JSON values listed there (`late`, not the Dart name `lateArrival`; `class`, not `klass`).
 
 ## Errors
 
@@ -46,7 +46,6 @@ Remote parsers currently expect the raw array (or a single object). When a backe
 | --- | --- |
 | `login` | `POST /auth/login` `{ "email", "password" }` → user |
 | `loginWithOtp` | `POST /auth/otp` `{ "email", "otp" }` → user |
-| `loginAs` | `POST /auth/demo` `{ "role" }` → user |
 
 ## Directory
 
@@ -132,7 +131,7 @@ Staff attendance and leave, the class diary, parent-teacher meetings, leave earl
 
 ## Plug-ins (not built)
 
-These stay behind their own interfaces so the demo does not pretend to talk to a vendor.
+These stay behind their own interfaces, so a screen never pretends to talk to a vendor.
 
 **Push.** `PushGateway.register(token)` and `PushGateway.revoke()`. The server stores the device token on `POST /devices`. Tapping a push opens the `route` already stored on a notification. The in-app list remains `NotificationRepository`.
 
