@@ -55,6 +55,3 @@ export function slotKey(cycle: TimetableCycle, day: number): string {
   if (cycle.kind === 'ab') return `${WEEK_KEYS[(day - 1) % 7]}-${day > 7 ? 'b' : 'a'}`;
   return WEEK_KEYS[day - 1] ?? 'mon';
 }
-
-/** The ISO weekday a weekly or A/B timetable day falls on (null for a cycle of days, which has no weekday). */
-export const slotWeekday = (cycle: TimetableCycle, day: number): number | null => (cycle.kind === 'days' ? null : ((day - 1) % 7) + 1);

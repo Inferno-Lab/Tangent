@@ -509,7 +509,3 @@ export const UserPrefPut = z.object({ key: z.enum(Object.keys(USER_PREFS) as [Us
 
 /** A grading scale (`grading.scale`): each grade from the lowest percentage that earns it. */
 export type GradingScale = { grade: string; minPct: number }[];
-/** The grade a percentage earns on the school's scale ('' when the scale has no grade that low). */
-export function gradeFor(pct: number, scale: GradingScale): string {
-  return [...scale].sort((a, b) => b.minPct - a.minPct).find((g) => pct >= g.minPct)?.grade ?? '';
-}

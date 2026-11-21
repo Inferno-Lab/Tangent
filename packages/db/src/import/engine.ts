@@ -279,13 +279,6 @@ export async function undoBatch(pool: pg.Pool, id: string): Promise<void> {
   }
 }
 
-/** The empty template for a kind: the header row and one example row, so a school can fill it in Excel. */
-export function templateCsv(key: string): string {
-  const kind = importKind(key);
-  if (!kind) throw new ImportError(tx('There is no import for “{key}”.', { key }));
-  return toCsv([kind.columns.map((c) => c.key), kind.columns.map((c) => c.example)]);
-}
-
 /**
  * The template as an .xlsx: the columns by their names with an example row, a dropdown on every column that takes fixed
  * values, and a second sheet that says what each column is, whether it is needed and what it takes.

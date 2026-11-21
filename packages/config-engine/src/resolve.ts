@@ -180,15 +180,3 @@ export function validateSettingsChanges(
   return problems.length ? { ok: false, problems } : { ok: true, values };
 }
 
-export function diffSettings(
-  before: Record<string, unknown>,
-  after: Record<string, unknown>,
-): { key: string; from: unknown; to: unknown }[] {
-  const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
-  const out: { key: string; from: unknown; to: unknown }[] = [];
-  for (const key of keys) {
-    if (JSON.stringify(before[key]) !== JSON.stringify(after[key])) out.push({ key, from: before[key], to: after[key] });
-  }
-  return out;
-}
-

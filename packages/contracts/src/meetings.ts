@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { localizedLabels } from './i18n.js';
 
 /**
  * Parent-teacher meetings (docs/one-shot-plan.md §6.21): the school sets a day, its hours and the length of a slot, and which
@@ -8,7 +7,6 @@ import { localizedLabels } from './i18n.js';
  */
 export const MEETING_MODES = ['inPerson', 'online', 'either'] as const;
 export type MeetingMode = (typeof MEETING_MODES)[number];
-export const MEETING_MODE_LABELS = localizedLabels({ inPerson: 'In person', online: 'Online', either: 'In person or online' });
 export const MEETING_STATES = ['draft', 'open', 'closed'] as const;
 
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use a time like 09:00');

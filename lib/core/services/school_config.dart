@@ -29,9 +29,8 @@ class SchoolHouse {
 }
 
 /// What Tangent set up for this school in the console (`/v1/config`): who may use the app, what each role sees, the modules,
-/// and the school's own lists and rules. On sample content it reads `assets/mock/config.json`, which `tools/gen-app-config.mjs`
-/// writes from the same module definitions and defaults the server uses. The last copy is kept on the phone, so the app opens
-/// offline with the school's own setup; [stale] says when it could not be refreshed.
+/// and the school's own lists and rules. The last copy is kept on the phone, so the app opens offline with the school's own
+/// setup; [stale] says when it could not be refreshed.
 abstract final class SchoolConfig {
   static Map<String, dynamic> _json = const {};
   static Map<String, dynamic> _settings = const {};

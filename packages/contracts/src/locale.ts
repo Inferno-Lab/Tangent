@@ -109,9 +109,6 @@ export const LOCALES: [string, string][] = [
   ['ur-PK', 'اردو (پاکستان)'], ['id-ID', 'Bahasa Indonesia'], ['ms-MY', 'Bahasa Melayu'], ['sw-KE', 'Kiswahili'], ['tr-TR', 'Türkçe'], ['zh-CN', '中文 (中国)'], ['ja-JP', '日本語'],
 ];
 
-/** Writing direction of a language (Arabic, Hebrew, Persian, Urdu and the like read right to left). */
-export const isRtl = (locale: string): boolean => /^(ar|he|fa|ur|ps|sd|ug|yi|dv|ckb)(-|$)/i.test(locale);
-
 // The school whose "today" and money are meant when a caller does not say: the server sets it per request and per job, a
 // web page from the school it is open on. ponytail: one source per process; anything that serves two schools at once passes them explicitly.
 let zoneSource: () => string | undefined = () => undefined;
