@@ -177,7 +177,10 @@ font-family:var(--fb);color:var(--ink);background:var(--bd);-webkit-font-smoothi
 .nest .popm button svg{width:17px;height:17px;flex:none;opacity:.75}
 .nest .popm button .ck{margin-inline-start:auto;color:var(--brand);opacity:1}
 /* overlays */
-.nest .scrim{position:fixed;inset:0;z-index:50;background:var(--scrim);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);animation:nFade var(--t3) var(--e) both}
+.nest .scrim{position:fixed;inset:0;z-index:50;background:var(--scrim);animation:nFade var(--t3) var(--e) both}
+/* While a popup is open the page under it stays still, and a scroll inside the popup never runs on into the page. */
+html:has(.nest .scrim){overflow:hidden}
+.nest :is(.dlg,.drw,.popm,.sxp),.nest :is(.dlg,.drw) *{overscroll-behavior:contain}
 .nest .scrim[data-leaving]{animation:nFadeO var(--t2) var(--ei) forwards}
 /* The layer a dialog or the search box sits in. It centres with a grid, not a transform, so the opening animation can never move it. */
 .nest .mod{position:fixed;inset:0;z-index:51;display:grid;grid-template:minmax(0,1fr)/minmax(0,1fr);place-items:center;padding:16px;pointer-events:none}

@@ -14,7 +14,7 @@ export interface DialogProps {
 }
 
 /**
- * A card over a blurred page. Escape and the backdrop close it, and focus stays inside until it does.
+ * A card over a dimmed page (no blur: it made every scroll inside the popup repaint the whole page). Escape and the backdrop close it, and focus stays inside until it does.
  * Render it inside `<Presence>` (Page's `overlays` does) and it fades out instead of vanishing.
  */
 export function Dialog({ title, tag, dark, onClose, shake, width, children }: DialogProps) {
@@ -55,7 +55,7 @@ export function Dialog({ title, tag, dark, onClose, shake, width, children }: Di
   );
 }
 
-/** A record opened beside the list: slides in from the right over a blurred page. Escape and the backdrop close it. Render it inside `<Presence>`. */
+/** A record opened beside the list: slides in from the right over a dimmed page. Escape and the backdrop close it. Render it inside `<Presence>`. */
 export function Panel({ label, onClose, children }: { label: string; onClose: () => void; children: ReactNode }) {
   const ref = useRef<HTMLElement>(null);
   const leaving = useLeaving();
