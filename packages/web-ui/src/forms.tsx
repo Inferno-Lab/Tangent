@@ -86,10 +86,11 @@ interface SelectProps {
 
 export function SelectField({ label, value, onChange, options, error, disabled, fit }: SelectProps) {
   const id = useId();
-  // ch is a little wider than an average letter, so the longest label always fits beside the chevron.
+  // ch is a little wider than an average letter, so the longest label fits beside the chevron; on a narrow screen the box
+  // still shrinks to its row (the width is wanted, not forced).
   const longest = fit ? Math.max(0, ...options.map((o) => o.label.length)) : 0;
   return (
-    <div className="fld" style={fit ? { minWidth: `calc(${longest}ch + 64px)`, maxWidth: '100%' } : undefined}>
+    <div className="fld" style={fit ? { width: `max(140px, calc(${longest}ch + 64px))`, maxWidth: '100%' } : undefined}>
       <label htmlFor={id}>{label}</label>
       <Select id={id} value={value} onChange={onChange} options={options} invalid={!!error} disabled={disabled} className={error ? 'shake' : ''} />
       {error && <ErrorLine>{error}</ErrorLine>}

@@ -176,8 +176,8 @@ function Packs({ cfg, schoolId, can, say }: { cfg: SchoolConfig; schoolId: strin
       <div className="ch"><h2>{tr('console.config_tab.starter_packs')}</h2></div>
       <div className="help">{tr('console.config_tab.starter_packs_help')}</div>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 10 }}>
-        <div style={{ minWidth: 200, maxWidth: '100%' }}><SelectField fit label={tr('console.config_tab.country_pack')} value={country} onChange={(v) => { setCountry(v); setGroups([]); }} options={Object.keys(COUNTRY_PACKS).map((c) => ({ value: c, label: c }))} /></div>
-        <div style={{ minWidth: 260, maxWidth: '100%' }}><SelectField fit label={tr('console.config_tab.curriculum_pack')} value={curriculum} onChange={(v) => { setCurriculum(v); setGroups([]); }}
+        <div style={{ minWidth: 0, maxWidth: '100%' }}><SelectField fit label={tr('console.config_tab.country_pack')} value={country} onChange={(v) => { setCountry(v); setGroups([]); }} options={Object.keys(COUNTRY_PACKS).map((c) => ({ value: c, label: c }))} /></div>
+        <div style={{ minWidth: 0, maxWidth: '100%' }}><SelectField fit label={tr('console.config_tab.curriculum_pack')} value={curriculum} onChange={(v) => { setCurriculum(v); setGroups([]); }}
           options={[{ value: '', label: tr('console.config_tab.none') }, ...curriculaFor(country).map((c) => ({ value: c.key, label: c.name }))]} /></div>
       </div>
       {parts.isLoading ? <div className="skc" style={{ height: 120, borderRadius: 16, marginTop: 12 }} />
