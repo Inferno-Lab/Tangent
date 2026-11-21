@@ -29,6 +29,7 @@
  "ui.fields.increase": "Increase",
  "ui.fields.next_month": "Next month",
  "ui.fields.previous_month": "Previous month",
+ "ui.forms.email_invalid": "That is not a whole email address. Check it, like name@school.org.",
  "ui.forms.phone_invalid": "That is not a whole phone number here. Check it, or write it with its country code (+…).",
  "ui.forms.phone_needs_code": "Write the number with its country code, like +44 20 7946 0958.",
  "ui.forms.phone_saved_as": "Saved as {n}",

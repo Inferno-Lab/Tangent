@@ -3,8 +3,8 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
 import { HttpError } from '@tangent/api-client';
 import { CORE_MODULES, closeModules } from '@tangent/config-engine';
-import { packSettings, curriculaFor, countryName, ZONES, LOCALES, COUNTRY_DEFAULTS, COUNTRIES, DEFAULT_BRAND, DEPLOY_TARGET_LABELS, LANGUAGES, readableOn, WizardAdmin, WizardBasics, WizardBranding, WizardData, WizardPayload, WizardPlacement, WizardPlan, type ProvisionRunRow, type WizardReview } from '@tangent/contracts';
-import { ColourField, Field, FilePick, NumberField, SelectField, useShake, Icon, t as tr, listOf, dayOf } from '@tangent/web-ui';
+import { phoneProblem, packSettings, curriculaFor, countryName, ZONES, LOCALES, COUNTRY_DEFAULTS, COUNTRIES, DEFAULT_BRAND, DEPLOY_TARGET_LABELS, LANGUAGES, readableOn, WizardAdmin, WizardBasics, WizardBranding, WizardData, WizardPayload, WizardPlacement, WizardPlan, type ProvisionRunRow, type WizardReview } from '@tangent/contracts';
+import { ColourField, Field, FilePick, NumberField, PhoneField, SelectField, useShake, Icon, t as tr, listOf, dayOf } from '@tangent/web-ui';
 import { Card, Page, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
 import { count, price } from '../../app/format';
@@ -120,6 +120,8 @@ export function WizardPage() {
     const r = s.schema!.safeParse(data[k]);
     const out: Record<string, string> = {};
     if (!r.success) for (const i of r.error.issues) out[`${k}.${String(i.path[0] ?? '')}`] ??= friendly(i.message);
+    // The first admin's phone is read in the school's country, which the first step chose.
+    if (k === 'admin' && data.admin.phone) { const bad = phoneProblem(str(data.admin.phone), str(data.basics.country)); if (bad) out['admin.phone'] ??= bad; }
     if (k === 'placement' && !data.placement.cell) out['placement.cell'] = tr('console.wizard_page.pick_where_this_school_should');
     setErrs((e) => ({ ...e, ...Object.fromEntries(Object.keys(e).filter((x) => x.startsWith(`${k}.`)).map((x) => [x, ''])), ...out }));
     if (Object.keys(out).length) shake.hit();
@@ -172,7 +174,7 @@ export function WizardPage() {
           <div className="two">{f('basics', 'city', tr('console.wizard_page.town_or_city'))}{f('basics', 'gstin', tr('console.wizard_page.gstin_optional'))}</div>
           {f('basics', 'address', tr('console.wizard_page.address_optional'))}
           <div className="lbl" style={{ margin: '8px 0' }}>{tr('console.wizard_page.who_we_talk_to')}</div>
-          <div className="two">{f('basics', 'contactName', tr('console.wizard_page.contact_name'))}{f('basics', 'contactPhone', tr('console.wizard_page.phone'), { type: 'tel' })}</div>
+          <div className="two">{f('basics', 'contactName', tr('console.wizard_page.contact_name'))}<PhoneField label={tr('console.wizard_page.phone')} country={str(data.basics.country)} value={str(data.basics.contactPhone)} onChange={(v) => set('basics', 'contactPhone', v)} error={errs['basics.contactPhone']} /></div>
           {f('basics', 'contactEmail', tr('console.wizard_page.email'), { type: 'email' })}
         </>
       );
@@ -260,7 +262,7 @@ export function WizardPage() {
       case 'admin': return (
         <>
           <div className="help" style={{ marginBottom: 12 }}>{tr('console.wizard_page.this_person_gets_the_principal')}</div>
-          {f('admin', 'name', tr('console.wizard_page.name'))}{f('admin', 'email', tr('console.wizard_page.email'), { type: 'email' })}{f('admin', 'phone', tr('console.wizard_page.phone'), { type: 'tel' })}
+          {f('admin', 'name', tr('console.wizard_page.name'))}{f('admin', 'email', tr('console.wizard_page.email'), { type: 'email' })}<PhoneField label={tr('console.wizard_page.phone')} country={str(data.basics.country)} value={str(data.admin.phone)} onChange={(v) => set('admin', 'phone', v)} error={errs['admin.phone']} />
           <SelectField label={tr('console.wizard_page.send_the_invitation_by')} value={invite.some((o) => o.value === str(data.admin.invite)) ? str(data.admin.invite) : invite[0]?.value ?? ''} onChange={(v) => set('admin', 'invite', v)} options={invite} />
           {invite.length < 3 && <div className="help">{tr('console.wizard_page.connected_under_integrations', { n: invite.length })}{links.data?.mode === 'sandbox' ? tr('console.wizard_page.in_sandbox_it_lands_in') : ''}.</div>}
         </>

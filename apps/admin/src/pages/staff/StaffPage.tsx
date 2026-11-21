@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CustomFieldsSetting, CustomValues, StaffRow } from '@tangent/contracts';
-import { CustomFieldInputs, Dialog, Field, Segmented, Select, SelectField, useShake, EmptyState, EmptyNote, t as tr } from '@tangent/web-ui';
+import { CustomFieldInputs, Dialog, Field, PhoneField, Segmented, Select, SelectField, useShake, EmptyState, EmptyNote, t as tr } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
-import { AddBtn, Avatar, Ico, problem, useSchoolConfig, useSetting } from '../../app/kit';
+import { AddBtn, Avatar, Ico, problem, useCountry, useSchoolConfig, useSetting } from '../../app/kit';
 import { ImportDialog } from '../students/StudentDialogs';
 
 const refresh = (qc: ReturnType<typeof useQueryClient>) => void qc.invalidateQueries({ predicate: (q) => ['staff', 'dashboard', 'shell', 'roles', 'activation'].includes(String(q.queryKey[0])) });
@@ -119,6 +119,7 @@ function StaffDialog({ person, onClose, onDone }: { person: StaffRow | null; onC
   const roles = useQuery({ queryKey: ['roles'], queryFn: app.api.roles.list, staleTime: 60_000 });
   const staff = useQuery({ queryKey: ['staff'], queryFn: () => app.api.staff.list() });
   const me = person?.id === app.user.id;
+  const country = useCountry();
   const [f, setF] = useState({ name: person?.name ?? '', email: person?.email ?? '', phone: person?.phone ?? '', designation: person?.designation ?? tr('admin.staff_page.teacher'), department: person?.department ?? '', roleId: person?.roles[0]?.id ?? '', managerId: person?.managerId ?? '' });
   // A new person starts as a teacher where the school has that role, else in the first one.
   const roleId = f.roleId || (roles.data?.find((r) => r.key === 'teacher') ?? roles.data?.[0])?.id || '';
@@ -156,7 +157,7 @@ function StaffDialog({ person, onClose, onDone }: { person: StaffRow | null; onC
         <Field label={tr('admin.staff_page.full_name')} value={f.name} onChange={set('name')} error={err.name} maxLength={80} />
         <div className="two">
           <Field label={tr('admin.staff_page.email')} type="email" value={f.email} onChange={set('email')} error={err.email} hint={tr('admin.staff_page.they_sign_in_with_this')} />
-          <Field label={tr('admin.staff_page.phone')} value={f.phone} onChange={set('phone')} error={err.phone} />
+          <PhoneField country={country} label={tr('admin.staff_page.phone')} value={f.phone} onChange={set('phone')} error={err.phone} />
         </div>
         <div className="two">
           <Field label={tr('admin.staff_page.designation')} value={f.designation} onChange={set('designation')} error={err.designation} maxLength={60} />

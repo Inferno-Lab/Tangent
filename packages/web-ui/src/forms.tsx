@@ -33,15 +33,24 @@ interface FieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'onChan
   icon?: IconName;
 }
 
-/** A labelled input. The error turns it red, makes it vibrate, and says what to do. */
-export function Field({ label, value, onChange, error, hint, icon, ...rest }: FieldProps) {
+// What an email address looks like to every server it will be sent through: one @, a dot in the domain, no spaces.
+const EMAIL = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
+
+/**
+ * A labelled input. The error turns it red, makes it vibrate, and says what to do. An email field checks itself when the
+ * person leaves it, the way the server will.
+ */
+export function Field({ label, value, onChange, error, hint, icon, onBlur, ...rest }: FieldProps) {
   const id = useId();
+  const [left, setLeft] = useState(false);
+  const own = rest.type === 'email' && left && value.trim() && !EMAIL.test(value.trim()) ? tr('ui.forms.email_invalid') : '';
+  error = error || own || undefined;
   return (
     <div className="fld">
       <label htmlFor={id}>{label}</label>
       <div className={`inp ${error ? 'err shake' : ''}`}>
         {icon && <Icon name={icon} />}
-        <input id={id} value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={!!error} aria-describedby={error || hint ? `${id}-m` : undefined} {...rest} />
+        <input id={id} value={value} onChange={(e) => { setLeft(false); onChange(e.target.value); }} onBlur={(e) => { setLeft(true); onBlur?.(e); }} aria-invalid={!!error} aria-describedby={error || hint ? `${id}-m` : undefined} {...rest} />
       </div>
       {error ? <div id={`${id}-m`}><ErrorLine>{error}</ErrorLine></div> : hint ? <div id={`${id}-m`} className="help">{hint}</div> : null}
     </div>
