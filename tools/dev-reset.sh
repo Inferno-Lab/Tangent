@@ -9,6 +9,8 @@ powershell.exe -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object
 command -v powershell.exe >/dev/null 2>&1 || { pkill -f "tsx src/dev-cli.ts"; pkill -f "tsx src/main.ts"; pkill -x postgres; } >/dev/null 2>&1 || true
 sleep 2
 rm -rf .tangent-data
+# A log left by the last run already says ready; waiting on it would race the new database.
+rm -f /tmp/pg.log /tmp/server.log
 [ -f .env ] || cp .env.example .env
 (cd packages/db && TANGENT_PG_DIR="$PWD/../../.tangent-data/pg" TANGENT_PG_PORT=54329 nohup npx tsx src/dev-cli.ts > /tmp/pg.log 2>&1 &)
 for i in $(seq 1 30); do grep -q ready /tmp/pg.log 2>/dev/null && break; sleep 1; done
