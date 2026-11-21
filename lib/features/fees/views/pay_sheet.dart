@@ -36,11 +36,8 @@ class _PaySheetState extends State<PaySheet> {
   var _busy = false;
   Receipt? _receipt;
 
-  // A live school pays through its payment connection, whose own page offers the ways it takes (cards, bank, the
-  // country's wallets); sample content shows the usual ones.
-  static List<(String, String?, String, String)> get _methods => AppConfig.live
-      ? const [('online', null, 'fees.online_title', 'fees.online_sub')]
-      : const [('card', null, 'fees.card_title', 'fees.card_sub'), ('bank', null, 'fees.net_title', 'fees.net_sub')];
+  // The school pays through its payment connection, whose own page offers the ways it takes (cards, bank, the country's wallets).
+  static const List<(String, String?, String, String)> _methods = [('online', null, 'fees.online_title', 'fees.online_sub')];
 
   Future<void> _pay(double max) async {
     setState(() {

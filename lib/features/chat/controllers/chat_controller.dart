@@ -5,7 +5,6 @@ import 'package:get/get.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:tangent/data/datasources/remote_datasource.dart';
-import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/services/live_stream.dart';
 import 'package:tangent/core/widgets/sheets.dart';
@@ -201,10 +200,6 @@ class ChatThreadController extends GetxController with Loadable, LiveListen {
     final id = thread?.id;
     final userId = me;
     if (id == null || userId == null || attaching.value) return;
-    if (!AppConfig.live) {
-      ToastHelper.show('common.sample_only');
-      return;
-    }
     final picked = await ImagePicker().pickImage(source: camera ? ImageSource.camera : ImageSource.gallery, imageQuality: 80, maxWidth: 2400);
     if (picked == null) return;
     attaching.value = true;

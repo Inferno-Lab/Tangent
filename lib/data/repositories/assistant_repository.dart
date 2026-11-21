@@ -32,32 +32,6 @@ abstract class AssistantRepository {
   Future<AssistantReply> ask({required String userId, required String prompt, List<AssistantTurn> history});
 }
 
-/// Canned answers so the experience can be designed and tested with no backend.
-class MockAssistantRepository implements AssistantRepository {
-  @override
-  Future<AssistantReply> ask({
-    required String userId,
-    required String prompt,
-    List<AssistantTurn> history = const [],
-  }) async {
-    final q = prompt.toLowerCase();
-    if (q.contains('fee')) {
-      return const AssistantReply(
-        text: 'Fees are under the Fees tab. You can pay there and the receipt is saved there.',
-        suggestions: ['When is the next due date?'],
-        route: '/fees',
-      );
-    }
-    if (q.contains('homework')) {
-      return const AssistantReply(text: 'Your homework is listed by due date.', route: '/homework');
-    }
-    return const AssistantReply(
-      text: 'I can help with fees, homework, timetable and notices. What would you like to know?',
-      suggestions: ['Fees', 'Homework', 'Timetable'],
-    );
-  }
-}
-
 /// Talks to the school backend, which owns the model provider, its keys and its guardrails.
 /// The app never holds a provider key.
 class RemoteAssistantRepository implements AssistantRepository {

@@ -4,16 +4,12 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:get/get.dart';
-import 'package:tangent/core/config/app_config.dart';
-import 'package:tangent/core/services/theme_service.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
 import 'package:tangent/core/utils/extensions.dart';
 import 'package:tangent/core/widgets/glass.dart';
-import 'package:tangent/core/widgets/glass_controls.dart';
 import 'package:tangent/core/widgets/page.dart';
 import 'package:tangent/core/widgets/ui.dart';
-import 'package:tangent/data/datasources/mock_json_datasource.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 /// Developer page: live glass samples and switches for testing states.
@@ -54,7 +50,6 @@ class _DesignSystemViewState extends State<DesignSystemView> {
   @override
   Widget build(BuildContext context) {
     final c = context.app;
-    final theme = Get.find<ThemeService>();
     final hz = View.of(context).display.refreshRate.round();
     return PageFrame(
       leading: const BackGlass(),
@@ -126,51 +121,6 @@ class _DesignSystemViewState extends State<DesignSystemView> {
           ),
         ),
         const SizedBox(height: 12),
-        EduCard(
-          child: Column(
-            children: [
-              Obx(
-                () => _Row(
-                  title: 'dev.errors',
-                  hint: 'dev.errors_hint',
-                  trailing: GlassSwitch(
-                    value: AppConfig.simulateErrors.value,
-                    label: 'dev.errors'.tr,
-                    onChanged: (v) => theme.setSimulateErrors(value: v),
-                  ),
-                ),
-              ),
-              const Hr(),
-              Obx(
-                () => _Row(
-                  title: 'dev.empty',
-                  hint: 'dev.empty_hint',
-                  trailing: GlassSwitch(
-                    value: AppConfig.emptyData.value,
-                    label: 'dev.empty'.tr,
-                    onChanged: (v) {
-                      AppConfig.emptyData.value = v;
-                      unawaited(Get.find<MockJsonDataSource>().reload());
-                    },
-                  ),
-                ),
-              ),
-              const Hr(),
-              Obx(
-                () => _Row(
-                  title: 'dev.slow',
-                  hint: 'dev.slow_hint',
-                  trailing: GlassSwitch(
-                    value: AppConfig.slowNetwork.value,
-                    label: 'dev.slow'.tr,
-                    onChanged: (v) => AppConfig.slowNetwork.value = v,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
         Text(
           'dev.readout'.trp({
             'ms': _frameMs.toStringAsFixed(1),
@@ -181,32 +131,4 @@ class _DesignSystemViewState extends State<DesignSystemView> {
       ],
     );
   }
-}
-
-class _Row extends StatelessWidget {
-  const _Row({required this.title, required this.hint, required this.trailing});
-
-  final String title;
-  final String hint;
-  final Widget trailing;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    child: Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title.tr, style: context.type.ts),
-              Text(hint.tr, style: context.type.cap),
-            ],
-          ),
-        ),
-        const SizedBox(width: 12),
-        trailing,
-      ],
-    ),
-  );
 }

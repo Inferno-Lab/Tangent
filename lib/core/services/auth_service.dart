@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:get/get.dart';
 import 'package:tangent/core/services/push_service.dart';
-import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/services/live_stream.dart';
 import 'package:tangent/core/services/storage_service.dart';
@@ -25,7 +24,7 @@ class AuthService extends GetxService {
     final raw = _storage.read<String>(StorageKeys.sessionUser);
     if (raw == null) return;
     // A saved person without a saved token (an older build, or a token that was dropped) has to sign in again.
-    if (AppConfig.live && _storage.read<String>(StorageKeys.accessToken) == null) return;
+    if (_storage.read<String>(StorageKeys.accessToken) == null) return;
     final decoded = jsonDecode(raw);
     if (decoded is! Map<String, dynamic>) return;
     final next = AppUser.fromJson(decoded);

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/services/language_packs.dart';
 import 'package:tangent/core/services/storage_service.dart';
 import 'package:tangent/core/theme/app_theme.dart';
@@ -31,8 +30,6 @@ class ThemeService extends GetxService {
     locale.value = Locale(code);
     notifyHomework.value = _storage.read<bool>(StorageKeys.notifyHomework) ?? true;
     notifyFees.value = _storage.read<bool>(StorageKeys.notifyFees) ?? true;
-    AppConfig.simulateErrors.value =
-        _storage.read<bool>(StorageKeys.simulateErrors) ?? false;
   }
 
   Future<void> setMode(AppThemeMode value) async {
@@ -70,10 +67,5 @@ class ThemeService extends GetxService {
       notifyFees.value = fees;
       await _storage.write(StorageKeys.notifyFees, fees);
     }
-  }
-
-  Future<void> setSimulateErrors({required bool value}) async {
-    AppConfig.simulateErrors.value = value;
-    await _storage.write(StorageKeys.simulateErrors, value);
   }
 }

@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/services/storage_service.dart';
 import 'package:tangent/core/translations/languages.dart';
@@ -25,11 +24,7 @@ abstract final class LanguagePacks {
   static Future<void> refresh(String lang) async {
     if (lang == 'en') return;
     try {
-      final Object? fresh = AppConfig.useMockData
-          ? jsonDecode(await rootBundle.loadString('assets/i18n/$lang.json'))
-          : Get.isRegistered<RemoteDataSource>()
-              ? await Get.find<RemoteDataSource>().get('/v1/i18n/app/$lang')
-              : null;
+      final Object? fresh = Get.isRegistered<RemoteDataSource>() ? await Get.find<RemoteDataSource>().get('/v1/i18n/app/$lang') : null;
       if (fresh is! Map) return;
       final pack = Map<String, dynamic>.from(fresh);
       _use(lang, pack);
@@ -47,7 +42,7 @@ abstract final class LanguagePacks {
   /// server, kept on the phone, and loaded so every text role can fall back to it (AppText's fontFamilyFallback).
   static Future<void> _font(String lang) async {
     final family = kLanguageFonts[lang];
-    if (family == null || _loaded.contains(family) || AppConfig.useMockData || !Get.isRegistered<RemoteDataSource>()) return;
+    if (family == null || _loaded.contains(family) || !Get.isRegistered<RemoteDataSource>()) return;
     final storage = Get.find<StorageService>();
     try {
       final loader = FontLoader(family);
@@ -70,7 +65,7 @@ abstract final class LanguagePacks {
 
   /// The school learns the person's language, so its messages reach them in it (a signed-in account on a real school only).
   static Future<void> remember(String lang) async {
-    if (AppConfig.useMockData || !Get.isRegistered<RemoteDataSource>() || !Get.isRegistered<AuthService>() || !Get.find<AuthService>().isLoggedIn) return;
+    if (!Get.isRegistered<RemoteDataSource>() || !Get.isRegistered<AuthService>() || !Get.find<AuthService>().isLoggedIn) return;
     try {
       await Get.find<RemoteDataSource>().client.send('PUT', '/v1/auth/me/prefs', {'key': 'language', 'value': lang});
     } on Object {

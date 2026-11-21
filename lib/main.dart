@@ -16,7 +16,7 @@ import 'package:intl/date_symbol_data_local.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  AppConfig.assertReleaseUrl();
+  AppConfig.assertSchool();
   ErrorReporter.install();
   await initializeDateFormatting();
   final storage = await StorageService().init();

@@ -1,10 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
-import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/services/language_packs.dart';
 import 'package:tangent/core/services/storage_service.dart';
 import 'package:tangent/core/services/theme_service.dart';
@@ -85,6 +83,14 @@ abstract final class SchoolConfig {
     final tt = _json['timetable'];
     final keys = tt is Map ? tt['keys'] : null;
     return keys is List && keys.isNotEmpty ? keys.map((k) => '$k').toList() : const ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  }
+
+  /// A subject's name as the school writes it, by the key the app's routes use ("s6fdm78a9f" → "Mathematics"); null when the
+  /// school's setup does not have it.
+  static String? subjectNameOf(String key) {
+    final names = _json['subjects'];
+    final name = names is Map ? names[key] : null;
+    return name is String && name.isNotEmpty ? name : null;
   }
 
   /// The timetable day a date uses for A/B weeks and cycles of days (which holidays move on), from the server; null for a
@@ -212,26 +218,21 @@ abstract final class SchoolConfig {
 
   /// Before the first frame: the sample school's config, or the copy saved at the last start, so the app opens laid out.
   static Future<void> restore() async {
-    if (!AppConfig.live) return load();
     final saved = await Get.find<StorageService>().readCache(_cacheKey);
     if (saved != null) await _apply(Map<String, dynamic>.from(jsonDecode(saved) as Map));
   }
 
   static Future<void> load() async {
     Map<String, dynamic>? json;
-    if (AppConfig.live) {
-      try {
-        // One quiet retry for a blip (a phone waking, a lift between floors) before saying anything.
-        json = await _fetch().catchError((Object _) => Future<Map<String, dynamic>>.delayed(const Duration(seconds: 3), _fetch));
-        await Get.find<StorageService>().writeCache(_cacheKey, jsonEncode(json));
-        stale.value = false;
-      } on Object {
-        final saved = await Get.find<StorageService>().readCache(_cacheKey);
-        if (saved != null) json = Map<String, dynamic>.from(jsonDecode(saved) as Map);
-        stale.value = true;
-      }
-    } else {
-      json = Map<String, dynamic>.from(jsonDecode(await rootBundle.loadString('assets/mock/config.json')) as Map);
+    try {
+      // One quiet retry for a blip (a phone waking, a lift between floors) before saying anything.
+      json = await _fetch().catchError((Object _) => Future<Map<String, dynamic>>.delayed(const Duration(seconds: 3), _fetch));
+      await Get.find<StorageService>().writeCache(_cacheKey, jsonEncode(json));
+      stale.value = false;
+    } on Object {
+      final saved = await Get.find<StorageService>().readCache(_cacheKey);
+      if (saved != null) json = Map<String, dynamic>.from(jsonDecode(saved) as Map);
+      stale.value = true;
     }
     if (json == null) return;
     await _apply(json);

@@ -12,9 +12,7 @@ import 'package:tangent/core/theme/tokens.dart';
 import 'package:tangent/core/utils/extensions.dart';
 import 'package:tangent/core/utils/validators.dart';
 import 'package:tangent/core/widgets/glass.dart';
-import 'package:tangent/core/widgets/glass_controls.dart';
 import 'package:tangent/core/widgets/ui.dart';
-import 'package:tangent/data/models/user.dart';
 import 'package:tangent/features/auth/controllers/login_controller.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -145,33 +143,6 @@ class _PasswordScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                    // Demo cards only where there is something to demo: sample content or a demo school.
-                    Obx(
-                      () => !AppConfig.demoSchool.value
-                          ? const SizedBox.shrink()
-                          : Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                const SizedBox(height: 24),
-                                Rise(
-                                  index: 5,
-                                  child: Row(
-                                    children: [
-                                      const Expanded(child: Hr()),
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                                        child: Overline('auth.or_demo'.tr),
-                                      ),
-                                      const Expanded(child: Hr()),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Rise(index: 6, child: _DemoCard(controller: controller)),
-                              ],
-                            ),
-                    ),
                     const SizedBox(height: 32),
                     Center(
                       child: Pressable(
@@ -262,58 +233,6 @@ class _PasswordFieldState extends State<_PasswordField> {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _DemoCard extends StatelessWidget {
-  const _DemoCard({required this.controller});
-
-  final LoginController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final roles = [UserRole.parent, UserRole.teacher];
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: SizedBox(
-        height: 118,
-        child: Stack(
-          children: [
-            Positioned.fill(child: ColoredBox(color: context.app.deep)),
-            Positioned(
-              left: 12,
-              right: 12,
-              top: 14,
-              child: Obx(
-                () => GlassSegmented(
-                  labels: const ['nav.parent', 'nav.teacher'],
-                  index: controller.demoRole.value == null ? -1 : roles.indexOf(controller.demoRole.value!),
-                  height: 48,
-                  onPigment: true,
-                  semanticLabel: 'auth.or_demo'.tr,
-                  onChanged: (i) {
-                    controller.demoRole.value = roles[i];
-                    unawaited(controller.demo(roles[i]));
-                  },
-                ),
-              ),
-            ),
-            Positioned(
-              left: 18,
-              right: 18,
-              top: 74,
-              child: Obx(
-                () => Text(
-                  'auth.demo_line_${controller.demoRole.value?.name ?? 'pick'}'.tr,
-                  maxLines: 2,
-                  style: AppText.cap(color: context.app.onDeep2),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
