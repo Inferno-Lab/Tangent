@@ -109,13 +109,24 @@ export function Sidebar({ label, collapsed, groups, active, onNavigate, header, 
 }
 
 /** The school block at the top of the admin menu, and the button that collapses the menu. */
-export function SchoolHeader({ logo, logoUrl, name, place, color, onToggle, collapsed }: { logo: string; logoUrl?: string | null; name: string; place: string; color?: string; onToggle: () => void; collapsed: boolean }) {
-  // An image that cannot load (an expired link, storage down) shows the school's letters, never a broken picture.
+/**
+ * A school's logo image, or `fallback` (its letters, or nothing) while there is none or it cannot load: an expired link, storage
+ * down, a file that is not an image. An image that failed before this mounted (from the cache) is caught too, so a broken
+ * picture is never shown.
+ */
+export function LogoImage({ src, fallback = null, className, style }: { src?: string | null; fallback?: ReactNode; className?: string; style?: CSSProperties }) {
   const [failed, setFailed] = useState('');
-  const img = logoUrl && failed !== logoUrl ? logoUrl : null;
+  const ref = useRef<HTMLImageElement>(null);
+  useEffect(() => { const i = ref.current; if (i && src && i.complete && !i.naturalWidth) setFailed(src); }, [src]);
+  if (!src || failed === src) return <>{fallback}</>;
+  return <img ref={ref} className={className} style={style} src={src} alt="" onError={() => setFailed(src)} />;
+}
+
+export function SchoolHeader({ logo, logoUrl, name, place, color, onToggle, collapsed }: { logo: string; logoUrl?: string | null; name: string; place: string; color?: string; onToggle: () => void; collapsed: boolean }) {
+  // The mark wears the school's colour; a logo that loads covers it, one that cannot leaves the letters.
   return (
     <div className="ws">
-      <span className="lg" style={img ? undefined : markStyle(color)}>{img ? <img className="lgi" src={img} alt="" onError={() => setFailed(img)} /> : logo}</span>
+      <span className="lg" style={markStyle(color)}><LogoImage className="lgi" src={logoUrl} fallback={logo} /></span>
       <div className="fade"><b>{name}</b><small>{place}</small></div>
       <button className="colb" onClick={onToggle} aria-label={collapsed ? t('ui.sidebar.expand_the_menu') : t('ui.sidebar.collapse_the_menu')}>
         <Icon name="sidebar" size={20} />

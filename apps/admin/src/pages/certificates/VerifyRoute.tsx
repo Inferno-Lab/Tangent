@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useRouteContext } from '@tanstack/react-router';
-import { EmptyCard, useHue, t } from '@tangent/web-ui';
+import { EmptyCard, LogoImage, useHue, t } from '@tangent/web-ui';
 
 /**
  * What a certificate's QR code opens, for anyone (an employer, another school): whether the certificate is genuine, with only
@@ -24,7 +24,7 @@ export function VerifyRoute() {
     <div className="nest" style={{ minHeight: '100dvh', padding: 16, background: 'var(--bg)' }}>
       <main style={{ maxWidth: 640, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16, paddingBlock: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {b?.logoUrl ? <img src={b.logoUrl} alt="" style={{ width: 44, height: 44, borderRadius: 12, objectFit: 'cover' }} /> : null}
+          <LogoImage src={b?.logoUrl} style={{ width: 44, height: 44, borderRadius: 12, objectFit: 'cover' }} />
           <h1 className="fd" style={{ margin: 0, overflowWrap: 'anywhere' }}>{b?.name ?? ''}</h1>
         </div>
         {body}
