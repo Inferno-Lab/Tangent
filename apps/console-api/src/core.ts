@@ -43,6 +43,7 @@ export class Db implements OnApplicationShutdown {
       options: '-c statement_timeout=15000 -c idle_in_transaction_session_timeout=10000',
     });
     this.pool.on('error', () => undefined);
+    this.pool.on('connect', (c) => c.on('error', () => undefined));
     this.db = drizzle(this.pool, { schema: reg });
   }
 
