@@ -94,7 +94,8 @@ function TextRow({ lang, surface, row, canWrite, onSaved, onError }: { lang: str
   const save = useMutation({ mutationFn: () => app.api.languages.put(lang, surface, { key: row.key, text, reviewed }), onSuccess: onSaved, onError: (e) => onError((e as Error).message) });
   const changed = text !== row.text || reviewed !== row.reviewed;
   return (
-    <div style={{ borderTop: '1px solid var(--line)', padding: '14px 0', display: 'grid', gap: 8 }}>
+    // Up to 500 of these: the ones off screen are not laid out or painted until they scroll in, so the page scrolls smoothly.
+    <div style={{ borderTop: '1px solid var(--line)', padding: '14px 0', display: 'grid', gap: 8, contentVisibility: 'auto', containIntrinsicSize: 'auto 190px' }}>
       <div className="help" style={{ margin: 0 }}><b>{row.english}</b> · {row.source === 'machine' ? t('console.languages_page.machine_draft') : row.source === 'file' ? 'shipped' : row.source === 'person' ? t('console.languages_page.by', { p0: row.updatedBy ?? 'a person' }) : 'missing'}</div>
       <AreaField label={languageLabel(lang)} value={text} onChange={setText} rows={2} disabled={!canWrite} />
       {canWrite && (

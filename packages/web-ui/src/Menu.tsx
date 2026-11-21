@@ -75,7 +75,7 @@ function PopBox({ anchor, onClose, returnTo, side = 'auto', role = 'dialog', lab
     const away = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node) && !anchor.current?.contains(e.target as Node)) close.current(); };
     document.addEventListener('pointerdown', away, true);
     window.addEventListener('resize', place);
-    window.addEventListener('scroll', place, true);
+    window.addEventListener('scroll', place, { capture: true, passive: true });
     return () => {
       document.removeEventListener('pointerdown', away, true);
       window.removeEventListener('resize', place);

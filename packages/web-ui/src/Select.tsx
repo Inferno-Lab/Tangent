@@ -88,7 +88,7 @@ export function Select({ value, onChange, options, id, disabled, invalid, compac
     };
     const move = (e: Event) => { if (!pop.current?.contains(e.target as Node)) place(); };
     document.addEventListener('pointerdown', away, true);
-    window.addEventListener('scroll', move, true);
+    window.addEventListener('scroll', move, { capture: true, passive: true });
     window.addEventListener('resize', place);
     return () => {
       document.removeEventListener('pointerdown', away, true);

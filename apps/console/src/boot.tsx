@@ -2,6 +2,7 @@ import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react
 import { RouterProvider } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { quietFields } from '@tangent/web-ui';
 import './console.css';
 import { makeRouter } from './router';
 
@@ -13,6 +14,7 @@ const queryClient: QueryClient = new QueryClient({
 });
 const router = makeRouter();
 
+quietFields();
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
