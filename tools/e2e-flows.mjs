@@ -525,15 +525,15 @@ await flow('admin: the school sets up its roles, app and messages from its profi
 
 await flow('admin: the dashboard widgets can be hidden and added back', { storage: adminStore }, async (p) => {
   await p.goto(A('/'), { waitUntil: 'networkidle' });
-  // The class rolls widget is the Today board's "In school today" card.
+  // The class rolls widget is the Today board's "In school" card ("In school today" on a school day, the day's name on a closed one).
   await p.getByRole('button', { name: /Choose what (the dashboard|this page) shows/ }).click();
   await p.getByRole('switch', { name: 'Class rolls' }).click();
   await p.getByRole('button', { name: 'Done' }).click();
-  if (await p.getByText('In school today').count()) throw new Error('the hidden widget is still shown');
+  if (await p.getByText(/^In school/).count()) throw new Error('the hidden widget is still shown');
   await p.getByRole('button', { name: /Choose what (the dashboard|this page) shows/ }).click();
   await p.getByRole('switch', { name: 'Class rolls' }).click();
   await p.getByRole('button', { name: 'Done' }).click();
-  await expectVisible(p.getByText('In school today'), 'the widget back');
+  await expectVisible(p.getByText(/^In school/), 'the widget back');
 });
 
 await flow('status: the public status page opens without signing in', {}, async (p) => {
