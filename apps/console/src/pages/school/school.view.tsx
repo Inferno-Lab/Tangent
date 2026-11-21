@@ -2,9 +2,9 @@
 // One school's markup: classes and structure are the design's. Values come from SchoolPage.
 import { Fragment, type CSSProperties } from "react";
 import { DEFAULT_BRAND, hueOf, hueTokens } from '@tangent/contracts';
-import { MenuButton, PageScope, Presence, Select, ToastSlot, Segmented, Icon, EmptyNote } from "@tangent/web-ui";
+import { MenuButton, PageScope, Presence, Select, ToastSlot, Segmented, Icon } from "@tangent/web-ui";
 import "./school.css";
-import { t as tr } from '@tangent/web-ui';
+import { t as tr, EmptyNote } from '@tangent/web-ui';
 
 // The school's own deep colour, worked out from its brand colour, so its page header looks like its admin (the School board).
 const schoolColours = (colour: string) => {
@@ -210,7 +210,7 @@ export function SchoolView({ v }: { v: any }) {
                   </span>
                 </div>
                 <div style={{ marginTop: "8px" } as CSSProperties}>
-                  {v.checks.length === 0 && <div className="help">{tr('console.school.view.the_store_checklist_is_created')}</div>}
+                  {v.checks.length === 0 && <EmptyNote icon="checkCircle" title={tr('console.school.view.no_checklist_yet')} body={tr('console.school.view.the_store_checklist_is_created')} />}
                   {v.checks.map((c: any) => (
                     <div key={c.key} className="ck" style={{ cursor: "default", alignItems: "center", flexWrap: "wrap" } as CSSProperties}>
                       <i className={c.cls}>

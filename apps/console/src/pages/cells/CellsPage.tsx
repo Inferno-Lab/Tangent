@@ -106,7 +106,7 @@ function AddCell({ onClose, onDone }: { onClose: () => void; onDone: (m: string)
         <div className="two"><Field label={tr('console.cells_page.region')} value={f.region} onChange={set('region')} error={err.region} placeholder={tr('console.cells_page.frankfurt')} /><NumberField label={tr('console.cells_page.most_schools')} min={1} value={f.maxSchools} onChange={set('maxSchools')} error={err.maxSchools} /></div>
         <SelectField label={target === 'aws-cell' ? tr('console.cells_page.where_its_schools_databases_are') : tr('console.cells_page.where_its_schools_databases_are_2')} value={f.connectionId} onChange={set('connectionId')} error={err.connectionId}
           options={[{ value: '', label: target === 'aws-cell' ? tr('console.cells_page.choose_a_school_databases_connection') : tr('console.cells_page.the_registry_s_own_server') }, ...dbs.map((c) => ({ value: c.id, label: c.name }))]} />
-        {!dbs.length && <div className="help">{tr('console.cells_page.add_a_postgresql_server_or')}</div>}
+        {!dbs.length && <EmptyNote icon="cells" title={tr('console.cells_page.no_database_servers_yet')} body={tr('console.cells_page.add_a_postgresql_server_or')} />}
         {err._ && <div className="emsg" role="alert">{err._}</div>}
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
 import { ACTION_LABELS, SETTINGS_META, type ActionRow } from '@tangent/contracts';
-import { AreaField, Dialog, Select, useShake, EmptyState, t } from '@tangent/web-ui';
+import { AreaField, Dialog, Select, useShake, EmptyState, t, EmptyNote } from '@tangent/web-ui';
 import { Card, Page, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
 import { ago, when } from '../../app/format';
@@ -70,7 +70,7 @@ export function ApprovalsPage() {
           })}
         </Card>
         <Card title={t('console.approvals_page.decided')} span="s12" chip={<Select compact aria-label={t('console.approvals_page.show')} value={show} onChange={(v) => setShow(v as typeof show)} options={[{ value: 'all', label: t('console.approvals_page.everything') }, { value: 'done', label: t('console.approvals_page.done') }, { value: 'failed', label: t('console.approvals_page.failed') }, { value: 'rejected', label: t('console.approvals_page.rejected') }, { value: 'running', label: t('console.approvals_page.running') }]} />}>
-          {past.length === 0 && <div className="help">{t('console.approvals_page.finished_requests_show_up_here')}</div>}
+          {past.length === 0 && <EmptyNote icon="approvals" title={t('console.approvals_page.nothing_decided_yet')} body={t('console.approvals_page.finished_requests_show_up_here')} />}
           {past.map((r) => (
             <div key={r.id} className="kv" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
               <span style={{ flex: '1 1 260px', minWidth: 0 }}>

@@ -66,6 +66,9 @@ describe('the design system', { timeout: 30_000 }, () => {
     const none = new Set(Object.keys(english).filter((k) => /^(No |Nothing|Nobody)/.test(english[k]!)));
     const bare = /<(p|div)\b[^>]*className="(help|t2|admn)"[^>]*>\{t?r?\('([\w.]+)'\)\}<\/\1>/g;
     expect(hits(tsx, /<(p|div)\b/, (line) => /\.length|[?:]\s*<|&&\s*</.test(line) && [...line.matchAll(bare)].some((m) => none.has(m[3]!))), 'use EmptyState, EmptyNote or EmptyCard').toEqual([]);
+    // Whatever its words, a line of help text shown because a list is empty is an empty state drawn by hand.
+    const emptyBranch = /(\.length (===|==) 0|!!?[\w.?]+\.length)\s*(&&|\?)\s*<(p|div|span|small)\b[^>]*className="(help|t2|admn)"/;
+    expect(hits(tsx, /\.length/, (line) => emptyBranch.test(line) && !/!!/.test(line.match(emptyBranch)![0])), 'an empty list gets EmptyState, EmptyNote or EmptyCard').toEqual([]);
   });
 
   it('builds overlays from the shared parts', () => {

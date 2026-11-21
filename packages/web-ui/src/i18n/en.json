@@ -213,7 +213,8 @@
  "ui.settings.new_step": "New step",
  "ui.settings.no_fields_yet": "No fields of the school’s own yet. Add one and it appears on these records’ forms, in the import and on the record.",
  "ui.settings.no_grade_starts_at_0": "No grade starts at 0%, so marks below",
- "ui.settings.no_houses_profiles_and_the": "No houses: profiles and the roll-call grid show none.",
+ "ui.settings.no_houses_profiles_and_the": "Add a house and students can be placed in it; their profiles and the roll call then show it.",
+ "ui.settings.no_houses_yet": "No houses yet",
  "ui.settings.no_other_schemes": "Every mark uses the scale above. Add a scheme where some year groups or subjects are graded differently.",
  "ui.settings.none_ticked_every_fee": "None ticked: every fee.",
  "ui.settings.not_saved_yet": "{name}: not saved yet",
@@ -377,5 +378,6 @@
  "vocab.teacher.many": "teachers",
  "vocab.teacher.one": "teacher",
  "vocab.term.many": "terms",
- "vocab.term.one": "term"
+ "vocab.term.one": "term",
+ "ui.settings.no_kinds_of_exam_yet": "No kinds of exam yet"
 }

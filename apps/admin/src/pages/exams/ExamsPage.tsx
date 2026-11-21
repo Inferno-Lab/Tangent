@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { addDays, listLabel, listOptions, schoolToday, type ExamRow, type ListItem } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, Field, NumberField, Segmented, Select, SelectField, TimeField, currentLanguage, useShake, EmptyState, t } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, Field, NumberField, Segmented, Select, SelectField, TimeField, currentLanguage, useShake, useMore, EmptyState, t, EmptyNote } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { AddBtn, Avatar, dateLabel, problem, useOpenParam, useSetting } from '../../app/kit';
@@ -38,17 +38,24 @@ export function ExamsPage() { const { tabs } = usePageTabs('/exams');
         <div><EmptyState scene="exams" onAction={canWrite ? () => setCreating(true) : undefined} /></div>
       ) : (
         <div className="exb">
-          {groups.map((g) => (
-            <section className="exbs rise" key={g.s}>
-              <div className="ch"><h2>{LABEL[g.s]}</h2><span className={`chip ${g.s === 'published' ? 'g' : g.s === 'marking' ? 'a' : ''}`}>{g.items.length}</span></div>
-              <div className="exg">
-                {g.items.map((e) => <ExamCard key={e.id} e={e} onOpen={() => setOpen(e.id)} />)}
-              </div>
-            </section>
-          ))}
+          {groups.map((g) => <ExamGroup key={g.s} s={g.s} items={g.items} onOpen={setOpen} />)}
         </div>
       )}
     </Page>
+  );
+}
+
+// A group shows a dozen exams at a time, so a full term's results do not run the page on for screens.
+function ExamGroup({ s, items, onOpen }: { s: 'marking' | 'upcoming' | 'published'; items: ExamRow[]; onOpen: (id: string) => void }) {
+  const [shown, more] = useMore(items, 12);
+  return (
+    <section className="exbs rise">
+      <div className="ch"><h2>{LABEL[s]}</h2><span className={`chip ${s === 'published' ? 'g' : s === 'marking' ? 'a' : ''}`}>{items.length}</span></div>
+      <div className="exg">
+        {shown.map((e) => <ExamCard key={e.id} e={e} onOpen={() => onOpen(e.id)} />)}
+      </div>
+      {more}
+    </section>
   );
 }
 
@@ -277,7 +284,7 @@ function ExamSheet({ id, onClose, onChange, onChanged, onRemoved }: { id: string
               ))}
             </div>
           ) : (
-            !results.data ? <div className="skc" style={{ height: 240, borderRadius: 16 }} /> : results.data.rows.length === 0 ? <div className="help" style={{ padding: 16 }}>{t('admin.exams_page.results_appear_here_as_marks')}</div> : (
+            !results.data ? <div className="skc" style={{ height: 240, borderRadius: 16 }} /> : results.data.rows.length === 0 ? <div style={{ padding: 16 }}><EmptyNote icon="exams" title={t('admin.exams_page.no_results_yet')} body={t('admin.exams_page.results_appear_here_as_marks')} /></div> : (
               <>
                 <div className="tgrow" style={{ marginBottom: 10 }}><span className="chip v">{t('admin.exams_page.average')}{' '}{results.data.average}%</span><span className="chip g">{results.data.passPct}{t('admin.exams_page.passed')}</span><span className="chip">{results.data.rows.length} {t('admin.exams_page.students')}</span></div>
                 <div className="lscroll" style={{ maxHeight: 'min(46dvh,400px)', border: '1px solid var(--line)', borderRadius: 16 }}>

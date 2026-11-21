@@ -53,7 +53,7 @@ export function ReviewDialog({ list, onClose, onDone }: { list: Push[]; onClose:
             <div className="tgrow" style={{ marginTop: 6 }}>
               {r.added.map((k) => <span key={k} className="chip g">+ {catalogueName(k)}</span>)}
               {r.removed.map((k) => <span key={k} className="chip c">− {catalogueName(k)}</span>)}
-              {!r.added.length && !r.removed.length && <span className="help" style={{ margin: 0 }}>{t('console.modules_page.limits_dates_or_plan_only')}</span>}
+              {!r.added.length && !r.removed.length && <span className="chip">{t('console.modules_page.limits_dates_or_plan_only')}</span>}
             </div>
           </div>
         ))}
@@ -178,7 +178,7 @@ function Schools({ say }: { say: Say }) { const app = useApp();
                 {can && <Checkbox aria-label={t('console.modules_page.choose_every_school_shown')} checked={every} onChange={() => setPicked(every ? new Set() : new Set(rows.map((r) => r.id)))} />}
               </span>
               <span role="columnheader" className="help" style={{ margin: 0, padding: '16px 8px', fontWeight: 700, display: 'flex', alignItems: 'center' }}>{t('console.modules_page.school')}{' '}{rows.length}</span>
-              {cols.length === 0 && <span role="columnheader" className="help" style={{ margin: 0, padding: 16 }}>{t('console.modules_page.no_features_to_choose')}</span>}
+              {cols.length === 0 && <span role="columnheader" style={{ padding: 16 }}><EmptyNote icon="modules" title={t('console.modules_page.no_features_to_choose')} /></span>}
               {cols.map((c) => (
                 <span key={c.key} role="columnheader" style={{ padding: '10px 4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {c.feature ? <span className="vc" style={{ alignItems: 'center', gap: 4 }}>

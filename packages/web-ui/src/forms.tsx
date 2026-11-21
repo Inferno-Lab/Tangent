@@ -80,12 +80,16 @@ interface SelectProps {
   options: { value: string; label: string }[];
   error?: string;
   disabled?: boolean;
+  /** As wide as its longest choice, so no choice is cut and rows of the same choices line up (in any language). */
+  fit?: boolean;
 }
 
-export function SelectField({ label, value, onChange, options, error, disabled }: SelectProps) {
+export function SelectField({ label, value, onChange, options, error, disabled, fit }: SelectProps) {
   const id = useId();
+  // ch is a little wider than an average letter, so the longest label always fits beside the chevron.
+  const longest = fit ? Math.max(0, ...options.map((o) => o.label.length)) : 0;
   return (
-    <div className="fld">
+    <div className="fld" style={fit ? { minWidth: `calc(${longest}ch + 64px)`, maxWidth: '100%' } : undefined}>
       <label htmlFor={id}>{label}</label>
       <Select id={id} value={value} onChange={onChange} options={options} invalid={!!error} disabled={disabled} className={error ? 'shake' : ''} />
       {error && <ErrorLine>{error}</ErrorLine>}

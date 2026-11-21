@@ -290,7 +290,7 @@ function ValueMap({ columns, values, unmatched, onChange }: { columns: ImportCol
       <div className="lbl" style={{ margin: '12px 0 6px' }}>{tr('console.data_tab.values_replaced')}</div>
       <div className="tgrow">
         {kept.map((x) => <button key={`${x.k}|${x.f}`} type="button" className="chip v" data-tip={tr('console.data_tab.remove')} onClick={() => put(x.k, x.f, '')}>{label(x.k)}: {x.f} → {x.v} ×</button>)}
-        {!kept.length && <span className="help" style={{ margin: 0 }}>{tr('console.data_tab.none_yet_values_are_read')}</span>}
+        {!kept.length && <EmptyNote icon="file" title={tr('console.data_tab.no_kept_readings_yet')} body={tr('console.data_tab.none_yet_values_are_read')} />}
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 8 }}>
         <div style={{ width: 180 }}><Select compact aria-label={tr('console.data_tab.column')} value={col} onChange={setCol} options={columns.map((c) => ({ value: c.key, label: c.label }))} /></div>

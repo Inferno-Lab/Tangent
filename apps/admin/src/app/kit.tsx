@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Field, FilePick, tintFor, Icon, type IconName, t as tr } from '@tangent/web-ui';
+import { Field, FilePick, tintFor, Icon, type IconName, t as tr, EmptyNote } from '@tangent/web-ui';
 import { useApp } from './context';
 import { HttpError } from '@tangent/api-client';
 import { fmtDate, gradeChoices } from '@tangent/contracts';
@@ -52,7 +52,7 @@ export function StudentPick({ label, value, onChange, error }: { label: string; 
       {q.trim().length >= 2 && (
         <div className="tgrow" style={{ marginTop: 8 }}>
           {(found.data?.items ?? []).map((s) => <button key={s.id} type="button" className="chip" onClick={() => { onChange({ id: s.id, name: s.name, className: s.className }); setQ(''); }}>{s.name} · {s.className}</button>)}
-          {found.data && !found.data.items.length && <span className="help">{tr('admin.kit.no_student_matches')}</span>}
+          {found.data && !found.data.items.length && <EmptyNote icon="search" title={tr('admin.kit.no_student_found')} body={tr('admin.kit.no_student_matches')} />}
         </div>
       )}
     </div>

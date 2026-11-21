@@ -114,7 +114,7 @@ function TagDialog({ photo, onClose, onDone }: { photo: PhotoRow; onClose: () =>
   return (
     <Dialog title={t('admin.gallery_page.who_is_in_this_photo')} onClose={onClose} width={480}>
       <div className="stack">
-        <div className="tgrow">{kids.length ? kids.map((k) => <button key={k.id} type="button" className="chip v" onClick={() => setKids((l) => l.filter((x) => x.id !== k.id))} data-tip={t('admin.gallery_page.remove')}>{k.name} ×</button>) : <span className="help">{t('admin.gallery_page.nobody_tagged_yet')}</span>}</div>
+        <div className="tgrow">{kids.length ? kids.map((k) => <button key={k.id} type="button" className="chip v" onClick={() => setKids((l) => l.filter((x) => x.id !== k.id))} data-tip={t('admin.gallery_page.remove')}>{k.name} ×</button>) : <EmptyNote icon="people" title={t('admin.gallery_page.nobody_tagged_yet')} />}</div>
         <StudentPick label={t('admin.gallery_page.add_a_child')} value={null} onChange={(s) => s && setKids((l) => (l.some((x) => x.id === s.id) ? l : [...l, { id: s.id, name: s.name }]))} />
         {save.isError && <div className="emsg" role="alert">{(save.error as Error).message}</div>}
       </div>

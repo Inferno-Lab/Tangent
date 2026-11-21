@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { I18N_SURFACES, I18N_SURFACE_LABELS, languageLabel, type I18nSurface, type TranslationRow } from '@tangent/contracts';
-import { AreaField, Checkbox, FilePick, Field, Segmented, Select, EmptyNote } from '@tangent/web-ui';
+import { AreaField, Checkbox, FilePick, Field, Segmented, Select, EmptyNote, useMore } from '@tangent/web-ui';
 import { Card, Page, Tiles, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
 import { t } from '@tangent/web-ui';
@@ -25,6 +25,8 @@ export function LanguagesPage() {
   const canWrite = app.can('languages.write');
   const summary = useQuery({ queryKey: ['languages'], queryFn: app.api.languages.summary });
   const rows = useQuery({ queryKey: ['languages', lang, surface, filter, q], queryFn: () => app.api.languages.rows(lang, surface, filter, q) });
+  // Twenty-five texts at a time: a part can hold five hundred, and every one is an editor.
+  const [shown, more] = useMore(rows.data ?? [], 25);
   const refresh = () => void qc.invalidateQueries({ queryKey: ['languages'] });
   const draft = useMutation({
     mutationFn: () => app.api.languages.draft(lang, { surface, limit: 200 }),
@@ -79,8 +81,9 @@ export function LanguagesPage() {
         </div>
         {rows.data && !rows.data.length
           ? <EmptyNote icon="check" title={t('console.languages_page.nothing_here')} body={filter === 'missing' ? t('console.languages_page.every_text_of_this_part') : t('console.languages_page.no_text_matches')} />
-          : (rows.data ?? []).map((r) => <TextRow key={r.key} lang={lang} surface={surface} row={r} canWrite={canWrite} onSaved={refresh} onError={(m) => say(m, 'bad')} />)}
-        {(rows.data?.length ?? 0) >= 500 && <div className="help">{t('console.languages_page.the_first_500_are_shown')}</div>}
+          : shown.map((r) => <TextRow key={r.key} lang={lang} surface={surface} row={r} canWrite={canWrite} onSaved={refresh} onError={(m) => say(m, 'bad')} />)}
+        {more}
+        {!more && (rows.data?.length ?? 0) >= 500 && <div className="help">{t('console.languages_page.the_first_500_are_shown')}</div>}
       </Card>
     </Page>
   );

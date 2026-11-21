@@ -937,7 +937,7 @@
  "console.join_page.this_link_is_incomplete_open": "This link is incomplete. Open the whole link from your invitation email, or ask for a new one.",
  "console.join_page.use_at_least_10_characters": "Use at least 10 characters.",
  "console.join_page.your_password_is_set": "Your password is set",
- "console.languages_page.a_word_in_english_or": "A word in English or the translation",
+ "console.languages_page.a_word_in_english_or": "A word in any language",
  "console.languages_page.all": "All",
  "console.languages_page.approved": "{approved} approved",
  "console.languages_page.approved_2": "Approved",
@@ -1802,5 +1802,10 @@
  "console.wizard_page.works_with_no_domain_s": "Works with no domain: …/s/name",
  "console.wizard_page.would_run": "Would run",
  "console.wizard_page.would_stop_here": "Would stop here",
- "console.wizard_page.your_school": "Your school"
+ "console.wizard_page.your_school": "Your school",
+ "console.approvals_page.nothing_decided_yet": "Nothing decided yet",
+ "console.cells_page.no_database_servers_yet": "No database servers yet",
+ "console.config_tab.no_changes_yet": "No changes yet",
+ "console.data_tab.no_kept_readings_yet": "Nothing kept yet",
+ "console.school.view.no_checklist_yet": "No checklist yet"
 }

@@ -6,6 +6,7 @@ import { ColourField } from './ColourPicker';
 import { ErrorLine, Field, SelectField } from './forms';
 import { Select } from './Select';
 import { Icon } from './Icon';
+import { EmptyNote } from './EmptyCard';
 import { currentLanguage, t as tr } from './i18n';
 
 /** What a setting's editor picks from: the school's classes and fee heads, and what it has, so the app's choices fit its modules. */
@@ -149,7 +150,7 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {kinds.map((k) => <div key={k.key} style={{ width: 170 }}><NumberField label={listLabel(kinds, k.key, currentLanguage())} min={0} max={meta.max ?? 100} value={w[k.key] === undefined ? '' : String(w[k.key])} disabled={disabled}
             onChange={(v) => { const next = { ...w }; if (v === '') delete next[k.key]; else next[k.key] = Math.min(meta.max ?? 100, Math.max(0, Number(v) || 0)); onChange(next); }} /></div>)}
-          {!kinds.length && <div className="help" style={{ margin: 0 }}>{tr('ui.settings.add_kinds_of_exam_first')}</div>}
+          {!kinds.length && <EmptyNote icon="exams" title={tr('ui.settings.no_kinds_of_exam_yet')} body={tr('ui.settings.add_kinds_of_exam_first')} />}
         </div>,
       );
     }
@@ -161,9 +162,9 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
         <div>
           <Checkbox checked={!!r} disabled={disabled} label={tr('ui.settings.use_a_late_fee_rule')} onChange={(on) => onChange(on ? { kind: 'percent', amount: 2, every: 'month', graceDays: 0, cap: 0, heads: [] } : null)} />
           {r && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 8 }}>
-            <div style={{ width: 200 }}><SelectField label={tr('ui.settings.late_fee_is')} value={r.kind} disabled={disabled} onChange={(k) => put({ kind: k as LateRule['kind'] })} options={[{ value: 'percent', label: tr('ui.settings.a_percent_of_what_is_owed') }, { value: 'fixed', label: tr('ui.settings.a_fixed_amount') }]} /></div>
+            <div style={{ minWidth: 200, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.late_fee_is')} value={r.kind} disabled={disabled} onChange={(k) => put({ kind: k as LateRule['kind'] })} options={[{ value: 'percent', label: tr('ui.settings.a_percent_of_what_is_owed') }, { value: 'fixed', label: tr('ui.settings.a_fixed_amount') }]} /></div>
             <div style={{ width: 130 }}><NumberField label={r.kind === 'percent' ? tr('ui.settings.percent') : tr('ui.settings.amount')} min={0} max={r.kind === 'percent' ? 25 : 1000000} decimals value={String(r.amount)} disabled={disabled} onChange={(v) => put({ amount: Number(v) || 0 })} /></div>
-            <div style={{ width: 180 }}><SelectField label={tr('ui.settings.charged')} value={r.every} disabled={disabled} onChange={(e) => put({ every: e as LateRule['every'] })} options={[{ value: 'once', label: tr('ui.settings.once') }, { value: 'day', label: tr('ui.settings.every_day') }, { value: 'week', label: tr('ui.settings.every_week_late') }, { value: 'month', label: tr('ui.settings.every_month') }]} /></div>
+            <div style={{ minWidth: 180, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.charged')} value={r.every} disabled={disabled} onChange={(e) => put({ every: e as LateRule['every'] })} options={[{ value: 'once', label: tr('ui.settings.once') }, { value: 'day', label: tr('ui.settings.every_day') }, { value: 'week', label: tr('ui.settings.every_week_late') }, { value: 'month', label: tr('ui.settings.every_month') }]} /></div>
             <div style={{ width: 130 }}><NumberField label={tr('ui.settings.grace_days')} min={0} max={90} value={String(r.graceDays)} disabled={disabled} onChange={(v) => put({ graceDays: Number(v) || 0 })} /></div>
             <div style={{ width: 150 }}><NumberField label={tr('ui.settings.cap_0_none')} min={0} decimals value={String(r.cap)} disabled={disabled} onChange={(v) => put({ cap: Number(v) || 0 })} /></div>
           </div>}
@@ -224,7 +225,7 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
             return (
               <div key={m.key} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
                 <div style={{ width: 180 }}><Field label={tr('ui.settings.name')} value={m.name} disabled={disabled} maxLength={40} onChange={(v) => put(i, { name: v })} /></div>
-                <div style={{ width: 150 }}><SelectField label={tr('ui.settings.who')} value={m.staff ? 'staff' : 'students'} disabled={disabled} onChange={(v) => put(i, { staff: v === 'staff', grades: [] })}
+                <div style={{ minWidth: 150, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.who')} value={m.staff ? 'staff' : 'students'} disabled={disabled} onChange={(v) => put(i, { staff: v === 'staff', grades: [] })}
                   options={[{ value: 'students', label: tr('ui.settings.students') }, { value: 'staff', label: tr('ui.settings.staff') }]} /></div>
                 {!m.staff && <>
                   <div style={{ width: 110 }}><NumberField label={tr('ui.settings.from_year')} min={-3} max={20} value={from === null ? '' : String(from)} disabled={disabled} onChange={(v) => setRange(i, v === '' ? null : Number(v), to)} /></div>
@@ -269,7 +270,7 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
             <div key={x.key} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
               <div style={{ width: 180 }}><Field label={tr('ui.settings.name')} value={x.name} disabled={disabled} maxLength={40} onChange={(v) => put(i, { name: v })} /></div>
               <div style={{ width: 110 }}><NumberField label={tr('ui.settings.days_a_year')} min={0} max={366} value={String(x.days)} disabled={disabled} onChange={(v) => put(i, { days: Math.max(0, Number(v) || 0) })} /></div>
-              <div style={{ width: 210 }}><SelectField label={tr('ui.settings.given')} value={x.accrual} disabled={disabled} onChange={(v) => put(i, { accrual: v as LeaveType['accrual'] })}
+              <div style={{ minWidth: 210, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.given')} value={x.accrual} disabled={disabled} onChange={(v) => put(i, { accrual: v as LeaveType['accrual'] })}
                 options={[{ value: 'year', label: tr('ui.settings.all_at_the_start') }, { value: 'month', label: tr('ui.settings.a_twelfth_each_month') }]} /></div>
               <div style={{ width: 120 }}><NumberField label={tr('ui.settings.carries_over')} min={0} max={366} value={String(x.carry)} disabled={disabled} onChange={(v) => put(i, { carry: Math.max(0, Number(v) || 0) })} /></div>
               <Checkbox checked={x.halfDays} disabled={disabled} label={tr('ui.settings.half_days')} onChange={(on) => put(i, { halfDays: on })} />
@@ -320,7 +321,7 @@ export function SettingRow({ meta, value, error, disabled, ctx, logo, onLogo, on
       const c = TimetableCycle.safeParse(value).data ?? { kind: 'week' as const, length: 6 };
       return box(
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <div style={{ width: 260 }}><SelectField label={tr('ui.settings.repeats')} value={c.kind} disabled={disabled} onChange={(k) => onChange({ ...c, kind: k })}
+          <div style={{ minWidth: 260, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.repeats')} value={c.kind} disabled={disabled} onChange={(k) => onChange({ ...c, kind: k })}
             options={[{ value: 'week', label: tr('ui.settings.every_week') }, { value: 'ab', label: tr('ui.settings.a_and_b_weeks') }, { value: 'days', label: tr('ui.settings.a_cycle_of_days') }]} /></div>
           {c.kind === 'days' && <div style={{ width: 150 }}><NumberField label={tr('ui.settings.days_in_the_cycle')} min={2} max={10} value={String(c.length)} disabled={disabled} onChange={(v) => onChange({ ...c, length: Math.min(10, Math.max(2, Number(v) || 2)) })} /></div>}
           {c.kind !== 'week' && <div style={{ width: 220 }}><DateField label={c.kind === 'ab' ? tr('ui.settings.a_day_in_week_a') : tr('ui.settings.day_1_is')} value={c.startsOn ?? ''} disabled={disabled} onChange={(d) => onChange({ ...c, startsOn: d || undefined })} /></div>}
@@ -477,7 +478,7 @@ function HousesEditor({ value, max, disabled, onChange }: { value: { key: string
   const put = (i: number, patch: Partial<{ name: string; color: string }>) => onChange(value.map((h, j) => (j === i ? { ...h, ...patch, ...(patch.name !== undefined ? { key: keyOf(patch.name) } : {}) } : h)));
   return (
     <div>
-      {!value.length && <div className="help" style={{ margin: 0 }}>{tr('ui.settings.no_houses_profiles_and_the')}</div>}
+      {!value.length && <EmptyNote icon="people" title={tr('ui.settings.no_houses_yet')} body={tr('ui.settings.no_houses_profiles_and_the')} />}
       {value.map((h, i) => (
         <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 6, flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 160 }}><Field label={tr('ui.settings.house')} value={h.name} maxLength={24} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
@@ -498,7 +499,7 @@ function CategoriesEditor({ value, max, disabled, onChange }: { value: Category[
       {value.map((c, i) => (
         <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 6, flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 160 }}><Field label={tr('ui.settings.category')} value={c.name} maxLength={24} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
-          <div style={{ width: 160 }}><SelectField label={tr('ui.settings.colour')} value={c.tone} disabled={disabled} onChange={(t) => put(i, { tone: t as Category['tone'] })} options={CATEGORY_TONES.map((t) => ({ value: t, label: CATEGORY_TONE_LABELS[t] }))} /></div>
+          <div style={{ minWidth: 160, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.colour')} value={c.tone} disabled={disabled} onChange={(t) => put(i, { tone: t as Category['tone'] })} options={CATEGORY_TONES.map((t) => ({ value: t, label: CATEGORY_TONE_LABELS[t] }))} /></div>
           {/* A fixed slot for the preview, so a longer name never pushes the row's fields out of line with the others. */}
           <span style={{ width: 140, flex: 'none', marginBottom: 10, minWidth: 0 }}><span className={`chip ${c.tone}`} style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name || tr('ui.settings.category')}</span></span>
           <button type="button" className="btn sm" disabled={disabled || value.length <= 1} onClick={() => onChange(value.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
@@ -605,12 +606,12 @@ export function FieldListEditor({ list, setList, languages, disabled, inApp = tr
   };
   return (
     <div>
-      {!list.length && <div className="help">{tr('ui.settings.no_fields_yet')}</div>}
+      {!list.length && <EmptyNote icon="edit" title={tr('ui.settings.no_fields_yet')} />}
       {list.map((f, i) => (
         <div key={f.key} className="card" style={{ padding: 12, marginTop: 8 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 160 }}><Field label={tr('ui.settings.field_name')} value={f.label} maxLength={40} disabled={disabled} onChange={(v) => put(i, { label: v })} /></div>
-            <div style={{ width: 180 }}><SelectField label={tr('ui.settings.field_kind')} value={f.kind} disabled={disabled} onChange={(k) => put(i, { kind: k as FieldKind, options: k === 'choice' || k === 'multi' ? f.options ?? [{ key: 'one', name: tr('ui.settings.first_choice') }] : undefined })} options={FIELD_KINDS.map((k) => ({ value: k, label: KIND_LABEL[k] }))} /></div>
+            <div style={{ minWidth: 180, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.field_kind')} value={f.kind} disabled={disabled} onChange={(k) => put(i, { kind: k as FieldKind, options: k === 'choice' || k === 'multi' ? f.options ?? [{ key: 'one', name: tr('ui.settings.first_choice') }] : undefined })} options={FIELD_KINDS.map((k) => ({ value: k, label: KIND_LABEL[k] }))} /></div>
             <button type="button" className="btn sm" disabled={disabled} onClick={() => setList(list.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
           </div>
           <div className="tgrow" style={{ marginTop: 8 }}>
@@ -656,14 +657,14 @@ function WorkflowsEditor({ value, languages, roles, staff, disabled, onChange }:
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <span className="chip" style={{ marginBottom: 10 }}>{i + 1}</span>
             <div style={{ flex: 1, minWidth: 160 }}><Field label={tr('ui.settings.step')} value={s.name} maxLength={40} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
-            <div style={{ width: 230 }}><SelectField label={tr('ui.settings.who_takes_it')} value={s.who} disabled={disabled} onChange={(w) => put(i, { who: w as StepDef['who'], ref: undefined })} options={STEP_ACTORS.map((a) => ({ value: a, label: STEP_ACTOR_LABELS[a] }))} /></div>
-            {s.who === 'role' && <div style={{ width: 200 }}><SelectField label={tr('ui.settings.role')} value={s.ref ?? ''} disabled={disabled} onChange={(r) => put(i, { ref: r })} options={[{ value: '', label: tr('ui.settings.choose') }, ...roles.map((r) => ({ value: r.key, label: r.name }))]} /></div>}
-            {s.who === 'person' && <div style={{ width: 200 }}><SelectField label={tr('ui.settings.person')} value={s.ref ?? ''} disabled={disabled} onChange={(r) => put(i, { ref: r })} options={[{ value: '', label: tr('ui.settings.choose') }, ...staff.map((p) => ({ value: p.id, label: p.name }))]} /></div>}
+            <div style={{ minWidth: 230, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.who_takes_it')} value={s.who} disabled={disabled} onChange={(w) => put(i, { who: w as StepDef['who'], ref: undefined })} options={STEP_ACTORS.map((a) => ({ value: a, label: STEP_ACTOR_LABELS[a] }))} /></div>
+            {s.who === 'role' && <div style={{ minWidth: 200, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.role')} value={s.ref ?? ''} disabled={disabled} onChange={(r) => put(i, { ref: r })} options={[{ value: '', label: tr('ui.settings.choose') }, ...roles.map((r) => ({ value: r.key, label: r.name }))]} /></div>}
+            {s.who === 'person' && <div style={{ minWidth: 200, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.person')} value={s.ref ?? ''} disabled={disabled} onChange={(r) => put(i, { ref: r })} options={[{ value: '', label: tr('ui.settings.choose') }, ...staff.map((p) => ({ value: p.id, label: p.name }))]} /></div>}
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 6 }}>
             {(kind === 'fee_waiver' || kind === 'receipt_cancel') && <div style={{ width: 200 }}><NumberField label={tr('ui.settings.only_above_amount')} min={0} value={s.above === undefined ? '' : String(s.above)} disabled={disabled} onChange={(v) => put(i, { above: v === '' ? undefined : Math.round(Number(v)) })} /></div>}
             <div style={{ width: 160 }}><NumberField label={tr('ui.settings.days_to_answer')} min={1} max={60} value={s.days === undefined ? '' : String(s.days)} disabled={disabled} onChange={(v) => put(i, { days: v === '' ? undefined : Number(v), then: v === '' ? undefined : s.then ?? 'remind' })} /></div>
-            {s.days !== undefined && <div style={{ width: 260 }}><SelectField label={tr('ui.settings.then')} value={s.then ?? 'remind'} disabled={disabled} onChange={(v) => put(i, { then: v as StepDef['then'] })} options={STEP_TIMEOUTS.map((x) => ({ value: x, label: STEP_TIMEOUT_LABELS[x] }))} /></div>}
+            {s.days !== undefined && <div style={{ minWidth: 260, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.then')} value={s.then ?? 'remind'} disabled={disabled} onChange={(v) => put(i, { then: v as StepDef['then'] })} options={STEP_TIMEOUTS.map((x) => ({ value: x, label: STEP_TIMEOUT_LABELS[x] }))} /></div>}
             <button type="button" className="btn sm" aria-label={tr('ui.settings.move_up')} disabled={disabled || i === 0} onClick={() => move(i, -1)}><Icon name="caretUp" /></button>
             <button type="button" className="btn sm" aria-label={tr('ui.settings.move_down')} disabled={disabled || i === steps.length - 1} onClick={() => move(i, 1)}><Icon name="caretDown" /></button>
             <button type="button" className="btn sm" disabled={disabled || steps.length <= 1} onClick={() => setSteps(steps.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
@@ -689,12 +690,12 @@ function GradingSchemesEditor({ value, subjects, disabled, onChange }: { value: 
   const years = (s: GradingScheme) => (s.grades ?? []).join(', ');
   return (
     <div>
-      {!value.length && <div className="help" style={{ margin: 0 }}>{tr('ui.settings.no_other_schemes')}</div>}
+      {!value.length && <EmptyNote icon="layers" title={tr('ui.settings.no_other_schemes')} />}
       {value.map((s, i) => (
         <div key={s.key} className="card" style={{ padding: 12, marginTop: 8 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 160 }}><Field label={tr('ui.settings.scheme')} value={s.name} maxLength={40} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
-            <div style={{ width: 220 }}><SelectField label={tr('ui.settings.grades_by')} value={s.kind} disabled={disabled} onChange={(k) => put(i, { kind: k as GradingScheme['kind'], ...(k === 'rubric' && !s.criteria?.length ? { criteria: ['a', 'b', 'c', 'd'].map((x) => ({ key: x, name: tr('ui.settings.criterion_n', { n: x.toUpperCase() }), max: 8 })) } : {}) })} options={SCHEME_KINDS.map((k) => ({ value: k, label: SCHEME_KIND_LABELS[k] }))} /></div>
+            <div style={{ minWidth: 220, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.grades_by')} value={s.kind} disabled={disabled} onChange={(k) => put(i, { kind: k as GradingScheme['kind'], ...(k === 'rubric' && !s.criteria?.length ? { criteria: ['a', 'b', 'c', 'd'].map((x) => ({ key: x, name: tr('ui.settings.criterion_n', { n: x.toUpperCase() }), max: 8 })) } : {}) })} options={SCHEME_KINDS.map((k) => ({ value: k, label: SCHEME_KIND_LABELS[k] }))} /></div>
             <div style={{ width: 130 }}><NumberField label={tr('ui.settings.pass_mark')} min={0} max={100} value={String(s.passPct)} disabled={disabled} onChange={(v) => put(i, { passPct: v === '' ? 0 : Number(v) })} /></div>
             <button type="button" className="btn sm" disabled={disabled} onClick={() => onChange(value.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
           </div>
@@ -746,7 +747,7 @@ function ReminderDayAdd({ disabled, onAdd }: { disabled: boolean; onAdd: (d: num
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 8 }}>
       <div style={{ width: 110 }}><NumberField label={tr('ui.settings.days')} min={0} max={120} value={n} disabled={disabled} onChange={setN} /></div>
-      <div style={{ width: 180 }}><SelectField label={tr('ui.settings.when')} value={when} disabled={disabled} onChange={setWhen} options={[{ value: 'before', label: tr('ui.settings.before_the_due_date') }, { value: 'after', label: tr('ui.settings.after_the_due_date') }]} /></div>
+      <div style={{ minWidth: 180, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.when')} value={when} disabled={disabled} onChange={setWhen} options={[{ value: 'before', label: tr('ui.settings.before_the_due_date') }, { value: 'after', label: tr('ui.settings.after_the_due_date') }]} /></div>
       <button type="button" className="btn sm" disabled={disabled} onClick={() => onAdd((when === 'before' ? -1 : 1) * Math.min(when === 'before' ? 60 : 120, Number(n) || 0))}>{tr('ui.settings.add')}</button>
     </div>
   );
@@ -846,11 +847,11 @@ function DocumentTemplatesEditor({ value, languages, preview, disabled, onChange
             <div style={{ width: 320, maxWidth: '100%' }}><SelectField label={tr('ui.settings.block')} value={b.kind} disabled={disabled} onChange={(k) => put(i, { kind: k as Block['kind'] })} options={BLOCK_KINDS.map((k) => ({ value: k, label: BLOCK_KIND_LABELS[k] }))} /></div>
             {['heading', 'text', 'fact', 'signatures'].includes(b.kind) && <>
               <div style={{ width: 110 }}><NumberField label={tr('ui.settings.text_size')} min={7} max={28} value={b.size === undefined ? '' : String(b.size)} disabled={disabled} onChange={(v) => put(i, { size: v === '' ? undefined : Number(v) })} /></div>
-              <div style={{ width: 150 }}><SelectField label={tr('ui.settings.align')} value={b.align ?? 'start'} disabled={disabled} onChange={(a) => put(i, { align: a === 'start' ? undefined : (a as Block['align']) })}
+              <div style={{ minWidth: 150, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.align')} value={b.align ?? 'start'} disabled={disabled} onChange={(a) => put(i, { align: a === 'start' ? undefined : (a as Block['align']) })}
                 options={[{ value: 'start', label: tr('ui.settings.align_start') }, { value: 'center', label: tr('ui.settings.align_center') }, { value: 'end', label: tr('ui.settings.align_end') }]} /></div>
               <div style={{ paddingBottom: 10 }}><Checkbox checked={!!b.bold} disabled={disabled} label={tr('ui.settings.bold')} onChange={(on) => put(i, { bold: on || undefined })} /></div>
             </>}
-            <div style={{ width: 170 }}><SelectField label={tr('ui.settings.only_when')} value={b.when ?? ''} disabled={disabled} onChange={(w) => put(i, { when: w || undefined })}
+            <div style={{ minWidth: 170, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.only_when')} value={b.when ?? ''} disabled={disabled} onChange={(w) => put(i, { when: w || undefined })}
               options={[{ value: '', label: tr('ui.settings.always') }, ...DOC_PLACEHOLDERS[kind].map((p) => ({ value: p, label: `{${p}}` }))]} /></div>
             <button type="button" className="btn sm" aria-label={tr('ui.settings.move_up')} disabled={disabled || i === 0} onClick={() => move(i, -1)}><Icon name="caretUp" /></button>
             <button type="button" className="btn sm" aria-label={tr('ui.settings.move_down')} disabled={disabled || i === blocks.length - 1} onClick={() => move(i, 1)}><Icon name="caretDown" /></button>
@@ -877,7 +878,7 @@ function PaymentMethodsEditor({ value, max, disabled, onChange }: { value: Payme
       {value.map((m, i) => (
         <div key={m.key} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 6, flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 160 }}><Field label={tr('ui.settings.method')} value={m.name} maxLength={30} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
-          <div style={{ width: 180 }}><SelectField label={tr('ui.settings.kind_of_money')} value={m.kind} disabled={disabled} onChange={(k) => put(i, { kind: k as PaymentMethod['kind'] })} options={PAYMENT_KINDS.map((k) => ({ value: k, label: PAYMENT_KIND_LABELS[k] }))} /></div>
+          <div style={{ minWidth: 180, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.kind_of_money')} value={m.kind} disabled={disabled} onChange={(k) => put(i, { kind: k as PaymentMethod['kind'] })} options={PAYMENT_KINDS.map((k) => ({ value: k, label: PAYMENT_KIND_LABELS[k] }))} /></div>
           <button type="button" className="btn sm" disabled={disabled || value.length <= 1} onClick={() => onChange(value.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
         </div>
       ))}
@@ -953,7 +954,7 @@ function AttendanceMarksEditor({ value, max, disabled, onChange }: { value: Atte
         <div key={m.key} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 6, flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 150 }}><Field label={tr('ui.settings.mark')} value={m.name} maxLength={30} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
           <div style={{ width: 90 }}><Field label={tr('ui.settings.letter')} value={m.code} maxLength={3} disabled={disabled} onChange={(v) => put(i, { code: v })} /></div>
-          <div style={{ width: 200 }}><SelectField label={tr('ui.settings.means')} value={m.meaning} disabled={disabled} onChange={(k) => put(i, { meaning: k as AttendanceMarkDef['meaning'] })} options={ATTENDANCE_MARKS.map((k) => ({ value: k, label: MARK_MEANING_LABELS[k] }))} /></div>
+          <div style={{ minWidth: 200, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.means')} value={m.meaning} disabled={disabled} onChange={(k) => put(i, { meaning: k as AttendanceMarkDef['meaning'] })} options={ATTENDANCE_MARKS.map((k) => ({ value: k, label: MARK_MEANING_LABELS[k] }))} /></div>
           <button type="button" className="btn sm" disabled={disabled || value.length <= 2} onClick={() => onChange(value.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
         </div>
       ))}
