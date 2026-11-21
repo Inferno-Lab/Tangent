@@ -20,5 +20,8 @@ for the app.
 
 ## Logo
 
-`logo/` holds the working logo the owner picked on 2026-11-05 (not final yet, so do not derive the product palette from its
-colours): a "fingerprint" mark, four whorl lines whose outer line closes into the letter's bar.
+`logo/` holds the Tangent logo the owner chose on 2026-11-21, the **graduation fold**: a mortarboard whose tassel folds into
+the letter T, in ink on chalk. Only the mark is used (never the name beside it). `tangent-mark.svg` is the one source;
+`node tools/gen-logo.mjs` makes the rest from it: the reversed mark, the app-icon and favicon tiles, the admin's and the
+console's favicons, the web parts' path (`packages/web-ui/src/tangent-mark.ts`, drawn by `TangentIcon`) and every Android
+and iPhone launcher icon. The logo keeps its own ink and white; the school's colours never tint it.

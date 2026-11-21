@@ -72,7 +72,7 @@ export class Migration implements OnModuleInit {
     return this.with(id, async (pool) => {
       const [batches, uploads, students, staff, staffInvited, classes, year, orphans, families, invited, signed, dues] = await Promise.all([
         listBatches(pool), this.uploads(pool),
-        n(pool, 'select count(*) n from students'), n(pool, "select count(*) n from users where kind = 'staff' and status = 'active'"),
+        n(pool, "select count(*) n from students where status = 'active'"), n(pool, "select count(*) n from users where kind = 'staff' and status = 'active'"),
         n(pool, "select count(*) n from users where kind = 'staff' and status = 'active' and (invited_at is not null or password_hash is not null)"),
         n(pool, 'select count(*) n from classes'), n(pool, 'select count(*) n from academic_years where current'),
         n(pool, "select count(*) n from students s where s.status = 'active' and not exists (select 1 from student_guardians sg join guardians g on g.id = sg.guardian_id where sg.student_id = s.id and sg.is_primary and g.phone is not null)"),
@@ -165,11 +165,11 @@ export class Migration implements OnModuleInit {
     return this.with(id, async (pool) => {
       if (input.kind === 'students') {
         const p = await previewImport(pool, input);
-        const total = (await n(pool, 'select count(*) n from students')) + p.counts.create;
+        const total = (await n(pool, "select count(*) n from students where status = 'active'")) + p.counts.create;
         if (total > s.entitlement.limits.students) throw new ApiError('validation', tx('This takes the school to {total} students; its plan allows {students}. Raise the limit on the Plan and modules tab first.', { total, students: s.entitlement.limits.students }));
       }
       const batch = await commitImport(pool, input, by);
-      await this.db.pool.query('update schools set students_count = $2 where id = $1', [id, await n(pool, 'select count(*) n from students')]);
+      await this.db.pool.query('update schools set students_count = $2 where id = $1', [id, await n(pool, "select count(*) n from students where status = 'active'")]);
       await this.db.audit(by, 'import.committed', 'school', id, { kind: input.kind, file: input.fileName, created: batch.created, updated: batch.updated, skipped: batch.skipped });
       return batch;
     });
@@ -179,7 +179,7 @@ export class Migration implements OnModuleInit {
     return this.with(id, async (pool) => {
       await undoBatch(pool, batchId);
       await pool.query("update import_uploads set status = 'new', batch_id = null where batch_id = $1", [batchId]);
-      await this.db.pool.query('update schools set students_count = $2 where id = $1', [id, await n(pool, 'select count(*) n from students')]);
+      await this.db.pool.query('update schools set students_count = $2 where id = $1', [id, await n(pool, "select count(*) n from students where status = 'active'")]);
       await this.db.audit(by, 'import.undone', 'school', id, { batchId });
       return listBatches(pool);
     });
