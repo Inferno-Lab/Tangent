@@ -2510,6 +2510,7 @@
  "admin.visitors.family_code": "Family’s code",
  "admin.visitors.family_to_agree": "Family to agree",
  "admin.visitors.from_check_ins": "From today’s check-ins",
+ "admin.visitors.signed_in_at_the_gate": "Signed in at the gate and not out yet",
  "admin.visitors.from_todays_marks": "From today’s roll calls, less those who left",
  "admin.visitors.gone": "Gone",
  "admin.visitors.has_left": "{name} has left.",

@@ -295,16 +295,17 @@ function Roll({ say }: { say: Say }) { const app = useApp();
       <button className="btn" onClick={() => void q.refetch()}>{t('admin.visitors.refresh')}</button>
       {r && <small className="help" style={{ margin: 0, alignSelf: 'center' }}>{t('admin.visitors.as_of', { time: time(r.at) })}</small>}
     </div>
-    {r && <section className="grid" data-even="">
+    {/* One card with three columns: their headings and notes sit on one line whatever each list holds. */}
+    {r && <section className="card rise" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 24, alignItems: 'start' }}>
       {[
-        { title: t('admin.visitors.students_n', { n: r.students.length }), note: r.marked.students ? t('admin.visitors.from_todays_marks') : t('admin.visitors.not_marked_everyone_expected'), items: r.students.map((s) => `${s.name} · ${s.className}`) },
-        { title: t('admin.visitors.staff_n', { n: r.staff.length }), note: r.marked.staff ? t('admin.visitors.from_check_ins') : t('admin.visitors.not_marked_everyone_expected'), items: r.staff.map((s) => s.name) },
-        { title: t('admin.visitors.visitors_n', { n: r.visitors.length }), note: '', items: r.visitors.map((v) => `${v.name}${v.hostName ? ` · ${v.hostName}` : ''}`) },
+        { title: t('admin.visitors.students_n', { n: r.students.length }), note: r.marked.students ? t('admin.visitors.from_todays_marks') : t('admin.visitors.not_marked_everyone_expected'), items: r.students.map((s) => [s.name, s.className]) },
+        { title: t('admin.visitors.staff_n', { n: r.staff.length }), note: r.marked.staff ? t('admin.visitors.from_check_ins') : t('admin.visitors.not_marked_everyone_expected'), items: r.staff.map((s) => [s.name, '']) },
+        { title: t('admin.visitors.visitors_n', { n: r.visitors.length }), note: t('admin.visitors.signed_in_at_the_gate'), items: r.visitors.map((v) => [v.name, v.hostName ?? '']) },
       ].map((g) => (
-        <div key={g.title} className="card s4 rise">
-          <div className="ch"><h2>{g.title}</h2></div>
-          {g.note && <small className="help">{g.note}</small>}
-          {g.items.length ? <div style={{ maxHeight: 360, overflow: 'auto' }} data-even-scroll>{g.items.map((x, i) => <div key={i} style={{ padding: '4px 0' }}>{x}</div>)}</div>
+        <div key={g.title} style={{ minWidth: 0 }}>
+          <h3 style={{ margin: 0 }}>{g.title}</h3>
+          <small className="help" style={{ display: 'block', margin: '2px 0 10px' }}>{g.note}</small>
+          {g.items.length ? <div className="lscroll" style={{ maxHeight: 360 }}>{g.items.map(([name, more], i) => <div key={i} className="kv"><span>{name}</span>{more && <small className="help" style={{ margin: 0 }}>{more}</small>}</div>)}</div>
             : <EmptyNote icon="people" title={t('admin.visitors.nobody_on_site_in_this')} body={t('admin.visitors.the_roll_call_fills_in')} />}
         </div>
       ))}

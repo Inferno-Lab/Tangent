@@ -499,7 +499,8 @@ function CategoriesEditor({ value, max, disabled, onChange }: { value: Category[
         <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 6, flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 160 }}><Field label={tr('ui.settings.category')} value={c.name} maxLength={24} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
           <div style={{ width: 160 }}><SelectField label={tr('ui.settings.colour')} value={c.tone} disabled={disabled} onChange={(t) => put(i, { tone: t as Category['tone'] })} options={CATEGORY_TONES.map((t) => ({ value: t, label: CATEGORY_TONE_LABELS[t] }))} /></div>
-          <span className={`chip ${c.tone}`} style={{ marginBottom: 10 }}>{c.name || tr('ui.settings.category')}</span>
+          {/* A fixed slot for the preview, so a longer name never pushes the row's fields out of line with the others. */}
+          <span style={{ width: 140, flex: 'none', marginBottom: 10, minWidth: 0 }}><span className={`chip ${c.tone}`} style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name || tr('ui.settings.category')}</span></span>
           <button type="button" className="btn sm" disabled={disabled || value.length <= 1} onClick={() => onChange(value.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
         </div>
       ))}
