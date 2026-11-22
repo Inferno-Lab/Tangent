@@ -231,7 +231,6 @@ class _FormPageState extends State<_FormPage> {
     final children = widget.form.pending.whereType<String>().toList();
     return Form(
       key: _form,
-      autovalidateMode: AutovalidateMode.onUserInteraction,
       child: PageFrame(
         leading: const BackGlass(),
         bottomBarHeight: 56,

@@ -109,7 +109,7 @@ class PageFrame extends StatelessWidget {
     // it under the keyboard left the field counted as visible while the keyboard covered it.)
     // A bottom bar rides on the keyboard, so the area also stops above the bar: a field scrolled to its end is never under it.
     final shown = Padding(padding: EdgeInsets.only(bottom: keyboard > 0 && bottomBar != null ? keyboard + bottomBarHeight + 12 : keyboard), child: page);
-    final body = formKey == null ? shown : Form(key: formKey, autovalidateMode: AutovalidateMode.onUserInteraction, child: shown);
+    final body = formKey == null ? shown : Form(key: formKey, child: shown);
     return Scaffold(
       backgroundColor: background ?? c.chalk,
       resizeToAvoidBottomInset: false,

@@ -223,7 +223,12 @@ class Field extends StatefulWidget {
 class _FieldState extends State<Field> with WidgetsBindingObserver {
   final _focus = FocusNode();
   final _box = GlobalKey();
+  final _field = GlobalKey<FormFieldState<String>>();
   Timer? _settle;
+
+  /// Checked as it changes only once the person has left it after typing, or it shows what is wrong: an address is not
+  /// called invalid while it is still being typed.
+  var _live = false;
 
   @override
   void initState() {
@@ -231,6 +236,11 @@ class _FieldState extends State<Field> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _focus.addListener(() {
       setState(() {});
+      final field = _field.currentState;
+      if (!_focus.hasFocus && field != null && field.hasInteractedByUser) {
+        _live = true;
+        field.validate();
+      }
       if (_focus.hasFocus) {
         // After the frame that draws the focus (a post-frame callback asks for no frame itself).
         WidgetsBinding.instance
@@ -270,6 +280,7 @@ class _FieldState extends State<Field> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final c = context.app;
     return FormField<String>(
+      key: _field,
       initialValue: widget.controller?.text,
       validator: widget.validator == null ? null : (_) => widget.validator!(widget.controller?.text),
       builder: (state) {
@@ -323,6 +334,7 @@ class _FieldState extends State<Field> with WidgetsBindingObserver {
                       inputFormatters: [...?widget.inputFormatters?.cast<TextInputFormatter>(), if (widget.maxLength != null) LengthLimitingTextInputFormatter(widget.maxLength)],
                       onChanged: (value) {
                         state.didChange(value);
+                        if (_live || state.hasError) state.validate();
                         widget.onChanged?.call(value);
                       },
                       style: AppText.b(color: c.ink, height: 1.35),

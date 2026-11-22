@@ -43,7 +43,7 @@ class SheetBody extends StatefulWidget {
 }
 
 class _SheetBodyState extends State<SheetBody> {
-  // Each sheet is a form, so its fields' validators run and show their message, and stay checked as they change.
+  // Each sheet is a form, so its fields' validators run and show their message: a field when it is left, all on send.
   final _form = GlobalKey<FormState>();
 
   @override
@@ -85,7 +85,6 @@ class _SheetBodyState extends State<SheetBody> {
           ),
           child: Form(
             key: _form,
-            autovalidateMode: AutovalidateMode.onUserInteraction,
             child: SafeArea(
               top: false,
               minimum: EdgeInsets.only(bottom: safe > 0 ? 0 : 20),
