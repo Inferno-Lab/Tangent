@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { PromotionPreview, YearRow } from '@tangent/contracts';
 import { fmtMoney, schoolToday } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, EmptyCard, Field, Select, useShake, EmptyNote, t, busyFor } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, EmptyCard, Field, Select, useShake, EmptyNote, t, busyFor, Skeleton } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { StudentPick, dateLabel, problem, stamp } from '../../app/kit';
@@ -52,7 +52,7 @@ function PublicHolidays({ onClose, onDone }: { onClose: () => void; onDone: (m: 
   return (
     <Dialog title={t('admin.year_page.bring_in_public_holidays')} onClose={onClose} width={520}>
       <div className="stack">
-        {list.isLoading ? <div className="skc" style={{ height: 200, borderRadius: 16 }} />
+        {list.isLoading ? <Skeleton kind="rows" rows={3} />
           : list.isError ? <div className="emsg" role="alert">{(list.error as Error).message}</div>
           : !list.data!.length ? <EmptyNote icon="calendar" title={t('admin.year_page.no_public_holidays_came_back')} body={t('admin.year_page.the_connection_has_none_for')} />
           : <div className="lscroll" style={{ maxHeight: 360 }}>{list.data!.map((h) => (
@@ -181,7 +181,7 @@ function Promote({ years, onClose, onDone }: { years: YearRow[]; onClose: () => 
   const total = moves.reduce((n, m) => n + m.students, 0);
   return (
     <Dialog title={t('admin.year_page.promote_students')} tag={target ? { text: t('admin.year_page.into', { label: target.label }), tone: 'v' } : undefined} onClose={onClose} width={640} shake={shake.cls}>
-      {preview.isLoading ? <div className="skc" style={{ height: 220, borderRadius: 16 }} /> : !classes.length ? <EmptyCard title={t('admin.year_page.promotion')} chip={{ text: t('admin.year_page.0_classes'), tone: 'v' }} icon="people" heading={t('admin.year_page.no_classes_to_promote')} body={t('admin.year_page.classes_come_from_academic_year')} /> : (
+      {preview.isLoading ? <Skeleton kind="table" rows={5} /> : !classes.length ? <EmptyCard title={t('admin.year_page.promotion')} chip={{ text: t('admin.year_page.0_classes'), tone: 'v' }} icon="people" heading={t('admin.year_page.no_classes_to_promote')} body={t('admin.year_page.classes_come_from_academic_year')} /> : (
         <div className="stack">
           <div className="help">{t('admin.year_page.each_class_moves_to_the')}</div>
           <div className="lscroll" style={{ maxHeight: 280 }}>

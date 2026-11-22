@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
 import { PERMISSION_CATALOG, permissionAvailable, type RoleDef } from '@tangent/contracts';
-import { Checkbox, Dialog, EmptyCard, ErrorLine, Field, Select, useShake, Icon, useMore, EmptyNote, t as tr, busyFor } from '@tangent/web-ui';
+import { Checkbox, Dialog, EmptyCard, ErrorLine, Field, Select, useShake, Icon, useMore, EmptyNote, t as tr, busyFor, Skeleton } from '@tangent/web-ui';
 import { url } from '../../app/base';
 import { useApp } from '../../app/context';
 
@@ -49,7 +49,7 @@ export function RolesTab({ schoolId, say }: { schoolId: string; say: Say }) {
   const people = (q.data?.staff ?? []).filter((s) => !find.trim() || `${s.name} ${s.designation}`.toLowerCase().includes(find.trim().toLowerCase()));
   const [shownPeople, morePeople] = useMore(people);
 
-  if (q.isLoading) return <div className="skc" style={{ height: 420, borderRadius: 24 }} />;
+  if (q.isLoading) return <Skeleton kind="table" rows={6} />;
   if (q.isError || !q.data) return <EmptyCard error title={tr('console.roles_tab.roles')} chip={{ text: tr('console.roles_tab.couldn_t_load'), tone: 'c' }} icon="lock" heading={tr('console.roles_tab.roles_didn_t_load')} body={(q.error as Error)?.message ?? ''} actions={<button className="btn pri" onClick={() => void q.refetch()}>{tr('console.roles_tab.try_again')}</button>} />;
   const readOnly = !can || !!cur?.locked;
   // A new role starts from one of the starting roles (Blueprints → Starting roles), or from nothing.

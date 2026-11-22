@@ -4,7 +4,7 @@ import { useParams } from '@tanstack/react-router';
 import { HttpError } from '@tangent/api-client';
 import { CORE_MODULES, closeModules } from '@tangent/config-engine';
 import { phoneProblem, packSettings, curriculaFor, countryName, ZONES, LOCALES, COUNTRY_DEFAULTS, COUNTRIES, DEFAULT_BRAND, DEPLOY_TARGET_LABELS, LANGUAGES, readableOn, WizardAdmin, WizardBasics, WizardBranding, WizardData, WizardPayload, WizardPlacement, WizardPlan, type ProvisionRunRow, type WizardReview } from '@tangent/contracts';
-import { ColourField, Field, FilePick, NumberField, PhoneField, SelectField, useShake, Icon, t as tr, listOf, dayOf } from '@tangent/web-ui';
+import { ColourField, Field, FilePick, NumberField, PhoneField, SelectField, useShake, Icon, t as tr, listOf, dayOf, Skeleton } from '@tangent/web-ui';
 import { Card, Page, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
 import { count, price } from '../../app/format';
@@ -313,7 +313,7 @@ export function WizardPage() {
 
 function ReviewStep({ review, loading, error, payloadOk, missing, rehearsal }: { review?: WizardReview; loading: boolean; error: string; payloadOk: boolean; missing: string[]; rehearsal: ProvisionRunRow | null }) {
   if (!payloadOk) return <div className="emsg" role="alert">{tr('console.wizard_page.finish_these_steps_first')}{' '}{missing.join(', ')}.</div>;
-  if (loading) return <div className="skc" style={{ height: 240, borderRadius: 16 }} />;
+  if (loading) return <Skeleton kind="form" rows={4} />;
   if (error) return <div className="emsg" role="alert">{error}</div>;
   if (!review) return null;
   return (

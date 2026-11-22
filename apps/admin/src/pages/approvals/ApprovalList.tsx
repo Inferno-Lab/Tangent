@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ApprovalKind, ApprovalRow } from '@tangent/contracts';
-import { Dialog, EmptyCard, useShake, EmptyState, t, busyFor } from '@tangent/web-ui';
+import { Dialog, EmptyCard, useShake, EmptyState, t, busyFor, Skeleton } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { AreaField, Avatar, problem } from '../../app/kit';
 import { fmtDate } from '@tangent/contracts';
@@ -34,7 +34,7 @@ export function useApprovalList(view: ApprovalView, kind: ApprovalKind | undefin
   });
 
   const overlay = declining && <Decline row={declining} busy={decide.isPending} onClose={() => setDeclining(null)} onDecline={(note) => decide.mutate({ row: declining, decision: 'reject', note })} />;
-  if (list.isLoading) return { list: <div className="skc" style={{ height: 240, borderRadius: 16 }} />, overlay };
+  if (list.isLoading) return { list: <Skeleton kind="rows" rows={4} />, overlay };
   if (list.isError) return { overlay, list: <EmptyCard error title={t('admin.approval_list.approvals')} chip={{ text: t('admin.approval_list.couldn_t_load'), tone: 'c' }} icon="warning" heading={t('admin.approval_list.that_didn_t_load')} body={(list.error as Error).message} actions={<button className="btn pri" onClick={() => void list.refetch()}>{t('admin.approval_list.try_again')}</button>} /> };
   const rows = list.data ?? [];
   // Each view has its own scene: nothing waiting, nothing sent, nothing decided, no leave asked for.

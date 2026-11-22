@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
-import { Dialog, Field, NumberField, NumberInput, Select, useShake, Icon, EmptyState, t, EmptyNote, useUnsaved, busyFor } from '@tangent/web-ui';
+import { Dialog, Field, NumberField, NumberInput, Select, useShake, Icon, EmptyState, t, EmptyNote, useUnsaved, busyFor, Skeleton } from '@tangent/web-ui';
 import type { PolicyDoc, ReleaseRow } from '@tangent/contracts';
 import { Card, Page, Tiles, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
@@ -122,7 +122,7 @@ function RolloutRules({ say }: { say: (m: string, tone?: 'ok' | 'bad') => void }
   const save = useMutation({ mutationFn: (p: PolicyDoc) => app.api.policy.set(p), onSuccess: (p) => { qc.setQueryData(['policy'], p); say(t('console.releases_page.rollout_rules_saved')); }, onError: (e) => say((e as Error).message, 'bad') });
   const can = app.can('policy.write');
   useUnsaved(!!pol && JSON.stringify(pol) !== JSON.stringify(policy.data));
-  if (!pol) return <div className="skc" style={{ height: 320, borderRadius: 28 }} />;
+  if (!pol) return <Skeleton kind="form" rows={4} />;
   const ok = pol.waves.length > 0 && pol.waves.at(-1)!.matches === 'rest' && pol.waves.every((w) => w.name.trim().length > 0 && w.batch >= 1);
   const dirty = JSON.stringify(pol) !== JSON.stringify(policy.data);
   return (

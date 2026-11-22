@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter, useRouterState } from '@tanstack/react-router';
-import { EmptyCard, PageScope, Presence, t } from '@tangent/web-ui';
+import { EmptyCard, PageScope, Presence, t, Skeleton } from '@tangent/web-ui';
 import { AskTangent } from '../profile/AskTangent';
 import { useApp } from '../../app/context';
 import { pageForPath } from '@tangent/config-engine';
@@ -23,7 +23,7 @@ export function PlanGate({ children }: { children: ReactNode }) {
   // The page's code loads while the menu does, so waiting for the menu costs nothing on a first visit.
   useEffect(() => { if (page && !d) void router.preloadRoute({ to: pathname as never }).catch(() => undefined); }, [page, d, pathname, router]);
   // Until the menu is known a page is not drawn: a module paused or taken away would otherwise ask the server first.
-  if (page && !d && !shell.isError) return <main className="mn"><div className="skc" style={{ height: 320, borderRadius: 24 }} /></main>;
+  if (page && !d && !shell.isError) return <main className="mn"><Skeleton kind="rows" rows={6} /></main>;
   if (!page || !d || d.menu.some((g) => g.pages.some((x) => x.id === page.id))) return <>{children}</>;
   const need = moduleForPath(path);
   if (need && !d.modules.includes(need) && !d.features.includes(need)) return <NotInPlan area={page.label} />;

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
 import { CAPABILITIES, CAPABILITY_LABELS, INTEGRATION_PROVIDERS, providerDef, type SchoolDetail } from '@tangent/contracts';
-import { Dialog, EmptyCard, Presence, useShake, EmptyNote, t } from '@tangent/web-ui';
+import { Dialog, EmptyCard, Presence, useShake, EmptyNote, t, Skeleton } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { ago } from '../../app/format';
 import { url } from '../../app/base';
@@ -16,7 +16,7 @@ export function IntegrationsTab({ d }: { d: SchoolDetail }) { const app = useApp
   const view = useQuery({ queryKey: ['integrations'], queryFn: app.api.integrations.view, enabled: app.can('integrations.read') });
   const fails = useQuery({ queryKey: ['activity', d.slug, '', 'failed'], queryFn: () => app.api.integrations.activity({ school: d.slug, status: 'failed', limit: 10 }), enabled: app.can('integrations.read') });
   if (!app.can('integrations.read')) return <EmptyCard title={t('console.integrations_tab.messaging')} chip={{ text: t('console.integrations_tab.not_for_your_role'), tone: 'a' }} icon="lock" heading={t('console.integrations_tab.integrations_are_for_implementation_and')} body={t('console.integrations_tab.ask_a_super_admin_if')} />;
-  if (view.isLoading) return <div className="skc" style={{ height: 240, borderRadius: 24 }} />;
+  if (view.isLoading) return <Skeleton kind="rows" rows={4} />;
   const v = view.data;
   if (!v) return <EmptyCard error title={t('console.integrations_tab.integrations')} chip={{ text: t('console.integrations_tab.couldn_t_load'), tone: 'c' }} icon="warning" heading={t('console.integrations_tab.that_didn_t_load')} body={(view.error as Error)?.message ?? ''} actions={<button className="btn pri" onClick={() => void view.refetch()}>{t('console.integrations_tab.try_again')}</button>} />;
   const name = (id: string | null) => (id ? v.connections.find((c) => c.id === id)?.name ?? t('console.integrations_tab.deleted') : '');
@@ -71,7 +71,7 @@ export function RecordsTab({ d, say }: { d: SchoolDetail; say: (m: string, tone?
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['retention', d.id], queryFn: () => app.api.retention(d.id), enabled: d.status !== 'onboarding' });
   const [open, setOpen] = useState(false);
-  if (q.isLoading) return <div className="skc" style={{ height: 200, borderRadius: 24 }} />;
+  if (q.isLoading) return <Skeleton kind="rows" rows={3} />;
   const r = q.data;
   return (
     <section className="card s12 rise">

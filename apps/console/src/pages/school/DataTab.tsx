@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ImportInputIn } from '@tangent/api-client';
 import { IMPORT_KINDS, IMPORT_SOURCES, type ImportBatchRow, type ImportColumn, type ImportKind, type ImportPreview, type MigrationView, type SchoolDetail } from '@tangent/contracts';
-import { Dialog, EmptyCard, Field, FilePick, Select, EmptyNote, t as tr, busyFor } from '@tangent/web-ui';
+import { Dialog, EmptyCard, Field, FilePick, Select, EmptyNote, t as tr, busyFor, Skeleton } from '@tangent/web-ui';
 import { RecordsTab } from './IntegrationsTab';
 import { useApp } from '../../app/context';
 import { when } from '../../app/format';
@@ -78,7 +78,7 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
   const exp = useMutation({ mutationFn: () => app.api.migration.exportAll(schoolId), onSuccess: (b) => save(b, `${schoolId}-export.zip`), onError: fail });
   const tpl = useMutation({ mutationFn: (k: string) => app.api.migration.template(schoolId, k), onSuccess: (blob, k) => save(blob, `${k}-template.xlsx`), onError: fail });
 
-  if (q.isLoading) return <div className="skc" style={{ height: 420, borderRadius: 24 }} />;
+  if (q.isLoading) return <Skeleton kind="table" rows={6} />;
   if (q.isError || !v) return <EmptyCard error title={tr('console.data_tab.data')} chip={{ text: tr('console.data_tab.couldn_t_load'), tone: 'c' }} icon="warning" heading={tr('console.data_tab.the_school_s_data_didn')} body={(q.error as Error)?.message ?? ''} actions={<button className="btn pri" onClick={() => void q.refetch()}>{tr('console.data_tab.try_again')}</button>} />;
   const pickKind = (k: string) => { setKindKey(k); change(null); };
   return (

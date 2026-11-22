@@ -6,7 +6,7 @@ import {
   CAPABILITIES, CAPABILITY_LABELS, DELIVERY_STATUSES, INTEGRATION_PROVIDERS, LANGUAGES, MESSAGE_EVENTS, PLATFORM_CAPABILITIES, SUGGESTED_PROVIDERS, SYSTEM_MESSAGES, fieldProblem, providerDef, suggestedFirst,
   type Capability, type ConnectionRow, type DeliveryRow, type IntegrationsView, type ProviderField, type RouteRow, type SchoolRow, type TemplateRow,
 } from '@tangent/contracts';
-import { Checkbox, Dialog, Field, FilePick, NumberField, Segmented, Select, SelectField, useShake, Icon, type IconName, EmptyState, useMore, EmptyNote, t as tr, busyFor } from '@tangent/web-ui';
+import { Checkbox, Dialog, Field, FilePick, NumberField, Segmented, Select, SelectField, useShake, Icon, type IconName, EmptyState, useMore, EmptyNote, t as tr, busyFor, Skeleton } from '@tangent/web-ui';
 import { Card, Page, Tiles, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
 import { ago, count, price, when } from '../../app/format';
@@ -514,7 +514,7 @@ function Activity({ schools, write, say }: { schools: SchoolRow[]; write: boolea
       </div>
       <Card title={tr('console.integrations_page.every_message_s_fate')} chip={<span className="chip">{rows.length} {tr('console.integrations_page.shown')}</span>} style={{ padding: 0 }}>
         {q.isError ? <div className="help" style={{ padding: 20 }}>{(q.error as Error).message}</div>
-          : !rows.length ? <div style={{ padding: 20 }}>{q.isLoading ? <div className="skc" style={{ height: 120, borderRadius: 16 }} /> : school || channel || status ? <EmptyNote icon="search" title={tr('console.integrations_page.no_messages_match')} body={tr('console.integrations_page.try_another_school_channel_or')} /> : <EmptyState scene="activity" onAction={() => app.go('/integrations/inbox')} />}</div> : (
+          : !rows.length ? <div style={{ padding: 20 }}>{q.isLoading ? <Skeleton kind="rows" rows={3} /> : school || channel || status ? <EmptyNote icon="search" title={tr('console.integrations_page.no_messages_match')} body={tr('console.integrations_page.try_another_school_channel_or')} /> : <EmptyState scene="activity" onAction={() => app.go('/integrations/inbox')} />}</div> : (
             <div className="tbl scroll-x"><div style={{ minWidth: 760 }} className="lscroll">
               <div className="grd th" style={{ '--cols': '96px 110px minmax(0,1fr) minmax(0,2fr) 120px 90px' } as React.CSSProperties}><span>{tr('console.integrations_page.status')}</span><span>{tr('console.integrations_page.school')}</span><span>{tr('console.integrations_page.to')}</span><span>{tr('console.integrations_page.message')}</span><span>{tr('console.integrations_page.through')}</span><span></span></div>
               {rows.map((m) => (
@@ -607,7 +607,7 @@ function TestInbox({ schools }: { schools: SchoolRow[] }) {
   const [shown, more] = useMore(rows);
   return (
     <Card title={tr('console.integrations_page.test_inbox')} chip={<Select compact aria-label={tr('console.integrations_page.school')} value={school} onChange={setSchool} options={[{ value: '', label: tr('console.integrations_page.all_schools') }, ...schools.map((s) => ({ value: s.slug, label: s.name }))]} />}>
-      {msgs.isLoading ? <div className="skc" style={{ height: 200, borderRadius: 16 }} />
+      {msgs.isLoading ? <Skeleton kind="rows" rows={4} />
         : rows.length === 0 ? school ? <EmptyNote icon="inbox" title={tr('console.integrations_page.nothing_for_this_school_yet')} body={tr('console.integrations_page.its_sign_in_codes_receipts')} /> : <EmptyState scene="inbox" onAction={() => app.go('/integrations')} />
           : <>{shown.map((m) => (
             <div key={m.id} className="kv" style={{ alignItems: 'flex-start', height: 'auto', padding: '12px 0' }}>

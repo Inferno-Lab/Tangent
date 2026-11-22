@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { uploadFile } from '@tangent/api-client';
 import { fmtDate, type AlbumRow, type GalleryReportRow, type PhotoRow } from '@tangent/contracts';
-import { Dialog, Field, FilePick, Panel, Presence, SelectField, useShake, Icon, EmptyState, EmptyNote, t, busyFor } from '@tangent/web-ui';
+import { Dialog, Field, FilePick, Panel, Presence, SelectField, useShake, Icon, EmptyState, EmptyNote, t, busyFor, Skeleton } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { AddBtn, StudentPick, problem, stamp } from '../../app/kit';
@@ -84,7 +84,7 @@ function AlbumPanel({ album, canWrite, say, onEdit, onClose }: { album: AlbumRow
       </div>
       <div className="db">
         {hidden > 0 && <div className="chip a" role="status" style={{ height: 'auto', padding: '8px 12px', whiteSpace: 'normal', lineHeight: 1.4 }}>{t('admin.gallery_page.a_child_whose_family_has', { n: hidden })}</div>}
-        {photos.isLoading ? <div className="skc" style={{ height: 200, borderRadius: 16 }} /> : !list.length ? <EmptyNote icon="camera" title={t('admin.gallery_page.no_photos_in_this_album')} body={t('admin.gallery_page.add_the_first_ones_families')} /> : (
+        {photos.isLoading ? <Skeleton kind="grid" rows={6} /> : !list.length ? <EmptyNote icon="camera" title={t('admin.gallery_page.no_photos_in_this_album')} body={t('admin.gallery_page.add_the_first_ones_families')} /> : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 12 }}>
             {list.map((p) => (
               <div key={p.id}>

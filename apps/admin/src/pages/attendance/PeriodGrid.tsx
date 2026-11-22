@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { markMeaning, type AttendanceMarkDef, type PeriodRoll } from '@tangent/contracts';
-import { EmptyCard, Select, t } from '@tangent/web-ui';
+import { EmptyCard, Select, t, Skeleton } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { problem, useSetting } from '../../app/kit';
 
@@ -34,7 +34,7 @@ export function PeriodGrid({ classId, date, say }: { classId: string; date: stri
     onError: (e) => say(Object.values(problem(e))[0] ?? t('admin.period_grid.could_not_save_try_again'), 'bad'),
   });
 
-  if (roll.isLoading) return <div className="skc" style={{ height: 320, borderRadius: 16 }} />;
+  if (roll.isLoading) return <Skeleton kind="table" rows={6} />;
   if (roll.isError) return <EmptyCard error title={t('admin.period_grid.every_period')} chip={{ text: t('admin.period_grid.couldn_t_load'), tone: 'c' }} icon="warning" heading={t('admin.period_grid.that_didn_t_load')} body={(roll.error as Error).message} actions={<button className="btn pri" onClick={() => void roll.refetch()}>{t('admin.period_grid.try_again')}</button>} />;
   if (!p) return <EmptyCard title={t('admin.period_grid.every_period')} chip={{ text: t('admin.period_grid.0_periods'), tone: 'v' }} icon="calendar" heading={t('admin.period_grid.no_lessons_that_day')} body={t('admin.period_grid.the_class_has_no_periods')} />;
   const students = roll.data!.students;

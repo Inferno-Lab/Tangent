@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fmtMoney, fmtDate, importKind, type ImportColumn, type SetupSection } from '@tangent/contracts';
-import { DateField, Dialog, EmptyCard, Field, SelectField, TimeField, useShake, EmptyState, EmptyNote, type EmptyScene, type IconName, t } from '@tangent/web-ui';
+import { DateField, Dialog, EmptyCard, Field, SelectField, TimeField, useShake, EmptyState, EmptyNote, type EmptyScene, type IconName, t, Skeleton } from '@tangent/web-ui';
 
 // The lists that have a scene of their own; the rest show an EmptyNote.
 const SCENE: Record<string, EmptyScene> = { classes: 'year', holidays: 'holidays', subjects: 'subjects', periods: 'bells' };
@@ -37,7 +37,7 @@ export function useSetupSections(kinds: readonly string[], say: (text: string, t
   const sections = list.data ?? [];
   const overlay = editing && <RowDialog section={editing.section} row={editing.row} all={sections} onClose={() => setEditing(null)}
     onDone={(msg, next) => { setEditing(null); if (next) qc.setQueryData(['setup'], next); void qc.invalidateQueries({ predicate: (q) => ['classes', 'subjects', 'timetable', 'events', 'shell'].includes(String(q.queryKey[0])) }); say(msg); }} />;
-  if (list.isLoading) return { view: <div className="skc" style={{ height: 240, borderRadius: 16 }} />, overlay: null };
+  if (list.isLoading) return { view: <Skeleton kind="rows" rows={4} />, overlay: null };
   if (list.isError) return { view: <EmptyCard error title={t('admin.setup_sections.setup')} chip={{ text: t('admin.setup_sections.couldn_t_load'), tone: 'c' }} icon="warning" heading={t('admin.setup_sections.that_didn_t_load')} body={(list.error as Error).message} actions={<button className="btn pri" onClick={() => void list.refetch()}>{t('admin.setup_sections.try_again')}</button>} />, overlay: null };
   const view = (
     <div className="stack" style={{ gap: 16 }}>

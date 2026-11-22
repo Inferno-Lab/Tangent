@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import type { PublicStatus } from '@tangent/contracts';
-import { useTheme, EmptyNote, t } from '@tangent/web-ui';
+import { useTheme, EmptyNote, t, Skeleton } from '@tangent/web-ui';
 import { fmtDate } from '@tangent/contracts';
 
 const TEXT = { ok: t('admin.status_board.everything_is_working'), degraded: t('admin.status_board.some_things_are_slow'), down: t('admin.status_board.something_is_down') } as const;
@@ -24,7 +24,7 @@ export function StatusBoard() {
           <h1 className="fd" style={{ margin: '6px 0 4px', font: '700 30px/1.1 var(--fd)', letterSpacing: '-.035em' }}>{s ? TEXT[s.state] : q.isError ? t('admin.status_board.we_could_not_check') : t('admin.status_board.checking')}</h1>
           <p style={{ margin: 0, color: 'var(--ink3)', font: '600 14px var(--fb)' }}>{s ? t('admin.status_board.updated_this_page_refreshes_by', { fmtDate: fmtDate(s.updatedAt, 'time') }) : q.isError ? t('admin.status_board.try_again_in_a_minute') : ' '}</p>
         </header>
-        {!s && !q.isError && <div className="skc" style={{ height: 220, borderRadius: 24 }} />}
+        {!s && !q.isError && <Skeleton kind="rows" rows={4} />}
         {s && (
           <>
             <section className="card">

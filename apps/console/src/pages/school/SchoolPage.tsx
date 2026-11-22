@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
 import { HttpError } from '@tangent/api-client';
 import { CURRICULA, SchoolDetailsPatch, STEP_LABELS, auditLabel, type ActionKey, type ProvisionRunRow, type SchoolDetail } from '@tangent/contracts';
-import { DateField, Dialog, EmptyCard, Field, NumberField, PageScope, PhoneField, Select, SelectField, useShake, useToast, EmptyNote, t as tr, busyFor } from '@tangent/web-ui';
+import { DateField, Dialog, EmptyCard, Field, NumberField, PageScope, PhoneField, Select, SelectField, useShake, useToast, EmptyNote, t as tr, busyFor, Skeleton } from '@tangent/web-ui';
 import { PRICE_CURRENCY } from '@tangent/config-engine';
 import { useApp } from '../../app/context';
 import { url } from '../../app/base';
@@ -93,7 +93,7 @@ export function SchoolPage() {
     return (
       <PageScope page="school">
         <main className="mn" aria-busy="true"><header className="hd"><div><h1>&nbsp;</h1><p>&nbsp;</p></div></header>
-          <div className="skc" style={{ height: 520, borderRadius: 28 }} />
+          <Skeleton kind="cards" rows={4} />
         </main>
       </PageScope>
     );
@@ -288,7 +288,7 @@ function Audit({ id }: { id: string }) {
         <DateField compact label={tr('console.school_page.to')} value={f.to} onChange={set('to')} min={f.from || undefined} />
         <button className="btn sm" onClick={download}>{tr('console.school_page.export')}</button>
       </div>
-      {q.isLoading ? <div className="skc" style={{ height: 240, margin: 20, borderRadius: 24 }} />
+      {q.isLoading ? <Skeleton kind="rows" rows={4} style={{ margin: 20 }} />
         : !rows.length ? <div style={{ padding: '0 20px 20px' }}><EmptyNote icon={pages.length || Object.values(f).some(Boolean) ? 'search' : 'audit'} title={pages.length || Object.values(f).some(Boolean) ? tr('console.school_page.nothing_matches') : tr('console.school_page.nothing_has_happened_yet')} body={pages.length || Object.values(f).some(Boolean) ? tr('console.school_page.clear_a_filter_to_see') : tr('console.school_page.every_change_made_from_the')} /></div>
           : <div className="lscroll" style={{ padding: '0 20px' }}>{rows.map((r) => <div key={r.id} className="kv"><span>{auditLabel(r.action)}<br /><small style={{ color: 'var(--ink3)' }}>{r.actor}{r.detail ? ` · ${r.detail}` : ''}</small></span><b>{when(r.at)}</b></div>)}</div>}
       <div className="tgrow" style={{ padding: '12px 20px 20px' }}>
@@ -321,7 +321,7 @@ function GoLive({ d, say, onDone }: { d: SchoolDetail; say: (m: string, tone?: '
   if (d.wentLiveAt) return <div className="card s12 rise"><div className="ch"><h2>{tr('console.school_page.live')}</h2><span className="chip g">{tr('console.school_page.since')}{' '}{when(d.wentLiveAt)}</span></div><div className="help">{tr('console.school_page.moving_in_is_over_the')}</div></div>;
   if (d.status !== 'live') return <div className="card s12 rise"><div className="ch"><h2>{tr('console.school_page.ready_to_go_live')}</h2><span className="chip v">{tr('console.school_page.after_set_up')}</span></div><div className="help">{tr('console.school_page.the_go_live_checklist_starts')}</div></div>;
   const v = q.data;
-  if (!v) return <div className="skc" style={{ height: 200, borderRadius: 24 }} />;
+  if (!v) return <Skeleton kind="rows" rows={3} />;
   const open = v.readiness.filter((r) => !r.done);
   return (
     <div className="card s12 rise">

@@ -25,6 +25,7 @@ export * from './ColourPicker';
 export * from './Dialog';
 export * from './Unsaved';
 export * from './Busy';
+export * from './Skeleton';
 export * from './Presence';
 export * from './Toast';
 export * from './Segmented';
