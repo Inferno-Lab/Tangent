@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { PromotionPreview, YearRow } from '@tangent/contracts';
 import { fmtMoney, schoolToday } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, EmptyCard, Field, Select, useShake, EmptyNote, t } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, EmptyCard, Field, Select, useShake, EmptyNote, t, busyFor } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { StudentPick, dateLabel, problem, stamp } from '../../app/kit';
@@ -117,7 +117,7 @@ function YearEnd({ tabs }: { tabs: React.ReactNode }) { const app = useApp();
                 <span style={{ minWidth: 0 }}><b style={{ color: 'var(--ink)' }}>{y.label}</b><br /><small className="help">{dateLabel(y.startsOn)} {y.startsOn.slice(0, 4)} {t('admin.year_page.to')}{' '}{dateLabel(y.endsOn)} {y.endsOn.slice(0, 4)}{y.status === 'current' ? t('admin.year_page.classes_students', { classes: y.classes, students: y.students }) : ''}</small></span>
                 <b style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', minWidth: 0 }}>
                   <span className={`chip ${STATUS[y.status].tone}`}>{STATUS[y.status].text}</span>
-                  {can && y.status === 'draft' && <><button className="btn sm pri" disabled={act.isPending || !v.runs.some((r) => r.toYear === y.id && !r.undoneAt)} data-tip={v.runs.some((r) => r.toYear === y.id && !r.undoneAt) ? undefined : t('admin.year_page.promote_students_into_it_first')} onClick={() => setSure({ what: 'start', id: y.id, text: t('admin.year_page.start_the_year_now_running', { label: y.label }) })}>{t('admin.year_page.start')}</button><button className="btn sm" disabled={act.isPending} onClick={() => setSure({ what: 'remove', id: y.id, text: t('admin.year_page.remove_the_draft', { label: y.label }) })}>{t('admin.year_page.remove')}</button></>}
+                  {can && y.status === 'draft' && <><button className="btn sm pri" disabled={busyFor(act, y.id) || !v.runs.some((r) => r.toYear === y.id && !r.undoneAt)} data-tip={v.runs.some((r) => r.toYear === y.id && !r.undoneAt) ? undefined : t('admin.year_page.promote_students_into_it_first')} onClick={() => setSure({ what: 'start', id: y.id, text: t('admin.year_page.start_the_year_now_running', { label: y.label }) })}>{t('admin.year_page.start')}</button><button className="btn sm" disabled={busyFor(act, y.id)} onClick={() => setSure({ what: 'remove', id: y.id, text: t('admin.year_page.remove_the_draft', { label: y.label }) })}>{t('admin.year_page.remove')}</button></>}
                 </b>
               </div>
             ))}

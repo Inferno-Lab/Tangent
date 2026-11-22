@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MEETING_MODES, MeetingInput, schoolToday, type MeetingRow, type MeetingSlotRow } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, EmptyNote, Field, NumberField, Segmented, SelectField, TimeField, useShake, t, EmptyState } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, EmptyNote, Field, NumberField, Segmented, SelectField, TimeField, useShake, t, EmptyState, busyFor } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { AddBtn, dateLabel, problem, stamp } from '../../app/kit';
@@ -119,7 +119,7 @@ function SlotsDialog({ meeting, canManage, onClose, say }: { meeting: MeetingRow
             <div key={s.id} className="rw" style={{ display: 'flex', gap: 10, alignItems: 'center', height: 'auto', minHeight: 40, padding: '4px 0', flexWrap: 'wrap' }}>
               <b style={{ flex: '0 0 70px' }}>{time(s.startsAt)}</b>
               <span style={{ flex: 1 }}>{s.state === 'booked' ? `${s.studentName ?? ''}${s.bookedBy ? ` · ${s.bookedBy}` : ''}${s.mode ? ` · ${MODE[s.mode]}` : ''}` : s.state === 'closed' ? t('admin.meetings.closed_by_teacher') : t('admin.meetings.free')}</span>
-              {s.state === 'booked' && canManage && <button className="btn sm" disabled={cancel.isPending} onClick={() => cancel.mutate(s)}>{t('admin.meetings.cancel_booking')}</button>}
+              {s.state === 'booked' && canManage && <button className="btn sm" disabled={busyFor(cancel, s)} onClick={() => cancel.mutate(s)}>{t('admin.meetings.cancel_booking')}</button>}
             </div>
           ))}
         </div>

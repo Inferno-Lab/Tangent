@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
 import { HttpError } from '@tangent/api-client';
 import { CURRICULA, SchoolDetailsPatch, STEP_LABELS, auditLabel, type ActionKey, type ProvisionRunRow, type SchoolDetail } from '@tangent/contracts';
-import { DateField, Dialog, EmptyCard, Field, NumberField, PageScope, PhoneField, Select, SelectField, useShake, useToast, EmptyNote, t as tr } from '@tangent/web-ui';
+import { DateField, Dialog, EmptyCard, Field, NumberField, PageScope, PhoneField, Select, SelectField, useShake, useToast, EmptyNote, t as tr, busyFor } from '@tangent/web-ui';
 import { PRICE_CURRENCY } from '@tangent/config-engine';
 import { useApp } from '../../app/context';
 import { url } from '../../app/base';
@@ -334,7 +334,7 @@ function GoLive({ d, say, onDone }: { d: SchoolDetail; say: (m: string, tone?: '
             <b style={{ font: '700 14px var(--fb)' }}>{r.label}</b>
             <span style={{ color: 'var(--ink3)', font: '600 13px var(--fb)', textAlign: 'end', display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
               {r.detail}
-              {can && r.manual && <button className="btn sm" disabled={mark.isPending} onClick={() => mark.mutate({ key: r.key as 'config_reviewed' | 'staff_trained', done: !r.done })}>{r.done ? tr('console.school_page.undo') : tr('console.school_page.mark_done')}</button>}
+              {can && r.manual && <button className="btn sm" disabled={busyFor(mark, r.key)} onClick={() => mark.mutate({ key: r.key as 'config_reviewed' | 'staff_trained', done: !r.done })}>{r.done ? tr('console.school_page.undo') : tr('console.school_page.mark_done')}</button>}
             </span>
           </div>
         ))}

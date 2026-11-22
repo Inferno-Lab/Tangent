@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DEFAULT_TRIP_SESSIONS, type BusRouteRow, type RiderRow, type StopInput, type TripSession } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, Field, NumberField, PhoneField, Select, SelectField, TimeField, useShake, EmptyState, EmptyNote, t as tr } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, Field, NumberField, PhoneField, Select, SelectField, TimeField, useShake, EmptyState, EmptyNote, t as tr, busyFor } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { AddBtn, Ico, problem, stamp, useCountry, useSetting } from '../../app/kit';
@@ -106,9 +106,9 @@ function Riders({ routes, riders, canWrite, say }: { routes: BusRouteRow[]; ride
           return (
             <div key={r.studentId} className="grd rw" style={{ '--cols': 'minmax(0,1.4fr) minmax(0,1.2fr) minmax(0,1.2fr)', height: 'auto', minHeight: 56, padding: '8px 20px' } as React.CSSProperties}>
               <b style={{ font: '700 13px var(--fb)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.student}{term && <small className="help" style={{ display: 'block', margin: 0 }}>{r.className}</small>}</b>
-              <Select compact aria-label={tr('admin.transport_page.route_for', { student: r.student })} disabled={!canWrite || set.isPending} value={r.routeId ?? ''} onChange={(x) => set.mutate({ studentId: r.studentId, routeId: x || null, stopId: null })}
+              <Select compact aria-label={tr('admin.transport_page.route_for', { student: r.student })} disabled={!canWrite || busyFor(set, r.studentId)} value={r.routeId ?? ''} onChange={(x) => set.mutate({ studentId: r.studentId, routeId: x || null, stopId: null })}
                 options={[{ value: '', label: tr('admin.transport_page.does_not_ride') }, ...routes.map((x) => ({ value: x.id, label: x.name }))]} />
-              <Select compact aria-label={tr('admin.transport_page.stop_for', { student: r.student })} disabled={!canWrite || !route || set.isPending} value={r.stopId ?? ''} onChange={(x) => set.mutate({ studentId: r.studentId, routeId: r.routeId, stopId: x || null })}
+              <Select compact aria-label={tr('admin.transport_page.stop_for', { student: r.student })} disabled={!canWrite || !route || busyFor(set, r.studentId)} value={r.stopId ?? ''} onChange={(x) => set.mutate({ studentId: r.studentId, routeId: r.routeId, stopId: x || null })}
                 options={[{ value: '', label: route ? tr('admin.transport_page.choose_a_stop') : '–' }, ...(route?.stops ?? []).map((s) => ({ value: s.id, label: `${s.name}${s.pickup ? ` · ${s.pickup}` : ''}` }))]} />
             </div>
           );

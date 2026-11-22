@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReportQuery } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, Select, SelectField, EmptyState, EmptyNote, currentLanguage, t } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, Select, SelectField, EmptyState, EmptyNote, currentLanguage, t, busyFor } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { Ico, useOpenParam } from '../../app/kit';
@@ -139,7 +139,7 @@ function Schedules({ reportId, title, classId, onClose, say }: { reportId: strin
         {mine.map((s) => (
           <div key={s.id} className="kv" style={{ alignItems: 'center' }}>
             <span>{s.every === 'week' ? t('admin.reports_page.every_weekday', { day: weekday(s.day) }) : t('admin.reports_page.every_month_on', { day: s.day })} · {s.toNames.join(', ')}</span>
-            <button className="btn sm" disabled={drop.isPending} onClick={() => drop.mutate(s.id)}>{t('admin.reports_page.stop')}</button>
+            <button className="btn sm" disabled={busyFor(drop, s.id)} onClick={() => drop.mutate(s.id)}>{t('admin.reports_page.stop')}</button>
           </div>
         ))}
         <div className="two">

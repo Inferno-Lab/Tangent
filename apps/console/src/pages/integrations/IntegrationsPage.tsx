@@ -6,7 +6,7 @@ import {
   CAPABILITIES, CAPABILITY_LABELS, DELIVERY_STATUSES, INTEGRATION_PROVIDERS, LANGUAGES, MESSAGE_EVENTS, PLATFORM_CAPABILITIES, SUGGESTED_PROVIDERS, SYSTEM_MESSAGES, fieldProblem, providerDef, suggestedFirst,
   type Capability, type ConnectionRow, type DeliveryRow, type IntegrationsView, type ProviderField, type RouteRow, type SchoolRow, type TemplateRow,
 } from '@tangent/contracts';
-import { Checkbox, Dialog, Field, FilePick, NumberField, Segmented, Select, SelectField, useShake, Icon, type IconName, EmptyState, useMore, EmptyNote, t as tr } from '@tangent/web-ui';
+import { Checkbox, Dialog, Field, FilePick, NumberField, Segmented, Select, SelectField, useShake, Icon, type IconName, EmptyState, useMore, EmptyNote, t as tr, busyFor } from '@tangent/web-ui';
 import { Card, Page, Tiles, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
 import { ago, count, price, when } from '../../app/format';
@@ -440,7 +440,7 @@ function Templates({ v, write, say, onEdit }: { v: IntegrationsView; write: bool
         const mapped = v.templates.filter((t) => t.connectionId === c.id);
         return (
           <Card key={c.id} title={c.name} chip={<><span className={`chip ${mapped.length === MESSAGE_KEYS.length ? 'g' : 'a'}`}>{mapped.length} {tr('console.integrations_page.of')}{' '}{MESSAGE_KEYS.length} {tr('console.integrations_page.mapped')}</span>
-            {write && IMPORTABLE.has(c.provider) && <button className="btn sm" disabled={imp.isPending} onClick={() => imp.mutate(c.id)}>{imp.isPending ? tr('console.integrations_page.importing') : tr('console.integrations_page.import_from_provider')}</button>}</>} style={{ padding: 0 }}>
+            {write && IMPORTABLE.has(c.provider) && <button className="btn sm" disabled={busyFor(imp, c.id)} onClick={() => imp.mutate(c.id)}>{imp.isPending ? tr('console.integrations_page.importing') : tr('console.integrations_page.import_from_provider')}</button>}</>} style={{ padding: 0 }}>
             <div className="tbl scroll-x"><div style={{ minWidth: 600 }}>
               <div className="grd th" style={{ '--cols': 'minmax(0,1.2fr) minmax(0,2fr) 200px' } as React.CSSProperties}><span>{tr('console.integrations_page.message')}</span><span>{tr('console.integrations_page.approved_template')}</span><span></span></div>
               {MESSAGE_KEYS.map((m) => {
@@ -524,7 +524,7 @@ function Activity({ schools, write, say }: { schools: SchoolRow[]; write: boolea
                   <span style={{ minWidth: 0 }}><b className="num" style={{ font: '700 13px var(--fb)' }}>{m.to}</b><div className="help" style={{ margin: 0 }}>{CAPABILITY_LABELS[m.channel as Capability] ?? m.channel} · {ago(m.createdAt)}</div></span>
                   <span style={{ minWidth: 0, font: '400 13px/1.4 var(--fb)', color: 'var(--ink2)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} data-tip={m.error ?? m.body}>{m.error ? <span style={{ color: 'var(--bad-i)' }}>{m.error}</span> : m.body}</span>
                   <span className="help" style={{ margin: 0 }}>{m.connectionName ?? '–'}{m.costPaise ? ` · ${price(m.costPaise / 100)}` : ''}</span>
-                  <span>{write && m.status === 'failed' && <button className="btn sm" disabled={retry.isPending} onClick={() => retry.mutate(m.id)}>{tr('console.integrations_page.retry')}</button>}</span>
+                  <span>{write && m.status === 'failed' && <button className="btn sm" disabled={busyFor(retry, m.id)} onClick={() => retry.mutate(m.id)}>{tr('console.integrations_page.retry')}</button>}</span>
                 </div>
               ))}
             </div></div>

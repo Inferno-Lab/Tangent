@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Checkbox, Segmented, Select, tintFor, EmptyState, EmptyNote, t as tr } from '@tangent/web-ui';
+import { Checkbox, Segmented, Select, tintFor, EmptyState, EmptyNote, t as tr, busyFor } from '@tangent/web-ui';
 import { Card, Page, Tiles, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
 import { url } from '../../app/base';
@@ -72,7 +72,7 @@ export function HealthPage() { const app = useApp();
                 <span style={{ color: 'var(--ink3)', font: '600 13px var(--fb)', whiteSpace: 'nowrap' }}>{ago(e.lastAt)}</span>
               </summary>
               <div className="help" style={{ marginTop: 8, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>{e.url ?? ''}{e.release ? tr('console.health_page.release', { release: e.release }) : ''} {tr('console.health_page.first_seen')}{' '}{ago(e.firstAt)}
-                {!e.handledBy && app.can('schools.write') && <button className="btn sm" disabled={done.isPending} onClick={() => done.mutate(e.fingerprint)}>{tr('console.health_page.mark_handled')}</button>}</div>
+                {!e.handledBy && app.can('schools.write') && <button className="btn sm" disabled={busyFor(done, e.fingerprint)} onClick={() => done.mutate(e.fingerprint)}>{tr('console.health_page.mark_handled')}</button>}</div>
               {e.stack && <pre style={{ margin: '8px 0 0', padding: 12, borderRadius: 12, background: 'var(--s2)', font: '400 12px/1.5 var(--fm, monospace)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 260, overflow: 'auto' }}>{e.stack}</pre>}
             </details>
           ))}
@@ -129,7 +129,7 @@ function Jobs({ say }: { say: (m: string, tone?: 'bad') => void }) { const app =
                 <span style={{ minWidth: 0 }}><b style={{ font: '700 13px var(--fb)' }}>{JOB_LABELS[j.kind] ?? j.kind}</b><div className="help" style={{ margin: 0 }}>{ago(j.finishedAt ?? j.runAt)}{j.attempts > 1 ? tr('console.health_page.try', { attempts: j.attempts }) : ''}</div></span>
                 <span className="help" style={{ margin: 0, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{j.schoolName ?? tr('console.health_page.every_school')}</span>
                 <span style={{ minWidth: 0, font: '400 13px/1.4 var(--fb)', color: j.lastError ? 'var(--bad-i)' : 'var(--ink2)', overflowWrap: 'anywhere' }}>{j.lastError ?? j.result ?? ''}</span>
-                <span>{app.can('schools.write') && j.status === 'failed' && <button className="btn sm" disabled={retry.isPending} onClick={() => retry.mutate(j.id)}>{tr('console.health_page.retry')}</button>}</span>
+                <span>{app.can('schools.write') && j.status === 'failed' && <button className="btn sm" disabled={busyFor(retry, j.id)} onClick={() => retry.mutate(j.id)}>{tr('console.health_page.retry')}</button>}</span>
               </div>
             ))}
           </div></div>

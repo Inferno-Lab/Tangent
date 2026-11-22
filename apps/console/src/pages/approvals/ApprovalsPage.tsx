@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
 import { ACTION_LABELS, SETTINGS_META, type ActionRow } from '@tangent/contracts';
-import { AreaField, Dialog, Select, useShake, EmptyState, t, EmptyNote } from '@tangent/web-ui';
+import { AreaField, Dialog, Select, useShake, EmptyState, t, EmptyNote, busyFor } from '@tangent/web-ui';
 import { Card, Page, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
 import { ago, when } from '../../app/format';
@@ -51,7 +51,7 @@ export function ApprovalsPage() {
                   </span>
                   <span className="tgrow">
                     <button className="btn sm" disabled={!mayDecide} onClick={() => setRejecting(r)}>{t('console.approvals_page.reject')}</button>
-                    <button className="btn pri sm" disabled={!mayDecide || own || approve.isPending} data-tip={own ? t('console.approvals_page.a_second_person_has_to') : undefined} onClick={() => approve.mutate(r.id)}>{t('console.approvals_page.approve')}</button>
+                    <button className="btn pri sm" disabled={!mayDecide || own || busyFor(approve, r.id)} data-tip={own ? t('console.approvals_page.a_second_person_has_to') : undefined} onClick={() => approve.mutate(r.id)}>{t('console.approvals_page.approve')}</button>
                   </span>
                 </div>
                 {r.changes.length > 0 && (

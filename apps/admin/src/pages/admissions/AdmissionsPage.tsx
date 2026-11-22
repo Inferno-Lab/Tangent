@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AdmissionStages, DEFAULT_ADMISSION_STAGES, addDays, schoolToday, stageName, type AdmissionStage, type EnquiryPatch, type EnquiryRow, type EnquiryStage } from '@tangent/contracts';
-import { EmptyNote, Checkbox, DateField, Dialog, Field, PhoneField, SelectField, currentLanguage, useShake, EmptyState, t, useUnsaved } from '@tangent/web-ui';
+import { EmptyNote, Checkbox, DateField, Dialog, Field, PhoneField, SelectField, currentLanguage, useShake, EmptyState, t, useUnsaved, busyFor } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { AddBtn, AreaField, Avatar, dateLabel, problem, useCountry, useGrades, useSetting } from '../../app/kit';
@@ -94,7 +94,7 @@ export function AdmissionsPage() {
                           {r.scores[r.stage] && <span className="chip v">{r.scores[r.stage]}</span>}
                           {r.studentId && <span className="chip g">{t('admin.admissions_page.student')}</span>}
                         </div>
-                        {canWrite && (() => { const to = step(r.stage, 1); return to && <button className="btn sm" disabled={move.isPending} onClick={() => act(r, to)}>{to === 'enrolled' ? t('admin.admissions_page.enrol') : t('admin.admissions_page.move_to', { label: label(to) })}</button>; })()}
+                        {canWrite && (() => { const to = step(r.stage, 1); return to && <button className="btn sm" disabled={busyFor(move, r.id)} onClick={() => act(r, to)}>{to === 'enrolled' ? t('admin.admissions_page.enrol') : t('admin.admissions_page.move_to', { label: label(to) })}</button>; })()}
                       </article>
                     ))}
                   </div>

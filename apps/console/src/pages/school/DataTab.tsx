@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ImportInputIn } from '@tangent/api-client';
 import { IMPORT_KINDS, IMPORT_SOURCES, type ImportBatchRow, type ImportColumn, type ImportKind, type ImportPreview, type MigrationView, type SchoolDetail } from '@tangent/contracts';
-import { Dialog, EmptyCard, Field, FilePick, Select, EmptyNote, t as tr } from '@tangent/web-ui';
+import { Dialog, EmptyCard, Field, FilePick, Select, EmptyNote, t as tr, busyFor } from '@tangent/web-ui';
 import { RecordsTab } from './IntegrationsTab';
 import { useApp } from '../../app/context';
 import { when } from '../../app/format';
@@ -130,14 +130,14 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
             {asideFor === u.id && (
               <span style={{ flex: '1 1 100%', display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                 <span style={{ flex: '1 1 260px' }}><Field label={tr('console.data_tab.why_the_school_reads_this')} value={why} onChange={setWhy} maxLength={200} placeholder={tr('console.data_tab.this_is_last_year_s')} /></span>
-                <button className="btn sm pri" disabled={aside.isPending || why.trim().length < 3} onClick={() => aside.mutate({ id: u.id, reason: why.trim() })}>{tr('console.data_tab.set_aside_2')}</button>
+                <button className="btn sm pri" disabled={busyFor(aside, u.id) || why.trim().length < 3} onClick={() => aside.mutate({ id: u.id, reason: why.trim() })}>{tr('console.data_tab.set_aside_2')}</button>
                 <button className="btn sm" onClick={() => setAsideFor(null)}>{tr('console.data_tab.cancel')}</button>
               </span>
             )}
             <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', marginInlineStart: 'auto' }}>
               {u.status === 'imported' ? <span className="chip g">{tr('console.data_tab.imported')}</span> : <>
-                {can && /\.(csv|txt|xlsx)$/i.test(u.fileName) && <button className="btn sm" disabled={open.isPending} onClick={() => open.mutate(u.id)}>{tr('console.data_tab.open')}</button>}
-                {can && <button className="btn sm" disabled={aside.isPending} onClick={() => (u.status === 'set_aside' ? aside.mutate({ id: u.id, reason: '' }) : setAsideFor(u.id))}>{u.status === 'set_aside' ? tr('console.data_tab.bring_back') : tr('console.data_tab.set_aside_2')}</button>}
+                {can && /\.(csv|txt|xlsx)$/i.test(u.fileName) && <button className="btn sm" disabled={busyFor(open, u.id)} onClick={() => open.mutate(u.id)}>{tr('console.data_tab.open')}</button>}
+                {can && <button className="btn sm" disabled={busyFor(aside, u.id)} onClick={() => (u.status === 'set_aside' ? aside.mutate({ id: u.id, reason: '' }) : setAsideFor(u.id))}>{u.status === 'set_aside' ? tr('console.data_tab.bring_back') : tr('console.data_tab.set_aside_2')}</button>}
               </>}
               <button className="btn sm" onClick={() => void app.api.migration.upload(schoolId, u.id).then((f) => save(f.content.startsWith('data:') ? dataBlob(f.content) : new Blob([f.content], { type: 'text/csv' }), f.fileName), fail)}>{tr('console.data_tab.download')}</button>
             </span>

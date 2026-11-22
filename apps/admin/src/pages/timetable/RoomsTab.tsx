@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { dayLabel, schoolToday, type RoomRow } from '@tangent/contracts';
-import { EmptyNote, Checkbox, DateField, Dialog, ErrorLine, Field, NumberField, TimeField, useShake, EmptyState, t } from '@tangent/web-ui';
+import { EmptyNote, Checkbox, DateField, Dialog, ErrorLine, Field, NumberField, TimeField, useShake, EmptyState, t, busyFor } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { AddBtn, problem } from '../../app/kit';
@@ -55,7 +55,7 @@ export function RoomsTab({ tabs }: { tabs: React.ReactNode }) {
                 {day.data?.bookings.length ? day.data.bookings.map((b) => (
                   <div key={b.id} className="kv" style={{ alignItems: 'center', gap: 12 }}>
                     <span>{b.start}–{b.end}</span><b style={{ flex: 1 }}>{b.purpose}<small style={{ display: 'block', color: 'var(--ink3)' }}>{b.bookedBy}</small></b>
-                    {(b.mine || canEdit) && <button className="btn sm" disabled={cancel.isPending} onClick={() => cancel.mutate(b.id)}>{t('admin.rooms_tab.cancel_booking')}</button>}
+                    {(b.mine || canEdit) && <button className="btn sm" disabled={busyFor(cancel, b.id)} onClick={() => cancel.mutate(b.id)}>{t('admin.rooms_tab.cancel_booking')}</button>}
                   </div>
                 )) : <EmptyNote icon="calendar" title={t('admin.rooms_tab.no_bookings')} />}
                 {cur.bookable && date >= schoolToday() && <BookForm roomId={cur.id} date={date} onDone={() => after(t('admin.rooms_tab.room_booked', { room: cur.name }))} />}

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { uploadFile } from '@tangent/api-client';
 import { fmtDate, type AlbumRow, type GalleryReportRow, type PhotoRow } from '@tangent/contracts';
-import { Dialog, Field, FilePick, Panel, Presence, SelectField, useShake, Icon, EmptyState, EmptyNote, t } from '@tangent/web-ui';
+import { Dialog, Field, FilePick, Panel, Presence, SelectField, useShake, Icon, EmptyState, EmptyNote, t, busyFor } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { AddBtn, StudentPick, problem, stamp } from '../../app/kit';
@@ -95,7 +95,7 @@ function AlbumPanel({ album, canWrite, say, onEdit, onClose }: { album: AlbumRow
                 {canWrite && <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                   <button className="btn sm" onClick={() => setTagging(p)}>{t('admin.gallery_page.tag')}</button>
                   {removing === p.id
-                    ? <><button className="btn sm dngf" disabled={remove.isPending} onClick={() => remove.mutate(p.id)}>{t('admin.gallery_page.yes_remove')}</button><button className="btn sm" onClick={() => setRemoving(null)}>{t('admin.gallery_page.keep')}</button></>
+                    ? <><button className="btn sm dngf" disabled={busyFor(remove, p.id)} onClick={() => remove.mutate(p.id)}>{t('admin.gallery_page.yes_remove')}</button><button className="btn sm" onClick={() => setRemoving(null)}>{t('admin.gallery_page.keep')}</button></>
                     : <button className="btn sm" onClick={() => setRemoving(p.id)}>{t('admin.gallery_page.remove')}</button>}
                 </div>}
               </div>
@@ -178,8 +178,8 @@ function Reported({ say }: { say: (m: string, tone?: 'bad') => void }) { const a
             <small className="help">{r.by} · {r.album ?? t('admin.gallery_page.an_album')} · {stamp(r.createdAt)}</small>
             {canWrite && (
               <span className="tgrow">
-                <button className="btn sm dng" disabled={act.isPending} onClick={() => act.mutate({ r, remove: true })}>{t('admin.gallery_page.take_it_down')}</button>
-                <button className="btn sm" disabled={act.isPending} onClick={() => act.mutate({ r, remove: false })}>{t('admin.gallery_page.keep_it')}</button>
+                <button className="btn sm dng" disabled={busyFor(act, r)} onClick={() => act.mutate({ r, remove: true })}>{t('admin.gallery_page.take_it_down')}</button>
+                <button className="btn sm" disabled={busyFor(act, r)} onClick={() => act.mutate({ r, remove: false })}>{t('admin.gallery_page.keep_it')}</button>
               </span>
             )}
           </div>

@@ -144,3 +144,7 @@
 /* A popup asking before it throws away what was typed in it (Dialog, Panel). */
 .nest .unsaved{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:12px 0;padding:10px 12px;border-radius:16px;background:var(--bad-s);color:var(--bad-i);font:600 13px var(--fb);animation:nEm var(--t2) var(--e)}
 .nest .unsaved span{flex:1;min-width:140px}
+/* The button whose change is in flight (markBusy): a spinner in place of its words, its width kept, no second click. */
+.nest :is(button,.btn)[aria-busy="true"]{position:relative;pointer-events:none;-webkit-text-fill-color:transparent}
+.nest :is(button,.btn)[aria-busy="true"]>*{visibility:hidden}
+.nest :is(button,.btn)[aria-busy="true"]::after{content:"";position:absolute;inset:0;margin:auto;width:16px;height:16px;border-radius:50%;border:2.5px solid color-mix(in srgb,currentColor 28%,transparent);border-top-color:currentColor;animation:nSpin .7s linear infinite}
