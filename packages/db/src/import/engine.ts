@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import { checkCustom, customText, rawOf, IMPORT_KINDS, importKind, type CustomEntity, type FieldDef, type ImportBatchRow, type ImportInput, type ImportKind, type ImportPreview, type ImportRowCheck, tx } from '@tangent/contracts';
+import { checkCustom, customText, rawOf, IMPORT_KINDS, PREVIEW_ROWS, importKind, type CustomEntity, type FieldDef, type ImportBatchRow, type ImportInput, type ImportKind, type ImportPreview, type ImportRowCheck, tx } from '@tangent/contracts';
 import { ImportError, readTable, toCsv, xlsx, zip } from './files.js';
 import { KINDS, type Impl, type Row, type Write } from './kinds.js';
 import { savedSetting } from '../numbers.js';
@@ -66,6 +66,19 @@ const signature = (kind: string, headers: string[]) => `${kind}:${headers.map(no
 
 interface Checked { preview: ImportPreview; valid: Row[]; impl: Impl<unknown>; lookups: unknown; own: FieldDef[] }
 
+// A big file is read and checked a few thousand rows at a time, letting the server answer everyone else in between: one
+// long loop over a year of attendance held every other request for seconds.
+const TICK = 2000;
+const tick = () => new Promise<void>((ok) => setImmediate(ok));
+async function each<T, U>(list: T[], fn: (x: T, i: number) => U): Promise<U[]> {
+  const out: U[] = new Array(list.length);
+  for (let i = 0; i < list.length; i++) {
+    if (i && i % TICK === 0) await tick();
+    out[i] = fn(list[i]!, i);
+  }
+  return out;
+}
+
 async function check(db: Q, input: ImportInput): Promise<Checked> {
   const kind = await ownKind(db, input.kind);
   const impl = KINDS[input.kind] as Impl<unknown> | undefined;
@@ -81,7 +94,7 @@ async function check(db: Q, input: ImportInput): Promise<Checked> {
   const meaning = Object.fromEntries(Object.entries(values).map(([k, m]) => [k, new Map(Object.entries(m).map(([from, to]) => [same(from), to]))]));
   const mapped = new Set(Object.values(mapping).filter(Boolean));
   const missing = kind.columns.filter((c) => c.required && !mapped.has(c.key)).map((c) => c.label);
-  const rows: Row[] = data.map((cells) => {
+  const rows: Row[] = await each(data, (cells) => {
     const r: Row = {};
     for (const col of kind.columns) r[col.key] = '';
     headers.forEach((h, i) => { const k = mapping[h]; if (k && cells[i]) r[k] = r[k] ? `${r[k]} ${cells[i]}` : cells[i]!; });
@@ -99,7 +112,7 @@ async function check(db: Q, input: ImportInput): Promise<Checked> {
   }
   const lookups = await impl.load(db, rows);
   const seen = new Map<string, number>();
-  const checks: ImportRowCheck[] = rows.map((r, i) => {
+  const checks: ImportRowCheck[] = await each(rows, (r, i): ImportRowCheck => {
     const line = input.rows ? i + 1 : i + 2;
     if (missing.length) return { line, values: r, action: 'skip', errors: [`Nothing is matched to ${missing.join(', ')}.`] };
     const errors = kind.columns.filter((c) => c.required && !r[c.key]).map((c) => tx('{column} is empty.', { column: c.label }));
@@ -117,12 +130,16 @@ async function check(db: Q, input: ImportInput): Promise<Checked> {
   });
   const valid = rows.filter((_, i) => checks[i]!.action !== 'skip');
   const counts = { create: checks.filter((c) => c.action === 'create').length, update: checks.filter((c) => c.action === 'update').length, skip: checks.filter((c) => c.action === 'skip').length, total: checks.length };
-  return { preview: { kind: kind.key, source, headers, mapping, values, unmatched, missing, rows: checks, counts, totals: impl.totals(valid, lookups), columns: kind.columns.map((c) => ({ ...rawOf(c), label: c.label })) }, valid, impl, lookups, own };
+  return { preview: { kind: kind.key, source, headers, mapping, values, unmatched, missing, rows: checks, partial: false, counts, totals: impl.totals(valid, lookups), columns: kind.columns.map((c) => ({ ...rawOf(c), label: c.label })) }, valid, impl, lookups, own };
 }
 
 /** Reads, matches and checks a file without changing anything: what would be added, changed and left out, and the totals. */
 export async function previewImport(db: Q, input: ImportInput): Promise<ImportPreview> {
-  return (await check(db, input)).preview;
+  const p = (await check(db, input)).preview;
+  if (p.rows.length <= PREVIEW_ROWS) return p;
+  const bad = p.rows.filter((r) => r.errors.length).slice(0, PREVIEW_ROWS);
+  const good = p.rows.filter((r) => !r.errors.length).slice(0, PREVIEW_ROWS - bad.length);
+  return { ...p, rows: [...bad, ...good].sort((a, b) => a.line - b.line), partial: true };
 }
 
 const ident = (s: string) => `"${s.replace(/"/g, '""')}"`;
@@ -150,7 +167,9 @@ async function apply(client: pg.PoolClient, w: Write): Promise<Change> {
   });
   const fresh: Rec[] = [];
   const changed: Rec[] = [];
-  for (const r of w.rows) {
+  for (let i = 0; i < w.rows.length; i++) {
+    if (i && i % TICK === 0) await tick();
+    const r = w.rows[i]!;
     const before = existing.get(keyOf(r));
     if (!before) fresh.push(r);
     else if (w.cols.some((c) => differs(before[c], r[c]))) { changed.push(r); change.updated.push(before); }

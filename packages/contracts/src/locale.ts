@@ -129,24 +129,35 @@ export const schoolCurrency = (): string => localeSource()?.currency || 'USD';
 /** The current school's country (ISO 3166), for phone numbers and the country's rules; empty when not known. */
 export const schoolCountry = (): string => localeSource()?.country || '';
 
-const partsCache = new Map<string, Intl.DateTimeFormat>();
-function parts(at: Date, tz: string): Record<string, number> {
-  let f = partsCache.get(tz);
+const zoneFmt = new Map<string, Intl.DateTimeFormat>();
+const offsets = new Map<string, number>();
+const QUARTER = 15 * 60_000;
+
+/**
+ * Minutes the zone is ahead of UTC at that instant (330 for India, -300 for New York in winter). Asking Intl is slow (an
+ * import of a year's attendance asked 130,000 times and held the server for seconds), and a zone's offset only changes at
+ * its switches, which fall on a quarter hour, so it is asked once per zone per quarter hour.
+ */
+export function zoneOffsetMinutes(at: Date, tz = schoolZone()): number {
+  const key = `${tz}|${Math.floor(at.getTime() / QUARTER)}`;
+  const hit = offsets.get(key);
+  if (hit !== undefined) return hit;
+  let f = zoneFmt.get(tz);
   if (!f) {
     f = new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
-    partsCache.set(tz, f);
+    zoneFmt.set(tz, f);
   }
-  const out: Record<string, number> = {};
-  for (const p of f.formatToParts(at)) if (p.type !== 'literal') out[p.type] = Number(p.value);
-  return out;
+  const p: Record<string, number> = {};
+  for (const x of f.formatToParts(at)) if (x.type !== 'literal') p[x.type] = Number(x.value);
+  const asUtc = Date.UTC(p.year!, p.month! - 1, p.day!, p.hour! % 24, p.minute!, p.second!);
+  const off = Math.round((asUtc - Math.floor(at.getTime() / 1000) * 1000) / 60_000);
+  if (offsets.size > 5000) offsets.clear();
+  offsets.set(key, off);
+  return off;
 }
 
-/** Minutes the zone is ahead of UTC at that instant (330 for India, -300 for New York in winter). */
-export function zoneOffsetMinutes(at: Date, tz = schoolZone()): number {
-  const p = parts(at, tz);
-  const asUtc = Date.UTC(p.year!, p.month! - 1, p.day!, p.hour! % 24, p.minute!, p.second!);
-  return Math.round((asUtc - Math.floor(at.getTime() / 1000) * 1000) / 60_000);
-}
+/** The school's wall clock at an instant, as a Date whose UTC fields read it. */
+const wall = (at: Date, tz: string): Date => new Date(at.getTime() + zoneOffsetMinutes(at, tz) * 60_000);
 
 /** The instant a school's wall clock reads `day` at `time` ("08:30"), in its zone. */
 export function schoolInstant(day: string, time = '00:00', tz = schoolZone()): Date {
@@ -159,19 +170,18 @@ export function schoolInstant(day: string, time = '00:00', tz = schoolZone()): D
 
 /** A Date whose UTC fields read the school's wall clock (getUTCHours() is the hour at the school). */
 export function schoolNow(now: Date = new Date(), tz = schoolZone()): Date {
-  return new Date(now.getTime() + zoneOffsetMinutes(now, tz) * 60_000);
+  return wall(now, tz);
 }
 
 /** YYYY-MM-DD at the school, now or at an instant. */
 export function schoolToday(now: Date = new Date(), tz = schoolZone()): string {
-  const p = parts(now, tz);
-  return `${String(p.year).padStart(4, '0')}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
+  return wall(now, tz).toISOString().slice(0, 10);
 }
 
 /** Minutes since midnight at the school. */
 export function schoolMinutes(now: Date = new Date(), tz = schoolZone()): number {
-  const p = parts(now, tz);
-  return (p.hour! % 24) * 60 + p.minute!;
+  const w = wall(now, tz);
+  return w.getUTCHours() * 60 + w.getUTCMinutes();
 }
 
 const fmtCache = new Map<string, Intl.NumberFormat | Intl.DateTimeFormat>();

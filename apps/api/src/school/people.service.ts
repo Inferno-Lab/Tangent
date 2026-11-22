@@ -188,10 +188,10 @@ export class PeopleService {
     const count = Number((await t.pool.query<{ n: string }>("select count(*) n from users where kind = 'staff' and status = 'active'")).rows[0]!.n);
     if (limit && count + p.counts.create > limit) throw new ApiError('locked', tx('Your plan allows {limit} staff accounts and this sheet would make {p1}. Ask Tangent to raise the limit.', { limit, p1: count + p.counts.create }));
     const errors = p.rows.filter((r) => r.errors.length).map((r) => ({ line: r.line, message: r.errors.join(' ') }));
-    if (p.counts.create + p.counts.update === 0) return { created: 0, updated: 0, skipped: errors.length, errors };
+    if (p.counts.create + p.counts.update === 0) return { created: 0, updated: 0, skipped: p.counts.skip, errors };
     const batch = await commitImport(t.pool, input, user.name);
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'staff.imported', entity: 'staff', detail: { created: batch.created, updated: batch.updated, skipped: batch.skipped } });
-    return { created: batch.created, updated: batch.updated, skipped: errors.length, errors };
+    return { created: batch.created, updated: batch.updated, skipped: p.counts.skip, errors };
   }
 
   /** Everyone on staff, in the import sheet's columns, so it can go back in after editing. */

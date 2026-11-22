@@ -62,7 +62,7 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
   const fail = (e: unknown) => say((e as Error).message, 'bad');
   const commit = useMutation({
     mutationFn: () => app.api.migration.commit(schoolId, input()!),
-    onSuccess: (b) => { change(null); refresh(); if ('run' in b) { say(tr('console.data_tab.importing_in_background', { rows: b.run.rows })); return; } say(tr('console.data_tab.imported_added_updated', { p0: kind!.label.toLowerCase(), created: b.created, updated: b.updated, p3: b.skipped ? tr('console.data_tab.left_out_2', { skipped: b.skipped }) : '' })); },
+    onSuccess: (b) => { change(null); refresh(); if ('run' in b) { say(tr('console.data_tab.importing_in_background', { rows: b.run.rows || (preview.data?.counts.total ?? 0) })); return; } say(tr('console.data_tab.imported_added_updated', { p0: kind!.label.toLowerCase(), created: b.created, updated: b.updated, p3: b.skipped ? tr('console.data_tab.left_out_2', { skipped: b.skipped }) : '' })); },
     onError: fail,
   });
   const undo = useMutation({ mutationFn: (id: string) => app.api.migration.undo(schoolId, id), onSuccess: (batches) => { setUndoing(null); refresh({ batches }); say(tr('console.data_tab.undone_everything_it_changed_is')); }, onError: fail });
@@ -104,7 +104,7 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
         {v.runs.map((r, i) => (
           // A big file's result ("129,942 added, 0 changed, 0 left out") goes under its name on a phone instead of off the edge.
           <div key={r.id} className="kv" style={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 8 }}>
-            <span>{IMPORT_KINDS.find((k) => k.key === r.kind)?.label ?? r.kind} · {r.fileName} · {tr('console.data_tab.rows_n', { n: r.rows })}<small style={{ display: 'block', color: r.error ? 'var(--bad)' : 'var(--ink3)' }}>{r.error ?? `${r.by} · ${when(r.startedAt)}`}</small></span>
+            <span>{IMPORT_KINDS.find((k) => k.key === r.kind)?.label ?? r.kind} · {r.fileName}{r.rows ? ` · ${tr('console.data_tab.rows_n', { n: r.rows })}` : ''}<small style={{ display: 'block', color: r.error ? 'var(--bad)' : 'var(--ink3)' }}>{r.error ?? `${r.by} · ${when(r.startedAt)}`}</small></span>
             <b><span className={`chip ${r.status === 'done' ? 'g' : r.status === 'failed' ? 'c' : 'a'}`}>{r.status === 'running' ? (v.runs.slice(i + 1).some((o) => o.status === 'running') ? tr('console.data_tab.waiting_turn') : tr('console.data_tab.running')) : r.status === 'done' ? tr('console.data_tab.run_done', { created: r.created ?? 0, updated: r.updated ?? 0, skipped: r.skipped ?? 0 }) : tr('console.data_tab.run_failed')}</span></b>
           </div>
         ))}
@@ -192,6 +192,9 @@ function PreviewPanel({ kind: base, src, preview: p, loading, error, onMap, onVa
   const rows = useMemo(() => (p?.rows ?? []).map((r, i) => ({ ...r, i })), [p]);
   const bad = rows.filter((r) => r.errors.length);
   const shown = (onlyBad && bad.length ? bad : rows).slice(0, SHOWN);
+  // A big file comes back in part (PREVIEW_ROWS): its counts are the whole file's, and a cell is fixed in the file itself.
+  const badTotal = p?.partial ? p.counts.skip : bad.length;
+  const listTotal = onlyBad && bad.length ? badTotal : p?.partial ? p.counts.total : rows.length;
   const options = [{ value: '', label: tr('console.data_tab.leave_out') }, ...kind.columns.map((c) => ({ value: c.key, label: `${c.label}${c.required ? ' *' : ''}` }))];
   // Fixing a cell turns the file into typed rows (already matched to the columns), checked again on every change.
   const edit = (i: number, key: string, value: string) => onRows(rows.map((r) => (r.i === i ? { ...r.values, [key]: value } : r.values)));
@@ -228,10 +231,11 @@ function PreviewPanel({ kind: base, src, preview: p, loading, error, onMap, onVa
           {rows.length > 0 && (
             <>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
-                {bad.length > 0 && <button className="btn sm" onClick={() => setOnlyBad(!onlyBad)}>{onlyBad ? tr('console.data_tab.show_every_row') : tr('console.data_tab.show_only_the_with_problems', { length: bad.length })}</button>}
-                {rows.length > SHOWN && <span className="help">{tr('console.data_tab.showing')}{' '}{shown.length} {tr('console.data_tab.of')}{' '}{(onlyBad && bad.length ? bad : rows).length}.</span>}
+                {bad.length > 0 && <button className="btn sm" onClick={() => setOnlyBad(!onlyBad)}>{onlyBad ? tr('console.data_tab.show_every_row') : tr('console.data_tab.show_only_the_with_problems', { length: badTotal })}</button>}
+                {listTotal > shown.length && <span className="help">{tr('console.data_tab.showing')}{' '}{shown.length} {tr('console.data_tab.of')}{' '}{listTotal}.</span>}
                 {src.kind === 'rows' && <button className="btn sm" onClick={addRow}>{tr('console.data_tab.add_a_row')}</button>}
               </div>
+              {p.partial && <div className="help" style={{ marginTop: 8 }}>{tr('console.data_tab.big_file_fix_in_file', { total: p.counts.total })}</div>}
               <div className="scroll-x lscroll" style={{ marginTop: 8 }}>
                 <div style={{ minWidth: 56 + kind.columns.length * 120 + 180 }}>
                   <div className="grd th" style={grid}><span>{tr('console.data_tab.line')}</span>{kind.columns.map((c) => <span key={c.key}>{c.label}</span>)}<span>{tr('console.data_tab.problem')}</span></div>
@@ -239,7 +243,7 @@ function PreviewPanel({ kind: base, src, preview: p, loading, error, onMap, onVa
                     <div key={r.i} className="grd rw" style={{ ...grid, height: 'auto', padding: '6px 0', gap: 6 }}>
                       <span style={{ font: '700 12px var(--fb)', color: 'var(--ink3)' }}>{r.line}</span>
                       {/* Keyed by the value too: a box typed in keeps nothing from another file's row at the same place. */}
-                      {kind.columns.map((c) => <input key={`${c.key}|${r.values[c.key] ?? ''}`} className={`hws ${r.errors.length && c.required && !r.values[c.key] ? 'bad' : ''}`} style={{ width: '100%', textAlign: 'start' }} aria-label={tr('console.data_tab.line_2', { line: r.line, label: c.label })} placeholder={c.example} defaultValue={r.values[c.key] ?? ''}
+                      {kind.columns.map((c) => <input key={`${c.key}|${r.values[c.key] ?? ''}`} className={`hws ${r.errors.length && c.required && !r.values[c.key] ? 'bad' : ''}`} style={{ width: '100%', textAlign: 'start' }} aria-label={tr('console.data_tab.line_2', { line: r.line, label: c.label })} placeholder={c.example} defaultValue={r.values[c.key] ?? ''} readOnly={p.partial}
                         onBlur={(e) => { if (e.target.value !== (r.values[c.key] ?? '')) edit(r.i, c.key, e.target.value); }} />)}
                       <span style={{ font: '600 12px var(--fb)', color: r.errors.length ? 'var(--bad)' : 'var(--ok)' }}>{r.errors.length ? r.errors.join(' ') : r.action === 'update' ? tr('console.data_tab.updates_what_is_there') : tr('console.data_tab.new')}</span>
                     </div>

@@ -110,16 +110,24 @@ export function zip(files: { name: string; content: string | Buffer }[]): Buffer
 
 /** The files inside a ZIP (an .xlsx is one), by name. Stored and deflated entries, which is all Excel and Sheets write. */
 export function unzip(buf: Buffer): Map<string, Buffer> {
-  const out = new Map<string, Buffer>();
+  return new Map(zipEntries(buf).map((e) => [e.name, e.read()]));
+}
+
+/**
+ * The entries of a ZIP, each read only when asked: a photo zip may be 300 MB, and inflating every photo at once held it twice
+ * over in memory. `size` is the entry's size once read.
+ */
+export function zipEntries(buf: Buffer): { name: string; size: number; read: () => Buffer }[] {
+  const out: { name: string; size: number; read: () => Buffer }[] = [];
   const eocd = buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
   if (eocd < 0) throw new ImportError('This file is not a spreadsheet Tangent can read. Save it as .xlsx or .csv.');
   let p = buf.readUInt32LE(eocd + 16);
   for (let i = buf.readUInt16LE(eocd + 10); i > 0; i--) {
-    const method = buf.readUInt16LE(p + 10), size = buf.readUInt32LE(p + 20), n = buf.readUInt16LE(p + 28), off = buf.readUInt32LE(p + 42);
+    const method = buf.readUInt16LE(p + 10), size = buf.readUInt32LE(p + 20), full = buf.readUInt32LE(p + 24), n = buf.readUInt16LE(p + 28), off = buf.readUInt32LE(p + 42);
     const name = buf.toString('utf8', p + 46, p + 46 + n);
     const start = off + 30 + buf.readUInt16LE(off + 26) + buf.readUInt16LE(off + 28);
     const data = buf.subarray(start, start + size);
-    out.set(name, method === 8 ? inflateRawSync(data) : data);
+    out.push({ name, size: full, read: () => (method === 8 ? inflateRawSync(data) : data) });
     p += 46 + n + buf.readUInt16LE(p + 30) + buf.readUInt16LE(p + 32);
   }
   return out;

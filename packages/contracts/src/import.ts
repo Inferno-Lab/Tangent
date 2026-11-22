@@ -113,6 +113,9 @@ export const ImportInput = z.object({
 }).refine((v) => !!v.csv !== !!v.rows, { message: 'Send a file or typed rows, not both.' });
 export type ImportInput = z.infer<typeof ImportInput>;
 
+/** The most rows a preview sends back: a year of attendance was 130,000 rows and 15 MB, for a grid that shows 100. */
+export const PREVIEW_ROWS = 1000;
+
 export interface ImportRowCheck {
   line: number;
   values: Record<string, string>;
@@ -132,7 +135,10 @@ export interface ImportPreview {
   unmatched: Record<string, string[]>;
   /** Required columns nothing maps to: the import cannot go ahead until each has a column. */
   missing: string[];
+  /** Every row of a file up to PREVIEW_ROWS; past that the rows with problems first, then the first good ones (`partial`). */
   rows: ImportRowCheck[];
+  /** The file has more rows than came back: `counts` covers all of them, `rows` only some, so cells are fixed in the file. */
+  partial: boolean;
   counts: { create: number; update: number; skip: number; total: number };
   /** Totals to check against the old system: rows per class, money per fee head, and so on. */
   totals: { label: string; value: string }[];
