@@ -100,7 +100,8 @@ export function resolveConfig({ settings, entitlement, audience, flags, live = t
     vocab: (merged['vocab.words'] ?? {}) as Vocabulary,
     limits: entitlement.limits,
     app: { roles, layout },
-    privacy: { notice: str('privacy.notice'), officerName: str('privacy.officerName'), officerEmail: str('privacy.officerEmail'), officerPhone: str('privacy.officerPhone') },
+    // A country pack's notice says {school}; the school's own name goes in its place.
+    privacy: { notice: str('privacy.notice').replace(/\{school\}/g, str('school.name')), officerName: str('privacy.officerName'), officerEmail: str('privacy.officerEmail'), officerPhone: str('privacy.officerPhone') },
     flags: flags ?? {},
   };
 }

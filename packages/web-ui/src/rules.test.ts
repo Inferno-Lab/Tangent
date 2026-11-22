@@ -164,6 +164,31 @@ describe('every word in a language catalogue', () => {
     expect(indiaInCode(), 'take it from the school’s settings or its country pack (node tools/guard-international.mjs); a line about India on purpose says india-pack: why').toEqual([]);
   });
 
+  it('fills every {value} a message names, so no {placeholder} reaches a page', () => {
+    // These explain the {placeholder} syntax to the person writing a template.
+    const syntax = new Set(['console.integrations_page.paste_it_exactly_as_approved']);
+    const unfilled = code.flatMap((f) => {
+      const src = ts.createSourceFile(f, read(f), ts.ScriptTarget.Latest, true, f.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+      const out: string[] = [];
+      const visit = (n: ts.Node): void => {
+        if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && /^tr?$/.test(n.expression.text) && n.arguments[0] && ts.isStringLiteral(n.arguments[0])) {
+          const key = n.arguments[0].text;
+          const need = en[key] === undefined || syntax.has(key) ? [] : messageArgs(en[key]!).filter((a) => !a.startsWith('@'));
+          const arg = n.arguments[1];
+          // A params object built elsewhere, or spread, cannot be read here.
+          const given = !arg ? new Set<string>() : ts.isObjectLiteralExpression(arg) && !arg.properties.some(ts.isSpreadAssignment)
+            ? new Set(arg.properties.map((p) => p.name?.getText(src).replace(/['"]/g, '').toLowerCase() ?? '')) : null;
+          const missing = given ? need.filter((a) => !given.has(a)) : [];
+          if (missing.length) out.push(`${rel(f)}:${src.getLineAndCharacterOfPosition(n.getStart(src)).line + 1}  ${key} needs {${missing.join('}, {')}}`);
+        }
+        ts.forEachChild(n, visit);
+      };
+      visit(src);
+      return out;
+    });
+    expect(unfilled, 'pass every value the English names, or the page shows the {placeholder}').toEqual([]);
+  });
+
   it('keeps code out of the catalogues (CSS, class names)', () => {
     const code = catalogues.flatMap((d) => Object.entries(JSON.parse(read(path.join(root, d, 'en.json'))) as Record<string, string>)
       .filter(([, v]) => /minmax\(|var\(--|\d(px|fr)\b|\bsp-\{|!important/.test(v)).map(([k]) => `${d}/en.json ${k}`));

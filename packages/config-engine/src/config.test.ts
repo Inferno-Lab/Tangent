@@ -46,6 +46,10 @@ describe('resolveConfig', () => {
     expect(all.menu.flatMap((g) => g.pages.map((p) => p.id))).toContain('move');
     expect(resolveConfig({ settings, entitlement: entitlement(['fees']) }).menu.flatMap((g) => g.pages.map((p) => p.id))).not.toContain('move');
   });
+  it('puts the school’s name in its privacy notice', () => {
+    const values = { ...settings.values, 'privacy.notice': '{school} keeps your data. Write to {school}.' };
+    expect(resolveConfig({ settings: { ...settings, values }, entitlement: entitlement([]) }).privacy.notice).toBe('Greenfield keeps your data. Write to Greenfield.');
+  });
   it('lays out each app role from what the school has', () => {
     const values = { ...settings.values, 'app.roles': ['parent', 'driver', 'nobody'], 'app.layout': { parent: { dock: ['home', 'fees', 'library'], home: [], quick: ['payFees'] }, student: { dock: ['home'], home: [], quick: [] }, teacher: { dock: [], home: [], quick: [] }, driver: { dock: ['trips'], home: [], quick: [] } } };
     const cfg = resolveConfig({ settings: { ...settings, values }, entitlement: entitlement(['fees']) });

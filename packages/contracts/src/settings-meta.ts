@@ -82,7 +82,7 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = localized({
   'security.webSessionDays': { group: 'Sign-in and security', label: 'Admin sign-in lasts (days)', kind: 'number', min: 1, max: 30 },
   'security.appSessionDays': { group: 'Sign-in and security', label: 'App sign-in lasts (days)', kind: 'number', min: 1, max: 90 },
   'documents.templates': { group: 'School identity', label: 'Printed documents', kind: 'documentTemplates', help: 'The layout and wording of receipts and report cards: blocks in order, with {placeholders} the document fills, in each of the school’s languages. Preview shows it with real data.' },
-  'privacy.notice': { group: 'Privacy', label: 'Privacy notice', kind: 'textarea', help: 'Shown in the app (Settings → Privacy, and when someone is asked to consent) and behind “Privacy” on the school’s sign-in page.' },
+  'privacy.notice': { group: 'Privacy', label: 'Privacy notice', kind: 'textarea', help: 'Shown in the app (Settings → Privacy, and when someone is asked to consent) and behind “Privacy” on the school’s sign-in page. {school} becomes the school’s name.' },
   'privacy.officerName': { group: 'Privacy', label: 'Grievance officer', kind: 'text', help: 'Shown with the privacy notice.' },
   'privacy.officerEmail': { group: 'Privacy', label: 'Grievance officer’s email', kind: 'text' },
   'privacy.officerPhone': { group: 'Privacy', label: 'Grievance officer’s phone', kind: 'text' },

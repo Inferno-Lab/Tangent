@@ -19,6 +19,20 @@ void main() {
     expect(missing, isEmpty);
   });
 
+  test('a message with @values is never read with plain .tr, or the screen shows "@name"', () {
+    final english = AppTranslations().keys['en']!;
+    final withValues = {for (final e in english.entries) if (RegExp(r'@\w').hasMatch(e.value)) e.key};
+    final plain = RegExp(r"'([a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+)'\s*\.\s*tr\b(?!\w)");
+    final unfilled = <String>{};
+    for (final file in Directory('lib').listSync(recursive: true).whereType<File>()) {
+      if (!file.path.endsWith('.dart')) continue;
+      for (final m in plain.allMatches(file.readAsStringSync())) {
+        if (withValues.contains(m.group(1))) unfilled.add('${m.group(1)}  (${file.path})');
+      }
+    }
+    expect(unfilled, isEmpty);
+  });
+
   test('keys built from data exist: weekdays and the subjects a new school starts with', () {
     final english = AppTranslations().keys['en']!;
     // A school's own subjects are named by the school (SchoolConfig.subjectNameOf); a new school's starter subjects are the
