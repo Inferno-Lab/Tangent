@@ -6,17 +6,22 @@ import 'package:get/get.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/tokens.dart';
 import 'package:tangent/core/utils/extensions.dart';
+import 'package:tangent/core/utils/haptics.dart';
 import 'package:tangent/core/widgets/glass.dart';
+import 'package:tangent/core/widgets/ui/controls.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 enum ToastKind { success, error, info }
 
 class _Toast {
-  _Toast(this.message, this.kind, this.body);
+  _Toast(this.message, this.kind, this.body, this.action);
 
   final String message;
   final ToastKind kind;
   final String? body;
+
+  /// A button on the toast (Undo): its translation key and what it does.
+  final (String, VoidCallback)? action;
   final key = UniqueKey();
   final shownAt = DateTime.now();
 
@@ -33,15 +38,15 @@ abstract final class ToastHelper {
   static _Toast? _next;
   static Timer? _timer;
 
-  static void show(String messageKey, {ToastKind kind = ToastKind.info, String? body}) {
+  static void show(String messageKey, {ToastKind kind = ToastKind.info, String? body, (String, VoidCallback)? action}) {
     if (Get.testMode) return;
     // Asked for while a frame is being built (a sheet's initState): shown once that frame is done, since changing the
     // toast host mid-build throws.
     if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.persistentCallbacks) {
-      SchedulerBinding.instance.addPostFrameCallback((_) => show(messageKey, kind: kind, body: body));
+      SchedulerBinding.instance.addPostFrameCallback((_) => show(messageKey, kind: kind, body: body, action: action));
       return;
     }
-    final toast = _Toast(messageKey, kind, body);
+    final toast = _Toast(messageKey, kind, body, action);
     final now = _current.value;
     if (now != null && now.same(toast)) return _hold(now);
     if (now != null && now.kind == ToastKind.error && kind != ToastKind.error && DateTime.now().difference(now.shownAt) < AppMotion.toastErrorFloor) {
@@ -51,6 +56,9 @@ abstract final class ToastHelper {
     _next = null;
     _current.value = toast;
     _hold(toast);
+    // The outcome of something the person did is felt as well as seen.
+    if (kind == ToastKind.success) Haptics.success();
+    if (kind == ToastKind.error) Haptics.error();
   }
 
   /// Closes the toast showing (and any waiting), e.g. on sign-out.
@@ -70,7 +78,8 @@ abstract final class ToastHelper {
 
   static void _hold(_Toast toast) {
     _timer?.cancel();
-    _timer = Timer(holdFor(toast.message.tr, toast.body?.tr, error: toast.kind == ToastKind.error), _dismiss);
+    // One with a button stays as long as any toast does, so there is time to reach it.
+    _timer = Timer(toast.action != null ? AppMotion.toastMax : holdFor(toast.message.tr, toast.body?.tr, error: toast.kind == ToastKind.error), _dismiss);
   }
 
   /// A moment to notice it and a little per word to read it (AppMotion.toast*).
@@ -170,6 +179,13 @@ class _ToastCard extends StatelessWidget {
                         ],
                       ),
                     ),
+                    if (toast.action case (final label, final onTap)) ...[
+                      const SizedBox(width: 8),
+                      Btn(label, small: true, kind: BtnKind.quiet, onPressed: () {
+                        ToastHelper._dismiss();
+                        onTap();
+                      }),
+                    ],
                   ],
                 ),
               ),
