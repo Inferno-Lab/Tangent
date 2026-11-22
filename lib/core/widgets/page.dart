@@ -60,7 +60,7 @@ class PageFrame extends StatelessWidget {
   final bool topFade;
   final ScrollController? controller;
 
-  /// Makes the page a form: its fields' validators show under them, checked with `formKey.currentState!.validate()`.
+  /// Makes the page a form: its fields' validators show under them, checked with `formKey.currentState?.validate() ?? true`.
   final GlobalKey<FormState>? formKey;
 
   @override

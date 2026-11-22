@@ -35,7 +35,7 @@ class LoginController extends GetxController {
   Future<void> resend() => _codeOnly ? requestCode() : _enter(() => Get.find<AuthRepository>().login(email: email.text, password: password.text));
 
   Future<void> submit() async {
-    if (formKey.currentState?.validate() != true) return;
+    // The code screen has no form (the password screen's is gone once it shows); its Verify waits for six digits.
     if (useOtp.value) {
       await _enter(
         () => Get.find<AuthRepository>().loginWithOtp(
@@ -45,6 +45,7 @@ class LoginController extends GetxController {
       );
       return;
     }
+    if (formKey.currentState?.validate() != true) return;
     _codeOnly = false;
     await _enter(
       () => Get.find<AuthRepository>().login(
