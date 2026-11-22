@@ -10,7 +10,9 @@ services:
     healthCheckPath: /health
     # corepack enable writes shims to /usr/bin (EROFS on Render). Use `corepack pnpm` instead.
     buildCommand: corepack pnpm install --frozen-lockfile --prod=false && CONSOLE_BASE=/console/ corepack pnpm exec turbo run build --concurrency=2 --env-mode=loose
-    startCommand: node apps/server/dist/main.js
+    # The free plan stops the server above 512 MB, but Node does not know that and leaves garbage until it feels short: a
+    # year's attendance import peaked at 374 MB uncapped and 289 MB capped on one machine. The cap makes it collect in time.
+    startCommand: node --max-old-space-size=256 apps/server/dist/main.js
     envVars:
       - key: NODE_VERSION
         value: "24"
