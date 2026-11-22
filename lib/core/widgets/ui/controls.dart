@@ -10,12 +10,15 @@ import 'package:tangent/core/utils/extensions.dart';
 
 /// Squash-on-press wrapper used by cards, rows and buttons.
 class Pressable extends StatefulWidget {
-  const Pressable({required this.child, this.onTap, this.scale = .97, this.label, super.key});
+  const Pressable({required this.child, this.onTap, this.scale = .97, this.label, this.button = false, super.key});
 
   final Widget child;
   final VoidCallback? onTap;
   final double scale;
   final String? label;
+
+  /// Always a button to a screen reader, said to be dimmed while it cannot be pressed (a card without a tap is not one).
+  final bool button;
 
   @override
   State<Pressable> createState() => _PressableState();
@@ -28,7 +31,8 @@ class _PressableState extends State<Pressable> {
   Widget build(BuildContext context) {
     final enabled = widget.onTap != null;
     return Semantics(
-      button: enabled,
+      button: enabled || widget.button,
+      enabled: widget.button ? enabled : null,
       label: widget.label,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -88,37 +92,51 @@ class Btn extends StatelessWidget {
     };
     final h = height ?? (small ? 40.0 : 56.0);
     final disabled = onPressed == null && !loading;
-    final style = hueText(small ? 14 : 16, 600, height: 1, color: fg);
-    final content = Row(
+    // Dimmed by mixing with the page, not by Opacity: a button floating over a list never shows the list through it.
+    Color dim(Color x) => disabled ? Color.alphaBlend(x.withValues(alpha: x.a * .4), x.a == 0 ? Colors.transparent : c.chalk) : x;
+    final ink = disabled ? Color.alphaBlend(fg.withValues(alpha: .4), bg.a == 0 ? c.chalk : dim(bg)) : fg;
+    final style = hueText(small ? 14 : 16, 600, height: 1, color: ink);
+    final row = Row(
       mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        if (loading)
-          SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2.2, color: fg))
-        else ...[
-          if (icon != null) ...[Icon(icon, size: 20, color: fg), const SizedBox(width: 8)],
-          Flexible(
-            child: Text(label.tr, style: style, maxLines: 1, overflow: TextOverflow.ellipsis),
-          ),
-          if (trailing != null) ...[const SizedBox(width: 8), Icon(trailing, size: 20, color: fg)],
-        ],
+        if (icon != null) ...[Icon(icon, size: 20, color: ink), const SizedBox(width: 8)],
+        Flexible(
+          child: Text(label.tr, style: style, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+        if (trailing != null) ...[const SizedBox(width: 8), Icon(trailing, size: 20, color: ink)],
       ],
     );
-    return Opacity(
-      opacity: disabled ? .4 : 1,
+    // The label stays laid out under the spinner, so the button keeps its width while it works.
+    final content = Stack(
+      alignment: Alignment.center,
+      children: [
+        AnimatedOpacity(opacity: loading ? 0 : 1, duration: AppMotion.t1, child: row),
+        AnimatedOpacity(
+          opacity: loading ? 1 : 0,
+          duration: AppMotion.t1,
+          child: SizedBox.square(dimension: 18, child: loading ? CircularProgressIndicator(strokeWidth: 2.2, color: fg) : null),
+        ),
+      ],
+    );
+    return Semantics(
+      liveRegion: loading,
       child: Pressable(
         scale: .96,
-        label: label.tr,
+        button: true,
+        label: loading ? '${label.tr}, ${'common.working'.tr}' : label.tr,
         onTap: loading ? null : onPressed,
-        child: Container(
-          height: h,
-          padding: EdgeInsets.symmetric(horizontal: small ? 16 : 24),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(small ? AppRadius.md : AppRadius.field),
-            border: kind == BtnKind.quiet ? Border.all(color: c.line2) : null,
+        child: ExcludeSemantics(
+          child: Container(
+            height: h,
+            padding: EdgeInsets.symmetric(horizontal: small ? 16 : 24),
+            decoration: BoxDecoration(
+              color: dim(bg),
+              borderRadius: BorderRadius.circular(small ? AppRadius.md : AppRadius.field),
+              border: kind == BtnKind.quiet ? Border.all(color: dim(c.line2)) : null,
+            ),
+            child: content,
           ),
-          child: content,
         ),
       ),
     );
