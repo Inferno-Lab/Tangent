@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/routes/middlewares.dart';
 import 'package:tangent/core/services/auth_service.dart';
@@ -72,6 +73,7 @@ class ShellController extends GetxController {
       body: 'shell.exit_body',
       confirm: 'shell.exit_confirm',
       danger: false,
+      icon: PhosphorIconsRegular.signOut,
     );
     if (leave) unawaited(SystemNavigator.pop());
   }

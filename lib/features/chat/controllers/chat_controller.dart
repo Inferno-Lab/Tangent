@@ -218,19 +218,16 @@ class ChatThreadController extends GetxController with Loadable, LiveListen {
   /// Long-press on a message: take back one's own, or report someone else's to the office.
   Future<void> onHold(ChatMessage m) async {
     final mine = m.senderId == me;
-    final ok = await confirmSheet(
-      title: mine ? 'chat.delete_title' : 'chat.report_title',
-      body: mine ? 'chat.delete_body' : 'chat.report_body',
-      confirm: mine ? 'chat.delete' : 'chat.report',
-      icon: mine ? PhosphorIconsRegular.trash : PhosphorIconsRegular.flag,
-    );
-    if (!ok) return;
+    final reason = mine
+        ? (await confirmSheet(title: 'chat.delete_title', body: 'chat.delete_body', confirm: 'chat.delete', icon: PhosphorIconsRegular.trash) ? '' : null)
+        : await reportSheet(title: 'chat.report_title', body: 'chat.report_body', confirm: 'chat.report', reasons: const ['chat.reason_hurtful', 'chat.reason_not_for_me', 'chat.reason_other']);
+    if (reason == null) return;
     try {
       final repo = Get.find<ChatRepository>();
       if (mine) {
         await repo.delete(m.id);
       } else {
-        await repo.report(m.id, 'Reported from the app');
+        await repo.report(m.id, reason);
       }
       await load();
       ToastHelper.show(mine ? 'chat.deleted' : 'chat.reported', kind: ToastKind.success);

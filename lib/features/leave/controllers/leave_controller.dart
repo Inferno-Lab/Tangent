@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:tangent/core/widgets/sheets.dart';
 import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/utils/app_exception.dart';
@@ -35,7 +36,7 @@ class LeaveController extends GetxController with Loadable {
   int get waiting => items.where((i) => i.status == LeaveStatus.pending).length;
 
   Future<void> withdraw(LeaveRequest item) async {
-    final ok = await confirmSheet(title: 'leave.withdraw_title', body: 'leave.withdraw_body', confirm: 'leave.withdraw');
+    final ok = await confirmSheet(title: 'leave.withdraw_title', body: 'leave.withdraw_body', confirm: 'leave.withdraw', icon: PhosphorIconsRegular.arrowCounterClockwise);
     if (!ok) return;
     try {
       await Get.find<LeaveRepository>().withdraw(item.id);

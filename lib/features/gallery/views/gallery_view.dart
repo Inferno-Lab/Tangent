@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/utils/app_exception.dart';
+import 'package:tangent/data/repositories/campus_repository.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
 import 'package:tangent/core/theme/tokens.dart';
@@ -383,13 +385,20 @@ class _GalleryViewerState extends State<GalleryViewer> with SingleTickerProvider
   );
 
   Future<void> _report(GalleryPhoto photo) async {
-    final ok = await confirmSheet(
+    final reason = await reportSheet(
       title: 'gallery.report_title',
       body: 'gallery.report_body',
       confirm: 'gallery.report',
-      icon: PhosphorIconsRegular.flag,
+      reasons: const ['gallery.reason_my_child', 'gallery.reason_wrong_album', 'gallery.reason_other'],
     );
-    if (ok) ToastHelper.show('gallery.reported', kind: ToastKind.success);
+    if (reason == null) return;
+    // Thanked only once the school has it.
+    try {
+      await Get.find<GalleryRepository>().report(photo.id, reason);
+      ToastHelper.show('gallery.reported', kind: ToastKind.success);
+    } on AppException catch (e) {
+      ToastHelper.show(e.message, kind: ToastKind.error);
+    }
   }
 
   @override

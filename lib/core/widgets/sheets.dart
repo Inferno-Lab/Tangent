@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/tokens.dart';
+import 'package:tangent/core/translations/app_translations.dart';
 import 'package:tangent/core/utils/extensions.dart';
 import 'package:tangent/core/widgets/ui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -116,8 +117,8 @@ Future<bool> confirmSheet({
   required String body,
   required String confirm,
   String cancel = 'common.cancel',
+  required IconData icon,
   bool danger = true,
-  IconData icon = PhosphorIconsRegular.signOut,
 }) async {
   final result = await showSheet<bool>(
     Builder(
@@ -158,6 +159,52 @@ Future<bool> confirmSheet({
     ),
   );
   return result ?? false;
+}
+
+/// Reporting something to the school office: the person picks why (one of [reasons], translation keys), then Report.
+/// Returns the reason in English, which is what the office reads, or null when they cancel.
+Future<String?> reportSheet({required String title, required String body, required String confirm, required List<String> reasons}) async {
+  var picked = reasons.first;
+  final result = await showSheet<bool>(
+    StatefulBuilder(
+      builder: (context, setState) {
+        final c = context.app;
+        return SheetBody(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(color: c.badSoft, shape: BoxShape.circle),
+                    child: Icon(PhosphorIconsRegular.flag, color: c.badText),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(title.tr, style: context.type.h2)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(body.tr, style: context.type.b.copyWith(color: c.ink2)),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [for (final r in reasons) Chip2(r.tr, on: r == picked, onTap: () => setState(() => picked = r))],
+              ),
+              const SizedBox(height: 24),
+              Btn(confirm, kind: BtnKind.danger, expand: true, onPressed: () => Get.back(result: true)),
+              const SizedBox(height: 10),
+              Btn('common.cancel', kind: BtnKind.quiet, expand: true, onPressed: () => Get.back(result: false)),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+  return result ?? false ? english[picked] ?? picked.tr : null;
 }
 
 double _statusBar(BuildContext context) {

@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:get/get.dart';
 import 'package:tangent/core/services/auth_service.dart';
+import 'package:tangent/core/services/connectivity_service.dart';
 import 'package:tangent/core/services/error_reporter.dart';
 import 'package:tangent/core/services/session_bus.dart';
 import 'package:tangent/core/utils/app_exception.dart';
 import 'package:tangent/core/utils/view_state.dart';
+import 'package:tangent/core/widgets/toast.dart';
 
 mixin Loadable on GetxController {
   final state = ViewState.loading.obs;
@@ -28,7 +30,10 @@ mixin Loadable on GetxController {
     Future<void> Function() body, {
     bool Function()? isEmpty,
   }) async {
-    if (state.value != ViewState.success) state.value = ViewState.loading;
+    // What the screen shows already (a list, or the friendly empty page) stays up while it reloads, and when the reload
+    // fails: the person keeps reading and hears of the failure in a toast. Only a first load that fails shows the error page.
+    final shown = state.value == ViewState.success || state.value == ViewState.empty;
+    if (!shown) state.value = ViewState.loading;
     try {
       await body();
       final next = (isEmpty?.call() ?? false) ? ViewState.empty : ViewState.success;
@@ -40,15 +45,24 @@ mixin Loadable on GetxController {
         state.value = next;
       }
     } on AppException catch (error) {
-      errorMessage.value = error.message;
-      state.value = ViewState.error;
+      _failed(error.message, shown);
     } on Object catch (error, stack) {
       // A bug (bad data, a case nobody wrote for): the screen says it could not load and offers Retry, instead of
       // spinning for ever; the school's server hears of it.
       ErrorReporter.report(error, stack);
-      errorMessage.value = 'errors.generic';
-      state.value = ViewState.error;
+      _failed('errors.generic', shown);
     }
+  }
+
+  void _failed(String message, bool shown) {
+    errorMessage.value = message;
+    if (!shown) {
+      state.value = ViewState.error;
+      return;
+    }
+    // Offline, the page's offline capsule already says why nothing new came.
+    final offline = Get.isRegistered<ConnectivityService>() && !Get.find<ConnectivityService>().isOnline.value;
+    if (!offline) ToastHelper.show(message, kind: ToastKind.error);
   }
 
   @override
