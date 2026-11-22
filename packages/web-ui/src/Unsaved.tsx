@@ -4,6 +4,22 @@ import { useEffect } from 'react';
 let open = 0;
 const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); };
 
+// Popups that hear when a change was saved (what was typed in them is no longer at risk).
+const savers = new Set<() => void>();
+
+/** A change was saved (MutationCache onSuccess): popups stop counting what was typed before it as unsaved. */
+export function markSaved(): void {
+  for (const f of savers) f();
+}
+
+/** Calls [f] each time a change is saved, while the component is mounted. */
+export function useOnSaved(f: () => void): void {
+  useEffect(() => {
+    savers.add(f);
+    return () => { savers.delete(f); };
+  }, [f]);
+}
+
 /** Whether anything on the page holds work that is not saved (the app's router asks before it leaves the page). */
 export const hasUnsaved = (): boolean => open > 0;
 

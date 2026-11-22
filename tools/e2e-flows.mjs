@@ -339,7 +339,10 @@ await flow('console: support needs a reason; erase needs the school code', { sto
   await p.getByLabel(/Type/).fill('wrong');
   await p.getByRole('button', { name: 'Request erasure' }).click();
   await expectVisible(p.getByText(/isn’t the school code/), 'the wrong-code message');
+  // Something was typed: Escape asks before throwing it away.
   await p.keyboard.press('Escape');
+  await expectVisible(p.getByText('Discard what you typed?'), 'the discard question');
+  await p.getByRole('button', { name: 'Discard', exact: true }).click();
   await p.getByRole('button', { name: 'Support session' }).click();
   await p.getByRole('button', { name: 'Start session' }).click();
   await expectVisible(p.getByText(/at least 8 letters/), 'the reason error');

@@ -1,7 +1,7 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { leavingProps, useLeaving, useReturnFocus } from './Presence';
 import { t } from './i18n';
-import { useUnsaved } from './Unsaved';
+import { useOnSaved, useUnsaved } from './Unsaved';
 
 export interface DialogProps {
   title: string;
@@ -32,6 +32,8 @@ function useGuardedClose(onClose: () => void) {
   const [dirty, setDirty] = useState(false);
   const [asking, setAsking] = useState(false);
   useUnsaved(dirty);
+  // Saved from inside the popup (a mark, then another): what was typed so far is kept, so closing need not ask.
+  useOnSaved(useCallback(() => setDirty(false), []));
   const dismiss = () => (dirty ? setAsking(true) : onClose());
   const ask = asking && (
     <div className="unsaved" role="alertdialog" aria-label={t('ui.unsaved.discard_q')}>
