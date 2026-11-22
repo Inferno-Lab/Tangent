@@ -254,6 +254,7 @@ class HomeworkDetailView extends GetView<HomeworkDetailController> {
       final pigment = item == null ? null : AppColors.subject(item.subject);
       return PageFrame(
         leading: BackGlass(color: pigment?.on),
+        onRefresh: controller.load,
         actions: [
           GlassIconButton(
             icon: PhosphorIconsRegular.bell,

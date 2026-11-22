@@ -38,7 +38,6 @@ class DashboardView extends StatefulWidget {
 
 class _DashboardViewState extends State<DashboardView> {
   int? _scrub;
-  var _pulled = false;
 
   DashboardController get controller => Get.find<DashboardController>();
 
@@ -63,16 +62,9 @@ class _DashboardViewState extends State<DashboardView> {
         backgroundColor: c.chalk,
         body: Stack(
           children: [
-            NotificationListener<ScrollUpdateNotification>(
-              // Pull down on Home opens search.
-              onNotification: (n) {
-                if (n.metrics.pixels < -90 && !_pulled) {
-                  _pulled = true;
-                  unawaited(Get.toNamed<void>(AppRoutes.search)?.then((_) => _pulled = false));
-                }
-                return false;
-              },
-              // No refresh circle here: pulling down is the search gesture, and Home reloads itself on any change.
+            PullToRefresh(
+              onRefresh: controller.load,
+              top: top + 14,
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                 padding: EdgeInsets.zero,
@@ -86,23 +78,24 @@ class _DashboardViewState extends State<DashboardView> {
                           children: [
                             if (parent) const ChildCapsule() else _ProfileCapsule(data: data),
                             const Spacer(),
-                            if (!parent) ...[
+                            if (parent) ...[
+                              _Round(PhosphorIconsRegular.magnifyingGlass, 'common.search', () => Get.toNamed<void>(AppRoutes.search)),
+                              const SizedBox(width: 10),
+                              _Round(PhosphorIconsRegular.bell, 'notifications.title', () => Get.toNamed<void>(AppRoutes.notifications), dot: true),
+                            ] else ...[
                               GlassIconButton(
                                 icon: PhosphorIconsRegular.magnifyingGlass,
                                 label: 'common.search'.tr,
                                 onTap: () => Get.toNamed<void>(AppRoutes.search),
                               ),
                               const SizedBox(width: 10),
-                            ],
-                            if (parent)
-                              const _Bell()
-                            else
                               GlassIconButton(
                                 icon: PhosphorIconsRegular.bell,
                                 label: 'notifications.title'.tr,
                                 badge: true,
                                 onTap: () => Get.toNamed<void>(AppRoutes.notifications),
                               ),
+                            ],
                           ],
                         ),
                         SizedBox(height: parent ? 24 : 16),
@@ -482,15 +475,21 @@ class _ParentBody extends StatelessWidget {
 }
 
 /// The parent's bell: paper with the page's line, an amber dot when something is new.
-class _Bell extends StatelessWidget {
-  const _Bell();
+/// A parent's round header button (search, notifications), as the ParentHome board.
+class _Round extends StatelessWidget {
+  const _Round(this.icon, this.label, this.onTap, {this.dot = false});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool dot;
 
   @override
   Widget build(BuildContext context) {
     final c = context.app;
     return Pressable(
-      onTap: () => Get.toNamed<void>(AppRoutes.notifications),
-      label: 'notifications.title'.tr,
+      onTap: onTap,
+      label: label.tr,
       child: Container(
         width: 48,
         height: 48,
@@ -498,8 +497,9 @@ class _Bell extends StatelessWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            Icon(PhosphorIconsRegular.bell, size: 20, color: c.ink),
-            PositionedDirectional(
+            Icon(icon, size: 20, color: c.ink),
+            if (dot)
+              PositionedDirectional(
               top: 12,
               end: 12,
               child: Container(
