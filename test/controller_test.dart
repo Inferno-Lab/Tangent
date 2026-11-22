@@ -6,10 +6,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/services/auth_service.dart';
+import 'package:tangent/core/utils/app_exception.dart';
 import 'package:tangent/core/utils/view_state.dart';
+import 'package:tangent/data/datasources/remote_datasource.dart';
 import 'package:tangent/data/models/academics.dart';
 import 'package:tangent/data/models/user.dart';
 import 'package:tangent/data/repositories/academic_repository.dart';
+import 'package:tangent/data/repositories/auth_repository.dart';
 import 'package:tangent/data/repositories/directory_repository.dart';
 import 'package:tangent/features/auth/controllers/login_controller.dart';
 import 'package:tangent/features/dashboard/controllers/dashboard_controller.dart';
@@ -42,6 +45,18 @@ void main() {
     await real(tester, login.submit);
     expect(Get.find<AuthService>().user.value, isNull);
     expect(login.useOtp.value, isFalse);
+  });
+
+  testWidgets('the code screen sends the code, with the password screen and its form gone', (tester) async {
+    await tester.pumpWidget(testApp(home: const SizedBox.shrink()));
+    final sent = _CodeSent(Get.find<RemoteDataSource>());
+    Get.replace<AuthRepository>(sent);
+    final login = await put(tester, () => LoginController());
+    login
+      ..useOtp.value = true
+      ..otp.text = '123456';
+    await real(tester, login.submit);
+    expect(sent.code, '123456');
   });
 
   testWidgets('the dashboard loads the child and what the family owes', (tester) async {
@@ -110,4 +125,17 @@ void main() {
     final draft = await real(tester, () => Get.find<ExamRepository>().marksDraft(cls, subject));
     expect(draft?.marks[studentId], 91);
   });
+}
+
+/// Keeps the code the sign-in sent, and answers as a school does to a wrong one.
+class _CodeSent extends AuthRepository {
+  _CodeSent(super._remote);
+
+  String? code;
+
+  @override
+  Future<AppUser> loginWithOtp({required String email, required String otp}) async {
+    code = otp;
+    throw const AppException('errors.code_expired');
+  }
 }
