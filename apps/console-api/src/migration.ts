@@ -19,6 +19,7 @@ const BIG_BYTES = 1024 * 1024;
 /** Tangent's onboarding team moves a school in: files in, checked, imported as batches that add up, and undone if wrong. */
 @Injectable()
 export class Migration implements OnModuleInit {
+  private readonly queue = new Map<string, Promise<unknown>>();
   constructor(private readonly db: Db, private readonly actions: Actions, @Inject(ENV) private readonly env: Env, @Inject(REGISTRY) private readonly registry: Registry) {}
 
   onModuleInit(): void {
@@ -155,11 +156,15 @@ export class Migration implements OnModuleInit {
     if (!busy && !big && rows <= BIG_ROWS) return this.commitNow(id, input, by);
     const runId = newId('run');
     await this.db.pool.query('insert into import_runs (id, school_id, kind, file_name, rows, by) values ($1,$2,$3,$4,$5,$6)', [runId, id, input.kind, input.fileName, rows, by]);
+    // Runs take their turn in the order they came: each school's wait behind the last one (one process serves the console).
     // A run whose end cannot be written is marked failed, never left running for ever.
-    void this.commitNow(id, input, by)
+    const turn = (this.queue.get(id) ?? Promise.resolve())
+      .then(() => this.commitNow(id, input, by))
       .then((b) => this.db.pool.query("update import_runs set status = 'done', batch_id = $2, created = $3, updated = $4, skipped = $5, rows = greatest(rows, $3::int + $4::int + $5::int), done_at = now() where id = $1", [runId, b.id, b.created, b.updated, b.skipped]))
       .catch((e: Error) => this.db.pool.query("update import_runs set status = 'failed', error = $2, done_at = now() where id = $1", [runId, e.message.slice(0, 500)]))
       .catch(() => undefined);
+    this.queue.set(id, turn);
+    void turn.then(() => { if (this.queue.get(id) === turn) this.queue.delete(id); });
     return { run: (await this.runs(id)).find((r) => r.id === runId)! };
   }
 
