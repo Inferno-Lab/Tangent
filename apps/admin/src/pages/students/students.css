@@ -37,8 +37,6 @@
 .pg-students .fs.due{background:var(--brand-soft);color:var(--brand-ink)}
 .pg-students .fs.over{background:var(--bad-s);color:var(--bad)}
 .pg-students .fs.pp{animation:nPop var(--t3) var(--e)}
-.pg-students .kebab{width:34px;height:34px;border-radius:50%;border:0;background:none;color:var(--ink3);display:grid;place-items:center;cursor:pointer;transition:background var(--t2)}
-.pg-students .kebab:hover{background:var(--s2);color:var(--ink)}
 .pg-students .tfoot{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;padding:16px 24px;font:600 13px var(--fb);color:var(--ink3);border-top:1px solid var(--line)}
 .pg-students .dh{padding:24px 24px 20px;display:flex;flex-direction:column;gap:16px;background:linear-gradient(180deg,color-mix(in srgb,var(--brand-soft) 55%,var(--s1)),transparent)}
 .pg-students .dtop{display:flex;gap:16px;align-items:center}

@@ -11,6 +11,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
-  "dependencies": { "@tangent/contracts": "workspace:*", "zod": "^4.1.0" },
+  "dependencies": { "@tangent/contracts": "workspace:*" },
   "devDependencies": { "typescript": "~5.9.3", "vitest": "^4.1.12" }
 }

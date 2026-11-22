@@ -15,13 +15,7 @@ abstract final class Formatters {
   /// A count in the school's way of grouping digits.
   static String count(num n) => NumberFormat.decimalPattern(_locale).format(n);
 
-  static String dayMonth(DateTime date) => DateFormat.MMMd(_locale).format(date);
-
-  static String fullDate(DateTime date) => DateFormat.yMMMd(_locale).format(date);
-
   static String weekday(DateTime date) => DateFormat.E(_locale).format(date);
-
-  static String timeOf(DateTime date) => DateFormat.jm(_locale).format(date);
 
   // intl knows most locales; one it does not falls back to its language, then to English.
   static String get _locale {

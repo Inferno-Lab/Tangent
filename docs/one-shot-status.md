@@ -1,6 +1,6 @@
 # One-shot status
 
-Where the plan in `docs/one-shot-plan.md` stands on branch `feat/adapt-one-shot` (not merged, not pushed). **Done** =
+Where the plan in `docs/one-shot-plan.md` stands; it was merged in PR #45 (`feat/adapt-one-shot`) and its gate in PR #46. **Done** =
 built, with its server tests where it has a server side, and checked by the full gate below. "Known gap" = a limit that
 is written down, not a half-built screen.
 
@@ -55,7 +55,7 @@ school's own), reports (sent by themselves on a schedule).
 ## Phase 4: New modules (section 6), the five chosen
 
 Each module is one record in `MODULES` with its settings, lists, workflow, templates, series, permissions and messages;
-its own migrations, server routes behind `@RequireModule`, admin page, app screens, sample content, demo seed for every
+its own migrations, server routes behind `@RequireModule`, admin page, app screens, its data in the test school's files for every
 school day, and server tests of the paths that go wrong (`apps/api/test/five-modules.test.ts`).
 
 | § | Module | What it does |

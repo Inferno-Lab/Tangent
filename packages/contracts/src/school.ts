@@ -157,8 +157,6 @@ export type AssignFee = z.infer<typeof AssignFee>;
 export const CONTACT_CHANNELS = ['sms', 'whatsapp', 'email', 'push'] as const;
 export type ContactChannel = (typeof CONTACT_CHANNELS)[number];
 
-/** The fields of a student's record a school may require (console: People → fields the office must fill). */
-export const STUDENT_FIELDS = ['gender', 'house', 'admissionNo', 'bloodGroup', 'address'] as const;
 const StudentFields = {
   name: z.string().trim().min(2, 'Enter the full name').max(80),
   // Given and family names: when either is sent, the server writes `name` from both in the school's order (people.nameOrder).

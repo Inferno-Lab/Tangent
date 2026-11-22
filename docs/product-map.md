@@ -208,7 +208,7 @@ One record per module, in one file. The menu, the routes, the permissions list, 
 | Approvals it asks for | none |
 | Dashboard cards | none |
 | What it writes to the audit log | book added, issued, returned, fine waived |
-| Demo data | books and loans on every weekday |
+| Test data | books and loans in the test school's files (`tools/dataset`), on every weekday |
 
 A line may say "none", but it may not be missing: a build check fails if a live module leaves a line out, if a page, permission, setting, message or import belongs to no module, or if two modules claim the same thing. That check is what keeps the next module from scattering.
 

@@ -16,21 +16,21 @@ void main() {
     Get.put(StorageService(memory: <String, dynamic>{}));
     InitialBinding().dependencies();
 
-    expect(Get.find<AuthRepository>(), isA<RemoteAuthRepository>());
-    expect(Get.find<DirectoryRepository>(), isA<RemoteDirectoryRepository>());
-    expect(Get.find<AttendanceRepository>(), isA<RemoteAttendanceRepository>());
-    expect(Get.find<TimetableRepository>(), isA<RemoteTimetableRepository>());
-    expect(Get.find<HomeworkRepository>(), isA<RemoteHomeworkRepository>());
-    expect(Get.find<ExamRepository>(), isA<RemoteExamRepository>());
-    expect(Get.find<FeeRepository>(), isA<RemoteFeeRepository>());
-    expect(Get.find<NoticeRepository>(), isA<RemoteNoticeRepository>());
-    expect(Get.find<EventRepository>(), isA<RemoteEventRepository>());
-    expect(Get.find<ChatRepository>(), isA<RemoteChatRepository>());
-    expect(Get.find<LibraryRepository>(), isA<RemoteLibraryRepository>());
-    expect(Get.find<TransportRepository>(), isA<RemoteTransportRepository>());
-    expect(Get.find<LeaveRepository>(), isA<RemoteLeaveRepository>());
-    expect(Get.find<GalleryRepository>(), isA<RemoteGalleryRepository>());
-    expect(Get.find<NotificationRepository>(), isA<RemoteNotificationRepository>());
-    expect(Get.find<SchoolLifeRepository>(), isA<RemoteSchoolLifeRepository>());
+    expect(Get.find<AuthRepository>(), isA<AuthRepository>());
+    expect(Get.find<DirectoryRepository>(), isA<DirectoryRepository>());
+    expect(Get.find<AttendanceRepository>(), isA<AttendanceRepository>());
+    expect(Get.find<TimetableRepository>(), isA<TimetableRepository>());
+    expect(Get.find<HomeworkRepository>(), isA<HomeworkRepository>());
+    expect(Get.find<ExamRepository>(), isA<ExamRepository>());
+    expect(Get.find<FeeRepository>(), isA<FeeRepository>());
+    expect(Get.find<NoticeRepository>(), isA<NoticeRepository>());
+    expect(Get.find<EventRepository>(), isA<EventRepository>());
+    expect(Get.find<ChatRepository>(), isA<ChatRepository>());
+    expect(Get.find<LibraryRepository>(), isA<LibraryRepository>());
+    expect(Get.find<TransportRepository>(), isA<TransportRepository>());
+    expect(Get.find<LeaveRepository>(), isA<LeaveRepository>());
+    expect(Get.find<GalleryRepository>(), isA<GalleryRepository>());
+    expect(Get.find<NotificationRepository>(), isA<NotificationRepository>());
+    expect(Get.find<SchoolLifeRepository>(), isA<SchoolLifeRepository>());
   });
 }

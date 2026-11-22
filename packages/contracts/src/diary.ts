@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { localizedLabels } from './i18n.js';
 import type { ListItem } from './lists.js';
 
 /**
@@ -12,7 +11,6 @@ export const DEFAULT_DIARY_KINDS: ListItem[] = [
 ];
 /** Who writes a class's diary: its class teacher, or also every teacher who teaches the class. */
 export const DIARY_WRITERS = ['classTeacher', 'subjectTeachers'] as const;
-export const DIARY_WRITER_LABELS = localizedLabels({ classTeacher: 'The class teacher', subjectTeachers: 'Every teacher of the class' });
 
 export const DiaryInput = z.object({
   classId: z.string().min(1, 'Choose a class').max(60),

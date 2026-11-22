@@ -1,2 +1,5 @@
+# Every text file is LF in every checkout, whatever core.autocrlf says: tests compare bytes (assets/i18n/en.json) and the
+# migrator checksums each SQL file, so a CRLF checkout on Windows broke both.
+* text=auto eol=lf
 *.sh text eol=lf
 *.py text eol=lf

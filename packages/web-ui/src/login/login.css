@@ -62,8 +62,6 @@
 .pg-login .otp.bad .bx{border-color:var(--bad);background:color-mix(in srgb,var(--bad-s) 45%,var(--s1))}
 @keyframes car{0%,20%{opacity:1}50%,70%{opacity:0}100%{opacity:1}}
 .pg-login .otp input{position:absolute;inset:0;opacity:0;cursor:text;font-size:15px}
-.pg-login .demo{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 16px;border-radius:999px;border:1.5px dashed var(--line2);background:none;color:var(--ink2);font:700 13px var(--fb);cursor:pointer;align-self:flex-start;transition:border-color var(--t2),color var(--t2),background var(--t2)}
-.pg-login .demo:hover{border-color:var(--brand);color:var(--brand-ink);background:color-mix(in srgb,var(--brand-soft) 55%,var(--s1))}
 .pg-login .done{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px}
 .pg-login .bar{height:6px;width:220px;border-radius:2px;background:var(--s2);overflow:hidden}
 .pg-login .bar b{display:block;height:100%;background:var(--brand);border-radius:2px;animation:fillw var(--t3) .2s var(--e) both}

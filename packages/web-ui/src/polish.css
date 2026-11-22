@@ -10,7 +10,7 @@ html:has(.nest.dark){color-scheme:dark}
 .nest *::-webkit-scrollbar-corner{background:transparent}
 
 /* A scroll area keeps a plain background: painted-in edge shadows (background-attachment: local) made every scroll frame repaint on the main thread, which is what made lists feel slow. The themed bar shows there is more. */
-.nest .scl,.nest .popm,.nest .lscroll,.nest .tbl>.scroll-x{background:var(--s1)}
+.nest .popm,.nest .lscroll,.nest .tbl>.scroll-x{background:var(--s1)}
 /* A long list scrolls inside its card so the page keeps its shape. */
 .nest .lscroll,.nest .tbl>.scroll-x{max-height:min(66dvh,680px);overflow-y:auto}
 .nest .lscroll>.grd.rw:first-child{border-top:0}
@@ -45,7 +45,6 @@ html:has(.nest.dark){color-scheme:dark}
 /* Tiles size their contents to their own width, not the window's. */
 .nest .tile{container-type:inline-size}
 @container (max-width:250px){
-  .nest .tile .ghostic,.nest .tile.wl .nst{display:none}
   .nest .tile .big{font-size:38px}
 }
 .nest .need{flex-wrap:wrap}
@@ -90,7 +89,7 @@ html:has(.nest.dark){color-scheme:dark}
 /* The page header sits above the cards that follow it, so a menu that grows out of a header button is never painted under them. */
 .nest .hd{position:relative;z-index:10}
 /* Every box that scrolls on its own scrolls on the compositor, like the page does, instead of repainting its rows on each frame. */
-.nest .lscroll,.nest .scroll-x,.nest .popm,.nest .rpl,.nest .sxl,.nest .sheet,.nest .adm,.nest .wst,.nest .snav,.nest .db,.nest .tg,.nest .dlg,.nest .app>.sb,.nest .tbl{will-change:scroll-position}
+.nest .lscroll,.nest .scroll-x,.nest .popm,.nest .rpl,.nest .sxl,.nest .sheet,.nest .adm,.nest .wst,.nest .db,.nest .tg,.nest .dlg,.nest .app>.sb,.nest .tbl{will-change:scroll-position}
 .nest .sxl{background:var(--s1)}
 /* A table that scrolls keeps its column titles in view. */
 .nest .scroll-x .grd.th,.nest .lscroll .grd.th{position:sticky;top:0;z-index:3;background:var(--s1)}

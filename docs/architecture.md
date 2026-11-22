@@ -9,7 +9,7 @@
 | Repository | `data/repositories` | a data source | know about GetX state or widgets |
 | Data source | `data/datasources` | `ApiClient` | be called from a controller |
 
-Each repository file holds the **interface** and the **Remote** adapter for one area (`academic`, `campus`, `directory`, `auth`, `assistant`). Controllers depend on the interface; the tests run the same Remote adapters against the local test school.
+Each repository file holds one class per area (`academic`, `campus`, `directory`, `auth`, `driver`, `school_life`) that calls the family API; the tests run the same classes against the local test school. `AssistantRepository` alone is an interface with a `RemoteAssistantRepository`: the planned AI feature's seam, where another model provider would be a second class.
 
 ## Data flow of a screen
 
@@ -21,7 +21,7 @@ Each repository file holds the **interface** and the **Remote** adapter for one 
 
 ## Dependency injection
 
-`lib/core/bindings/initial_binding.dart` registers repositories lazily (`fenix: true`, so they rebuild after a `Get.delete`). Every repository is its Remote adapter. Tests build their own graph in `test/support/harness.dart` (`bootLive` against the local school, `bootApp` for widgets that read nothing).
+`lib/core/bindings/initial_binding.dart` registers repositories lazily (`fenix: true`, so they rebuild after a `Get.delete`). Tests build their own graph in `test/support/harness.dart` (`bootLive` against the local school, `bootApp` for widgets that read nothing).
 
 ## Feature switches
 
@@ -29,11 +29,11 @@ Each repository file holds the **interface** and the **Remote** adapter for one 
 
 ## Roles
 
-`UserRole` is student, parent or teacher. The shell (`features/shell`) picks tabs by role: families get Home / Academics / Fees / Chat / Profile; teachers get Home / Classes / Notices / Chat / Profile. Chat threads are stored from the family's side; `threadForMe` swaps the title for the person it names.
+`UserRole` is student, parent, teacher or driver (students and drivers only where the console turns them on, `app.roles`). The shell (`features/shell`) picks tabs by role and by the school's `app.dock`: families get Home / Academics / Fees / Chat / Profile; teachers get Home / Classes / Notices / Chat / Profile; a driver's Home is the route they drive. Chat threads are stored from the family's side; `threadForMe` swaps the title for the person it names.
 
 ## Navigation
 
-GetX named routes (`AppRoutes`). Tab switching from inside a screen: `ShellController.showTab(ShellController.chatTab)`. Sign-out: `AuthService.signOut()`.
+GetX named routes (`AppRoutes`). Tab switching from inside a screen: `ShellController.showTab('chat')` (a dock key). Sign-out: `AuthService.signOut()`.
 
 ## Platform pieces
 

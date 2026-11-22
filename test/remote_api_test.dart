@@ -148,8 +148,8 @@ void main() {
   });
 
   group('real sign-in', () {
-    late RemoteAuthRepository auth;
-    setUp(() => auth = RemoteAuthRepository(RemoteDataSource(client)));
+    late AuthRepository auth;
+    setUp(() => auth = AuthRepository(RemoteDataSource(client)));
 
     test('a right password asks for the code, and the code opens the app as the person', () async {
       await expectLater(
@@ -176,14 +176,14 @@ void main() {
     setUp(() => client.saveTokens({'accessToken': 'access-1', 'refreshToken': 'refresh-1'}));
 
     test('the fee account, with receipts', () async {
-      final account = await RemoteFeeRepository(RemoteDataSource(client)).forStudent('stu_aarav');
+      final account = await FeeRepository(RemoteDataSource(client)).forStudent('stu_aarav');
       expect(account!.installments.map((i) => i.paid), [true, false]);
       expect(account.receipts.single.reference, 'UPI123');
       expect(account.academicYear, '2026–27');
     });
 
     test('today’s attendance as a map the teacher screen can use, and marks sent with the right words', () async {
-      final repo = RemoteAttendanceRepository(RemoteDataSource(client));
+      final repo = AttendanceRepository(RemoteDataSource(client));
       final today = await repo.todayForClass(['stu_aarav', 'stu_diya']);
       expect(today, {'stu_aarav': AttendanceStatus.lateArrival, 'stu_diya': AttendanceStatus.absent});
       await repo.markToday({'stu_aarav': AttendanceStatus.lateArrival, 'stu_diya': AttendanceStatus.present});
@@ -191,10 +191,10 @@ void main() {
     });
 
     test('the marks draft, and no transport as nothing rather than a crash', () async {
-      final draft = await RemoteExamRepository(RemoteDataSource(client)).marksDraft('cls_8a', 'maths');
+      final draft = await ExamRepository(RemoteDataSource(client)).marksDraft('cls_8a', 'maths');
       expect(draft.marks, {'stu_aarav': 44});
       expect(draft.maxMarks, 50);
-      expect(await RemoteTransportRepository(RemoteDataSource(client)).forStudent('stu_aarav'), isNull);
+      expect(await TransportRepository(RemoteDataSource(client)).forStudent('stu_aarav'), isNull);
     });
   });
 }

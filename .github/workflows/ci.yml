@@ -1,8 +1,11 @@
 name: CI
 # Once per change: on its pull request, and on main after the merge (a push to a branch alone runs nothing; open the PR).
+# Editing the pull request's description runs it again: the rules job checks that the description says what the change
+# reaches and what was not checked (tools/check-git.mjs).
 # Five jobs side by side; `CI passed` waits for all of them and is the one check main's branch rule requires.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
   workflow_dispatch:

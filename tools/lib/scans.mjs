@@ -1,7 +1,7 @@
 // The layout scans, each run inside a loaded page (page.evaluate): tools/check-pages.mjs runs any of them on the same
 // load as the audit; the scan-*.mjs commands still run one on its own. Each returns a list of findings.
 
-/** scan-gaps.mjs */
+/** --scans gaps */
 export const gaps = () => {
   const out = [];
   const nm = (el) => `${el.tagName.toLowerCase()}${typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : ''}`;
@@ -95,7 +95,7 @@ export const gaps = () => {
   return [...new Set(out)];
 };
 
-/** scan-fit.mjs */
+/** --scans fit */
 export const fit = () => {
   const out = [];
   const nm = (el) => `${el.tagName.toLowerCase()}${typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : ''} "${(el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 28)}"`;
@@ -147,7 +147,7 @@ export const fit = () => {
   return [...new Set(out)].slice(0, 30);
 };
 
-/** scan-cutoff.mjs */
+/** --scans cutoff */
 export const cutoff = () => {
   const out = [];
   const name = (el) => `${el.tagName.toLowerCase()}${typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : ''}`;
@@ -173,7 +173,7 @@ export const cutoff = () => {
   return [...new Set(out)].slice(0, 25);
 };
 
-/** scan-scroll.mjs */
+/** --scans scroll */
 export const scroll = async () => {
   const out = [];
   const nm = (el) => `${el.tagName.toLowerCase()}.${String(el.className).trim().split(/\s+/).slice(0, 2).join('.')}`;
@@ -200,7 +200,7 @@ export const scroll = async () => {
   return out;
 };
 
-/** scan-tight.mjs */
+/** --scans tight */
 export const tight = () => {
   const out = [];
   const nm = (el) => `${el.tagName.toLowerCase()}${typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : ''}`;

@@ -1,6 +1,6 @@
 # Tangent: the one-shot plan
 
-**Status:** approved direction, not started. It starts **after the design system lands on `main`** (another agent is building it). Written 2026-11-12 on branch `plan/adapt-one-shot`.
+**Status:** built and merged (PR #45, its gate PR #46), except what `docs/one-shot-status.md` lists as known gaps and as needing the owner; the modules of section 6 outside the five chosen stay planned. Written 2026-11-12. Where this plan and the code differ, the code and AGENTS.md hold.
 
 This is the only plan. It replaces `docs/features-plan.md`, `docs/product-audit.md` and `docs/product-fix-plan.md` (removed; their open items are all below, and git history keeps the originals). `docs/product-map.md` stays as the map of where things live, with its rules 5 and 7 rewritten to match section 1.
 
@@ -170,7 +170,7 @@ The build does not wait on these. Each has a default the plan uses; the owner ch
 4. **School-data translations:** names a school types (categories, fee heads, statuses, reasons, houses, subject names, notice titles where the school wants) can carry a translation per offered language; the admin shows a "Translations" sidebar on list editors; the app and messages pick the reader's language, falling back to the school's default.
 5. **Messages per language:** `MESSAGE_EVENTS` default wording exists per language in the `messages` catalogue; the school's overrides (`templates.messages`) become `{key: {lang: text}}`; the Messenger sends each recipient's language (the person's preference, else the school's default); DLT and WhatsApp template ids are per language (D9).
 6. **People's language:** every account has a preferred language (admin, console, app), defaulting to the school's; families can pick in the app; the office can set it on a guardian record.
-7. **Right-to-left:** web uses `dir` on `<html>` from the language and **logical CSS properties** everywhere (`margin-inline-start`, `inset-inline-end`, `text-align: start`) — a scan replaces physical ones in `nest.css`, `blocks.css`, `pages.css` and inline styles; icons that point (chevrons, arrows, back) mirror; charts and timelines read right to left; numbers and phone numbers stay left to right inside RTL text (`<bdi>`). Flutter uses `Directionality` from the locale, `EdgeInsetsDirectional`, `AlignmentDirectional`, and mirrored icons (`matchTextDirection`). `tools/audit-ui.mjs` gains an `--rtl` pass (Arabic) checking overflow, clipping and mirrored layout.
+7. **Right-to-left:** web uses `dir` on `<html>` from the language and **logical CSS properties** everywhere (`margin-inline-start`, `inset-inline-end`, `text-align: start`) — a scan replaces physical ones in `nest.css`, `blocks.css`, `pages.css` and inline styles; icons that point (chevrons, arrows, back) mirror; charts and timelines read right to left; numbers and phone numbers stay left to right inside RTL text (`<bdi>`). Flutter uses `Directionality` from the locale, `EdgeInsetsDirectional`, `AlignmentDirectional`, and mirrored icons (`matchTextDirection`). `tools/check-pages.mjs` gains an `--rtl` pass (Arabic) checking overflow, clipping and mirrored layout.
 8. **Fonts per script:** the design system's type roles map to a font per script (Latin, Devanagari, Arabic, Bengali, Tamil, Telugu, Gujarati, Gurmukhi, Kannada, Malayalam, CJK, Thai, Cyrillic and Greek through Noto): web loads only the scripts of the school's languages; the app bundles Latin, Devanagari and Arabic and downloads others on first use; PDFs embed the fonts of the scripts present on the page (`apps/api/src/school/pdf.ts` already uses pdf-lib + fontkit; add the Noto files under `apps/api/assets/fonts`).
 9. **Translation workflow:** console page Languages: per language and surface, coverage, untranslated keys, machine drafts (Hub capability `translation`, AI provider), review queue, export/import XLIFF or CSV for outside translators. New keys added by developers arrive as English plus machine drafts; the gate requires reviewed drafts only for D2 languages.
 10. **Dates and numbers in every language** come from the locale (`Intl` on the web, `intl` in Flutter): month and weekday names, digits (Arabic-Indic digits when the locale uses them), calendar systems stay Gregorian with the locale's names (Hijri display is a pack option for UAE: shown beside the Gregorian date on calendars and PDFs).
@@ -245,7 +245,7 @@ Add to the existing rule tests (`packages/web-ui/src/rules.test.ts`, `test/desig
 7. No `z.enum([...])` for a school-meaningful list in `config.ts` (allow-list for true system enums).
 8. No money as a float; every money column has a currency (migration check).
 9. Every scheduled job takes the school's time zone (a test runs jobs for a school in UTC−5 and one in UTC+4 and checks "today").
-10. `tools/audit-ui.mjs --rtl` and `--locale` passes are part of the gate.
+10. `tools/check-pages.mjs --rtl` and `--locale` passes are part of the gate.
 
 ---
 
@@ -679,7 +679,7 @@ Names, places and examples are international and neutral in designs and docs (ow
 ## 9. Gates before the merge
 
 1. `tool/verify.sh` (Flutter analyze and all tests), `pnpm typecheck && pnpm test`.
-2. `node tools/audit-ui.mjs` at four widths, light and dark, **plus `--rtl` (Arabic) and `--locale` for each D1 demo school**.
+2. `node tools/check-pages.mjs --full` at four widths, light and dark, **plus `--rtl` (Arabic) and `--locale` for each D1 demo school**.
 3. `node tools/e2e-flows.mjs` against every demo school (re-run `tools/dev-reset.sh` first), plus **one flow per module switched off** (no trace), plus flows for: a school editing a setting, a locked setting refusing, a risky setting asking a second person, re-applying a pack, adding a language and seeing it in admin and app, a workflow with three steps and an escalation, a template edited and printed, a custom field added and imported.
 4. The scans: `scan-gaps`, `scan-fit`, `scan-scroll`, `scan-cutoff`.
 5. App shots (`test/tool/shoot_test.dart`) for every role, light and dark, LTR and RTL, each demo school, small phone, phone and tablet; `EMPTY_DATA=true` run.

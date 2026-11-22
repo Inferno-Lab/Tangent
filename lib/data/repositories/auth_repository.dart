@@ -2,15 +2,6 @@ import 'package:tangent/core/utils/app_exception.dart';
 import 'package:tangent/data/datasources/remote_datasource.dart';
 import 'package:tangent/data/models/user.dart';
 
-abstract class AuthRepository {
-  Future<AppUser> login({required String email, required String password});
-
-  Future<AppUser> loginWithOtp({required String email, required String otp});
-
-  /// Sends a sign-in code to a family's phone or email, with no password. Always ends in [OtpRequired].
-  Future<Never> requestCode(String identifier);
-}
-
 /// The wait the school gives before another code (30 seconds when it does not say).
 int _resendIn(Map<String, dynamic> c) => (c['resendInSeconds'] as num?)?.toInt() ?? 30;
 
@@ -24,13 +15,12 @@ class OtpRequired extends AppException {
   final int resendIn;
 }
 
-class RemoteAuthRepository implements AuthRepository {
-  RemoteAuthRepository(this._remote);
+class AuthRepository {
+  AuthRepository(this._remote);
 
   final RemoteDataSource _remote;
   String? _challenge;
 
-  @override
   Future<AppUser> login({required String email, required String password}) async {
     final json = Map<String, dynamic>.from(await _remote.post('/v1/auth/login', {'identifier': email.trim(), 'password': password, 'client': 'mobile'}) as Map);
     if (json['step'] == 'done') return _enter(Map<String, dynamic>.from(json['tokens'] as Map));
@@ -44,7 +34,6 @@ class RemoteAuthRepository implements AuthRepository {
     return AppUser.fromJson(Map<String, dynamic>.from(await _remote.get('/me') as Map));
   }
 
-  @override
   Future<AppUser> loginWithOtp({
     required String email,
     required String otp,
@@ -56,7 +45,7 @@ class RemoteAuthRepository implements AuthRepository {
     return _enter(Map<String, dynamic>.from(json as Map));
   }
 
-  @override
+  /// Sends a sign-in code to a family's phone or email, with no password. Always ends in [OtpRequired].
   Future<Never> requestCode(String identifier) async {
     final challenge = Map<String, dynamic>.from(await _remote.post('/v1/auth/code', {'identifier': identifier.trim(), 'client': 'mobile'}) as Map);
     _challenge = challenge['challengeId'] as String;

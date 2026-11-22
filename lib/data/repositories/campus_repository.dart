@@ -4,23 +4,11 @@ import 'package:tangent/data/models/campus.dart';
 import 'package:tangent/data/models/student.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-abstract class FeeRepository {
-  Future<FeeAccount?> forStudent(String studentId);
-
-  /// Pays an installment and returns the stored receipt.
-  Future<Receipt?> pay({
-    required String studentId,
-    required String installmentId,
-    required String method,
-  });
-}
-
-class RemoteFeeRepository implements FeeRepository {
-  RemoteFeeRepository(this._remote);
+class FeeRepository {
+  FeeRepository(this._remote);
 
   final RemoteDataSource _remote;
 
-  @override
   Future<FeeAccount?> forStudent(String studentId) async {
     final json = await _remote.get('/students/$studentId/fees');
     return FeeAccount.fromJson(Map<String, dynamic>.from(json as Map));
@@ -28,7 +16,7 @@ class RemoteFeeRepository implements FeeRepository {
 
   /// Opens the provider's checkout in the browser (no payment SDK in the app), then waits for the provider to confirm:
   /// the receipt comes back once its webhook marks the order paid. Null when the family left without paying.
-  @override
+  /// Pays an installment and returns the stored receipt.
   Future<Receipt?> pay({
     required String studentId,
     required String installmentId,
@@ -50,24 +38,11 @@ class RemoteFeeRepository implements FeeRepository {
   }
 }
 
-abstract class NoticeRepository {
-  Future<List<Notice>> all();
-
-  /// A teacher's notice, published now: to their own class when [classId] is given, else to everyone.
-  Future<void> post(Notice notice, {String? classId});
-
-  Future<void> read(String id);
-
-  /// "I have read this", for a notice that asks for it.
-  Future<void> acknowledge(String id);
-}
-
-class RemoteNoticeRepository implements NoticeRepository {
-  RemoteNoticeRepository(this._remote);
+class NoticeRepository {
+  NoticeRepository(this._remote);
 
   final RemoteDataSource _remote;
 
-  @override
   Future<List<Notice>> all() async {
     final json = await _remote.get('/notices');
     return [
@@ -76,7 +51,7 @@ class RemoteNoticeRepository implements NoticeRepository {
     ];
   }
 
-  @override
+  /// A teacher's notice, published now: to their own class when [classId] is given, else to everyone.
   Future<void> post(Notice notice, {String? classId}) => _remote.post('/notices', {
     'title': notice.title,
     'body': notice.body,
@@ -88,29 +63,17 @@ class RemoteNoticeRepository implements NoticeRepository {
     if (classId != null) 'classId': classId,
   });
 
-  @override
   Future<void> read(String id) => _remote.post('/notices/$id/read', const {});
 
-  @override
+  /// "I have read this", for a notice that asks for it.
   Future<void> acknowledge(String id) => _remote.post('/notices/$id/acknowledge', const {});
 }
 
-abstract class EventRepository {
-  Future<List<SchoolEvent>> all();
-
-  Future<void> rsvp({
-    required String eventId,
-    required String userId,
-    required RsvpStatus status,
-  });
-}
-
-class RemoteEventRepository implements EventRepository {
-  RemoteEventRepository(this._remote);
+class EventRepository {
+  EventRepository(this._remote);
 
   final RemoteDataSource _remote;
 
-  @override
   Future<List<SchoolEvent>> all() async {
     final json = await _remote.get('/events');
     return [
@@ -119,7 +82,6 @@ class RemoteEventRepository implements EventRepository {
     ];
   }
 
-  @override
   Future<void> rsvp({
     required String eventId,
     required String userId,
@@ -130,44 +92,11 @@ class RemoteEventRepository implements EventRepository {
   });
 }
 
-abstract class ChatRepository {
-  Future<List<ChatThread>> threadsFor(String userId);
-
-  Future<List<ChatMessage>> messages(String threadId);
-
-  /// One round trip for the inbox, so the list does not wait per thread.
-  Future<({List<ChatThread> threads, List<ChatMessage> messages})> inbox(
-    String userId,
-  );
-
-  Future<void> send({
-    required String threadId,
-    required String senderId,
-    required String text,
-    List<String> fileIds = const [],
-  });
-
-  Future<void> markRead({required String threadId, required String userId});
-
-  /// Tells the other side this person is typing.
-  Future<void> typing(String threadId);
-
-  /// Takes back one's own message (it shows as deleted to both sides).
-  Future<void> delete(String messageId);
-
-  /// Reports someone else's message to the school office.
-  Future<void> report(String messageId, String reason);
-
-  /// Opens (or finds) a one-to-one thread with [teacher]; returns its id.
-  Future<String> start({required String userId, required Teacher teacher});
-}
-
-class RemoteChatRepository implements ChatRepository {
-  RemoteChatRepository(this._remote);
+class ChatRepository {
+  ChatRepository(this._remote);
 
   final RemoteDataSource _remote;
 
-  @override
   Future<List<ChatThread>> threadsFor(String userId) async {
     final json = await _remote.get('/users/$userId/threads');
     return [
@@ -176,7 +105,6 @@ class RemoteChatRepository implements ChatRepository {
     ];
   }
 
-  @override
   Future<List<ChatMessage>> messages(String threadId) async {
     final json = await _remote.get('/threads/$threadId/messages');
     return [
@@ -185,7 +113,6 @@ class RemoteChatRepository implements ChatRepository {
     ];
   }
 
-  @override
   Future<void> send({
     required String threadId,
     required String senderId,
@@ -197,7 +124,7 @@ class RemoteChatRepository implements ChatRepository {
     if (fileIds.isNotEmpty) 'fileIds': fileIds,
   });
 
-  @override
+  /// One round trip for the inbox, so the list does not wait per thread.
   Future<({List<ChatThread> threads, List<ChatMessage> messages})> inbox(
     String userId,
   ) async {
@@ -212,20 +139,19 @@ class RemoteChatRepository implements ChatRepository {
     );
   }
 
-  @override
+  /// Tells the other side this person is typing.
   Future<void> typing(String threadId) => _remote.post('/threads/$threadId/typing', const {});
 
-  @override
+  /// Takes back one's own message (it shows as deleted to both sides).
   Future<void> delete(String messageId) => _remote.client.send('DELETE', '/messages/$messageId');
 
-  @override
+  /// Reports someone else's message to the school office.
   Future<void> report(String messageId, String reason) => _remote.post('/messages/$messageId/report', {'reason': reason});
 
-  @override
   Future<void> markRead({required String threadId, required String userId}) =>
       _remote.post('/threads/$threadId/read', {'userId': userId});
 
-  @override
+  /// Opens (or finds) a one-to-one thread with [teacher]; returns its id.
   Future<String> start({
     required String userId,
     required Teacher teacher,
@@ -238,20 +164,11 @@ class RemoteChatRepository implements ChatRepository {
   }
 }
 
-abstract class LibraryRepository {
-  Future<List<LibraryBook>> all();
-
-  Future<void> reserve({required String bookId, required String studentId});
-
-  Future<void> renew(String bookId);
-}
-
-class RemoteLibraryRepository implements LibraryRepository {
-  RemoteLibraryRepository(this._remote);
+class LibraryRepository {
+  LibraryRepository(this._remote);
 
   final RemoteDataSource _remote;
 
-  @override
   Future<List<LibraryBook>> all() async {
     final json = await _remote.get('/library/books');
     // The server answers with the books, the history, the reservations and the rules; the shelf is the books.
@@ -262,54 +179,29 @@ class RemoteLibraryRepository implements LibraryRepository {
     ];
   }
 
-  @override
   Future<void> reserve({required String bookId, required String studentId}) =>
       _remote.post('/library/books/$bookId/reserve', {'studentId': studentId});
 
-  @override
   Future<void> renew(String bookId) =>
       _remote.post('/library/books/$bookId/renew', const {});
 }
 
-abstract class TransportRepository {
-  Future<TransportInfo?> forStudent(String studentId);
-}
-
-class RemoteTransportRepository implements TransportRepository {
-  RemoteTransportRepository(this._remote);
+class TransportRepository {
+  TransportRepository(this._remote);
 
   final RemoteDataSource _remote;
 
-  @override
   Future<TransportInfo?> forStudent(String studentId) async {
     final json = await _remote.get('/students/$studentId/transport');
     return json is Map ? TransportInfo.fromJson(Map<String, dynamic>.from(json)) : null;
   }
 }
 
-abstract class LeaveRepository {
-  Future<List<LeaveRequest>> forStudent(String studentId);
-
-  Future<void> apply(LeaveRequest request);
-
-  /// A class teacher approves or declines a request.
-  Future<void> review({
-    required String id,
-    required LeaveStatus status,
-    required String reviewer,
-    String? note,
-  });
-
-  /// Takes back a request the school has not answered yet.
-  Future<void> withdraw(String id);
-}
-
-class RemoteLeaveRepository implements LeaveRepository {
-  RemoteLeaveRepository(this._remote);
+class LeaveRepository {
+  LeaveRepository(this._remote);
 
   final RemoteDataSource _remote;
 
-  @override
   Future<List<LeaveRequest>> forStudent(String studentId) async {
     final json = await _remote.get('/students/$studentId/leave');
     return [
@@ -318,14 +210,13 @@ class RemoteLeaveRepository implements LeaveRepository {
     ];
   }
 
-  @override
   Future<void> apply(LeaveRequest request) =>
       _remote.post('/leave', request.toJson());
 
-  @override
+  /// Takes back a request the school has not answered yet.
   Future<void> withdraw(String id) => _remote.post('/leave/$id/withdraw', const {});
 
-  @override
+  /// A class teacher approves or declines a request.
   Future<void> review({
     required String id,
     required LeaveStatus status,
@@ -338,16 +229,11 @@ class RemoteLeaveRepository implements LeaveRepository {
   });
 }
 
-abstract class GalleryRepository {
-  Future<List<GalleryAlbum>> all();
-}
-
-class RemoteGalleryRepository implements GalleryRepository {
-  RemoteGalleryRepository(this._remote);
+class GalleryRepository {
+  GalleryRepository(this._remote);
 
   final RemoteDataSource _remote;
 
-  @override
   Future<List<GalleryAlbum>> all() async {
     final json = await _remote.get('/gallery');
     return [
@@ -357,23 +243,11 @@ class RemoteGalleryRepository implements GalleryRepository {
   }
 }
 
-abstract class NotificationRepository {
-  Future<List<AppNotification>> forUser(String userId);
-
-  Future<void> dismiss(String id);
-
-  /// Brings back one dismissed by mistake.
-  Future<void> restore(String id);
-
-  Future<void> markAllRead(String userId);
-}
-
-class RemoteNotificationRepository implements NotificationRepository {
-  RemoteNotificationRepository(this._remote);
+class NotificationRepository {
+  NotificationRepository(this._remote);
 
   final RemoteDataSource _remote;
 
-  @override
   Future<List<AppNotification>> forUser(String userId) async {
     final json = await _remote.get('/users/$userId/notifications');
     return [
@@ -382,14 +256,12 @@ class RemoteNotificationRepository implements NotificationRepository {
     ];
   }
 
-  @override
   Future<void> dismiss(String id) =>
       _remote.post('/notifications/$id/dismiss', {});
 
-  @override
+  /// Brings back one dismissed by mistake.
   Future<void> restore(String id) => _remote.post('/notifications/$id/restore', const {});
 
-  @override
   Future<void> markAllRead(String userId) =>
       _remote.post('/users/$userId/notifications/read', {});
 }

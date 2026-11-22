@@ -1,19 +1,14 @@
 import { Inject, Injectable, SetMetadata, createParamDecorator, type CanActivate, type ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import * as schema from '@tangent/db/school';
-import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { PoolManager, Registry, enterSchool, type TenantInfo } from '@tangent/tenancy';
 import type { Pool } from 'pg';
 import type { Vocabulary } from '@tangent/contracts';
 import type { FastifyRequest } from 'fastify';
 import { ApiError } from '@tangent/nest-kit';
 
-export type SchoolDb = NodePgDatabase<typeof schema>;
-
 export interface TenantCtx {
   info: TenantInfo;
   pool: Pool;
-  db: SchoolDb;
 }
 
 export interface AuthedUser {
@@ -39,7 +34,6 @@ export const Tenant = createParamDecorator((_: unknown, ctx: ExecutionContext): 
 
 @Injectable()
 export class TenantService {
-  private readonly dbs = new WeakMap<Pool, SchoolDb>();
 
   constructor(
     @Inject(REGISTRY) readonly registry: Registry,
@@ -64,14 +58,9 @@ export class TenantService {
       throw new ApiError('school_unavailable', msg);
     }
     const pool = this.pools.get(slug, info.dbUrl);
-    let db = this.dbs.get(pool);
-    if (!db) {
-      db = drizzle(pool, { schema });
-      this.dbs.set(pool, db);
-    }
     // Whatever runs next in this request or job is for this school: its clock, its currency (locale.ts), its words.
     enterSchool(info, await this.vocab(slug, pool));
-    return { info, pool, db };
+    return { info, pool };
   }
 }
 

@@ -79,8 +79,7 @@ export class ConsoleAuth implements OnModuleInit {
       const code = this.env.DEMO_CODE;
       await this.db.pool.query('insert into console_otp (id, user_id, code_hash, expires_at) values ($1,$2,$3,$4)', [id, u.id, sha256(`${id}:${code}`), expires]);
       await this.sandbox.put({ schoolSlug: 'console', channel: 'email', to: u.email, subject: 'Your Tangent console code', body: `Your sign-in code is ${code}. It expires in 10 minutes.` });
-      return { step: 'otp', challenge: { challengeId: id, channel: 'email', maskedTo: maskEmail(u.email), expiresInSeconds: 600, // The code is only handed back in development, so a hosted test track keeps it as a second step the password alone cannot skip.
-        ...(this.env.NODE_ENV !== 'production' ? { demoCode: code } : {}) } };
+      return { step: 'otp', challenge: { challengeId: id, channel: 'email', maskedTo: maskEmail(u.email), expiresInSeconds: 600 } };
     }
     // First sign-in: the person adds a new key to their authenticator, and its first code proves it works.
     const secret = newTotpSecret();
@@ -92,7 +91,7 @@ export class ConsoleAuth implements OnModuleInit {
    * "Forgot it?": a code to the person's email (through Tangent's email connection; on the test track the fixed demo code)
    * lets them choose a new password. The authenticator is still asked at the next sign-in, so a mailbox alone opens nothing.
    */
-  async resetStart(email: string): Promise<{ challengeId: string; channel: 'email'; maskedTo: string; expiresInSeconds: number; demoCode?: string }> {
+  async resetStart(email: string): Promise<{ challengeId: string; channel: 'email'; maskedTo: string; expiresInSeconds: number }> {
     const u = (await this.db.pool.query<{ id: string; email: string }>("select id, email from console_users where lower(email) = $1 and status = 'active'", [email.trim().toLowerCase()])).rows[0];
     const id = newId('cot');
     // An unknown address gets the same answer, so the form does not say who has an account.
@@ -102,7 +101,7 @@ export class ConsoleAuth implements OnModuleInit {
     if (!this.env.DEMO_CODE) {
       await this.platform.hub.send({ schoolId: null, schoolSlug: 'console', channel: 'email', to: u.email, subject: 'Your Tangent console code', body: `Your code to choose a new console password is ${code}. It expires in 10 minutes. If you did not ask for it, ignore this email.`, now: true });
     }
-    return { challengeId: id, channel: 'email', maskedTo: maskEmail(u.email), expiresInSeconds: 600, ...(this.env.DEMO_CODE && !this.production ? { demoCode: code } : {}) };
+    return { challengeId: id, channel: 'email', maskedTo: maskEmail(u.email), expiresInSeconds: 600 };
   }
 
   async resetFinish(challengeId: string, code: string, password: string): Promise<void> {

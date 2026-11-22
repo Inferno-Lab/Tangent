@@ -51,7 +51,7 @@ class HomeworkView extends GetView<HomeworkController> {
         onRefresh: controller.load,
         children: [
           PageTitle('homework.title', subtitle: _summary(controller, tab, counts)),
-          // The filter sits under the title (rule 12): the bottom of the screen belongs to the dock and the one action.
+          // The filter sits under the title (AGENTS.md, any day of the week): the bottom of the screen belongs to the dock and the one action.
           Padding(
             padding: const EdgeInsets.fromLTRB(0, 8, 0, 16),
             child: GlassSegmented(

@@ -31,47 +31,47 @@ class InitialBinding extends Bindings {
       Get.find<ConnectivityService>().onBackOnline.add(() async { await remote.client.flushOutbox(); });
     }
     Get
-      ..lazyPut<AuthRepository>(() => RemoteAuthRepository(remote), fenix: true)
+      ..lazyPut<AuthRepository>(() => AuthRepository(remote), fenix: true)
       ..lazyPut<DirectoryRepository>(
-        () => RemoteDirectoryRepository(remote),
+        () => DirectoryRepository(remote),
         fenix: true,
       )
       ..lazyPut<AttendanceRepository>(
-        () => RemoteAttendanceRepository(remote),
+        () => AttendanceRepository(remote),
         fenix: true,
       )
       ..lazyPut<TimetableRepository>(
-        () => RemoteTimetableRepository(remote),
+        () => TimetableRepository(remote),
         fenix: true,
       )
       ..lazyPut<HomeworkRepository>(
-        () => RemoteHomeworkRepository(remote),
+        () => HomeworkRepository(remote),
         fenix: true,
       )
-      ..lazyPut<ExamRepository>(() => RemoteExamRepository(remote), fenix: true)
-      ..lazyPut<FeeRepository>(() => RemoteFeeRepository(remote), fenix: true)
-      ..lazyPut<NoticeRepository>(() => RemoteNoticeRepository(remote), fenix: true)
-      ..lazyPut<EventRepository>(() => RemoteEventRepository(remote), fenix: true)
-      ..lazyPut<ChatRepository>(() => RemoteChatRepository(remote), fenix: true)
+      ..lazyPut<ExamRepository>(() => ExamRepository(remote), fenix: true)
+      ..lazyPut<FeeRepository>(() => FeeRepository(remote), fenix: true)
+      ..lazyPut<NoticeRepository>(() => NoticeRepository(remote), fenix: true)
+      ..lazyPut<EventRepository>(() => EventRepository(remote), fenix: true)
+      ..lazyPut<ChatRepository>(() => ChatRepository(remote), fenix: true)
       ..lazyPut<LibraryRepository>(
-        () => RemoteLibraryRepository(remote),
+        () => LibraryRepository(remote),
         fenix: true,
       )
       ..lazyPut<TransportRepository>(
-        () => RemoteTransportRepository(remote),
+        () => TransportRepository(remote),
         fenix: true,
       )
-      ..lazyPut<DriverRepository>(() => RemoteDriverRepository(remote), fenix: true)
-      ..lazyPut<LeaveRepository>(() => RemoteLeaveRepository(remote), fenix: true)
+      ..lazyPut<DriverRepository>(() => DriverRepository(remote), fenix: true)
+      ..lazyPut<LeaveRepository>(() => LeaveRepository(remote), fenix: true)
       ..lazyPut<GalleryRepository>(
-        () => RemoteGalleryRepository(remote),
+        () => GalleryRepository(remote),
         fenix: true,
       )
       ..lazyPut<NotificationRepository>(
-        () => RemoteNotificationRepository(remote),
+        () => NotificationRepository(remote),
         fenix: true,
       )
-      ..lazyPut<SchoolLifeRepository>(() => RemoteSchoolLifeRepository(remote), fenix: true)
+      ..lazyPut<SchoolLifeRepository>(() => SchoolLifeRepository(remote), fenix: true)
       ..lazyPut<AssistantRepository>(() => RemoteAssistantRepository(remote), fenix: true);
   }
 }

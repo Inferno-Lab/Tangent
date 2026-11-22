@@ -12,8 +12,6 @@
 .pg-p .rcall .grd.rw{min-height:60px}
 .pg-p .rcall .rn{font:700 13px var(--fb);color:var(--ink3)}
 .pg-p .big{font:700 38px/1 var(--fd);letter-spacing:-.04em}
-.pg-p .meter{display:flex;gap:4px;height:22px;margin-top:12px}
-.pg-p .meter i{border-radius:6px;transition:flex var(--t3) var(--e)}
 .pg-p .ntc{display:flex;flex-direction:column;gap:6px;padding:20px 0;border-top:1px solid var(--line)}
 .pg-p .ntc:first-child{border-top:0}
 .pg-p .ntc b{font:700 15px var(--fd);letter-spacing:-.01em}

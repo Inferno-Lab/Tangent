@@ -3,22 +3,11 @@ import 'package:tangent/core/utils/status.dart';
 import 'package:tangent/data/datasources/remote_datasource.dart';
 import 'package:tangent/data/models/academics.dart';
 
-abstract class AttendanceRepository {
-  Future<List<AttendanceDay>> forStudent(String studentId);
-
-  Future<AttendanceSummary> summary(String studentId, {DateTime? month});
-
-  Future<Map<String, AttendanceStatus>> todayForClass(List<String> studentIds);
-
-  Future<void> markToday(Map<String, AttendanceStatus> byStudent);
-}
-
-class RemoteAttendanceRepository implements AttendanceRepository {
-  RemoteAttendanceRepository(this._remote);
+class AttendanceRepository {
+  AttendanceRepository(this._remote);
 
   final RemoteDataSource _remote;
 
-  @override
   Future<List<AttendanceDay>> forStudent(String studentId) async {
     final json = await _remote.get('/students/$studentId/attendance');
     return [
@@ -27,13 +16,11 @@ class RemoteAttendanceRepository implements AttendanceRepository {
     ];
   }
 
-  @override
   Future<AttendanceSummary> summary(String studentId, {DateTime? month}) async {
     final days = await forStudent(studentId);
     return AttendanceSummary.from(days);
   }
 
-  @override
   Future<Map<String, AttendanceStatus>> todayForClass(
     List<String> studentIds,
   ) async {
@@ -44,7 +31,6 @@ class RemoteAttendanceRepository implements AttendanceRepository {
     };
   }
 
-  @override
   Future<void> markToday(Map<String, AttendanceStatus> byStudent) async {
     await _remote.post('/attendance', {
       for (final entry in byStudent.entries) entry.key: entry.value == AttendanceStatus.lateArrival ? 'late' : entry.value.name,
@@ -52,16 +38,11 @@ class RemoteAttendanceRepository implements AttendanceRepository {
   }
 }
 
-abstract class TimetableRepository {
-  Future<List<TimetableDay>> forClass(String classId);
-}
-
-class RemoteTimetableRepository implements TimetableRepository {
-  RemoteTimetableRepository(this._remote);
+class TimetableRepository {
+  TimetableRepository(this._remote);
 
   final RemoteDataSource _remote;
 
-  @override
   Future<List<TimetableDay>> forClass(String classId) async {
     final json = await _remote.get('/classes/$classId/timetable');
     return [
@@ -71,35 +52,11 @@ class RemoteTimetableRepository implements TimetableRepository {
   }
 }
 
-abstract class HomeworkRepository {
-  Future<List<Homework>> forClass(String classId);
-
-  Future<Homework?> byId(String id);
-
-  Future<void> submit({
-    required String homeworkId,
-    required String studentId,
-    required String fileName,
-    String? filePath,
-  });
-
-  Future<void> grade({
-    required String homeworkId,
-    required String studentId,
-    required int marks,
-    required String grade,
-    required String feedback,
-  });
-
-  Future<void> assign(Homework homework);
-}
-
-class RemoteHomeworkRepository implements HomeworkRepository {
-  RemoteHomeworkRepository(this._remote);
+class HomeworkRepository {
+  HomeworkRepository(this._remote);
 
   final RemoteDataSource _remote;
 
-  @override
   Future<List<Homework>> forClass(String classId) async {
     final json = await _remote.get('/classes/$classId/homework');
     return [
@@ -108,13 +65,11 @@ class RemoteHomeworkRepository implements HomeworkRepository {
     ];
   }
 
-  @override
   Future<Homework?> byId(String id) async {
     final json = await _remote.get('/homework/$id');
     return Homework.fromJson(Map<String, dynamic>.from(json as Map));
   }
 
-  @override
   Future<void> submit({
     required String homeworkId,
     required String studentId,
@@ -130,7 +85,6 @@ class RemoteHomeworkRepository implements HomeworkRepository {
     });
   }
 
-  @override
   Future<void> grade({
     required String homeworkId,
     required String studentId,
@@ -144,36 +98,15 @@ class RemoteHomeworkRepository implements HomeworkRepository {
     'feedback': feedback,
   });
 
-  @override
   Future<void> assign(Homework homework) =>
       _remote.post('/homework', homework.toJson());
 }
 
-abstract class ExamRepository {
-  Future<List<Exam>> forClass(String classId);
-
-  Future<ExamResult?> result({required String examId, required String studentId});
-
-  Future<List<ExamResult>> resultsFor(String studentId);
-
-  /// The marks entered so far and what the subject is marked out of; a subject graded without marks also has its grades
-  /// to pick from and the grades given so far.
-  Future<({Map<String, int> marks, int maxMarks, List<String> grades, Map<String, String> gradeMarks})> marksDraft(String classId, String subject);
-
-  Future<void> saveMarks({
-    required String classId,
-    required String subject,
-    required Map<String, int> values,
-    Map<String, String> grades = const {},
-  });
-}
-
-class RemoteExamRepository implements ExamRepository {
-  RemoteExamRepository(this._remote);
+class ExamRepository {
+  ExamRepository(this._remote);
 
   final RemoteDataSource _remote;
 
-  @override
   Future<List<Exam>> forClass(String classId) async {
     final json = await _remote.get('/classes/$classId/exams');
     return [
@@ -182,7 +115,6 @@ class RemoteExamRepository implements ExamRepository {
     ];
   }
 
-  @override
   Future<ExamResult?> result({
     required String examId,
     required String studentId,
@@ -191,7 +123,6 @@ class RemoteExamRepository implements ExamRepository {
     return ExamResult.fromJson(Map<String, dynamic>.from(json as Map));
   }
 
-  @override
   Future<List<ExamResult>> resultsFor(String studentId) async {
     final json = await _remote.get('/students/$studentId/results');
     return [
@@ -200,7 +131,8 @@ class RemoteExamRepository implements ExamRepository {
     ];
   }
 
-  @override
+  /// The marks entered so far and what the subject is marked out of; a subject graded without marks also has its grades
+  /// to pick from and the grades given so far.
   Future<({Map<String, int> marks, int maxMarks, List<String> grades, Map<String, String> gradeMarks})> marksDraft(String classId, String subject) async {
     final json = Map<String, dynamic>.from(await _remote.get('/classes/$classId/marks', query: {'subject': subject}) as Map);
     return (
@@ -211,7 +143,6 @@ class RemoteExamRepository implements ExamRepository {
     );
   }
 
-  @override
   Future<void> saveMarks({
     required String classId,
     required String subject,

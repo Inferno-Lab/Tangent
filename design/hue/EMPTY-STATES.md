@@ -2,7 +2,7 @@
 
 Approved by the owner on 10 November 2026, together with Tangent Hue ([README](README.md)). Not built yet: they are implemented with Hue, after the work in progress on `main` lands.
 
-The source of truth is the boards: `src/EmptyFrame.html` (the kit), `src/EmptyAdmin1-5.html`, `src/EmptyConsole1-4.html` and `src/EmptyApp1-4.html`, with `empty.css` for the kit's CSS. They are on the canvas pages **Empty states · admin / console / app**. Build with `node build.mjs`; check the final frames with `node qa.mjs @e EmptyAdmin1` (it renders with reduced motion on) and the motion with `node anim.mjs EmptyAdmin3 760 800 640 460`.
+The source of truth is the boards: `src/EmptyFrame.html` (the kit), `src/EmptyAdmin*.html`, `src/EmptyConsole*.html` and `src/EmptyApp*.html`, with `empty.css` for the kit's CSS. They are on the canvas pages **Empty states · admin / console / app**. Build with `node build.mjs`; check the final frames with `node qa.mjs @e EmptyAdmin1` (it renders with reduced motion on) and the motion with `node anim.mjs EmptyAdmin3 760 800 640 460`.
 
 ## The rules
 

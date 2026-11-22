@@ -16,7 +16,7 @@ export interface LoginFailure {
 }
 
 /** Where the code went: shown on the code step so the person knows which phone or inbox to check. */
-export interface Challenge { challengeId: string; demoCode?: string; channel?: 'sms' | 'email' | 'app'; maskedTo?: string; expiresInSeconds?: number; enroll?: { secret: string; uri: string } }
+export interface Challenge { challengeId: string; channel?: 'sms' | 'email' | 'app'; maskedTo?: string; expiresInSeconds?: number; enroll?: { secret: string; uri: string } }
 
 export interface LoginController {
   product: 'admin' | 'console';
@@ -30,8 +30,6 @@ export interface LoginController {
   logoUrl?: string | null;
   /** The school's privacy notice and grievance officer, behind "Privacy". */
   privacy?: { notice: string; officerName: string; officerEmail: string; officerPhone: string };
-  /** The console on a local or test track (VITE_DEMO_LOGIN): helpers that fill its fixed code. Schools have none. */
-  demoMode?: boolean;
   /** Step one. Resolves to the code challenge, or to nothing when the school has two-step sign-in off. */
   submitCredentials: (email: string, password: string) => Promise<Challenge | null>;
   /** Step two. Resolves to the signed-in person's name. */
@@ -72,8 +70,6 @@ export function useLogin(c: LoginController, themeCls: string) {
   const [forgotNote, setForgotNote] = useState('');
   const [resetting, setResetting] = useState(false);
   const [newPw, setNewPw] = useState('');
-  const fill = useRef<ReturnType<typeof setInterval>>(undefined);
-  useEffect(() => () => clearInterval(fill.current), []);
   const enterRef = useRef(c.enter);
   enterRef.current = c.enter;
   // The last step says "Opening…", so it does; the button stays for anyone who wants to skip the wait.
@@ -188,7 +184,6 @@ export function useLogin(c: LoginController, themeCls: string) {
     pw, onPw: (e: { target: { value: string } }) => { setPw(e.target.value); setPwErr(false); },
     pwType: show ? 'text' : 'password', eyeD: show ? EYE_OFF : EYE_ON, eyeLabel: show ? tr('ui.use_login.hide_password') : tr('ui.use_login.show_password'), toggleEye: () => setShow((s) => !s),
     emCls: emErr ? 'err shake' : '', emInv: emErr ? 'true' : 'false', emErr: !!emErr, emMsg: emErr, pwCls: pwErr ? 'err shake' : '', pwInv: pwErr ? 'true' : 'false', pwErr, pwMsg,
-    showDemo: !!c.demoMode, fillDemo: () => { setPw('nest2026'); setPwErr(false); },
     forgot: () => void forgot(), forgotNote, isReset: resetting, newPw, onNewPw: (e: { target: { value: string } }) => { setNewPw(e.target.value); setOtpErr(false); }, npCls: '',
     idLabel: cons ? tr('ui.use_login.tangent_email') : tr('ui.use_login.email_or_phone_number'), idType: cons ? 'email' : 'text',
     busy, notBusy: !busy,
@@ -205,12 +200,6 @@ export function useLogin(c: LoginController, themeCls: string) {
       const v = e.target.value.replace(/\D/g, '').slice(0, 6);
       setCode(v); setOtpErr(false);
       if (v.length === 6 && !resetting) setTimeout(() => void verifyNow(v), 250);
-    },
-    fillCode: () => {
-      const full = challenge?.demoCode ?? '424242';
-      let k = 0;
-      clearInterval(fill.current); setCode(''); setOtpErr(false);
-      fill.current = setInterval(() => { k++; setCode(full.slice(0, k)); if (k >= 6) { clearInterval(fill.current); setTimeout(() => void verifyNow(full), 350); } }, 140);
     },
     verify: () => void verifyNow(code),
     firstName: (name.includes('@') ? name.split(/[@.]/)[0] : firstName(name)) || 'there', goName: c.goName, enter: c.enter,

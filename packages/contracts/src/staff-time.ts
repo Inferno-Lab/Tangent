@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isLanguage, localizedLabels } from './i18n.js';
+import { isLanguage } from './i18n.js';
 import { addDays } from './dates.js';
 
 /**
@@ -29,11 +29,9 @@ export const DEFAULT_LEAVE_TYPES: LeaveType[] = [
   { key: 'earned', name: 'Earned leave', days: 15, accrual: 'month', carry: 30, halfDays: false, paid: true },
   { key: 'unpaid', name: 'Unpaid leave', days: 0, accrual: 'year', carry: 0, halfDays: true, paid: false },
 ];
-export const LEAVE_ACCRUAL_LABELS = localizedLabels({ year: 'All at the start of the year', month: 'A twelfth each month' });
 
 /** Staff check in from the app, or only the office marks the day. */
 export const STAFF_CHECK_IN = ['app', 'office'] as const;
-export const STAFF_CHECK_IN_LABELS = localizedLabels({ app: 'Staff check in from the app', office: 'Only the office marks staff' });
 
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Pick a day');
 export const StaffLeaveInput = z.object({
