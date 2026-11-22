@@ -63,7 +63,7 @@ class InviteView extends GetView<InviteController> {
                           ),
                           const SizedBox(width: 10),
                           if (v.state == 'invited' || v.state == 'pending')
-                            Btn('visitors.cancel', small: true, kind: BtnKind.quiet, onPressed: () => unawaited(controller.cancel(v)))
+                            Btn('visitors.cancel', small: true, kind: BtnKind.quiet, action: () => controller.cancel(v))
                           else
                             Chip2('visitors.state_${v.state}'.tr),
                         ],

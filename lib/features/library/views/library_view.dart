@@ -141,7 +141,7 @@ class _MineRow extends StatelessWidget {
         kind: BtnKind.quiet,
         small: true,
         height: 34,
-        onPressed: () => unawaited(controller.renew(book)),
+        action: () => controller.renew(book),
       );
     }
     return Padding(

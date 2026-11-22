@@ -518,7 +518,7 @@ class _ActionBar extends StatelessWidget {
               icon: PhosphorIconsRegular.uploadSimple,
               expand: true,
               height: 48,
-              onPressed: () => unawaited(_homework().upload(item)),
+              action: () => _homework().upload(item),
             ),
           ),
           const SizedBox(width: 8),

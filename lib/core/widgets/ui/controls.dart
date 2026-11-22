@@ -53,10 +53,11 @@ class _PressableState extends State<Pressable> {
 
 enum BtnKind { primary, ink, bright, quiet, danger, plain }
 
-class Btn extends StatelessWidget {
+class Btn extends StatefulWidget {
   const Btn(
     this.label, {
-    required this.onPressed,
+    this.onPressed,
+    this.action,
     this.kind = BtnKind.primary,
     this.small = false,
     this.icon,
@@ -68,7 +69,13 @@ class Btn extends StatelessWidget {
   });
 
   final String label;
+
+  /// What a tap does (opening a page or a sheet). Null, with no [action], dims the button.
   final VoidCallback? onPressed;
+
+  /// What a tap sends instead: the button shows its spinner until it is done and ignores taps meanwhile, so a second tap
+  /// never sends it twice.
+  final Future<void> Function()? action;
   final BtnKind kind;
   final bool small;
   final IconData? icon;
@@ -78,7 +85,26 @@ class Btn extends StatelessWidget {
   final double? height;
 
   @override
+  State<Btn> createState() => _BtnState();
+}
+
+class _BtnState extends State<Btn> {
+  var _working = false;
+
+  Future<void> _send(Future<void> Function() action) async {
+    setState(() => _working = true);
+    try {
+      await action();
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final Btn(:label, :kind, :small, :icon, :trailing, :expand, :height, :action) = widget;
+    final onPressed = action == null ? widget.onPressed : () => unawaited(_send(action));
+    final loading = widget.loading || _working;
     final c = context.app;
     final (bg, fg) = switch (kind) {
       // Tangent Hue: brand for the main action, the deep colour for a strong second one.

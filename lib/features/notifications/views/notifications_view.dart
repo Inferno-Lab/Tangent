@@ -125,7 +125,7 @@ class NotificationsView extends GetView<NotificationsController> {
                 child: Row(
                   children: [
                     Expanded(child: Text('notifications.removed'.tr, style: AppText.capB(color: context.app.ink3))),
-                    Btn('notifications.undo', kind: BtnKind.quiet, height: 48, onPressed: () => unawaited(controller.undo())),
+                    Btn('notifications.undo', kind: BtnKind.quiet, height: 48, action: () => controller.undo()),
                   ],
                 ),
               ),

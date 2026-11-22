@@ -76,9 +76,9 @@ class GatePassScreen extends GetView<GatePassController> {
                           const SizedBox(height: 12),
                           Row(
                             children: [
-                              Expanded(child: Btn('gate.agree', small: true, onPressed: () => unawaited(controller.answer(p, yes: true)))),
+                              Expanded(child: Btn('gate.agree', small: true, action: () => controller.answer(p, yes: true))),
                               const SizedBox(width: 10),
-                              Expanded(child: Btn('gate.refuse', small: true, kind: BtnKind.quiet, onPressed: () => unawaited(controller.answer(p, yes: false)))),
+                              Expanded(child: Btn('gate.refuse', small: true, kind: BtnKind.quiet, action: () => controller.answer(p, yes: false))),
                             ],
                           ),
                         ],
@@ -108,7 +108,7 @@ class GatePassScreen extends GetView<GatePassController> {
                           ),
                           const SizedBox(width: 10),
                           if (p.state == 'pending' || p.state == 'approved')
-                            Btn('gate.cancel', small: true, kind: BtnKind.quiet, onPressed: () => unawaited(controller.cancel(p)))
+                            Btn('gate.cancel', small: true, kind: BtnKind.quiet, action: () => controller.cancel(p))
                           else
                             Chip2('gate.state_${p.state}'.tr),
                         ],

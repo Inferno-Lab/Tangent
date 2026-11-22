@@ -74,7 +74,7 @@ class MeetingsView extends GetView<MeetingsController> {
                                         padding: const EdgeInsets.only(right: 8),
                                         child: Btn('meetings.join', small: true, onPressed: () => unawaited(launchUrl(Uri.parse(t.booked!.link), mode: LaunchMode.externalApplication))),
                                       ),
-                                    if (m.canCancel) Btn('meetings.cancel', small: true, kind: BtnKind.quiet, onPressed: () => unawaited(controller.cancel(t.booked!))),
+                                    if (m.canCancel) Btn('meetings.cancel', small: true, kind: BtnKind.quiet, action: () => controller.cancel(t.booked!)),
                                   ],
                                 )
                               else if (!m.canBook)
@@ -119,14 +119,14 @@ class MeetingsView extends GetView<MeetingsController> {
           children: [
             Text('meetings.book_with'.trp({'name': teacher, 'time': _hm(s.startsAt)}), style: context.type.h2),
             const SizedBox(height: 16),
-            Btn('meetings.mode_inPerson', expand: true, icon: PhosphorIconsRegular.users, onPressed: () async {
-              Get.back<void>();
-              await controller.book(s, studentId, 'inPerson');
+            Btn('meetings.mode_inPerson', expand: true, icon: PhosphorIconsRegular.users, action: () async {
+              // Closes once booked; a refusal (the slot just went) leaves the choice open with its reason.
+              if (await controller.book(s, studentId, 'inPerson')) Get.back<void>();
             }),
             const SizedBox(height: 10),
-            Btn('meetings.mode_online', expand: true, kind: BtnKind.quiet, icon: PhosphorIconsRegular.videoCamera, onPressed: () async {
-              Get.back<void>();
-              await controller.book(s, studentId, 'online');
+            Btn('meetings.mode_online', expand: true, kind: BtnKind.quiet, icon: PhosphorIconsRegular.videoCamera, action: () async {
+              // Closes once booked; a refusal (the slot just went) leaves the choice open with its reason.
+              if (await controller.book(s, studentId, 'online')) Get.back<void>();
             }),
           ],
         ),
@@ -193,7 +193,7 @@ class TeacherMeetingsView extends GetView<TeacherMeetingsController> {
                                     s.state == 'closed' ? 'meetings.open_it' : 'meetings.close_it',
                                     small: true,
                                     kind: BtnKind.quiet,
-                                    onPressed: () => unawaited(controller.setClosed(s, closed: s.state != 'closed')),
+                                    action: () => controller.setClosed(s, closed: s.state != 'closed'),
                                   ),
                                 ],
                               ),
@@ -217,11 +217,10 @@ class TeacherMeetingsView extends GetView<TeacherMeetingsController> {
     final ctl = TextEditingController(text: s.link);
     await showSheet<void>(SheetBody(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-      footer: Btn('meetings.save_link', expand: true, onPressed: () async {
+      footer: Btn('meetings.save_link', expand: true, action: () async {
         final v = ctl.text.trim();
         if (!SheetBody.valid()) return;
-        Get.back<void>();
-        await controller.setLink(s, v);
+        if (await controller.setLink(s, v)) Get.back<void>();
       }),
       child: Builder(
         builder: (context) => Column(

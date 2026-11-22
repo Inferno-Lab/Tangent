@@ -235,7 +235,7 @@ class _FormPageState extends State<_FormPage> {
       child: PageFrame(
         leading: const BackGlass(),
         bottomBarHeight: 56,
-        bottomBar: Obx(() => Btn('forms.send', expand: true, icon: PhosphorIconsRegular.paperPlaneTilt, loading: _c.sending.value, onPressed: () => unawaited(_send()))),
+        bottomBar: Obx(() => Btn('forms.send', expand: true, icon: PhosphorIconsRegular.paperPlaneTilt, loading: _c.sending.value, action: () => _send())),
         children: [
           PageTitle(widget.form.title),
           if (widget.form.intro.isNotEmpty) Text(widget.form.intro, style: context.type.b),
