@@ -92,7 +92,9 @@ ${tail}`);
       // connection" error (57P01) failed a test run that had passed (CI, 19 November). Fast only if smart does not end.
       if ((await stop('smart')) !== 0) await stop('fast');
       // A test's database is about 100 MB: left behind by every run, they filled the disk.
-      if (opts.throwaway) fs.rmSync(path.dirname(dataDir), { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+      // Windows can hold a file of the stopped server a moment longer: a folder that will not go stays in the temp folder
+      // rather than failing a run whose tests passed.
+      if (opts.throwaway) try { fs.rmSync(path.dirname(dataDir), { recursive: true, force: true, maxRetries: 10, retryDelay: 300 }); } catch { /* left for the OS */ }
     },
   };
 }
