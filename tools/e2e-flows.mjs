@@ -102,7 +102,8 @@ await flow('admin: wrong password shows an error, a wrong code is refused, then 
   await expectVisible(p.getByRole('alert'), 'the wrong-code message');
   await p.getByLabel('6-digit code').fill(code);
   await p.waitForURL(`${ADMIN}/s/${slug}/`, { timeout: 15000 });
-  await expectVisible(p.getByRole('heading', { name: 'Dashboard' }), 'the dashboard');
+  // The loaded dashboard, not its loading skeleton (whose heading says Dashboard and is gone once the day comes in).
+  await expectVisible(p.getByRole('heading', { level: 1, name: /^Good (morning|afternoon|evening),/ }), 'the dashboard', 15000);
 });
 
 await flow('admin: a forgotten password is replaced with a code, then signs in by phone number', {}, async (p) => {
