@@ -421,6 +421,7 @@ class ChatThreadView extends GetView<ChatThreadController> {
                   ? Padding(
                       padding: EdgeInsets.fromLTRB(20, inset.top + 90, 20, 0),
                       child: ViewStateView(
+                        skeleton: const SkeletonChat(),
                         state: controller.state.value,
                         onRetry: controller.load,
                         errorKey: controller.errorMessage.value,

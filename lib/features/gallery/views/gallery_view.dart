@@ -111,6 +111,7 @@ class GalleryView extends GetView<GalleryController> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   ViewStateView(
+                    skeleton: const SkeletonGrid(columns: 2, height: 210),
                     state: controller.state.value == ViewState.success ? ViewState.empty : controller.state.value,
                     onRetry: controller.load,
                     errorKey: controller.errorMessage.value,

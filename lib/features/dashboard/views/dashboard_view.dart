@@ -132,6 +132,7 @@ class _DashboardViewState extends State<DashboardView> {
                             ),
                           ),
                         ViewStateView(
+                          skeleton: const SkeletonCards(),
                           state: controller.state.value,
                           onRetry: controller.load,
                           errorKey: controller.errorMessage.value,

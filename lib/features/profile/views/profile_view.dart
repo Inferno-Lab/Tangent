@@ -50,6 +50,7 @@ class ProfileView extends GetView<ProfileController> {
         children: [
           _Header(user: user, controller: controller),
           ViewStateView(
+            skeleton: const SkeletonCards(),
             state: view,
             onRetry: controller.load,
             errorKey: controller.errorMessage.value,

@@ -48,6 +48,7 @@ class LibraryView extends GetView<LibraryController> {
         children: [
           const Rise(child: PageTitle('library.title')),
           ViewStateView(
+            skeleton: const SkeletonGrid(columns: 3, height: 150),
             state: controller.state.value,
             onRetry: controller.load,
             errorKey: controller.errorMessage.value,

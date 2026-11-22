@@ -82,6 +82,7 @@ class _FeesViewState extends State<FeesView> {
             _Due(controller: controller),
           ],
           ViewStateView(
+            skeleton: const SkeletonCards(),
             state: state,
             onRetry: controller.load,
             errorKey: controller.errorMessage.value,

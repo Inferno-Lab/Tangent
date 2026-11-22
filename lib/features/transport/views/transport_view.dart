@@ -37,6 +37,7 @@ class TransportView extends GetView<TransportController> {
             const PageTitle('transport.title'),
             const SizedBox(height: 16),
             ViewStateView(
+              skeleton: const SkeletonCards(),
               state: controller.state.value,
               onRetry: controller.load,
               errorKey: controller.errorMessage.value,

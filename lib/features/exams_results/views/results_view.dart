@@ -72,6 +72,7 @@ class ResultsView extends GetView<ResultsController> {
             ),
           ),
           ViewStateView(
+            skeleton: const SkeletonCards(),
             state: controller.state.value,
             onRetry: controller.load,
             errorKey: controller.errorMessage.value,

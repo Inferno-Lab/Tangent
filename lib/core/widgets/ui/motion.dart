@@ -18,6 +18,8 @@ class Rise extends StatefulWidget {
 class _RiseState extends State<Rise> with SingleTickerProviderStateMixin {
   late final _c = AnimationController(vsync: this, duration: AppMotion.t4);
   late final _a = CurvedAnimation(parent: _c, curve: kEase);
+  // About 12px for a typical row; SlideTransition moves by the child's own height.
+  late final _slide = Tween(begin: const Offset(0, .08), end: Offset.zero).animate(_a);
   Timer? _timer;
 
   @override
@@ -44,13 +46,10 @@ class _RiseState extends State<Rise> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     if (context.reduceMotion) return widget.child;
-    return AnimatedBuilder(
-      animation: _a,
-      child: widget.child,
-      builder: (context, child) => Opacity(
-        opacity: _a.value,
-        child: Transform.translate(offset: Offset(0, 12 * (1 - _a.value)), child: child),
-      ),
+    // Transitions, not an Opacity rebuilt every frame: the fade is a layer property and the child is never rebuilt.
+    return FadeTransition(
+      opacity: _a,
+      child: SlideTransition(position: _slide, transformHitTests: false, child: widget.child),
     );
   }
 }

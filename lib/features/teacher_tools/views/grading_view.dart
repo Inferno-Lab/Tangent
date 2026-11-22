@@ -55,6 +55,7 @@ class GradingView extends GetView<GradingController> {
           Rise(child: Builder(builder: (context) => Text('teacher.to_grade_n'.trp({'n': '${controller.total}'}), style: context.type.h1))),
           const SizedBox(height: 16),
           ViewStateView(
+            skeleton: const SkeletonCards(),
             state: controller.state.value,
             onRetry: controller.load,
             errorKey: controller.errorMessage.value,

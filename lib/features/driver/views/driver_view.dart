@@ -29,6 +29,7 @@ class DriverView extends GetView<DriverController> {
         children: [
           Rise(child: PageTitle('driver.title', subtitle: DateFormat('EEEE d MMMM').format(Clock.now()))),
           ViewStateView(
+            skeleton: const SkeletonCards(),
             state: controller.state.value,
             onRetry: controller.load,
             errorKey: controller.errorMessage.value,

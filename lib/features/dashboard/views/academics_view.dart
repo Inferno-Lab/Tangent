@@ -50,6 +50,7 @@ class AcademicsView extends GetView<AcademicsController> {
             _Shelf(controller: controller, selected: selected),
           ],
           ViewStateView(
+            skeleton: const SkeletonCards(),
             state: state,
             onRetry: controller.load,
             errorKey: controller.errorMessage.value,

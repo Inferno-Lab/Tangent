@@ -281,6 +281,7 @@ class HomeworkDetailView extends GetView<HomeworkDetailController> {
             Padding(
               padding: EdgeInsets.fromLTRB(20, inset.top + 70, 20, 0),
               child: ViewStateView(
+                skeleton: const SkeletonDetail(),
                 state: state,
                 onRetry: controller.load,
                 errorKey: controller.errorMessage.value,

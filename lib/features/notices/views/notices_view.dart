@@ -423,6 +423,7 @@ class NoticeDetailView extends GetView<NoticeDetailController> {
               ),
         children: [
           ViewStateView(
+            skeleton: const SkeletonDetail(),
             state: controller.state.value,
             onRetry: controller.load,
             errorKey: controller.errorMessage.value,

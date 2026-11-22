@@ -139,6 +139,7 @@ class TeacherHomeView extends GetView<TeacherHomeController> {
                   ],
                   const SizedBox(height: 20),
                   ViewStateView(
+                    skeleton: const SkeletonCards(),
                     state: controller.state.value,
                     onRetry: controller.load,
                     errorKey: controller.errorMessage.value,
@@ -576,6 +577,7 @@ class TeacherClassesView extends GetView<TeacherHomeController> {
           ),
           const SizedBox(height: 16),
           ViewStateView(
+            skeleton: const SkeletonCards(),
             state: controller.state.value,
             onRetry: controller.load,
             errorKey: controller.errorMessage.value,
