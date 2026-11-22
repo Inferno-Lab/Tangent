@@ -619,7 +619,8 @@ const attendance = kind<AttLookups>({
       const day = isoDay(r.date!)!;
       const k = `${s.class_id}|${day}`;
       const id = l.sessions.get(k) ?? (sessions.get(k)?.id as string | undefined) ?? newId('ses');
-      if (!l.sessions.has(k)) sessions.set(k, { id, class_id: s.class_id, date: day, submitted_at: ist(day, '09:00') });
+      // Once a class and day, not once a row: a year's file has 130k rows but a few thousand sessions.
+      if (!l.sessions.has(k) && !sessions.has(k)) sessions.set(k, { id, class_id: s.class_id, date: day, submitted_at: ist(day, '09:00') });
       marks.push({ session_id: id, student_id: s.id, status: MARK[norm(r.status!)] });
     }
     return [{ table: 'attendance_sessions', pk: ['id'], cols: [], rows: [...sessions.values()] }, { table: 'attendance_marks', pk: ['session_id', 'student_id'], cols: ['status'], rows: marks }];
