@@ -14,6 +14,17 @@ describe('a school’s own clock', () => {
     expect(schoolInstant('2026-11-15', '09:00', 'Asia/Kolkata').toISOString()).toBe('2026-11-15T03:30:00.000Z');
     expect(zoneOffsetMinutes(new Date('2026-07-01T00:00:00Z'), 'Europe/London')).toBe(60);
   });
+
+  it('the offset is right on each side of a switch, asked once or many times (it is kept per quarter hour)', () => {
+    for (let i = 0; i < 3; i++) {
+      expect(zoneOffsetMinutes(new Date('2026-03-29T00:59:59Z'), 'Europe/London')).toBe(0);
+      expect(zoneOffsetMinutes(new Date('2026-03-29T01:00:00Z'), 'Europe/London')).toBe(60);
+      expect(schoolToday(new Date('2026-03-29T00:59:59Z'), 'Asia/Kathmandu')).toBe('2026-03-29');
+      expect(schoolMinutes(new Date('2026-03-29T00:59:59Z'), 'Asia/Kathmandu')).toBe(6 * 60 + 44);
+      expect(zoneOffsetMinutes(new Date('2026-04-04T14:59:59Z'), 'Australia/Lord_Howe')).toBe(660);
+      expect(zoneOffsetMinutes(new Date('2026-04-04T15:00:00Z'), 'Australia/Lord_Howe')).toBe(630);
+    }
+  });
 });
 
 describe('a school’s way of writing numbers, money and dates', () => {
