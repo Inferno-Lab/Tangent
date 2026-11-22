@@ -30,6 +30,16 @@ const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', '
 
 /** A day as 2026-04-18, from that or from the Indian 18/04/2026, 18-04-2026, 18.04.2026 or 18 Apr 2026. Null when it is not a real day. */
 export function isoDay(v: string): string | null {
+  const hit = days.get(v);
+  if (hit !== undefined) return hit;
+  if (days.size > 10_000) days.clear();
+  const day = readDay(v);
+  days.set(v, day);
+  return day;
+}
+// A file says the same few hundred dates over and over (a year of attendance: 130,000 rows, 150 days), each read several times.
+const days = new Map<string, string | null>();
+function readDay(v: string): string | null {
   const s = v.trim();
   let y = 0, m = 0, d = 0;
   let x = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/.exec(s);
@@ -586,18 +596,18 @@ const payments = kind<PayLookups>({
 });
 
 const MARK: Record<string, string> = { present: 'present', p: 'present', '1': 'present', absent: 'absent', a: 'absent', '0': 'absent', late: 'late', l: 'late', leave: 'leave', lv: 'leave', onleave: 'leave' };
-type AttLookups = { students: Map<string, { id: string; class_id: string }>; sessions: Map<string, string>; marks: Map<string, string> };
+type AttLookups = { students: Map<string, { id: string; class_id: string }>; sessions: Map<string, string>; marks: Map<string, string>; today: string };
 const attendance = kind<AttLookups>({
   async load(db, rows) {
     const dates = [...new Set(rows.map((r) => isoDay(r.date!)).filter(Boolean))];
     const ss = (await db.query<{ id: string; class_id: string; date: string }>("select id, class_id, date::text from attendance_sessions where date = any($1::date[]) and part = 'day'", [dates])).rows;
     const ms = (await db.query<{ session_id: string; student_id: string; status: string }>('select session_id, student_id, status from attendance_marks where session_id = any($1)', [ss.map((s) => s.id)])).rows;
-    return { students: await studentMap(db), sessions: new Map(ss.map((s) => [`${s.class_id}|${s.date}`, s.id])), marks: new Map(ms.map((m) => [`${m.session_id}|${m.student_id}`, m.status])) };
+    return { students: await studentMap(db), sessions: new Map(ss.map((s) => [`${s.class_id}|${s.date}`, s.id])), marks: new Map(ms.map((m) => [`${m.session_id}|${m.student_id}`, m.status])), today: today() };
   },
   check(r, l) {
     const s = l.students.get(lc(r.admission_no!));
     const day = isoDay(r.date!);
-    const errors = [...needStudent(l.students, r.admission_no!), ...(!day ? ['Write the date as 2026-10-14 or 14/10/2026.'] : day > today() ? ['That date has not happened yet.'] : []), ...(!MARK[norm(r.status!)] ? ['Status is present, absent, late or leave (P, A, L also work).'] : [])];
+    const errors = [...needStudent(l.students, r.admission_no!), ...(!day ? ['Write the date as 2026-10-14 or 14/10/2026.'] : day > l.today ? ['That date has not happened yet.'] : []), ...(!MARK[norm(r.status!)] ? ['Status is present, absent, late or leave (P, A, L also work).'] : [])];
     const sess = s && day ? l.sessions.get(`${s.class_id}|${day}`) : undefined;
     return ok(`${day}|${lc(r.admission_no!)}`, errors, !!sess && l.marks.has(`${sess}|${s!.id}`));
   },

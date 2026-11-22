@@ -459,6 +459,7 @@
  "console.data_tab.show_every_row": "Show every row",
  "console.data_tab.show_only_the_with_problems": "Show only the {length} with problems",
  "console.data_tab.showing": "Showing",
+ "console.data_tab.big_file_fix_in_file": "This file has {total} rows, more than can be fixed here: fix a row in the file and send it again. The columns and values above still apply to every row.",
  "console.data_tab.spreadsheets_the_school_sends_for": "Spreadsheets the school sends for import are kept here.",
  "console.data_tab.students_10_to_3_000": "{@Students} (10 to 3,000)",
  "console.data_tab.test_school_and_export": "Test school and export",
