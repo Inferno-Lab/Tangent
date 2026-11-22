@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, Injectable, Post, type OnModuleInit } from '@nestjs/common';
 import { tx } from '@tangent/contracts';
-import { enqueue, newId, unzip, type Job } from '@tangent/db';
+import { enqueue, newId, zipEntries, type Job } from '@tangent/db';
 import { ApiError, ZodPipe, notFound } from '@tangent/nest-kit';
 import { z } from 'zod';
 import { Core, CurrentUser, Require, RequireModule } from '../auth/guards.js';
@@ -65,18 +65,21 @@ export class PhotoZipService implements OnModuleInit {
     }
     await s.pool.query("update photo_imports set status = 'running' where id = $1", [imp.id]);
     const r = await this.hubs.hub.resolve('storage', s.id, s.slug);
-    let entries: Map<string, Buffer>;
-    try { entries = unzip(await r.adapter.storage!.get(r.ctx, f.storage_key)); } catch { return fail(tx('This is not a zip Tangent can read.')); }
-    // Photos and PDFs: folders, hidden files and the Mac's copies are left out.
-    const photos = [...entries].filter(([name, data]) => data.length && !/(^|\/)(__MACOSX|\.)/.test(name) && /\.(jpe?g|png|webp|pdf)$/i.test(name));
+    let entries: ReturnType<typeof zipEntries>;
+    try { entries = zipEntries(await r.adapter.storage!.get(r.ctx, f.storage_key)); } catch { return fail(tx('This is not a zip Tangent can read.')); }
+    // Photos and PDFs: folders, hidden files and the Mac's copies are left out. Each is inflated only when its turn comes.
+    const photos = entries.filter((e) => e.size && !/(^|\/)(__MACOSX|\.)/.test(e.name) && /\.(jpe?g|png|webp|pdf)$/i.test(e.name));
     const students = new Map((await s.pool.query<{ id: string; admission_no: string }>("select id, admission_no from students where admission_no <> ''")).rows.map((x) => [norm(x.admission_no), x.id]));
     await s.pool.query('update photo_imports set total = $2 where id = $1', [imp.id, photos.length]);
     const unmatched: string[] = [];
     let matched = 0;
     let done = 0;
     const ids = new Map(students);
-    for (const [name, data] of photos) {
+    for (const entry of photos) {
+      const name = entry.name;
       const base = name.split('/').pop()!.replace(/\.[^.]+$/, '');
+      let data: Buffer;
+      try { data = entry.read(); } catch { unmatched.push(`${base} (${tx('not a photo')})`); if (++done % 20 === 0) await s.pool.query('update photo_imports set done = $2, matched = $3 where id = $1', [imp.id, done, matched]); continue; }
       if (/\.pdf$/i.test(name)) {
         // The admission number is the name's first words; what follows names the document.
         const words = base.split(/[\s_]+/).filter(Boolean);
@@ -110,7 +113,7 @@ export class PhotoZipService implements OnModuleInit {
       if (++done % 20 === 0) await s.pool.query('update photo_imports set done = $2, matched = $3 where id = $1', [imp.id, done, matched]);
     }
     await s.pool.query("update photo_imports set status = 'done', done = $2, matched = $3, unmatched = $4, done_at = now() where id = $1", [imp.id, done, matched, JSON.stringify(unmatched.slice(0, 500))]);
-    const pdfs = photos.filter(([name]) => /\.pdf$/i.test(name)).length;
+    const pdfs = photos.filter((e) => /\.pdf$/i.test(e.name)).length;
     return `${matched} of ${photos.length} ${!pdfs ? 'photos' : pdfs === photos.length ? 'documents' : 'photos and documents'} matched.`;
   }
 }

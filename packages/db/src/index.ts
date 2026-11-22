@@ -13,4 +13,4 @@ export * from './numbers.js';
 export * from './roles.js';
 export * from './queue.js';
 export * from './import/engine.js';
-export { ImportError, parseCsv, readTable, readXlsx, toCsv, unzip, xlsx, zip } from './import/files.js';
+export { ImportError, parseCsv, readTable, readXlsx, toCsv, unzip, xlsx, zip, zipEntries } from './import/files.js';
