@@ -68,13 +68,13 @@ class QuickTiles extends StatelessWidget {
     final c = context.app;
     final (icon, key, onTap, colour) = item;
     final tone = colour == 'brand' ? (c.mariSoft, c.mariText) : (c.spectrumFor(colour).soft, c.spectrumFor(colour).ink);
+    final style = AppText.capB(color: c.ink, height: 1.15);
     return Pressable(
       onTap: onTap,
       label: key.tr,
       child: Opacity(
         opacity: onTap == null ? .5 : 1,
         child: Container(
-          constraints: const BoxConstraints(minHeight: 84),
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
           decoration: BoxDecoration(color: c.paper, borderRadius: BorderRadius.circular(AppRadius.panel), border: Border.all(color: c.line)),
           child: Column(
@@ -87,7 +87,11 @@ class QuickTiles extends StatelessWidget {
                 child: Icon(icon, size: 18, color: tone.$2),
               ),
               const SizedBox(height: 8),
-              Text(key.tr, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: AppText.capB(color: c.ink, height: 1.15)),
+              // Room for two lines on every tile, so a one-line name makes a tile no shorter than its neighbours.
+              SizedBox(
+                height: context.linesHeight(style, 2),
+                child: Text(key.tr, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: style),
+              ),
             ],
           ),
         ),

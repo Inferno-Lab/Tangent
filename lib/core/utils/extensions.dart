@@ -22,6 +22,17 @@ extension AppContext on BuildContext {
       MediaQuery.disableAnimationsOf(this) ||
       (Get.isRegistered<ThemeService>() && Get.find<ThemeService>().reduceMotion.value);
 
+  /// How tall [lines] lines of [style] are at the reader's text size: tiles whose names wrap differently keep one size.
+  double linesHeight(TextStyle style, int lines) {
+    final p = TextPainter(
+      text: TextSpan(text: List.filled(lines, 'Ag').join('\n'), style: style),
+      textDirection: Directionality.of(this),
+      textScaler: MediaQuery.textScalerOf(this),
+    )..layout();
+    final h = p.height;
+    p.dispose();
+    return h;
+  }
 }
 
 extension DateOnly on DateTime {
