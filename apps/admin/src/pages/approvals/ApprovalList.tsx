@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ApprovalKind, ApprovalRow } from '@tangent/contracts';
-import { Dialog, EmptyCard, useShake, EmptyState, t } from '@tangent/web-ui';
+import { Dialog, EmptyCard, useShake, EmptyState, t, busyFor, Skeleton } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { AreaField, Avatar, problem } from '../../app/kit';
 import { fmtDate } from '@tangent/contracts';
@@ -34,7 +34,7 @@ export function useApprovalList(view: ApprovalView, kind: ApprovalKind | undefin
   });
 
   const overlay = declining && <Decline row={declining} busy={decide.isPending} onClose={() => setDeclining(null)} onDecline={(note) => decide.mutate({ row: declining, decision: 'reject', note })} />;
-  if (list.isLoading) return { list: <div className="skc" style={{ height: 240, borderRadius: 16 }} />, overlay };
+  if (list.isLoading) return { list: <Skeleton kind="rows" rows={4} />, overlay };
   if (list.isError) return { overlay, list: <EmptyCard error title={t('admin.approval_list.approvals')} chip={{ text: t('admin.approval_list.couldn_t_load'), tone: 'c' }} icon="warning" heading={t('admin.approval_list.that_didn_t_load')} body={(list.error as Error).message} actions={<button className="btn pri" onClick={() => void list.refetch()}>{t('admin.approval_list.try_again')}</button>} /> };
   const rows = list.data ?? [];
   // Each view has its own scene: nothing waiting, nothing sent, nothing decided, no leave asked for.
@@ -61,11 +61,11 @@ export function useApprovalList(view: ApprovalView, kind: ApprovalKind | undefin
           <span className="tgrow">
             <span className={`chip ${STATUS[r.status].tone}`}>{STATUS[r.status].text}</span>
             {may && r.status === 'pending' && view === 'waiting' && <>
-              <button className="btn sm pri" disabled={decide.isPending} onClick={() => decide.mutate({ row: r, decision: 'approve' })}>{r.action || t('admin.approval_list.approve')}</button>
-              <button className="btn sm" disabled={decide.isPending} onClick={() => setDeclining(r)}>{t('admin.approval_list.decline')}</button>
+              <button className="btn sm pri" disabled={busyFor(decide, r)} onClick={() => decide.mutate({ row: r, decision: 'approve' })}>{r.action || t('admin.approval_list.approve')}</button>
+              <button className="btn sm" disabled={busyFor(decide, r)} onClick={() => setDeclining(r)}>{t('admin.approval_list.decline')}</button>
             </>}
             {may && view === 'decided' && (r.status === 'approved' || r.status === 'rejected') && (
-              <button className="btn sm" disabled={decide.isPending} data-tip={t('admin.approval_list.put_it_back_in_the')} onClick={() => decide.mutate({ row: r, decision: 'undo' })}>{t('admin.approval_list.undo')}</button>
+              <button className="btn sm" disabled={busyFor(decide, r)} data-tip={t('admin.approval_list.put_it_back_in_the')} onClick={() => decide.mutate({ row: r, decision: 'undo' })}>{t('admin.approval_list.undo')}</button>
             )}
           </span>
         </div>

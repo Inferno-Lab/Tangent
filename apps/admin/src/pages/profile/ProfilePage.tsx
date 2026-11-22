@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
 import { MODULES } from '@tangent/config-engine';
 import { fmtNumber, PERMISSION_CATALOG, SETTINGS_META, SchoolSettingsSchema, permissionAvailable, type EffectiveConfig, type RoleDefSave, type RoleRow, type SettingMeta, type SettingsResponse } from '@tangent/contracts';
-import { Checkbox, EmptyCard, ErrorLine, Field, Icon, Segmented, useShake, useToast, t } from '@tangent/web-ui';
+import { Checkbox, EmptyCard, ErrorLine, Field, Icon, Segmented, useShake, useToast, t, Skeleton } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page } from '../../app/Page';
 import { SettingsEditor } from '../../app/SettingsView';
@@ -149,7 +149,7 @@ function Roles({ cfg, say }: { cfg: EffectiveConfig; say: (m: string, tone?: 'ba
   const remove = useMutation({ mutationFn: () => app.api.roles.remove(cur!.id), onSuccess: (r) => after(t('admin.profile_page.role_deleted'), r, ''), onError: fail });
   const startNew = () => { setSel('new'); setName(''); setDesc(''); setPerms(new Set()); setErr({}); setSure(false); };
 
-  if (roles.isLoading) return <div className="skc" style={{ height: 240, borderRadius: 16 }} />;
+  if (roles.isLoading) return <Skeleton kind="rows" rows={4} />;
   if (roles.isError) return <EmptyCard error title={t('admin.profile_page.roles')} chip={{ text: t('admin.profile_page.couldn_t_load'), tone: 'c' }} icon="lock" heading={t('admin.profile_page.you_can_t_see_roles')} body={(roles.error as Error).message} actions={<button className="btn pri" onClick={() => void roles.refetch()}>{t('admin.profile_page.try_again')}</button>} />;
   if (!list.length && sel !== 'new') return <EmptyCard title={t('admin.profile_page.roles')} chip={{ text: '0', tone: 'v' }} icon="lock" heading={t('admin.profile_page.no_roles_yet')} body={can ? t('admin.profile_page.make_a_role_for_each') : t('admin.profile_page.tangent_makes_the_school_s')} actions={can ? <button className="btn pri" onClick={startNew}>{t('admin.profile_page.new_role')}</button> : undefined} />;
   const readOnly = !can || !!cur?.locked;

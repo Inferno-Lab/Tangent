@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useParams, useRouteContext } from '@tanstack/react-router';
 import { visibleFields, type CustomValues } from '@tangent/contracts';
-import { CustomFieldInputs, EmptyCard, LogoImage, ErrorLine, useHue, useShake, t } from '@tangent/web-ui';
+import { CustomFieldInputs, EmptyCard, LogoImage, ErrorLine, useHue, useShake, t, Skeleton } from '@tangent/web-ui';
 import { fieldsOf, messageOf } from '../../app/kit';
 
 /**
@@ -39,7 +39,7 @@ export function FormRoute() {
       </main>
     </div>
   );
-  if (form.isLoading || brand.isLoading) return frame(<div className="skc" style={{ height: 360, borderRadius: 24 }} />);
+  if (form.isLoading || brand.isLoading) return frame(<Skeleton kind="form" rows={5} />);
   if (form.isError || !form.data) return frame(<EmptyCard title={t('admin.form_route.form')} chip={{ text: t('admin.form_route.not_found'), tone: 'c' }} icon="warning" heading={t('admin.form_route.this_form_is_not_here')} body={t('admin.form_route.check_the_link')} />);
   const f = form.data;
   if (!f.open) return frame(<EmptyCard title={f.title} chip={{ text: t('admin.form_route.closed'), tone: 'a' }} icon="calendar" heading={t('admin.form_route.this_form_is_closed')} body={t('admin.form_route.ask_the_school')} />);

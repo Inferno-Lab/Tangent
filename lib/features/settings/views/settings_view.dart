@@ -48,6 +48,7 @@ Future<void> signOut() async {
     body: 'settings.logout_body',
     confirm: 'common.logout',
     cancel: 'settings.stay',
+    icon: PhosphorIconsRegular.signOut,
   );
   if (ok) await Get.find<AuthService>().signOut();
 }

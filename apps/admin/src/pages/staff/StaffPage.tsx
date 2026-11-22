@@ -11,7 +11,7 @@ const refresh = (qc: ReturnType<typeof useQueryClient>) => void qc.invalidateQue
 const SEARCH = 'search';
 type Show = 'all' | 'active' | 'waiting' | 'off';
 /** Where a person stands: switched off, or active and signed in, invited, or not invited yet. */
-const standing = (r: StaffRow) => r.status !== 'active' ? { label: tr('admin.staff_page.off'), tone: 'n' } : r.access === 'signed_in' ? { label: tr('admin.staff_page.active'), tone: 'g' } : r.access === 'invited' ? { label: tr('admin.staff_page.invited'), tone: 'a' } : { label: tr('admin.staff_page.not_invited'), tone: 'a' };
+const standing = (r: StaffRow) => r.status !== 'active' ? { label: tr('admin.staff_page.off'), tone: 'n' } : r.access === 'signed_in' ? { label: tr('admin.staff_page.active'), tone: 'g' } : r.access === 'invited' ? { label: tr('admin.staff_page.invited_badge'), tone: 'a' } : { label: tr('admin.staff_page.not_invited'), tone: 'a' };
 const names = (list: string[]) => list.length > 3 ? tr('admin.staff_page.and_more', { p0: list.slice(0, 3).join(', '), p1: list.length - 3 }) : list.join(', ');
 
 export function StaffPage() { const app = useApp();

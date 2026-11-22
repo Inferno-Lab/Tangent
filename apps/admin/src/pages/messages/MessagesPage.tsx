@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { listLabel, listOptions, type ListItem, type ThreadDetail, type ThreadRow } from '@tangent/contracts';
-import { Checkbox, Dialog, Field, FilePick, Segmented, Select, currentLanguage, useShake, EmptyState, EmptyNote, t as tr } from '@tangent/web-ui';
+import { Checkbox, Dialog, Field, FilePick, Segmented, Select, currentLanguage, useShake, EmptyState, EmptyNote, t as tr, Skeleton } from '@tangent/web-ui';
 import { uploadFile } from '@tangent/api-client';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
@@ -107,7 +107,7 @@ function Conversation({ id, canWrite, onBack, onChanged }: { id: string; canWrit
     onError: (e) => { setErr(problem(e)._ ?? tr('admin.messages_page.could_not_send')); shake.hit(); },
   });
   const patch = useMutation({ mutationFn: (b: { status?: 'open' | 'closed'; assignToMe?: boolean; assignTo?: string }) => app.api.messages.patch(id, b), onSuccess: (r, b) => { qc.setQueryData(['messages', id], r); onChanged(b.status === 'closed' ? tr('admin.messages_page.conversation_closed') : b.status === 'open' ? tr('admin.messages_page.conversation_reopened') : b.assignTo && b.assignTo !== app.user.id ? tr('admin.messages_page.handed_to', { assignedToName: r.assignedToName }) : tr('admin.messages_page.it_is_yours_now')); }, onError: (e) => setErr((e as Error).message) });
-  if (!t) return <div className="skc" style={{ height: 360, borderRadius: 24, margin: 16 }} />;
+  if (!t) return <Skeleton kind="rows" rows={6} style={{ margin: 16 }} />;
   const send = () => { if (body.trim() || files.length) reply.mutate(); else { setErr(tr('admin.messages_page.write_a_reply_first')); shake.hit(); } };
   const open = (fileId: string) => void app.api.files.url(fileId, true).then((u) => window.open(u.url, '_blank', 'noopener')).catch((e: Error) => setErr(e.message));
   return (

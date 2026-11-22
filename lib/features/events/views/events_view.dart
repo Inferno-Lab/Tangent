@@ -393,6 +393,7 @@ class EventDetailView extends GetView<EventsController> {
           onRefresh: controller.load,
           children: [
             ViewStateView(
+              skeleton: const SkeletonDetail(),
               state: controller.state.value,
               onRetry: controller.load,
               errorKey: controller.errorMessage.value,

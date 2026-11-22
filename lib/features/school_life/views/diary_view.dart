@@ -107,7 +107,7 @@ class DiaryView extends GetView<DiaryController> {
                       child: _EntryCard(
                         e: e,
                         trailing: e.needsAck
-                            ? Btn('diary.mark_read', small: true, kind: BtnKind.quiet, icon: PhosphorIconsRegular.check, onPressed: () => unawaited(controller.acknowledge(e)))
+                            ? Btn('diary.mark_read', small: true, kind: BtnKind.quiet, icon: PhosphorIconsRegular.check, action: () => controller.acknowledge(e))
                             : e.acknowledged
                             ? Icon(PhosphorIconsBold.checkCircle, size: 18, color: context.app.mariText)
                             : null,

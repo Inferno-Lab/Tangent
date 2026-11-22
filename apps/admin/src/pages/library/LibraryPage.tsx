@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { listLabel, listOptions, type BookRow, type ListItem, type LoanRow, type ReservationRow } from '@tangent/contracts';
-import { DateField, Dialog, Field, NumberField, Segmented, SelectField, useShake, EmptyState, EmptyNote, currentLanguage, t as tr } from '@tangent/web-ui';
+import { DateField, Dialog, Field, NumberField, Segmented, SelectField, useShake, EmptyState, EmptyNote, currentLanguage, t as tr, busyFor } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { AddBtn, AreaField, SEARCH, StudentPick, dateLabel, problem, stamp, useSetting } from '../../app/kit';
@@ -114,7 +114,7 @@ export function LibraryPage() { const app = useApp();
                     <span style={{ minWidth: 0 }}><b style={{ font: '600 13px var(--fb)' }}>{l.student}</b><small className="help" style={{ display: 'block' }}>{l.className}</small></span>
                     <span className="num">{dateLabel(l.dueOn)}</span>
                     <span>{l.overdueDays > 0 ? <span className="chip c" data-tip={tr('admin.library_page.days_late', { overdueDays: l.overdueDays })}>{tr('admin.library_page.late')}{' '}{fmtMoney(l.fine)}</span> : <span className="chip g">{tr('admin.library_page.on_time')}</span>}</span>
-                    <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>{canWrite && <><button className="btn sm" disabled={renew.isPending} onClick={() => renew.mutate(l.id)}>{tr('admin.library_page.renew')}</button><button className="btn sm" onClick={() => setDlg({ kind: 'return', loan: l })}>{tr('admin.library_page.take_back')}</button></>}</span>
+                    <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>{canWrite && <><button className="btn sm" disabled={busyFor(renew, l.id)} onClick={() => renew.mutate(l.id)}>{tr('admin.library_page.renew')}</button><button className="btn sm" onClick={() => setDlg({ kind: 'return', loan: l })}>{tr('admin.library_page.take_back')}</button></>}</span>
                   </div>
                 ))}
               </div></div>

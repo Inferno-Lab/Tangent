@@ -63,6 +63,7 @@ class AttendanceView extends GetView<AttendanceController> {
         onRefresh: controller.load,
         children: [
           ViewStateView(
+            skeleton: const SkeletonCards(),
             state: controller.state.value,
             onRetry: controller.load,
             errorKey: controller.errorMessage.value,

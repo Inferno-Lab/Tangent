@@ -63,14 +63,8 @@ class NotificationsController extends GetxController with Loadable, LiveListen {
     }, isEmpty: () => items.isEmpty);
   }
 
-  /// The one just dismissed, offered back for a few seconds.
-  final undoable = Rxn<AppNotification>();
-  Timer? _undoOff;
-
-  Future<void> undo() async {
-    final n = undoable.value;
-    if (n == null) return;
-    undoable.value = null;
+  /// Brings back one dismissed by mistake (the Undo on its toast).
+  Future<void> undo(AppNotification n) async {
     try {
       await Get.find<NotificationRepository>().restore(n.id);
       gone.remove(n.id);
@@ -81,9 +75,7 @@ class NotificationsController extends GetxController with Loadable, LiveListen {
 
   Future<void> dismiss(AppNotification n) async {
     gone.add(n.id);
-    undoable.value = n;
-    _undoOff?.cancel();
-    _undoOff = Timer(const Duration(seconds: 6), () => undoable.value = null);
+    ToastHelper.show('notifications.removed', action: ('notifications.undo', () => unawaited(undo(n))));
     try {
       await Get.find<NotificationRepository>().dismiss(n.id);
     } on AppException catch (error) {

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DEFAULT_DIARY_KINDS, addDays, listOptions, schoolToday, type DiaryInput, type DiaryRow, type ListItem } from '@tangent/contracts';
 import { uploadFile } from '@tangent/api-client';
-import { DateField, Dialog, EmptyNote, EmptyState, Select, SelectField, useShake, t } from '@tangent/web-ui';
+import { DateField, Dialog, EmptyNote, EmptyState, Select, SelectField, useShake, t, busyFor } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { AddBtn, AreaField, Attach, dateLabel, problem, useSetting } from '../../app/kit';
@@ -54,7 +54,7 @@ export function DiaryPage() { const app = useApp();
               <button className="btn sm" onClick={() => setAcks(r)}>{t('admin.diary.acks', { n: r.acks, of: r.families })}</button>
               {writes && (r.byId === app.user.id || reads) && <>
                 <button className="btn sm" onClick={() => setEditing(r)}>{t('admin.diary.edit')}</button>
-                <button className="btn sm" disabled={remove.isPending} onClick={() => remove.mutate(r.id)}>{t('admin.diary.remove')}</button>
+                <button className="btn sm" disabled={busyFor(remove, r.id)} onClick={() => remove.mutate(r.id)}>{t('admin.diary.remove')}</button>
               </>}
             </div>
           ))}

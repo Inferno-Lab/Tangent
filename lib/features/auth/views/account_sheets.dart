@@ -190,7 +190,7 @@ class _DevicesSheetState extends State<_DevicesSheet> {
                     ),
                     const SizedBox(width: 12),
                     if (s['current'] != true)
-                      Btn('account.sign_out_there', kind: BtnKind.quiet, loading: _ending == s['id'], onPressed: () => unawaited(_end(s['id'] as String))),
+                      Btn('account.sign_out_there', kind: BtnKind.quiet, loading: _ending == s['id'], action: () => _end(s['id'] as String)),
                   ],
                 ),
               ),

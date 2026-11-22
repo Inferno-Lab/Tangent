@@ -254,6 +254,7 @@ class HomeworkDetailView extends GetView<HomeworkDetailController> {
       final pigment = item == null ? null : AppColors.subject(item.subject);
       return PageFrame(
         leading: BackGlass(color: pigment?.on),
+        onRefresh: controller.load,
         actions: [
           GlassIconButton(
             icon: PhosphorIconsRegular.bell,
@@ -280,6 +281,7 @@ class HomeworkDetailView extends GetView<HomeworkDetailController> {
             Padding(
               padding: EdgeInsets.fromLTRB(20, inset.top + 70, 20, 0),
               child: ViewStateView(
+                skeleton: const SkeletonDetail(),
                 state: state,
                 onRetry: controller.load,
                 errorKey: controller.errorMessage.value,
@@ -517,7 +519,7 @@ class _ActionBar extends StatelessWidget {
               icon: PhosphorIconsRegular.uploadSimple,
               expand: true,
               height: 48,
-              onPressed: () => unawaited(_homework().upload(item)),
+              action: () => _homework().upload(item),
             ),
           ),
           const SizedBox(width: 8),

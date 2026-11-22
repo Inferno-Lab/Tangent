@@ -818,7 +818,7 @@
  "console.integrations_page.one_school": "One school",
  "console.integrations_page.optional": "{label} (optional)",
  "console.integrations_page.pass_a_test_first": "Pass a test first",
- "console.integrations_page.paste_it_exactly_as_approved": "Paste it exactly as approved, with {placeholders} where the values go: {code}, {student}, {school}…",
+ "console.integrations_page.paste_it_exactly_as_approved": "Paste it exactly as approved, with each value’s name in braces where it goes, such as {code}, {student} or {school}.",
  "console.integrations_page.pause": "Pause",
  "console.integrations_page.paused": "Paused",
  "console.integrations_page.phone_numbers_and_email_addresses": "Phone numbers and email addresses that get real messages, one per line",

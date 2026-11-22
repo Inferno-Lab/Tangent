@@ -222,11 +222,11 @@ class _PrivacySheetState extends State<PrivacySheet> {
                 runSpacing: 8,
                 children: [
                   for (final k in const ['access', 'correction', 'erasure'])
-                    Btn('privacy.ask_$k', kind: BtnKind.quiet, onPressed: () => unawaited(_ask(k))),
+                    Btn('privacy.ask_$k', kind: BtnKind.quiet, action: () => _ask(k)),
                 ],
               ),
               const SizedBox(height: 12),
-              Btn('privacy.withdraw', kind: BtnKind.quiet, onPressed: () => unawaited(_withdraw())),
+              Btn('privacy.withdraw', kind: BtnKind.quiet, action: () => _withdraw()),
             ],
             if (widget.consent) ...[
               if (SchoolConfig.photoConsent) ...[

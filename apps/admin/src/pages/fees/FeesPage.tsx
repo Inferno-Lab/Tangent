@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fmtMoneyShort, fmtMoney, type StudentDetail } from '@tangent/contracts';
-import { EmptyNote, Dialog, EmptyState, Icon, Roll, Select, rollDigits, t } from '@tangent/web-ui';
+import { EmptyNote, Dialog, EmptyState, Icon, Roll, Select, rollDigits, t, busyFor } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { StudentPick } from '../../app/kit';
@@ -132,7 +132,7 @@ function Overview({ tabs }: { tabs: React.ReactNode }) { const app = useApp();
                       <span>{r.className}</span>
                       <span className="t2 cut">{r.guardianName}</span>
                       <b className="num r">{fmtMoney(r.amountDue)}</b>
-                      <span className="r">{canPay && <button className="btn ton sm" disabled={open.isPending} onClick={(e) => { e.stopPropagation(); open.mutate(r.id); }}>{t('admin.fees_page.collect')}</button>}</span>
+                      <span className="r">{canPay && <button className="btn ton sm" disabled={busyFor(open, r.id)} onClick={(e) => { e.stopPropagation(); open.mutate(r.id); }}>{t('admin.fees_page.collect')}</button>}</span>
                     </div>
                   ))}
                 </div>

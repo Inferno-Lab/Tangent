@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
 import { CONSOLE_ROLES, CONSOLE_ROLE_INFO, type ConsoleUserRow } from '@tangent/contracts';
-import { Dialog, Field, tintFor, useShake, Icon, EmptyState, t as tr } from '@tangent/web-ui';
+import { Dialog, Field, tintFor, useShake, Icon, EmptyState, t as tr, busyFor } from '@tangent/web-ui';
 import { Card, Page, Tiles, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
 import { initials, ago } from '../../app/format';
@@ -60,7 +60,7 @@ export function TeamPage() {
                   <span className="tgrow">{r.roles.map((x) => <span key={x} className="chip v">{roleLabel(x)}</span>)}{r.status !== 'active' && <span className="chip a">{r.status === 'invited' ? tr('console.team_page.invited') : tr('console.team_page.switched_off')}</span>}{r.status === 'active' && !r.authenticator && <span className="chip i">{tr('console.team_page.no_authenticator_yet')}</span>}</span>
                   <span style={{ color: 'var(--ink3)', font: '600 13px var(--fb)' }}>{ago(r.lastSeenAt)}</span>
                   <span className="tgrow">{canWrite && (r.status === 'invited'
-                    ? <><button className="btn sm" disabled={reinvite.isPending} onClick={() => reinvite.mutate(r)}>{tr('console.team_page.new_link')}</button>{!r.lastSeenAt && <button className="btn sm dng" disabled={remove.isPending} onClick={() => remove.mutate(r)}>{tr('console.team_page.remove')}</button>}</>
+                    ? <><button className="btn sm" disabled={busyFor(reinvite, r)} onClick={() => reinvite.mutate(r)}>{tr('console.team_page.new_link')}</button>{!r.lastSeenAt && <button className="btn sm dng" disabled={busyFor(remove, r)} onClick={() => remove.mutate(r)}>{tr('console.team_page.remove')}</button>}</>
                     : <button className="btn sm" onClick={() => setEdit(r)}>{tr('console.team_page.change')}</button>)}</span>
                 </div>
               );

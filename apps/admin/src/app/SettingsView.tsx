@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
 import { SETTINGS_META, TIGHTEN, settingOwner, type SettingKey } from '@tangent/contracts';
-import { EmptyNote, ErrorLine, Field, SettingRow, useShake, t } from '@tangent/web-ui';
+import { EmptyNote, ErrorLine, Field, SettingRow, useShake, t, useUnsaved, Skeleton } from '@tangent/web-ui';
 import { useApp } from './context';
 import { useShellChrome } from './Layout';
 import { Card, Page, useToast } from './Page';
@@ -29,6 +29,7 @@ export function SettingsEditor({ keys: asked, title = t('admin.settings_view.set
   const locked = (k: string) => v?.locks.find((l) => l.key === k);
   const value = (k: string) => (k in edits ? edits[k] : v?.values[k]);
   const changed = v ? Object.keys(edits).filter((k) => keys.includes(k as SettingKey) && !same(edits[k], v.values[k])) : [];
+  useUnsaved(changed.length > 0);
   const save = useMutation({
     mutationFn: () => app.api.settings.change({ expectedVersion: v!.version, changes: Object.fromEntries(changed.map((k) => [k, edits[k]])), note: note.trim() }),
     onSuccess: (r) => {
@@ -50,7 +51,7 @@ export function SettingsEditor({ keys: asked, title = t('admin.settings_view.set
     if (lock) return `${TIGHTEN[k] ? t('admin.settings_view.tangent_sets_the_minimum_here') : t('admin.settings_view.set_by_tangent_for_your_2')}${lock.note ? ` ${lock.note}` : ''}`;
     return SETTINGS_META[k].help;
   };
-  if (q.isLoading && !v) return <div className="skc" style={{ height: 240, borderRadius: 24 }} />;
+  if (q.isLoading && !v) return <Skeleton kind="form" rows={4} />;
   if (q.isError && !v) return <Card title={title}><ErrorLine>{(q.error as Error).message}</ErrorLine><button className="btn sm" style={{ marginTop: 8 }} onClick={() => void q.refetch()}>{t('admin.settings_view.try_again')}</button></Card>;
   if (!v) return null;
   return (

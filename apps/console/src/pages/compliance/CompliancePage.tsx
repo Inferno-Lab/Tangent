@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
 import { breachNotice, schoolToday, type ComplianceRow } from '@tangent/contracts';
-import { AreaField, DateField, Dialog, Field, FilePick, SelectField, useShake, EmptyState, Icon, t } from '@tangent/web-ui';
+import { AreaField, DateField, Dialog, Field, FilePick, SelectField, useShake, EmptyState, Icon, t, Skeleton } from '@tangent/web-ui';
 import { Card, Page, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
 import { ago, when } from '../../app/format';
@@ -69,7 +69,7 @@ export function CompliancePage() {
         <Card title={t('console.compliance_page.data_requests_at_every_school')} chip={<span className="chip">{requests.data?.length ?? 0} {t('console.compliance_page.open')}</span>}>
           <div className="help" style={{ marginTop: 0 }}>{t('console.compliance_page.asked_for_by_families_and')}</div>
           {!app.can('audit.read') ? <div className="help">{t('console.compliance_page.your_role_does_not_include')}</div>
-            : requests.isLoading ? <div className="skc" style={{ height: 160, borderRadius: 16 }} />
+            : requests.isLoading ? <Skeleton kind="rows" rows={3} />
               : !(requests.data ?? []).length ? <EmptyState scene="datarequests" onAction={() => app.go('/schools')} />
                 : requests.data!.map((r) => (
                   <div key={`${r.schoolId}${r.id}`} className="kv" style={{ alignItems: 'flex-start' }}>

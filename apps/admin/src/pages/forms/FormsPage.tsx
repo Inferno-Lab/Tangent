@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FORM_AUDIENCES, FormInput, listLabel, schoolToday, type FieldDef, type FormCondition, type FormRow } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, EmptyNote, EmptyState, Field, FieldListEditor, Segmented, Select, SelectField, currentLanguage, useShake, t } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, EmptyNote, EmptyState, Field, FieldListEditor, Segmented, Select, SelectField, currentLanguage, useShake, t, Skeleton } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { AddBtn, AreaField, problem, stamp, useSetting } from '../../app/kit';
@@ -135,7 +135,7 @@ function Answers({ form, onClose, say }: { form: FormRow; onClose: () => void; s
   };
   return (
     <Dialog title={form.title} tag={{ text: t('admin.forms_page.answers', { n: form.responses }), tone: 'v' }} onClose={onClose} width={760}>
-      {!r.data ? <div className="skc" style={{ height: 240, borderRadius: 16 }} /> : !r.data.rows.length
+      {!r.data ? <Skeleton kind="table" rows={5} /> : !r.data.rows.length
         ? <EmptyNote icon="file" title={t('admin.forms_page.no_answers_yet')} body={t('admin.forms_page.no_answers_body')} />
         : <div className="lscroll" style={{ maxHeight: 'min(56dvh,480px)', border: '1px solid var(--line)', borderRadius: 16, padding: '4px 16px' }}>
             {r.data.rows.map((x) => (

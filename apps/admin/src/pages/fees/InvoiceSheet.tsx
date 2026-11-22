@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type InvoiceDetail } from '@tangent/contracts';
-import { Dialog, ErrorLine, NumberField, Segmented, useShake, EmptyNote, t } from '@tangent/web-ui';
+import { Dialog, ErrorLine, NumberField, Segmented, useShake, EmptyNote, t, Skeleton } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { AreaField, dateLabel, problem } from '../../app/kit';
 import { fmtMoney } from '@tangent/contracts';
@@ -53,7 +53,7 @@ export function InvoiceSheet({ id, onClose, say, onCollect }: { id: string; onCl
   const d = q.data;
   return (
     <Dialog title={d ? d.title : t('admin.invoice_sheet.invoice')} tag={d ? { text: t('admin.invoice_sheet.class', { studentName: d.studentName, className: d.className }), tone: 'v' } : undefined} onClose={onClose} width={620} shake={shake.cls}>
-      {!d ? <div className="skc" style={{ height: 240, borderRadius: 16 }} /> : (
+      {!d ? <Skeleton kind="rows" rows={4} /> : (
         <div className="stack">
           <div>
             <div className="kv"><span>{t('admin.invoice_sheet.kind_of_fee')}</span><b>{d.headName}</b></div>

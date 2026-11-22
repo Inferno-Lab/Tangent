@@ -15,6 +15,7 @@ const _en = <String, String>{
   'common.retry': 'Try again',
   'common.cancel': 'Cancel',
   'common.save': 'Save',
+  'common.working': 'Working…',
   'common.submit': 'Submit',
   'common.continue': 'Continue',
   'common.skip': 'Skip',

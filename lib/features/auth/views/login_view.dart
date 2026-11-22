@@ -35,9 +35,12 @@ class LoginView extends GetView<LoginController> {
 /// The top of the sign-in screens, as the SignIn board: the school's crest and name with the cell art on its deep
 /// colour, ending in the sheet's rounded edge.
 class SignInHead extends StatelessWidget {
-  const SignInHead({this.art = true, super.key});
+  const SignInHead({this.art = true, this.leading, super.key});
 
   final bool art;
+
+  /// A back button, in the row before the crest so the two never overlap.
+  final Widget? leading;
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +58,7 @@ class SignInHead extends StatelessWidget {
               children: [
                 Row(
                   children: [
+                    if (leading != null) ...[leading!, const SizedBox(width: 12)],
                     Container(
                       width: 36,
                       height: 36,
@@ -297,12 +301,23 @@ class _OtpScreenState extends State<_OtpScreen> {
       child: Scaffold(
         backgroundColor: c.chalk,
         resizeToAvoidBottomInset: true,
-        body: Stack(
+        // The list ends above Verify, which ends above the keyboard: nothing scrolls under the button.
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ListView(
-              padding: EdgeInsets.only(bottom: inset.bottom + 120),
+            Expanded(
+              child: ListView(
+              padding: const EdgeInsets.only(bottom: 24),
               children: [
-                const SignInHead(art: false),
+                SignInHead(
+                  art: false,
+                  leading: GlassIconButton(
+                    icon: PhosphorIconsRegular.caretLeft,
+                    label: 'common.back'.tr,
+                    color: AppColors.white,
+                    onTap: back,
+                  ),
+                ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 4, 24, 0),
                   child: Column(
@@ -391,20 +406,9 @@ class _OtpScreenState extends State<_OtpScreen> {
                 ),
               ],
             ),
-            Positioned(
-              left: 16,
-              top: inset.top + 8,
-              child: GlassIconButton(
-                icon: PhosphorIconsRegular.caretLeft,
-                label: 'common.back'.tr,
-                color: AppColors.white,
-                onTap: back,
-              ),
             ),
-            Positioned(
-              left: 24,
-              right: 24,
-              bottom: 34 + inset.bottom,
+            Padding(
+              padding: EdgeInsets.fromLTRB(24, 8, 24, (MediaQuery.viewInsetsOf(context).bottom > 0 ? 12 : 34) + inset.bottom),
               child: Obx(
                 () => Btn(
                   'auth.verify',

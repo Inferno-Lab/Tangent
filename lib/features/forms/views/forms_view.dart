@@ -231,11 +231,10 @@ class _FormPageState extends State<_FormPage> {
     final children = widget.form.pending.whereType<String>().toList();
     return Form(
       key: _form,
-      autovalidateMode: AutovalidateMode.onUserInteraction,
       child: PageFrame(
         leading: const BackGlass(),
         bottomBarHeight: 56,
-        bottomBar: Obx(() => Btn('forms.send', expand: true, icon: PhosphorIconsRegular.paperPlaneTilt, loading: _c.sending.value, onPressed: () => unawaited(_send()))),
+        bottomBar: Obx(() => Btn('forms.send', expand: true, icon: PhosphorIconsRegular.paperPlaneTilt, loading: _c.sending.value, action: () => _send())),
         children: [
           PageTitle(widget.form.title),
           if (widget.form.intro.isNotEmpty) Text(widget.form.intro, style: context.type.b),

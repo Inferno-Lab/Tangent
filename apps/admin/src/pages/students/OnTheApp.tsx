@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useToast, EmptyState, t } from '@tangent/web-ui';
+import { useToast, EmptyState, t, busyFor } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page } from '../../app/Page';
 import { useSchoolConfig } from '../../app/kit';
@@ -48,8 +48,8 @@ export function OnTheApp({ tabs }: { tabs: React.ReactNode }) {
                   <span className="us" style={{ gap: 4 }}><div className="bar" style={{ height: 10 }}><i style={{ width: `${pct(c.signedIn, c.families)}%` }}></i></div><small style={{ font: '700 11px var(--fb)', color: 'var(--ink3)' }}>{c.signedIn} {t('admin.on_the_app.of')}{' '}{c.families}</small></span>
                   <span>{c.consented}</span>
                   <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                    {may && c.invited < c.families && <button className="btn sm" disabled={invite.isPending} onClick={() => invite.mutate({ classId: c.classId, remind: false })}>{t('admin.on_the_app.invite')}</button>}
-                    {may && c.invited > c.signedIn && <button className="btn sm" disabled={invite.isPending} onClick={() => invite.mutate({ classId: c.classId, remind: true })}>{t('admin.on_the_app.remind')}</button>}
+                    {may && c.invited < c.families && <button className="btn sm" disabled={busyFor(invite, c.classId)} onClick={() => invite.mutate({ classId: c.classId, remind: false })}>{t('admin.on_the_app.invite')}</button>}
+                    {may && c.invited > c.signedIn && <button className="btn sm" disabled={busyFor(invite, c.classId)} onClick={() => invite.mutate({ classId: c.classId, remind: true })}>{t('admin.on_the_app.remind')}</button>}
                     <button className="btn sm" disabled={!c.students} onClick={() => letters(c.classId, 'family')}>{t('admin.on_the_app.letters')}</button>
                     {students && <button className="btn sm" disabled={!c.students} onClick={() => letters(c.classId, 'student')}>{t('admin.on_the_app.student_letters')}</button>}
                   </span>

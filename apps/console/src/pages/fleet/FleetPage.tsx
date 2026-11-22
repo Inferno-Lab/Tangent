@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Dialog, EmptyCard, PageScope, tintFor, EmptyNote, t as tr, listOf } from '@tangent/web-ui';
+import { Dialog, EmptyCard, PageScope, tintFor, EmptyNote, t as tr, listOf, Skeleton } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { url } from '../../app/base';
 import { useShellChrome } from '../../app/Layout';
@@ -41,7 +41,7 @@ export function FleetPage() { const app = useApp();
   if (!f) { return (
       <PageScope page="fleet">
         <main className="mn" aria-busy="true"><header className="hd"><div><h1>{tr('console.fleet_page.fleet')}</h1><p>&nbsp;</p></div></header>
-          <div className="skc" style={{ height: 240, borderRadius: 28 }} />
+          <Skeleton kind="cards" rows={3} />
         </main>
       </PageScope>
     );

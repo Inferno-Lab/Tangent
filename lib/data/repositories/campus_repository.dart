@@ -241,6 +241,9 @@ class GalleryRepository {
         GalleryAlbum.fromJson(Map<String, dynamic>.from(item as Map)),
     ];
   }
+
+  /// Tells the school office something is wrong with a photo; it shows in the admin's reports.
+  Future<void> report(String photoId, String reason) => _remote.post('/photos/$photoId/report', {'reason': reason});
 }
 
 class NotificationRepository {

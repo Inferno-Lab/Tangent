@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { addDays, listLabel, listOptions, schoolToday, type ExamRow, type ListItem } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, Field, NumberField, Segmented, Select, SelectField, TimeField, currentLanguage, useShake, useMore, EmptyState, t, EmptyNote } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, Field, NumberField, Segmented, Select, SelectField, TimeField, currentLanguage, useShake, useMore, EmptyState, t, EmptyNote, useUnsaved, Skeleton } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { AddBtn, Avatar, dateLabel, problem, useOpenParam, useSetting } from '../../app/kit';
@@ -190,6 +190,7 @@ function ExamSheet({ id, onClose, onChange, onChanged, onRemoved }: { id: string
     onSuccess: () => { setErr(''); void marks.refetch(); onChanged(t('admin.exams_page.remarks_saved')); },
     onError: (e) => { setErr(problem(e)._ ?? t('admin.exams_page.could_not_save')); shake.hit(); } });
   const dirty = Object.keys(draft).filter((k) => { const [a, b] = k.split('|') as [string, string]; const s = saved(a, b); const d = draft[k]!; return s.score !== d.score || s.absent !== d.absent || s.grade !== d.grade || levels(s.criteria) !== levels(d.criteria); });
+  useUnsaved(dirty.length > 0);
   const save = useMutation({ mutationFn: () => app.api.exams.putMarks(id, { marks: dirty.map((k) => { const [studentId, subjectId] = k.split('|') as [string, string]; const d = draft[k]!; return { studentId, subjectId, score: d.absent || d.criteria || d.score === '' ? null : Number(d.score), absent: d.absent, grade: d.absent || !d.grade ? undefined : d.grade,
       // A rubric's levels: the server works the score out from them; none given clears the mark.
       ...(d.criteria && !d.absent && Object.values(d.criteria).some((v) => v !== '') ? { criteria: Object.fromEntries(Object.entries(d.criteria).filter(([, v]) => v !== '').map(([k, v]) => [k, Number(v)])) } : {}) }; }) }),
@@ -230,7 +231,7 @@ function ExamSheet({ id, onClose, onChange, onChanged, onRemoved }: { id: string
           </Dialog>
         );
       })()}
-      {!m || !ex ? <div className="skc" style={{ height: 280, borderRadius: 16 }} /> : (
+      {!m || !ex ? <Skeleton kind="table" rows={6} /> : (
         <>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', margin: '4px 0 12px' }}>
             <Segmented value={tab} onChange={setTab} label={t('admin.exams_page.exam_view')} options={[{ value: 'marks', label: t('admin.exams_page.marks_2') }, { value: 'results', label: t('admin.exams_page.results') }, { value: 'remarks', label: t('admin.exams_page.remarks') }]} />
@@ -284,7 +285,7 @@ function ExamSheet({ id, onClose, onChange, onChanged, onRemoved }: { id: string
               ))}
             </div>
           ) : (
-            !results.data ? <div className="skc" style={{ height: 240, borderRadius: 16 }} /> : results.data.rows.length === 0 ? <div style={{ padding: 16 }}><EmptyNote icon="exams" title={t('admin.exams_page.no_results_yet')} body={t('admin.exams_page.results_appear_here_as_marks')} /></div> : (
+            !results.data ? <Skeleton kind="table" rows={5} /> : results.data.rows.length === 0 ? <div style={{ padding: 16 }}><EmptyNote icon="exams" title={t('admin.exams_page.no_results_yet')} body={t('admin.exams_page.results_appear_here_as_marks')} /></div> : (
               <>
                 <div className="tgrow" style={{ marginBottom: 10 }}><span className="chip v">{t('admin.exams_page.average')}{' '}{results.data.average}%</span><span className="chip g">{results.data.passPct}{t('admin.exams_page.passed')}</span><span className="chip">{results.data.rows.length} {t('admin.exams_page.students')}</span></div>
                 <div className="lscroll" style={{ maxHeight: 'min(46dvh,400px)', border: '1px solid var(--line)', borderRadius: 16 }}>

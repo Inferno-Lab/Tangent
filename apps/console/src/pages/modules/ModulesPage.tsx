@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { catalogueName, changeEntitlement, type EntitlementChange } from '@tangent/config-engine';
 import { PlanSave, type EntitlementDoc, type EntitlementRow, type PlanRow } from '@tangent/contracts';
 import { HttpError } from '@tangent/api-client';
-import { Checkbox, DateField, Dialog, EmptyCard, ErrorLine, Field, IC, Icon, NumberField, Select, SelectField, useShake, type PageIcon, EmptyNote, EmptyState, t } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, EmptyCard, ErrorLine, Field, IC, Icon, NumberField, Select, SelectField, useShake, type PageIcon, EmptyNote, EmptyState, t, busyFor, Skeleton } from '@tangent/web-ui';
 import type { CatalogDoc } from '@tangent/api-client';
 import { Card, Page, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
@@ -136,7 +136,7 @@ function Schools({ say }: { say: Say }) { const app = useApp();
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ['flags'] }); say(t('console.modules_page.lifted_it_comes_back_within')); },
     onError: (e) => say((e as Error).message, 'bad') });
 
-  if (q.isLoading || cat.isLoading) return <div className="skc" style={{ height: 320, borderRadius: 28 }} />;
+  if (q.isLoading || cat.isLoading) return <Skeleton kind="rows" rows={6} />;
   if (q.isError) return <div><EmptyCard error title={t('console.modules_page.schools')} chip={{ text: t('console.modules_page.couldn_t_load'), tone: 'c' }} icon="warning" heading={t('console.modules_page.that_didn_t_load')} body={(q.error as Error).message} actions={<button className="btn pri" onClick={() => void q.refetch()}>{t('console.modules_page.try_again')}</button>} /></div>;
   if (!all.length) return <div><EmptyCard title={t('console.modules_page.plans_and_modules')} chip={{ text: t('console.modules_page.0_schools'), tone: 'v' }} icon="homework" heading={t('console.modules_page.no_schools_yet')} body={t('console.modules_page.once_a_school_is_onboarded')} /></div>;
   return (
@@ -183,7 +183,7 @@ function Schools({ say }: { say: Say }) { const app = useApp();
                 <span key={c.key} role="columnheader" style={{ padding: '10px 4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {c.feature ? <span className="vc" style={{ alignItems: 'center', gap: 4 }}>
                       <span className="help" style={{ margin: 0, fontWeight: 700, textAlign: 'center', lineHeight: 1.25, color: paused(c.key) ? 'var(--bad-i)' : undefined }}>{c.name}{paused(c.key) ? t('console.modules_page.paused') : ''}</span>
-                      {app.can('flags.write') && (paused(c.key) ? <button className="btn sm" aria-label={`${c.name}: ${t('console.modules_page.lift_the_pause')}`} disabled={lift.isPending} onClick={() => lift.mutate(c.key)}>{t('console.modules_page.lift_the_pause')}</button> : <button className="btn sm dng" aria-label={`${c.name}: ${t('console.modules_page.pause')}`} onClick={() => setPausing({ key: c.key, name: c.name })}>{t('console.modules_page.pause')}</button>)}
+                      {app.can('flags.write') && (paused(c.key) ? <button className="btn sm" aria-label={`${c.name}: ${t('console.modules_page.lift_the_pause')}`} disabled={busyFor(lift, c.key)} onClick={() => lift.mutate(c.key)}>{t('console.modules_page.lift_the_pause')}</button> : <button className="btn sm dng" aria-label={`${c.name}: ${t('console.modules_page.pause')}`} onClick={() => setPausing({ key: c.key, name: c.name })}>{t('console.modules_page.pause')}</button>)}
                     </span>
                     : <button className="vc" style={{ alignItems: 'center', gap: 6, font: '600 12px/16px var(--fb)', color: paused(c.key) ? 'var(--bad-i)' : 'var(--ink2)', textAlign: 'center' }} data-tip={paused(c.key) ? t('console.modules_page.paused_for_every_school_open') : t('console.modules_page.open_its_features')} onClick={() => setFocus(c.key)}><Icon name={modIcon(c.key)} className="i" />{c.name}{paused(c.key) ? t('console.modules_page.paused') : ''}</button>}
                 </span>
@@ -237,7 +237,7 @@ function Plans({ say }: { say: Say }) { const app = useApp();
   const remove = useMutation({ mutationFn: (key: string) => app.api.plan.remove(key),
     onSuccess: (list) => { qc.setQueryData(['plans'], list); say(t('console.modules_page.plan_removed')); },
     onError: (e) => say((e as Error).message, 'bad') });
-  if (plans.isLoading) return <div className="skc" style={{ height: 320, borderRadius: 28 }} />;
+  if (plans.isLoading) return <Skeleton kind="rows" rows={5} />;
   return (
     <>
       {editing && <PlanDialog plan={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onDone={(list, m) => { qc.setQueryData(['plans'], list); setEditing(null); say(m); }} />}
@@ -249,7 +249,7 @@ function Plans({ say }: { say: Say }) { const app = useApp();
               <b style={{ font: '700 15px var(--fb)' }}>{p.name}</b> <span className="chip">{t('console.modules_page.n_schools', { n: p.schools ?? 0 })}</span>
               <small style={{ display: 'block', color: 'var(--ink3)' }}>{price(p.perStudentYear)} {t('console.modules_page.a_student_a_year')}{' '}{p.modules.length} {t('console.modules_page.modules_up_to')}{' '}{count(p.limits.students)} {t('console.modules_page.students')}{' '}{count(p.limits.storageGb)} {t('console.modules_page.gb')}{' '}{count(p.limits.smsPerMonth)} {t('console.modules_page.texts_a_month')}</small>
             </span>
-            {can && <span className="tgrow"><button className="btn sm" onClick={() => setEditing(p)}>{t('console.modules_page.change')}</button><button className="btn sm dng" disabled={!!p.schools || remove.isPending} data-tip={p.schools ? t('console.modules_page.move_its_schools_to_another') : undefined} onClick={() => remove.mutate(p.key)}>{t('console.modules_page.remove')}</button></span>}
+            {can && <span className="tgrow"><button className="btn sm" onClick={() => setEditing(p)}>{t('console.modules_page.change')}</button><button className="btn sm dng" disabled={!!p.schools || busyFor(remove, p.key)} data-tip={p.schools ? t('console.modules_page.move_its_schools_to_another') : undefined} onClick={() => remove.mutate(p.key)}>{t('console.modules_page.remove')}</button></span>}
           </div>
         ))}
       </Card>
@@ -326,7 +326,7 @@ function Planned() { const app = useApp();
   const cat = useQuery({ queryKey: ['catalog'], queryFn: app.api.catalog, staleTime: 10 * 60_000 });
   const planned = (cat.data?.modules ?? []).filter((m) => m.state === 'planned');
   const features = (cat.data?.modules ?? []).filter((m) => m.state !== 'planned').flatMap((m) => m.features.filter((f) => f.state === 'planned').map((f) => ({ ...f, module: m.name })));
-  if (cat.isLoading) return <div className="skc" style={{ height: 240, borderRadius: 28 }} />;
+  if (cat.isLoading) return <Skeleton kind="rows" rows={4} />;
   return (
     <>
       <Card title={t('console.modules_page.planned_modules')} chip={<span className="chip">{planned.length}</span>}>

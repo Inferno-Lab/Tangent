@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
 import { addDays, dayLabel, markMeaning, type AttendanceMarkDef, type AttendanceStatus, type RegisterPart } from '@tangent/contracts';
-import { DateField, EmptyCard, EmptyState, Icon, Segmented, Select, t } from '@tangent/web-ui';
+import { DateField, EmptyCard, EmptyState, Icon, Segmented, Select, t, Skeleton } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { useSetting } from '../../app/kit';
 import { Page, useToast } from '../../app/Page';
@@ -107,7 +107,7 @@ export function AttendancePage() { const app = useApp();
               </div>
             )}
           </section>
-          {day.isLoading && <div className="skc" style={{ height: 320, borderRadius: 16 }} />}
+          {day.isLoading && <Skeleton kind="table" rows={6} />}
           {!day.isLoading && marks.length === 0 && <EmptyCard title={t('admin.attendance_page.class_3', { p0: cls?.name ?? '' })} chip={{ text: t('admin.attendance_page.0_students'), tone: 'v' }} icon="people" heading={t('admin.attendance_page.no_students_in_this_class')} body={t('admin.attendance_page.students_appear_here_once_they')} />}
           {marks.length > 0 && (
             <div className="g" style={{ gridTemplateColumns: `repeat(auto-fill,minmax(min(${options.length > 3 ? 300 : 260}px,100%),1fr))`, gap: 8 }}>

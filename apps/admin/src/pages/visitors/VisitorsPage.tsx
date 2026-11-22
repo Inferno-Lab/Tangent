@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DEFAULT_ID_TYPES, DEFAULT_VISITOR_PURPOSES, listOptions, schoolInstant, schoolToday, type CustomFieldsSetting, type CustomValues, type GatePassRow, type ListItem, type VisitorInput, type VisitorRow } from '@tangent/contracts';
 import { uploadFile } from '@tangent/api-client';
-import { CustomFieldInputs, DateField, Dialog, EmptyNote, EmptyState, Field, FilePick, PhoneField, SelectField, TimeField, useShake, t } from '@tangent/web-ui';
+import { CustomFieldInputs, DateField, Dialog, EmptyNote, EmptyState, Field, FilePick, PhoneField, SelectField, TimeField, useShake, t, busyFor } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { AddBtn, StudentPick, dateLabel, openPdf, problem, stamp, useCountry, useSetting } from '../../app/kit';
@@ -75,9 +75,9 @@ function Visitors({ view, desk, say }: { view: 'today' | 'expected'; desk: boole
           </span>
           <span className={`chip ${v.state === 'in' ? 'g' : v.state === 'pending' ? 'a' : ''}`}>{v.state === 'in' ? t('admin.visitors.on_site') : v.state === 'out' ? t('admin.visitors.gone') : v.state === 'pending' ? t('admin.visitors.waiting_for_approval') : t('admin.visitors.invited')}</span>
           {v.badgeNo && <button className="btn sm" onClick={() => void openPdf(app.api.visitors.badge(v.id)).catch((e: Error) => say(e.message, 'bad'))}>{t('admin.visitors.badge')}</button>}
-          {desk && v.state === 'in' && <button className="btn sm pri" disabled={act.isPending} onClick={() => act.mutate({ v, what: 'out' })}>{t('admin.visitors.sign_out')}</button>}
-          {desk && v.state === 'invited' && <button className="btn sm pri" disabled={act.isPending} onClick={() => act.mutate({ v, what: 'in' })}>{t('admin.visitors.arrived')}</button>}
-          {desk && (v.state === 'invited' || v.state === 'pending') && <button className="btn sm" disabled={act.isPending} onClick={() => act.mutate({ v, what: 'cancel' })}>{t('admin.visitors.cancel')}</button>}
+          {desk && v.state === 'in' && <button className="btn sm pri" disabled={busyFor(act, v)} onClick={() => act.mutate({ v, what: 'out' })}>{t('admin.visitors.sign_out')}</button>}
+          {desk && v.state === 'invited' && <button className="btn sm pri" disabled={busyFor(act, v)} onClick={() => act.mutate({ v, what: 'in' })}>{t('admin.visitors.arrived')}</button>}
+          {desk && (v.state === 'invited' || v.state === 'pending') && <button className="btn sm" disabled={busyFor(act, v)} onClick={() => act.mutate({ v, what: 'cancel' })}>{t('admin.visitors.cancel')}</button>}
         </div>
       ))}
     </Card>
@@ -156,8 +156,8 @@ function Passes({ desk, say }: { desk: boolean; say: Say }) { const app = useApp
           <span className={`chip ${PASS[g.state].tone}`}>{PASS[g.state].label}</span>
           {g.state === 'pending' && <a className="btn sm" href={`${app.base}/approvals`}>{t('admin.visitors.decide')}</a>}
           {(g.state === 'approved' || g.state === 'left') && <button className="btn sm" onClick={() => void openPdf(app.api.visitors.passPdf(g.id)).catch((e: Error) => say(e.message, 'bad'))}>{t('admin.visitors.print')}</button>}
-          {desk && g.state === 'approved' && <button className="btn sm pri" disabled={act.isPending} onClick={() => act.mutate({ g, what: 'out' })}>{t('admin.visitors.let_them_leave')}</button>}
-          {desk && ['consent', 'pending', 'approved'].includes(g.state) && <button className="btn sm" disabled={act.isPending} onClick={() => act.mutate({ g, what: 'cancel' })}>{t('admin.visitors.cancel')}</button>}
+          {desk && g.state === 'approved' && <button className="btn sm pri" disabled={busyFor(act, g)} onClick={() => act.mutate({ g, what: 'out' })}>{t('admin.visitors.let_them_leave')}</button>}
+          {desk && ['consent', 'pending', 'approved'].includes(g.state) && <button className="btn sm" disabled={busyFor(act, g)} onClick={() => act.mutate({ g, what: 'cancel' })}>{t('admin.visitors.cancel')}</button>}
         </div>
       ))}
     </Card>
@@ -227,7 +227,7 @@ function Pickup({ desk, say }: { desk: boolean; say: Say }) { const app = useApp
               <div key={s.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                 <b style={{ flex: '0 0 200px' }}>{s.name} · {s.className}</b>
                 <div style={{ width: 220 }}><Field label={t('admin.visitors.collected_by_name')} value={who[s.id] ?? ''} onChange={(v) => setWho({ ...who, [s.id]: v })} maxLength={80} /></div>
-                <button className="btn sm pri" disabled={(who[s.id] ?? '').trim().length < 2 || record.isPending} onClick={() => record.mutate({ studentId: s.id, pickupId: null, name: who[s.id]!, code })}>{t('admin.visitors.collected')}</button>
+                <button className="btn sm pri" disabled={(who[s.id] ?? '').trim().length < 2 || busyFor(record, s.id)} onClick={() => record.mutate({ studentId: s.id, pickupId: null, name: who[s.id]!, code })}>{t('admin.visitors.collected')}</button>
               </div>
             ))}
             {!!found.people.length && <small className="help" style={{ margin: 0 }}>{t('admin.visitors.named_people', { names: found.people.map((p) => `${p.name} (${p.relation})`).join(', ') })}</small>}
@@ -242,7 +242,7 @@ function Pickup({ desk, say }: { desk: boolean; say: Say }) { const app = useApp
           {!(people.data ?? []).length ? <EmptyNote icon="people" title={t('admin.visitors.nobody_named')} /> : (people.data ?? []).map((p) => (
             <div key={p.id} className="rw" style={{ display: 'flex', gap: 8, alignItems: 'center', height: 'auto', minHeight: 44, padding: '4px 0', flexWrap: 'wrap' }}>
               <span style={{ flex: 1 }}>{p.name} · {p.relation}{p.phone ? ` · ${p.phone}` : ''}</span>
-              {desk && <button className="btn sm pri" disabled={record.isPending} onClick={() => record.mutate({ studentId: student.id, pickupId: p.id, name: p.name, code: '' })}>{t('admin.visitors.collected_by_them')}</button>}
+              {desk && <button className="btn sm pri" disabled={busyFor(record, p.id)} onClick={() => record.mutate({ studentId: student.id, pickupId: p.id, name: p.name, code: '' })}>{t('admin.visitors.collected_by_them')}</button>}
               {desk && <button className="btn sm" onClick={() => void app.api.visitors.removePerson(p.id).then(() => qc.invalidateQueries({ queryKey: ['pickup-people'] })).catch((e: Error) => say(e.message, 'bad'))}>{t('admin.visitors.remove')}</button>}
             </div>
           ))}

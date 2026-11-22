@@ -109,7 +109,7 @@ class PageFrame extends StatelessWidget {
     // it under the keyboard left the field counted as visible while the keyboard covered it.)
     // A bottom bar rides on the keyboard, so the area also stops above the bar: a field scrolled to its end is never under it.
     final shown = Padding(padding: EdgeInsets.only(bottom: keyboard > 0 && bottomBar != null ? keyboard + bottomBarHeight + 12 : keyboard), child: page);
-    final body = formKey == null ? shown : Form(key: formKey, autovalidateMode: AutovalidateMode.onUserInteraction, child: shown);
+    final body = formKey == null ? shown : Form(key: formKey, child: shown);
     return Scaffold(
       backgroundColor: background ?? c.chalk,
       resizeToAvoidBottomInset: false,
@@ -119,7 +119,7 @@ class PageFrame extends StatelessWidget {
             Positioned.fill(child: body)
           else
             Positioned.fill(
-              child: _PullToRefresh(onRefresh: onRefresh!, top: top + 10, child: body),
+              child: PullToRefresh(onRefresh: onRefresh!, top: top + 10, child: body),
             ),
           // A thin scrim keeps the clock readable over text. Nothing else covers content: page-coloured bands read as
           // dark shadows in dark themes.
@@ -274,18 +274,18 @@ class SectionLabel extends StatelessWidget {
 
 /// Flutter's pull-to-refresh logic with our own indicator: a whole circle parked in the empty middle of
 /// the top control row, so it never lands on lectures or cards and is never clipped mid-pull.
-class _PullToRefresh extends StatefulWidget {
-  const _PullToRefresh({required this.onRefresh, required this.top, required this.child});
+class PullToRefresh extends StatefulWidget {
+  const PullToRefresh({required this.onRefresh, required this.top, required this.child, super.key});
 
   final Future<void> Function() onRefresh;
   final double top;
   final Widget child;
 
   @override
-  State<_PullToRefresh> createState() => _PullToRefreshState();
+  State<PullToRefresh> createState() => PullToRefreshState();
 }
 
-class _PullToRefreshState extends State<_PullToRefresh> {
+class PullToRefreshState extends State<PullToRefresh> {
   RefreshIndicatorStatus? _status;
 
   @override

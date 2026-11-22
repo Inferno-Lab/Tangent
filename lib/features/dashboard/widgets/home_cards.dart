@@ -62,8 +62,8 @@ class QuickRow extends StatelessWidget {
   );
 }
 
-/// Quick buttons two to a row: the old Home's chips (an icon and the whole name) grown into Hue's tiles. A name takes
-/// two lines when it needs them, so it is never cut short however many buttons the console picks.
+/// Quick buttons two to a row: the old Home's chips (an icon and the whole name) grown into Hue's tiles. Every tile leaves
+/// room for a two-line name, so none is cut short and all are one size however many buttons the console picks.
 class QuickGrid extends StatelessWidget {
   const QuickGrid({required this.items, super.key});
 
@@ -117,8 +117,15 @@ class QuickGrid extends StatelessWidget {
                 child: Icon(icon, size: 20, color: c.mariText),
               ),
               const SizedBox(width: 10),
+              // Room for two lines on every tile, so every row of tiles is one height.
               Expanded(
-                child: Text(key.tr, maxLines: 2, overflow: TextOverflow.ellipsis, style: context.type.ts.copyWith(color: c.ink)),
+                child: SizedBox(
+                  height: context.linesHeight(context.type.ts, 2),
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(key.tr, maxLines: 2, overflow: TextOverflow.ellipsis, style: context.type.ts.copyWith(color: c.ink)),
+                  ),
+                ),
               ),
             ],
           ),

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fmtNumber, fmtMoneyShort, fmtMoney, type InvoiceListQuery, type StudentDetail } from '@tangent/contracts';
-import { EmptyCard, EmptyNote, Segmented, Select, EmptyState, t as tr } from '@tangent/web-ui';
+import { EmptyCard, EmptyNote, Segmented, Select, EmptyState, t as tr, busyFor } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { Avatar, Ico, dateLabel, useFeeHeads, useOpenParam } from '../../app/kit';
@@ -80,7 +80,7 @@ export function InvoicesPage({ view, tabs }: { view: 'invoices' | 'receipts'; ta
                         <b className="num" style={{ font: '700 13px var(--fb)', textAlign: 'end' }}>{fmtMoney(r.amount - r.waived)}</b>
                         <span className="num hs" style={{ font: '600 13px var(--fb)', textAlign: 'end', color: 'var(--ink2)' }}>{fmtMoney(r.paid)}</span>
                         <span className={`st ${STATUS[r.status]!.tone}`}><i></i>{STATUS[r.status]!.label}</span>
-                        <span>{canPay && r.outstanding > 0 && <button className="btn sm" disabled={open.isPending} onClick={(e) => { e.stopPropagation(); open.mutate(r.studentId); }}>{tr('admin.invoices_page.collect')}</button>}</span>
+                        <span>{canPay && r.outstanding > 0 && <button className="btn sm" disabled={busyFor(open, r.studentId)} onClick={(e) => { e.stopPropagation(); open.mutate(r.studentId); }}>{tr('admin.invoices_page.collect')}</button>}</span>
                       </div>
                     ))}
                   </div>

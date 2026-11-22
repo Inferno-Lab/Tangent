@@ -1913,7 +1913,7 @@
  "Short name": "Short name",
  "Short remarks a teacher can pick for a student’s report card (they can still write their own). Each can be written in the school’s other languages.": "Short remarks a teacher can pick for a student’s report card (they can still write their own). Each can be written in the school’s other languages.",
  "Shortest password allowed": "Shortest password allowed",
- "Shown in the app (Settings → Privacy, and when someone is asked to consent) and behind “Privacy” on the school’s sign-in page.": "Shown in the app (Settings → Privacy, and when someone is asked to consent) and behind “Privacy” on the school’s sign-in page.",
+ "Shown in the app (Settings → Privacy, and when someone is asked to consent) and behind “Privacy” on the school’s sign-in page. {school} becomes the school’s name.": "Shown in the app (Settings → Privacy, and when someone is asked to consent) and behind “Privacy” on the school’s sign-in page. {school} becomes the school’s name.",
  "Shown once when the key is made": "Shown once when the key is made",
  "Shown with the privacy notice.": "Shown with the privacy notice.",
  "Sierra Leone": "Sierra Leone",

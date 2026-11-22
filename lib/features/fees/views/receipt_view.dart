@@ -130,7 +130,7 @@ class ReceiptView extends StatelessWidget {
                     kind: BtnKind.quiet,
                     icon: PhosphorIconsRegular.downloadSimple,
                     expand: true,
-                    onPressed: () => unawaited(openFromServer((s) => s.post('/receipts/${receipt.id}/link', {}))),
+                    action: () => openFromServer((s) => s.post('/receipts/${receipt.id}/link', {})),
                   ),
                 ),
                 const SizedBox(width: 10),

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fmtMoney, type CertificateRow } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, EmptyNote, Field, Segmented, SelectField, useShake, t, EmptyState } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, EmptyNote, Field, Segmented, SelectField, useShake, t, EmptyState, busyFor } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { AddBtn, StudentPick, openPdf, problem, stamp, useOpenParam } from '../../app/kit';
@@ -64,7 +64,7 @@ function List({ state, say, onAsk }: { state: 'pending' | 'register'; say: Say; 
           {c.feeDue > 0 && <span className="chip a">{t('admin.certificates.fee_due', { amount: fmtMoney(c.feeDue) })}</span>}
           <span className={`chip ${STATE[c.state].tone}`}>{STATE[c.state].label}</span>
           {c.state === 'pending' && <a className="btn sm" href={`${app.base}/approvals`}>{t('admin.certificates.decide')}</a>}
-          {c.state === 'pending' && <button className="btn sm" disabled={cancel.isPending} onClick={() => cancel.mutate(c.id)}>{t('admin.certificates.cancel')}</button>}
+          {c.state === 'pending' && <button className="btn sm" disabled={busyFor(cancel, c.id)} onClick={() => cancel.mutate(c.id)}>{t('admin.certificates.cancel')}</button>}
           {c.state === 'issued' && <button className="btn sm" onClick={() => void openPdf(app.api.certificates.pdf(c.id)).catch((e: Error) => say(e.message, 'bad'))}>{t('admin.certificates.print')}</button>}
           {c.state === 'issued' && canIssue && <button className="btn sm" onClick={() => setRevoking(c)}>{t('admin.certificates.revoke')}</button>}
         </div>

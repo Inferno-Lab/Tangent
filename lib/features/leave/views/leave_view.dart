@@ -236,7 +236,7 @@ class _Request extends StatelessWidget {
                           ),
                         ),
                         // Not answered yet: the parent can take it back.
-                        Btn('leave.withdraw', kind: BtnKind.quiet, small: true, onPressed: () => unawaited(Get.find<LeaveController>().withdraw(item))),
+                        Btn('leave.withdraw', kind: BtnKind.quiet, small: true, action: () => Get.find<LeaveController>().withdraw(item)),
                       ],
                     ),
                   )

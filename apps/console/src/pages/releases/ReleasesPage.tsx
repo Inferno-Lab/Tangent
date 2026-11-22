@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
-import { Dialog, Field, NumberField, NumberInput, Select, useShake, Icon, EmptyState, t, EmptyNote } from '@tangent/web-ui';
+import { Dialog, Field, NumberField, NumberInput, Select, useShake, Icon, EmptyState, t, EmptyNote, useUnsaved, busyFor, Skeleton } from '@tangent/web-ui';
 import type { PolicyDoc, ReleaseRow } from '@tangent/contracts';
 import { Card, Page, Tiles, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
@@ -79,8 +79,8 @@ function ReleasesList({ tabs, toast, say }: { tabs: React.ReactNode; toast: Retu
             </div>
             {canWrite && (
               <div className="tgrow" style={{ marginTop: 16 }}>
-                {r.status === 'draft' && <button className="btn pri" onClick={() => start.mutate(r.id)} disabled={start.isPending}>{t('console.releases_page.start_rollout')}</button>}
-                {(r.status === 'rolling' || r.status === 'paused') && <button className="btn" onClick={() => pause.mutate({ id: r.id, paused: r.status === 'rolling' })} disabled={pause.isPending}>{r.status === 'rolling' ? t('console.releases_page.pause') : t('console.releases_page.resume')}</button>}
+                {r.status === 'draft' && <button className="btn pri" onClick={() => start.mutate(r.id)} disabled={busyFor(start, r.id)}>{t('console.releases_page.start_rollout')}</button>}
+                {(r.status === 'rolling' || r.status === 'paused') && <button className="btn" onClick={() => pause.mutate({ id: r.id, paused: r.status === 'rolling' })} disabled={busyFor(pause, r.id)}>{r.status === 'rolling' ? t('console.releases_page.pause') : t('console.releases_page.resume')}</button>}
                 {live && r.status !== 'rolled_back' && <button className="btn dng" onClick={() => setBack(r)}>{t('console.releases_page.mark_as_rolled_back_3')}</button>}
               </div>
             )}
@@ -121,7 +121,8 @@ function RolloutRules({ say }: { say: (m: string, tone?: 'ok' | 'bad') => void }
   useEffect(() => { if (policy.data) setPol(policy.data); }, [policy.data]);
   const save = useMutation({ mutationFn: (p: PolicyDoc) => app.api.policy.set(p), onSuccess: (p) => { qc.setQueryData(['policy'], p); say(t('console.releases_page.rollout_rules_saved')); }, onError: (e) => say((e as Error).message, 'bad') });
   const can = app.can('policy.write');
-  if (!pol) return <div className="skc" style={{ height: 320, borderRadius: 28 }} />;
+  useUnsaved(!!pol && JSON.stringify(pol) !== JSON.stringify(policy.data));
+  if (!pol) return <Skeleton kind="form" rows={4} />;
   const ok = pol.waves.length > 0 && pol.waves.at(-1)!.matches === 'rest' && pol.waves.every((w) => w.name.trim().length > 0 && w.batch >= 1);
   const dirty = JSON.stringify(pol) !== JSON.stringify(policy.data);
   return (

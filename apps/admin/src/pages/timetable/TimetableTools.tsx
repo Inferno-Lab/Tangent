@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import type { SlotRow, WeekOf } from '@tangent/contracts';
-import { Dialog, ErrorLine, Field, Segmented, SelectField, useShake, t } from '@tangent/web-ui';
+import { Dialog, ErrorLine, Field, Segmented, SelectField, useShake, t, Skeleton } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { problem } from '../../app/kit';
 
@@ -97,7 +97,7 @@ export function WeekDialog({ days: shown, onClose }: { days: { day: number; name
           </div>
           {w && <button className="btn sm" onClick={() => window.print()}>{t('admin.timetable_tools.print')}</button>}
         </div>
-        {week.isLoading && pick && <div className="skc" style={{ height: 240, borderRadius: 16 }} />}
+        {week.isLoading && pick && <Skeleton kind="table" rows={5} />}
         {w && (
           <div className="scroll-x">
             <div style={{ display: 'grid', gridTemplateColumns: `90px repeat(${days.length}, minmax(110px,1fr))`, gap: 4, minWidth: 90 + days.length * 114 }}>

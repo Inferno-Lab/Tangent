@@ -96,7 +96,7 @@ class StaffTimeView extends GetView<StaffTimeController> {
                             ),
                             const SizedBox(width: 12),
                             if (r.status == 'pending')
-                              Btn('staff.withdraw', small: true, kind: BtnKind.quiet, onPressed: () => unawaited(controller.withdraw(r.id)))
+                              Btn('staff.withdraw', small: true, kind: BtnKind.quiet, action: () => controller.withdraw(r.id))
                             else
                               Chip2('staff.status_${r.status}'.tr),
                           ],
@@ -153,9 +153,9 @@ class CheckInCard extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             if (d.canCheckIn)
-              Btn('staff.check_in', small: true, icon: PhosphorIconsRegular.signIn, loading: c.busy.value, onPressed: () => unawaited(c.checkIn()))
+              Btn('staff.check_in', small: true, icon: PhosphorIconsRegular.signIn, loading: c.busy.value, action: () => c.checkIn())
             else if (d.checkIn != null && d.checkOut == null)
-              Btn('staff.check_out', small: true, kind: BtnKind.quiet, icon: PhosphorIconsRegular.signOut, loading: c.busy.value, onPressed: () => unawaited(c.checkOut())),
+              Btn('staff.check_out', small: true, kind: BtnKind.quiet, icon: PhosphorIconsRegular.signOut, loading: c.busy.value, action: () => c.checkOut()),
           ],
         ),
       );

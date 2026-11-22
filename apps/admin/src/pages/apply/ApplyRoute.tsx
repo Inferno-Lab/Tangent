@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouteContext } from '@tanstack/react-router';
 import { schoolToday } from '@tangent/contracts';
-import { Checkbox, DateField, EmptyCard, LogoImage, ErrorLine, Field, PhoneField, SelectField, useHue, useShake, t } from '@tangent/web-ui';
+import { Checkbox, DateField, EmptyCard, LogoImage, ErrorLine, Field, PhoneField, SelectField, useHue, useShake, t, Skeleton } from '@tangent/web-ui';
 import { AreaField, fieldsOf, messageOf } from '../../app/kit';
 
 /**
@@ -53,7 +53,7 @@ export function ApplyRoute() {
       </main>
     </div>
   );
-  if (info.isLoading || brand.isLoading) return frame(<div className="skc" style={{ height: 420, borderRadius: 24 }} />);
+  if (info.isLoading || brand.isLoading) return frame(<Skeleton kind="form" rows={6} />);
   if (info.isError || !info.data) return frame(<EmptyCard error title={t('admin.apply.apply_for_a_seat')} chip={{ text: t('admin.apply.couldn_t_load'), tone: 'c' }} icon="warning" heading={t('admin.apply.this_page_did_not_load')} body={messageOf(info.error)} actions={<button className="btn pri" onClick={() => void info.refetch()}>{t('admin.apply.try_again')}</button>} />);
   if (!info.data.open) {
     const reach = [b?.phone, b?.email].filter(Boolean).join(' · ');

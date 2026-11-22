@@ -116,7 +116,7 @@ class AppSearchController extends GetxController {
   }
 }
 
-/// Search, pulled down from Home: the field on the school's deep colour (as Home's header), the results on the sheet.
+/// Search, opened from Home's header: the field on the school's deep colour (as Home's header), the results on the sheet.
 class SearchView extends StatefulWidget {
   const SearchView({super.key});
 

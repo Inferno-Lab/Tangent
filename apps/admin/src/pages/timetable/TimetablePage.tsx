@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
 import { fmtNumber, addDays, dayLabel, dayMonth, dayName, schoolMinutes, schoolToday, weekday, type SlotRow, type TimetableView as TT, subjectColour } from '@tangent/contracts';
-import { Dialog, EmptyCard, PageScope, tintFor, useToast, EmptyState, t as tr } from '@tangent/web-ui';
+import { Dialog, EmptyCard, PageScope, tintFor, useToast, EmptyState, t as tr, Skeleton } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { useShellChrome } from '../../app/Layout';
 import { useSetting } from '../../app/kit';
@@ -76,7 +76,7 @@ function TimetableBoard({ tabs }: { tabs: React.ReactNode }) { const app = useAp
   if (!data) { return (
       <PageScope page="timetable">
         <main className="mn" aria-busy="true"><header className="hd"><div><h1>{tr('admin.timetable_page.timetable')}</h1><p>&nbsp;</p></div></header>
-          <div className="skc" style={{ height: 620, borderRadius: 28 }} />
+          <Skeleton kind="table" rows={8} />
         </main>
       </PageScope>
     );
@@ -173,7 +173,7 @@ function TeacherChooser({ slot, onClose, onPick }: { slot: SlotRow; onClose: () 
     <Dialog title={tr('admin.timetable_page.who_teaches', { subjectName: slot.subjectName })} onClose={onClose} width={480}>
       <p>{tr('admin.timetable_page.people_who_are_free_in')}</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 340, overflow: 'auto', marginBottom: 12 }}>
-        {q.isLoading && <div className="skc" style={{ height: 160 }} />}
+        {q.isLoading && <Skeleton kind="rows" rows={3} />}
         {(q.data ?? []).map((t) => (
           <button key={t.id} className="btn" disabled={!t.free && t.id !== slot.teacherId} onClick={() => onPick(t.id)} style={{ justifyContent: 'space-between', height: 48, borderRadius: 12, opacity: t.free ? 1 : 0.55 }}>
             <span>{t.name}<small style={{ marginInlineStart: 8, color: 'var(--ink3)', fontWeight: 600 }}>{t.subjects.join(', ')}</small></span>

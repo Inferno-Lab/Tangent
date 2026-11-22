@@ -66,7 +66,7 @@ class CertificatesView extends GetView<CertificatesController> {
                           ),
                           const SizedBox(width: 10),
                           if (c.state == 'pending')
-                            Btn('certificates.cancel', small: true, kind: BtnKind.quiet, onPressed: () => unawaited(controller.cancel(c)))
+                            Btn('certificates.cancel', small: true, kind: BtnKind.quiet, action: () => controller.cancel(c))
                           else if (c.state == 'issued')
                             Icon(PhosphorIconsRegular.filePdf, size: 22, color: context.app.mariText)
                           else

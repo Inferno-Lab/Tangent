@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReportQuery } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, Select, SelectField, EmptyState, EmptyNote, currentLanguage, t } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, Select, SelectField, EmptyState, EmptyNote, currentLanguage, t, busyFor, Skeleton } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { Ico, useOpenParam } from '../../app/kit';
@@ -71,7 +71,7 @@ export function ReportsPage() {
             ))}
           </nav>
           <div className="card tbl rise" style={{ padding: 0, minWidth: 0 }}>
-            {!d ? <div className="skc" style={{ height: 320, borderRadius: 24 }} /> : (
+            {!d ? <Skeleton kind="cards" rows={4} /> : (
               <>
                 <div className="ch" style={{ padding: '24px 24px 6px', flexWrap: 'wrap', gap: 10 }}>
                   <h2 style={{ whiteSpace: 'nowrap' }}>{d.title}</h2><span className="chip v">{d.scope}</span>
@@ -139,7 +139,7 @@ function Schedules({ reportId, title, classId, onClose, say }: { reportId: strin
         {mine.map((s) => (
           <div key={s.id} className="kv" style={{ alignItems: 'center' }}>
             <span>{s.every === 'week' ? t('admin.reports_page.every_weekday', { day: weekday(s.day) }) : t('admin.reports_page.every_month_on', { day: s.day })} · {s.toNames.join(', ')}</span>
-            <button className="btn sm" disabled={drop.isPending} onClick={() => drop.mutate(s.id)}>{t('admin.reports_page.stop')}</button>
+            <button className="btn sm" disabled={busyFor(drop, s.id)} onClick={() => drop.mutate(s.id)}>{t('admin.reports_page.stop')}</button>
           </div>
         ))}
         <div className="two">

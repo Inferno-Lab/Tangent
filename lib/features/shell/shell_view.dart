@@ -112,7 +112,7 @@ class _ShellViewState extends State<ShellView> {
                                   children: [
                                     Expanded(child: Text('common.config_stale'.tr, style: context.type.cap, maxLines: 2, overflow: TextOverflow.ellipsis)),
                                     const SizedBox(width: 8),
-                                    Btn('common.retry', kind: BtnKind.quiet, onPressed: () => unawaited(SchoolConfig.load())),
+                                    Btn('common.retry', kind: BtnKind.quiet, action: () => SchoolConfig.load()),
                                   ],
                                 ),
                               ),

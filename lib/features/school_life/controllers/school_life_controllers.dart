@@ -196,8 +196,10 @@ class TeacherMeetingsController extends GetxController with Loadable {
     if (await _act(() => _repo.setSlot(s.id, closed: closed), done: closed ? 'meetings.time_closed' : 'meetings.time_opened')) await load();
   }
 
-  Future<void> setLink(MeetingSlot s, String link) async {
-    if (await _act(() => _repo.setSlot(s.id, link: link), done: 'meetings.link_saved')) await load();
+  Future<bool> setLink(MeetingSlot s, String link) async {
+    final ok = await _act(() => _repo.setSlot(s.id, link: link), done: 'meetings.link_saved');
+    if (ok) await load();
+    return ok;
   }
 }
 

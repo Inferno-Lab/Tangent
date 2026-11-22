@@ -10,12 +10,15 @@ import 'package:tangent/core/utils/extensions.dart';
 
 /// Squash-on-press wrapper used by cards, rows and buttons.
 class Pressable extends StatefulWidget {
-  const Pressable({required this.child, this.onTap, this.scale = .97, this.label, super.key});
+  const Pressable({required this.child, this.onTap, this.scale = .97, this.label, this.button = false, super.key});
 
   final Widget child;
   final VoidCallback? onTap;
   final double scale;
   final String? label;
+
+  /// Always a button to a screen reader, said to be dimmed while it cannot be pressed (a card without a tap is not one).
+  final bool button;
 
   @override
   State<Pressable> createState() => _PressableState();
@@ -28,7 +31,8 @@ class _PressableState extends State<Pressable> {
   Widget build(BuildContext context) {
     final enabled = widget.onTap != null;
     return Semantics(
-      button: enabled,
+      button: enabled || widget.button,
+      enabled: widget.button ? enabled : null,
       label: widget.label,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -49,10 +53,11 @@ class _PressableState extends State<Pressable> {
 
 enum BtnKind { primary, ink, bright, quiet, danger, plain }
 
-class Btn extends StatelessWidget {
+class Btn extends StatefulWidget {
   const Btn(
     this.label, {
-    required this.onPressed,
+    this.onPressed,
+    this.action,
     this.kind = BtnKind.primary,
     this.small = false,
     this.icon,
@@ -64,7 +69,13 @@ class Btn extends StatelessWidget {
   });
 
   final String label;
+
+  /// What a tap does (opening a page or a sheet). Null, with no [action], dims the button.
   final VoidCallback? onPressed;
+
+  /// What a tap sends instead: the button shows its spinner until it is done and ignores taps meanwhile, so a second tap
+  /// never sends it twice.
+  final Future<void> Function()? action;
   final BtnKind kind;
   final bool small;
   final IconData? icon;
@@ -74,7 +85,26 @@ class Btn extends StatelessWidget {
   final double? height;
 
   @override
+  State<Btn> createState() => _BtnState();
+}
+
+class _BtnState extends State<Btn> {
+  var _working = false;
+
+  Future<void> _send(Future<void> Function() action) async {
+    setState(() => _working = true);
+    try {
+      await action();
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final Btn(:label, :kind, :small, :icon, :trailing, :expand, :height, :action) = widget;
+    final onPressed = action == null ? widget.onPressed : () => unawaited(_send(action));
+    final loading = widget.loading || _working;
     final c = context.app;
     final (bg, fg) = switch (kind) {
       // Tangent Hue: brand for the main action, the deep colour for a strong second one.
@@ -88,37 +118,51 @@ class Btn extends StatelessWidget {
     };
     final h = height ?? (small ? 40.0 : 56.0);
     final disabled = onPressed == null && !loading;
-    final style = hueText(small ? 14 : 16, 600, height: 1, color: fg);
-    final content = Row(
+    // Dimmed by mixing with the page, not by Opacity: a button floating over a list never shows the list through it.
+    Color dim(Color x) => disabled ? Color.alphaBlend(x.withValues(alpha: x.a * .4), x.a == 0 ? Colors.transparent : c.chalk) : x;
+    final ink = disabled ? Color.alphaBlend(fg.withValues(alpha: .4), bg.a == 0 ? c.chalk : dim(bg)) : fg;
+    final style = hueText(small ? 14 : 16, 600, height: 1, color: ink);
+    final row = Row(
       mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        if (loading)
-          SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2.2, color: fg))
-        else ...[
-          if (icon != null) ...[Icon(icon, size: 20, color: fg), const SizedBox(width: 8)],
-          Flexible(
-            child: Text(label.tr, style: style, maxLines: 1, overflow: TextOverflow.ellipsis),
-          ),
-          if (trailing != null) ...[const SizedBox(width: 8), Icon(trailing, size: 20, color: fg)],
-        ],
+        if (icon != null) ...[Icon(icon, size: 20, color: ink), const SizedBox(width: 8)],
+        Flexible(
+          child: Text(label.tr, style: style, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+        if (trailing != null) ...[const SizedBox(width: 8), Icon(trailing, size: 20, color: ink)],
       ],
     );
-    return Opacity(
-      opacity: disabled ? .4 : 1,
+    // The label stays laid out under the spinner, so the button keeps its width while it works.
+    final content = Stack(
+      alignment: Alignment.center,
+      children: [
+        AnimatedOpacity(opacity: loading ? 0 : 1, duration: AppMotion.t1, child: row),
+        AnimatedOpacity(
+          opacity: loading ? 1 : 0,
+          duration: AppMotion.t1,
+          child: SizedBox.square(dimension: 18, child: loading ? CircularProgressIndicator(strokeWidth: 2.2, color: fg) : null),
+        ),
+      ],
+    );
+    return Semantics(
+      liveRegion: loading,
       child: Pressable(
         scale: .96,
-        label: label.tr,
+        button: true,
+        label: loading ? '${label.tr}, ${'common.working'.tr}' : label.tr,
         onTap: loading ? null : onPressed,
-        child: Container(
-          height: h,
-          padding: EdgeInsets.symmetric(horizontal: small ? 16 : 24),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(small ? AppRadius.md : AppRadius.field),
-            border: kind == BtnKind.quiet ? Border.all(color: c.line2) : null,
+        child: ExcludeSemantics(
+          child: Container(
+            height: h,
+            padding: EdgeInsets.symmetric(horizontal: small ? 16 : 24),
+            decoration: BoxDecoration(
+              color: dim(bg),
+              borderRadius: BorderRadius.circular(small ? AppRadius.md : AppRadius.field),
+              border: kind == BtnKind.quiet ? Border.all(color: dim(c.line2)) : null,
+            ),
+            child: content,
           ),
-          child: content,
         ),
       ),
     );
@@ -179,7 +223,12 @@ class Field extends StatefulWidget {
 class _FieldState extends State<Field> with WidgetsBindingObserver {
   final _focus = FocusNode();
   final _box = GlobalKey();
+  final _field = GlobalKey<FormFieldState<String>>();
   Timer? _settle;
+
+  /// Checked as it changes only once the person has left it after typing, or it shows what is wrong: an address is not
+  /// called invalid while it is still being typed.
+  var _live = false;
 
   @override
   void initState() {
@@ -187,6 +236,11 @@ class _FieldState extends State<Field> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _focus.addListener(() {
       setState(() {});
+      final field = _field.currentState;
+      if (!_focus.hasFocus && field != null && field.hasInteractedByUser) {
+        _live = true;
+        field.validate();
+      }
       if (_focus.hasFocus) {
         // After the frame that draws the focus (a post-frame callback asks for no frame itself).
         WidgetsBinding.instance
@@ -226,6 +280,7 @@ class _FieldState extends State<Field> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final c = context.app;
     return FormField<String>(
+      key: _field,
       initialValue: widget.controller?.text,
       validator: widget.validator == null ? null : (_) => widget.validator!(widget.controller?.text),
       builder: (state) {
@@ -279,6 +334,7 @@ class _FieldState extends State<Field> with WidgetsBindingObserver {
                       inputFormatters: [...?widget.inputFormatters?.cast<TextInputFormatter>(), if (widget.maxLength != null) LengthLimitingTextInputFormatter(widget.maxLength)],
                       onChanged: (value) {
                         state.didChange(value);
+                        if (_live || state.hasError) state.validate();
                         widget.onChanged?.call(value);
                       },
                       style: AppText.b(color: c.ink, height: 1.35),

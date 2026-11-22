@@ -48,6 +48,7 @@ class LibraryView extends GetView<LibraryController> {
         children: [
           const Rise(child: PageTitle('library.title')),
           ViewStateView(
+            skeleton: const SkeletonGrid(columns: 3, height: 150),
             state: controller.state.value,
             onRetry: controller.load,
             errorKey: controller.errorMessage.value,
@@ -141,7 +142,7 @@ class _MineRow extends StatelessWidget {
         kind: BtnKind.quiet,
         small: true,
         height: 34,
-        onPressed: () => unawaited(controller.renew(book)),
+        action: () => controller.renew(book),
       );
     }
     return Padding(

@@ -204,53 +204,139 @@ class ErrorState extends StatelessWidget {
   }
 }
 
-/// Skeleton blocks share the glass light: one sweep travels across them all.
+/// A list screen loading: its rows in a card, under the page's own title (which shows already), so nothing moves when
+/// the rows arrive. Skeleton blocks share the glass light: one sweep travels across them all.
 class SkeletonList extends StatelessWidget {
-  const SkeletonList({this.rows = 3, super.key});
+  const SkeletonList({this.rows = 4, super.key});
 
   final int rows;
 
   @override
   Widget build(BuildContext context) {
     return Sweep(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SkeletonBox(width: 150, height: 12),
-          const SizedBox(height: 12),
-          const SkeletonBox(width: 240, height: 30, radius: 10),
-          const SizedBox(height: 20),
-          EduCard(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            child: Column(
-              children: [
-                for (var i = 0; i < rows; i++)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: Row(
-                      children: [
-                        const SkeletonBox(width: 42, height: 52, radius: 6),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              FractionallySizedBox(widthFactor: i.isEven ? .8 : .6, child: const SkeletonBox()),
-                              const SizedBox(height: 8),
-                              FractionallySizedBox(widthFactor: i.isEven ? .5 : .4, child: const SkeletonBox(height: 12)),
-                            ],
-                          ),
-                        ),
-                      ],
+      child: EduCard(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        child: Column(
+          children: [
+            for (var i = 0; i < rows; i++)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Row(
+                  children: [
+                    const SkeletonBox(width: 42, height: 42, radius: AppRadius.md),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          FractionallySizedBox(widthFactor: i.isEven ? .8 : .6, child: const SkeletonBox()),
+                          const SizedBox(height: 8),
+                          FractionallySizedBox(widthFactor: i.isEven ? .5 : .4, child: const SkeletonBox(height: 12)),
+                        ],
+                      ),
                     ),
-                  ),
-              ],
-            ),
-          ),
-        ],
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
+}
+
+/// A screen of cards loading (Home, fees, results, a bus): a tall first card and two shorter ones.
+class SkeletonCards extends StatelessWidget {
+  const SkeletonCards({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget card(double height, double line) => EduCard(
+      padding: const EdgeInsets.all(16),
+      child: SizedBox(
+        height: height,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SkeletonBox(width: 90, height: 12),
+            const SizedBox(height: 12),
+            FractionallySizedBox(widthFactor: line, child: const SkeletonBox(height: 22, radius: 8)),
+            const Spacer(),
+            const SkeletonBox(height: 12),
+          ],
+        ),
+      ),
+    );
+    return Sweep(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [card(120, .6), const SizedBox(height: 12), card(64, .45), const SizedBox(height: 12), card(64, .5)],
+      ),
+    );
+  }
+}
+
+/// Tiles loading (albums, books): [columns] to a row, each [height] tall, as the screen lays them out.
+class SkeletonGrid extends StatelessWidget {
+  const SkeletonGrid({required this.columns, required this.height, this.gap = 12, super.key});
+
+  final int columns;
+  final double height;
+  final double gap;
+
+  @override
+  Widget build(BuildContext context) => Sweep(
+    child: LayoutBuilder(
+      builder: (context, box) {
+        final w = (box.maxWidth - gap * (columns - 1)) / columns;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [for (var i = 0; i < columns * 2; i++) SkeletonBox(width: w, height: height, radius: AppRadius.panel)],
+        );
+      },
+    ),
+  );
+}
+
+/// One item's page loading (a notice, a homework, an event): its title and its words.
+class SkeletonDetail extends StatelessWidget {
+  const SkeletonDetail({super.key});
+
+  @override
+  Widget build(BuildContext context) => Sweep(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const FractionallySizedBox(widthFactor: .75, child: SkeletonBox(height: 26, radius: 8)),
+        const SizedBox(height: 10),
+        const SkeletonBox(width: 140, height: 12),
+        const SizedBox(height: 24),
+        for (final f in [1.0, .95, 1.0, .7]) ...[FractionallySizedBox(widthFactor: f, child: const SkeletonBox()), const SizedBox(height: 10)],
+      ],
+    ),
+  );
+}
+
+/// A conversation loading: bubbles from both sides.
+class SkeletonChat extends StatelessWidget {
+  const SkeletonChat({super.key});
+
+  @override
+  Widget build(BuildContext context) => Sweep(
+    child: Column(
+      children: [
+        for (final (mine, f) in [(false, .62), (true, .5), (false, .7), (true, .4)])
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Align(
+              alignment: mine ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
+              child: FractionallySizedBox(widthFactor: f, child: const SkeletonBox(height: 44, radius: AppRadius.panel)),
+            ),
+          ),
+      ],
+    ),
+  );
 }
 
 class SkeletonBox extends StatelessWidget {

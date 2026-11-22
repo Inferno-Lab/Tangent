@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { type StudentDetail } from '@tangent/contracts';
-import { Dialog, Field, SelectField, useShake, t } from '@tangent/web-ui';
+import { Dialog, Field, SelectField, useShake, t, Skeleton } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { DialogActions as Actions, fieldsOf, messageOf } from '../../app/kit';
 import { useShellChrome } from '../../app/Layout';
@@ -35,7 +35,7 @@ export function CollectFeeDialog({ student, onClose, onDone }: { student: Studen
   };
   return (
     <Dialog title={t('admin.collect_fee.collect_a_fee_from', { name: student.name })} onClose={onClose} shake={shake.cls}>
-      {inv.isLoading ? <div className="skc" style={{ height: 120 }} /> : open.length === 0 ? (
+      {inv.isLoading ? <Skeleton kind="rows" rows={2} /> : open.length === 0 ? (
         <>
           <p>{t('admin.collect_fee.nothing_is_due_for')}{' '}{student.name}{t('admin.collect_fee.every_invoice_is_paid')}</p>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button className="btn pri" onClick={onClose}>{t('admin.collect_fee.close')}</button></div>

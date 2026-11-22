@@ -385,7 +385,7 @@ class NoticeDetailView extends GetView<NoticeDetailController> {
                 child: Row(
                   children: [
                     Expanded(child: Text('notices.ack_asked'.tr, style: AppText.capB(color: c.ink3))),
-                    Btn('notices.ack', icon: PhosphorIconsRegular.checkCircle, height: 48, loading: controller.acking.value, onPressed: () => unawaited(controller.acknowledge())),
+                    Btn('notices.ack', icon: PhosphorIconsRegular.checkCircle, height: 48, loading: controller.acking.value, action: () => controller.acknowledge()),
                   ],
                 ),
               )
@@ -423,6 +423,7 @@ class NoticeDetailView extends GetView<NoticeDetailController> {
               ),
         children: [
           ViewStateView(
+            skeleton: const SkeletonDetail(),
             state: controller.state.value,
             onRetry: controller.load,
             errorKey: controller.errorMessage.value,

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { OnlinePaymentRow, ReconRow, RefundRow } from '@tangent/contracts';
-import { Dialog, Field, NumberField, Segmented, useShake, EmptyState, EmptyNote, t } from '@tangent/web-ui';
+import { Dialog, Field, NumberField, Segmented, useShake, EmptyState, EmptyNote, t, busyFor } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { AreaField, dateLabel, openPdf, problem, stamp, useOpenParam } from '../../app/kit';
@@ -93,8 +93,8 @@ export function OnlinePaymentsPage({ tabs }: { tabs?: React.ReactNode }) {
                 <b className="num" style={{ font: '700 13px var(--fb)' }}>{fmtMoney(r.amount)}</b>
                 <span style={{ flex: 1, minWidth: 180 }}>{r.student} · {r.receiptNo}<small className="help" style={{ display: 'block' }}>{r.reason} {t('admin.online_payments_page.asked_by')}{' '}{r.requestedBy ?? 'someone'} {stamp(r.createdAt)}{r.approvedBy ? t('admin.online_payments_page.by', { status: r.status === 'rejected' ? 'rejected' : 'approved', approvedBy: r.approvedBy }) : ''}{r.decisionNote ? ` · “${r.decisionNote}”` : ''}</small></span>
                 {canRefund && r.status === 'requested' && <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <button className="btn sm" disabled={decide.isPending} onClick={() => setDeciding({ r, yes: false })}>{t('admin.online_payments_page.decline')}</button>
-                  <button className="btn sm pri" disabled={decide.isPending} onClick={() => setDeciding({ r, yes: true })}>{t('admin.online_payments_page.approve')}</button>
+                  <button className="btn sm" disabled={busyFor(decide, r.id)} onClick={() => setDeciding({ r, yes: false })}>{t('admin.online_payments_page.decline')}</button>
+                  <button className="btn sm pri" disabled={busyFor(decide, r.id)} onClick={() => setDeciding({ r, yes: true })}>{t('admin.online_payments_page.approve')}</button>
                 </span>}
               </div>
             ))}
@@ -108,7 +108,7 @@ export function OnlinePaymentsPage({ tabs }: { tabs?: React.ReactNode }) {
               <div key={r.id} className="rw" style={{ display: 'flex', gap: 10, alignItems: 'center', height: 'auto', minHeight: 56, padding: '10px 20px', flexWrap: 'wrap', opacity: r.resolved ? 0.6 : 1 }}>
                 <span className={`chip ${r.resolved ? 'g' : 'c'}`}>{r.resolved ? t('admin.online_payments_page.sorted_out') : dateLabel(r.day)}</span>
                 <span style={{ flex: 1, minWidth: 200 }}>{r.problem}<small className="help" style={{ display: 'block' }}>{r.providerPaymentId} {t('admin.online_payments_page.provider')}{' '}{r.providerAmount == null ? '–' : fmtMoney(r.providerAmount)} {t('admin.online_payments_page.receipt_2')}{' '}{r.receiptAmount == null ? '–' : fmtMoney(r.receiptAmount)}{r.note ? ` · ${r.note}` : ''}</small></span>
-                {!r.resolved && perms.includes('fees.collect') && <button className="btn sm" disabled={resolve.isPending} onClick={() => setSorting(r)}>{t('admin.online_payments_page.sorted_out')}</button>}
+                {!r.resolved && perms.includes('fees.collect') && <button className="btn sm" disabled={busyFor(resolve, r.id)} onClick={() => setSorting(r)}>{t('admin.online_payments_page.sorted_out')}</button>}
               </div>
             ))}
         </Card>

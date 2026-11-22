@@ -1767,6 +1767,7 @@
  "admin.staff_page.invite": "{n, plural, one {Invite them} other {Invite all #}}",
  "admin.staff_page.invite_sent_to": "Invite sent to {to}.",
  "admin.staff_page.invited": "Invited {n, plural, one {# person} other {# people}}.",
+ "admin.staff_page.invited_badge": "Invited",
  "admin.staff_page.invited_not_signed_in": "{p0} invited {p0, plural, one {has} other {have}} not signed in. ",
  "admin.staff_page.invited_not_signed_in_yet": "Invited, not signed in yet. A new invite replaces the first password.",
  "admin.staff_page.line_manager": "Line manager",
@@ -2662,7 +2663,8 @@
  "admin.year_page.when_each_period_break_and": "When each period, break and lunch begins and ends.",
  "admin.year_page.where_goes": "Where {fromName} goes",
  "admin.year_page.yes": "Yes",
- "admin.year_page.yes_promote": "Yes, promote",
+ "admin.year_page.yes_promote": "Yes, promote"
+,
  "admin.kit.no_student_found": "No student found",
  "admin.exams_page.no_results_yet": "No results yet",
  "admin.transport_page.no_trips_today": "No trips yet today"

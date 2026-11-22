@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { FeeHead } from '@tangent/contracts';
-import { Checkbox, Field, useToast, t } from '@tangent/web-ui';
+import { Checkbox, Field, useToast, t, Skeleton } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Ico, problem, useSetting } from '../../app/kit';
 import { useShellChrome } from '../../app/Layout';
@@ -40,7 +40,7 @@ function Heads({ say }: { say: (text: string, tone?: 'bad') => void }) { const a
   const changed = JSON.stringify(draft) !== JSON.stringify((q.data ?? []).map((x) => ({ key: x.key, name: x.name, concession: x.concession })));
   const set = (i: number, p: Partial<Draft>) => setDraft(draft.map((d, j) => (j === i ? { ...d, ...p } : d)));
   const move = (i: number, by: -1 | 1) => { const n = [...draft]; const j = i + by; [n[i], n[j]] = [n[j]!, n[i]!]; setDraft(n); };
-  if (q.isLoading) return <div className="skc" style={{ height: 200, borderRadius: 16 }} />;
+  if (q.isLoading) return <Skeleton kind="table" rows={4} />;
   return (
     <Card title={t('admin.fee_structure.fee_heads')} chip={<span className="chip">{draft.length}</span>}>
       <p className="help" style={{ margin: '0 0 12px' }}>{may

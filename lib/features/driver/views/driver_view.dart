@@ -29,6 +29,7 @@ class DriverView extends GetView<DriverController> {
         children: [
           Rise(child: PageTitle('driver.title', subtitle: DateFormat('EEEE d MMMM').format(Clock.now()))),
           ViewStateView(
+            skeleton: const SkeletonCards(),
             state: controller.state.value,
             onRetry: controller.load,
             errorKey: controller.errorMessage.value,
@@ -85,7 +86,7 @@ class _RouteCard extends StatelessWidget {
                 icon: PhosphorIconsRegular.play,
                 expand: true,
                 loading: controller.busy.value,
-                onPressed: () => unawaited(controller.start(route)),
+                action: () => controller.start(route),
               )
             else ...[
               if (trip.lateMinutes > 0)
@@ -102,11 +103,11 @@ class _RouteCard extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: Btn('driver.late', kind: BtnKind.quiet, icon: PhosphorIconsRegular.clockCountdown, onPressed: () => unawaited(_late(context, trip))),
+                    child: Btn('driver.late', kind: BtnKind.quiet, icon: PhosphorIconsRegular.clockCountdown, action: () => _late(context, trip)),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Btn('driver.end', kind: BtnKind.ink, icon: PhosphorIconsRegular.flagCheckered, loading: controller.busy.value, onPressed: () => unawaited(_end(trip))),
+                    child: Btn('driver.end', kind: BtnKind.ink, icon: PhosphorIconsRegular.flagCheckered, loading: controller.busy.value, action: () => _end(trip)),
                   ),
                 ],
               ),
