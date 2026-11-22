@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { addDays, schoolToday, type HomeworkDetail, type HomeworkFile, type HomeworkRow } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, Field, NumberField, Segmented, Select, SelectField, useShake, EmptyState, EmptyNote, t } from '@tangent/web-ui';
+import { Checkbox, DateField, Dialog, Field, NumberField, Segmented, Select, SelectField, useShake, EmptyState, EmptyNote, t, useUnsaved } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { AddBtn, AreaField, Attach, Avatar, dateLabel, problem, useOpenParam, useSetting } from '../../app/kit';
@@ -175,6 +175,7 @@ function HomeworkSheet({ id, canWrite, onChange, onClose, onSaved, onRemoved }: 
   });
   const remove = useMutation({ mutationFn: () => app.api.homework.remove(id), onSuccess: onRemoved, onError: (e) => { setErr((e as Error).message); setConfirm(false); } });
   const dirty = d ? d.students.some((s) => { const x = draft[s.studentId]; return x && (x.handed !== !!s.handedAt || x.score !== (s.score == null ? '' : String(s.score)) || x.feedback !== s.feedback); }) : false;
+  useUnsaved(dirty);
   const nothing = !dirty || save.isPending;
   return (
     <Dialog title={d ? d.title : t('admin.homework_page.homework')} tag={d ? { text: t('admin.homework_page.class_4', { subjectName: d.subjectName, className: d.className }), tone: 'v' } : undefined} onClose={onClose} width={720} shake={shake.cls}>

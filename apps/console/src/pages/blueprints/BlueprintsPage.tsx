@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
 import { PERMISSION_CATALOG, ROLE_TEMPLATES, STEP_LABELS, type BlueprintRow, type RoleTemplate, DEPLOY_TARGET_LABELS } from '@tangent/contracts';
-import { Checkbox, Dialog, ErrorLine, Field, SelectField, useShake, Icon, EmptyState, EmptyNote, t as tr } from '@tangent/web-ui';
+import { Checkbox, Dialog, ErrorLine, Field, SelectField, useShake, Icon, EmptyState, EmptyNote, t as tr, useUnsaved } from '@tangent/web-ui';
 import { Card, Page, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
 import { ago } from '../../app/format';
@@ -112,6 +112,7 @@ function StartingRoles({ say }: { say: (m: string, tone?: 'ok' | 'bad') => void 
     onSuccess: (r) => { qc.setQueryData(['role-templates'], r); setList(r); say(tr('console.blueprints_page.starting_roles_saved_schools_set')); },
     onError: (e) => setErr(e instanceof HttpError ? e.message : (e as Error).message) });
   const can = app.can('blueprints.write');
+  useUnsaved(!!list && JSON.stringify(list) !== JSON.stringify(q.data));
   if (!list) return <div className="skc s12" style={{ height: 240, borderRadius: 24 }} />;
   const cur = list.find((r) => r.key === sel);
   const put = (r: RoleTemplate) => { setList(list.map((x) => (x.key === r.key ? r : x))); setErr(''); };

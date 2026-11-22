@@ -1,6 +1,7 @@
 import { createContext, Fragment, useContext, type ReactNode } from 'react';
 import { readingLocale, setLocaleSource, setZoneSource, type SchoolLocale, type ShellData } from '@tangent/contracts';
-import { Shell, currentLanguage, useLanguage, t } from '@tangent/web-ui';
+import { useBlocker } from '@tanstack/react-router';
+import { LeaveGuard, Presence, Shell, currentLanguage, hasUnsaved, useLanguage, t } from '@tangent/web-ui';
 import { useChrome } from './useChrome';
 
 interface ShellChrome { openSearch: () => void; shell: ShellData | undefined; themeCls: string }
@@ -28,9 +29,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
   useLanguage(v.shell?.locale.language, v.shell?.locale.vocab);
   // Pages are drawn again once if the school's locale arrives or changes, so nothing keeps a format from before.
   const key = current ? `${current.zone}|${current.locale}|${current.currency}` : '';
+  // A page or popup with unsaved work asks before the app moves to another page (closing the tab asks too: useUnsaved).
+  const leave = useBlocker({ shouldBlockFn: hasUnsaved, enableBeforeUnload: false, withResolver: true });
+  const guarded = <>{v.overlays}<Presence>{leave.status === 'blocked' && <LeaveGuard {...leave} />}</Presence></>;
   return (
     <Chrome.Provider value={{ openSearch: v.openSearch, shell: v.shell, themeCls: v.themeCls }}>
-      <Shell theme={v.themeCls} aside={v.aside} overlays={v.overlays}><Fragment key={key}>{children}</Fragment></Shell>
+      <Shell theme={v.themeCls} aside={v.aside} overlays={guarded}><Fragment key={key}>{children}</Fragment></Shell>
     </Chrome.Provider>
   );
 }

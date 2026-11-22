@@ -141,3 +141,6 @@
   .nest .hb>.g:nth-child(n+3)>*,.nest .hb>section:nth-child(n+3){animation-delay:120ms}
   .nest .hb .bar>i{animation:fillw var(--t3) 150ms var(--e) both}
 }
+/* A popup asking before it throws away what was typed in it (Dialog, Panel). */
+.nest .unsaved{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:12px 0;padding:10px 12px;border-radius:16px;background:var(--bad-s);color:var(--bad-i);font:600 13px var(--fb);animation:nEm var(--t2) var(--e)}
+.nest .unsaved span{flex:1;min-width:140px}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ACTIONS, ACTION_LABELS, CONSOLE_ROLES, CONSOLE_ROLE_INFO, type ConsoleRole, type PolicyDoc } from '@tangent/contracts';
-import { AreaField, Dialog, useShake, t } from '@tangent/web-ui';
+import { AreaField, Dialog, useShake, t, useUnsaved } from '@tangent/web-ui';
 import { Card, Page, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
 import { usePageTabs } from '../../app/tabs';
@@ -33,6 +33,7 @@ function Rules({ say }: { say: Say }) {
     onSuccess: (p) => { qc.setQueryData(['policy'], p); setPol(p); setFreezing(false); say(p.freeze ? t('console.settings_page.changes_are_frozen_every_page') : t('console.settings_page.rules_saved')); },
     onError: (e) => say((e as Error).message, 'bad'),
   });
+  useUnsaved(!!pol && JSON.stringify(pol) !== JSON.stringify(policy.data));
   if (!pol) return <div className="skc" style={{ height: 320, borderRadius: 28 }} />;
   const dirty = JSON.stringify(pol) !== JSON.stringify(policy.data);
   const rule = (a: string) => pol.approvals[a] ?? { needed: false, roles: ['super_admin'] as ConsoleRole[] };

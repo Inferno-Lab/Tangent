@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AdmissionStages, DEFAULT_ADMISSION_STAGES, addDays, schoolToday, stageName, type AdmissionStage, type EnquiryPatch, type EnquiryRow, type EnquiryStage } from '@tangent/contracts';
-import { EmptyNote, Checkbox, DateField, Dialog, Field, PhoneField, SelectField, currentLanguage, useShake, EmptyState, t } from '@tangent/web-ui';
+import { EmptyNote, Checkbox, DateField, Dialog, Field, PhoneField, SelectField, currentLanguage, useShake, EmptyState, t, useUnsaved } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { Page, useToast } from '../../app/Page';
 import { AddBtn, AreaField, Avatar, dateLabel, problem, useCountry, useGrades, useSetting } from '../../app/kit';
@@ -228,6 +228,7 @@ function Details({ row, stages, canWrite, back, onClose, onMove, onSaved }: { ro
   const was = { childName: row.childName, gradeSought: String(row.gradeSought), guardianName: row.guardianName, phone: row.phone, email: row.email ?? '', source: row.source, note: row.note };
   const docsChanged = asked.filter((d) => docs[d] !== !!row.docs[d]);
   const dirty = (Object.keys(f) as (keyof typeof f)[]).some((k) => f[k].trim() !== was[k]) || score.trim() !== (row.scores[row.stage] ?? '') || docsChanged.length > 0;
+  useUnsaved(dirty);
   const save = useMutation({
     mutationFn: () => {
       const b: EnquiryPatch = {};

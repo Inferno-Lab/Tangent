@@ -2,7 +2,7 @@ import { Fragment, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { changeEntitlement, type EntitlementChange } from '@tangent/config-engine';
 import type { SchoolDetail } from '@tangent/contracts';
-import { DateField, Dialog, NumberField, SelectField, t } from '@tangent/web-ui';
+import { DateField, Dialog, NumberField, SelectField, t, useUnsaved } from '@tangent/web-ui';
 import type { CatalogDoc } from '@tangent/api-client';
 import { Card } from '../../app/Page';
 import { useApp } from '../../app/context';
@@ -52,6 +52,7 @@ export function PlanTab({ d, say }: { d: SchoolDetail; say: Say }) {
   };
   const preview = changeEntitlement(cur, change);
   const dirty = sig(preview.next) !== sig(cur);
+  useUnsaved(dirty);
   const setDate = (k: string, field: 'from' | 'until', v: string) => setDates((x) => ({ ...x, [k]: { ...x[k], [field]: v || undefined } }));
   const next = asking ? plans.data?.find((p) => p.key === asking) : undefined;
 

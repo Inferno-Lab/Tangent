@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
 import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, MODULES } from '@tangent/config-engine';
 import { COUNTRY_PACKS, curriculaFor, tx, DEFAULT_BRAND, SETTING_GROUPS, SETTINGS_META, SchoolSettingsSchema, TIGHTEN, settingOwner, type SchoolConfig, type SettingKey, hueContrast, hueOf, hueTokens } from '@tangent/contracts';
-import { Checkbox, Dialog, EmptyCard, ErrorLine, Field, SelectField, SettingRow, useShake, Icon, EmptyNote, t as tr } from '@tangent/web-ui';
+import { Checkbox, Dialog, EmptyCard, ErrorLine, Field, SelectField, SettingRow, useShake, Icon, EmptyNote, t as tr, useUnsaved } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { ago } from '../../app/format';
 
@@ -57,6 +57,7 @@ export function ConfigTab({ schoolId, say }: { schoolId: string; say: Say }) { c
       shake.hit();
     } });
 
+  useUnsaved(changed.length > 0);
   if (q.isLoading) return <div className="skc" style={{ height: 420, borderRadius: 24 }} />;
   if (q.isError || !cfg) return <EmptyCard error title={tr('console.config_tab.configuration')} chip={{ text: tr('console.config_tab.couldn_t_load'), tone: 'c' }} icon="warning" heading={tr('console.config_tab.the_school_s_configuration_didn')} body={(q.error as Error)?.message ?? ''} actions={<button className="btn pri" onClick={() => void q.refetch()}>{tr('console.config_tab.try_again')}</button>} />;
 
