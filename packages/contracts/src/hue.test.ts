@@ -24,6 +24,13 @@ describe('Tangent Hue', () => {
     }
   });
 
+  it('gives the app surfaces, ink and frame without a green cast', () => {
+    for (const mode of ['light', 'dark', 'amoled'] as HueMode[]) for (const k of ['bg', 's1', 's2', 's3', 't1', 't2', 't3', 'deep', 'deep2', 'deep3', 'hero', 'on-deep2']) {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(APP_NEUTRALS[mode][k]!.slice(i, i + 2), 16));
+      expect(g! > r! && g! > b!, `${mode} ${k} ${APP_NEUTRALS[mode][k]}`).toBe(false);
+    }
+  });
+
   it('reads the seed from a brand colour', () => {
     expect(hueOf('#6A4CF5')).toBeGreaterThan(270);
     expect(hueOf('#6A4CF5')).toBeLessThan(295);

@@ -128,27 +128,15 @@ export const WEB_NEUTRALS: Record<HueMode, Record<string, string>> = {
 };
 
 /**
- * The app's neutrals, which a school's seed never tints: the old Chalk & Glass app's chalk, paper and ink, an ink frame
- * (the dock and the headline card) and marigold for "you are here". Tangent Hue's layouts, spectrum and status colours,
- * and the school's brand colour for actions, stay.
+ * The app's neutrals, which a school's seed never tints: the web's warm neutrals (no green cast, the reason the Blackboard
+ * theme went), with marigold for "you are here". Tangent Hue's layouts, spectrum and status colours, and the school's brand
+ * colour for actions, stay.
  */
-export const APP_NEUTRALS: Record<HueMode, Record<string, string>> = {
-  light: {
-    bg: '#EEF0EC', s1: '#FBFCF9', s2: '#F3F5F1', s3: '#E6EAE4', line: '#10201B17', line2: '#10201B2B',
-    t1: '#10201B', t2: '#36443F', t3: '#56635E', deep: '#10201B', deep2: '#22322C', deep3: '#34433D', hero: '#10201B', hero2: '#22322C',
-    'on-deep': '#FFFFFF', 'on-deep2': '#BCC8C2', bright: '#F2A007', 'on-bright': '#2B1C00', scrim: '#0A141157',
-  },
-  dark: {
-    bg: '#0D1814', s1: '#14231E', s2: '#1A2C26', s3: '#22362F', line: '#E8EFEA17', line2: '#E8EFEA2B',
-    t1: '#E8EFEA', t2: '#BCC8C2', t3: '#93A29B', deep: '#22362F', deep2: '#2B4239', deep3: '#364E44', hero: '#22362F', hero2: '#2B4239',
-    'on-deep': '#FFFFFF', 'on-deep2': '#BCC8C2', bright: '#F2A007', 'on-bright': '#2B1C00', scrim: '#00000080',
-  },
-  amoled: {
-    bg: '#000000', s1: '#0B110F', s2: '#111916', s3: '#1A2420', line: '#E8EFEA17', line2: '#E8EFEA2B',
-    t1: '#E8EFEA', t2: '#BCC8C2', t3: '#93A29B', deep: '#1A2420', deep2: '#24302B', deep3: '#2F3C36', hero: '#1A2420', hero2: '#24302B',
-    'on-deep': '#FFFFFF', 'on-deep2': '#BCC8C2', bright: '#F2A007', 'on-bright': '#2B1C00', scrim: '#000000B3',
-  },
+const appNeutrals = (m: HueMode): Record<string, string> => {
+  const { bd: _canvas, field: _field, ...surfaces } = WEB_NEUTRALS[m];
+  return { ...surfaces, bright: '#F2A007', 'on-bright': '#2B1C00' };
 };
+export const APP_NEUTRALS: Record<HueMode, Record<string, string>> = { light: appNeutrals('light'), dark: appNeutrals('dark'), amoled: appNeutrals('amoled') };
 
 /** Every colour the app gets for one seed and mode: [hueTokens] in the app's neutrals. */
 export const appTokens = (h: number, mode: HueMode): Record<string, string> => ({ ...hueTokens(h, mode), ...APP_NEUTRALS[mode] });
