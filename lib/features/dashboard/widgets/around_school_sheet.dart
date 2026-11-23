@@ -818,7 +818,11 @@ class _Nothing extends StatelessWidget {
       return Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Flexible(child: EmptyArtView(art, height: (box.maxHeight - (withLine ? 22 : 0)).clamp(0, 72))),
+          // The scene is drawn for a page; here it is scaled down whole to the tile, never cut.
+          SizedBox(
+            height: (box.maxHeight - (withLine ? 22 : 0)).clamp(0, 80),
+            child: FittedBox(child: SizedBox(width: 320, height: 214, child: EmptyArtView(art, caption: false))),
+          ),
           if (withLine) ...[
             const SizedBox(height: 4),
             Text(line!.tr, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: context.type.cap),

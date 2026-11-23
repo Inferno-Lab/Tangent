@@ -35,10 +35,13 @@ enum EmptyArt {
 }
 
 class EmptyArtView extends StatefulWidget {
-  const EmptyArtView(this.art, {this.height = 214, super.key});
+  const EmptyArtView(this.art, {this.height = 214, this.caption = true, super.key});
 
   final EmptyArt art;
   final double height;
+
+  /// The "examples" line under the scene; off where the scene is a small picture inside a tile.
+  final bool caption;
 
   @override
   State<EmptyArtView> createState() => _EmptyArtViewState();
@@ -89,8 +92,10 @@ class _EmptyArtViewState extends State<EmptyArtView> with SingleTickerProviderSt
             mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(height: widget.height, width: double.infinity, child: _scene(context, widget.art)),
-              const SizedBox(height: 8),
-              Text('empty.examples'.tr, style: context.type.tiny.copyWith(color: c.ink3)),
+              if (widget.caption) ...[
+                const SizedBox(height: 8),
+                Text('empty.examples'.tr, style: context.type.tiny.copyWith(color: c.ink3)),
+              ],
             ],
           ),
         ),

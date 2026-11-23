@@ -75,12 +75,15 @@ class TeacherHomeView extends GetView<TeacherHomeController> {
                   start: 16,
                   end: 16,
                   top: inset.top + 8,
+                  // The capsule takes what the buttons leave, so Search stays beside the bell before the teacher has loaded too.
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      if (t != null)
-                        Flexible(
-                          child: Pressable(
+                      Expanded(
+                        child: t == null
+                            ? const SizedBox.shrink()
+                            : Align(
+                                alignment: AlignmentDirectional.centerStart,
+                                child: Pressable(
                             onTap: () => ShellController.showTab('profile'),
                             label: t.name,
                             child: Container(
@@ -118,7 +121,8 @@ class TeacherHomeView extends GetView<TeacherHomeController> {
                               ),
                             ),
                           ),
-                        ),
+                              ),
+                      ),
                       const SizedBox(width: 12),
                       GlassIconButton(
                         icon: PhosphorIconsRegular.magnifyingGlass,
