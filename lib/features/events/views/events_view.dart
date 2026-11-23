@@ -120,8 +120,9 @@ class _Featured extends StatelessWidget {
   Widget build(BuildContext context) {
     final pigment = _pigment(event.category);
     final answer = controller.mine(event);
+    final reply = controller.canReply(event);
     return Container(
-      height: 206,
+      height: reply ? 206 : 146,
       decoration: BoxDecoration(color: pigment.fill, borderRadius: BorderRadius.circular(24)),
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -140,7 +141,7 @@ class _Featured extends StatelessWidget {
               onTap: () => _openEvent(event),
               scale: 1,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 80),
+                padding: EdgeInsets.fromLTRB(20, 20, 20, reply ? 80 : 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -157,7 +158,7 @@ class _Featured extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      answer == null ? '${event.description} ${'events.coming_q'.tr}' : event.description,
+                      reply && answer == null ? '${event.description} ${'events.coming_q'.tr}'.trim() : event.description,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: context.type.s.copyWith(color: pigment.on.withValues(alpha: .85)),
@@ -167,7 +168,7 @@ class _Featured extends StatelessWidget {
               ),
             ),
           ),
-          if (controller.canReply(event))
+          if (reply)
           Positioned(
             left: 14,
             right: 14,

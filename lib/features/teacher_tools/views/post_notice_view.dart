@@ -40,7 +40,7 @@ class PostNoticeView extends GetView<PostNoticeController> {
         edgeBar: true,
         bottomBar: TeacherActionBar(
           text: Text(
-            'teacher.notified'.trn(controller.reach),
+            controller.reachLine,
           ),
           action: 'teacher.post',
           loading: controller.saving.value,

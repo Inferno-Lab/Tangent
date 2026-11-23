@@ -792,6 +792,9 @@ const enRedesign = <String, String>{
   'teacher.now': 'now',
   'teacher.notified': '@n families will be notified',
   'teacher.notified_one': '@n family will be notified',
+  'teacher.notified_students': '@n students will be notified',
+  'teacher.notified_students_one': '@n student will be notified',
+  'teacher.notified_school': 'Everyone at the school will be notified',
   'teacher.post': 'Post',
   'teacher.notice_sent': 'Notice posted',
 
