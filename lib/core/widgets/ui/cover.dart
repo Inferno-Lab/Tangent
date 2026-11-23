@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
@@ -43,7 +45,8 @@ class Cover extends StatelessWidget {
     return Container(
       width: w,
       height: h,
-      padding: EdgeInsets.only(left: large ? 12 : 10, bottom: large ? 10 : 6),
+      // A narrow cover (30 wide beside the class chips) keeps its label inside: less inset, and the label shrinks to fit.
+      padding: EdgeInsets.only(left: large ? 12 : (w < 40 ? 7 : 10), right: 3, bottom: large ? 10 : 6),
       alignment: Alignment.bottomLeft,
       decoration: BoxDecoration(
         color: pigment.fill,
@@ -55,10 +58,14 @@ class Cover extends StatelessWidget {
         ),
       ),
       foregroundDecoration: const _SpineDecoration(),
-      child: Text(
-        label ?? subjectAbbr[subject] ?? _abbr(subjectName(subject)),
-        style: hueText(large ? 13 : 11, 760, width: 122, height: 1, em: .05, color: pigment.on),
-        maxLines: 1,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.bottomLeft,
+        child: Text(
+          label ?? subjectAbbr[subject] ?? _abbr(subjectName(subject)),
+          style: hueText(large ? 13 : 11, 760, width: 122, height: 1, em: .05, color: pigment.on),
+          maxLines: 1,
+        ),
       ),
     );
   }
@@ -159,4 +166,131 @@ String _abbr(String name) {
   final words = name.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
   if (words.length > 1) return words.take(3).map((w) => w[0]).join().toUpperCase();
   return name.length <= 3 ? name.toUpperCase() : name.substring(0, 3).toUpperCase();
+}
+
+/// A cover as a hardback seen from the front: a rounded spine down the left in the cover's deeper shade, the board, a
+/// thick block of pages under it held in the back board's edge, and a golden ribbon hanging out below. [child] is the
+/// flat cover; it fills the board.
+class Book3D extends StatelessWidget {
+  const Book3D({required this.child, required this.height, required this.colour, this.radius = 10, super.key});
+
+  final Widget child;
+  final double height;
+
+  /// The board's colour; the spine and the back board take its deeper shade.
+  final Color colour;
+
+  /// The roundness of the spine's corners (the open side stays almost square, as a board is cut).
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    final ink = AppColors.light.ink;
+    final deep = Color.lerp(colour, ink, .28)!;
+    final paper = AppColors.light.paper;
+    final gold = Color.lerp(AppColors.late, AppColors.white, .12)!;
+    // The ribbon hangs below the book; the book itself takes the rest of the height.
+    final tail = height * .075;
+    final body = height - tail;
+    final edge = (body * .035).clamp(1.5, 5.0);
+    final pages = (body * .14).clamp(5.0, 22.0);
+    final board = body - pages - edge;
+    const corner = Radius.circular(AppRadius.hair);
+    return LayoutBuilder(
+      builder: (context, box) {
+        final w = box.maxWidth.isFinite ? box.maxWidth : height * .7;
+        final spine = (w * .11).clamp(4.0, 14.0);
+        final round = Radius.circular(math.min(radius * 1.6, spine * 2.2));
+        return SizedBox(
+          width: w,
+          height: height,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // The case: spine and back board in one, rounded down the spine side.
+              Positioned(
+                left: 0,
+                top: 0,
+                right: 0,
+                height: body,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.only(topLeft: round, bottomLeft: round, topRight: corner, bottomRight: corner),
+                    gradient: LinearGradient(
+                      colors: [deep, Color.lerp(deep, AppColors.white, .1)!, deep, deep],
+                      stops: [0, spine / w * .45, spine / w, 1],
+                    ),
+                  ),
+                ),
+              ),
+              // The pages: a cream block, its end rounded into the spine, shaded where the board lies on it.
+              Positioned(
+                left: spine * .8,
+                right: 0,
+                top: board,
+                height: pages,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.horizontal(left: Radius.circular(pages / 2)),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color.lerp(paper, ink, .16)!, paper, paper, Color.lerp(paper, ink, .06)!],
+                      stops: const [0, .3, .8, 1],
+                    ),
+                  ),
+                ),
+              ),
+              // The ribbon, from under the board down past the foot, its end cut in a notch.
+              Positioned(
+                left: w * .7,
+                top: board,
+                width: (w * .12).clamp(4.0, 14.0),
+                height: height - board,
+                child: CustomPaint(painter: _Ribbon(gold, Color.lerp(gold, ink, .14)!)),
+              ),
+              // The board, flat against the spine.
+              Positioned(
+                left: spine,
+                top: 0,
+                right: 0,
+                height: board,
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.horizontal(right: corner),
+                  child: ColoredBox(color: colour, child: child),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// A ribbon marker: a strip with a notch cut in its end, lighter down its middle.
+class _Ribbon extends CustomPainter {
+  _Ribbon(this.fill, this.shade);
+
+  final Color fill;
+  final Color shade;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final notch = size.width * .5;
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width, size.height)
+      ..lineTo(size.width / 2, size.height - notch)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(
+      path,
+      Paint()..shader = LinearGradient(colors: [shade, fill, shade]).createShader(Offset.zero & size),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_Ribbon old) => old.fill != fill || old.shade != shade;
 }

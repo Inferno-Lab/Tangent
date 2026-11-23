@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/widgets/states.dart';
 import 'package:tangent/core/routes/app_pages.dart';
 import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/theme/app_theme.dart';
@@ -186,6 +187,12 @@ Future<void> _popups(WidgetTester tester, UserRole role) async {
 Future<void> _settle(WidgetTester tester) async {
   for (var i = 0; i < 14; i++) {
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 40)));
+    await tester.pump(const Duration(milliseconds: 120));
+  }
+  // A screen that loads from several calls (a teacher's Home reads every class) is shot once it has loaded, not while its
+  // skeleton still shows: up to about 20 s more.
+  for (var i = 0; i < 100 && find.byType(Sweep).evaluate().isNotEmpty; i++) {
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 80)));
     await tester.pump(const Duration(milliseconds: 120));
   }
 }

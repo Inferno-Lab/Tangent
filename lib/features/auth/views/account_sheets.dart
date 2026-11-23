@@ -101,7 +101,23 @@ class _ContactSheetState extends State<_ContactSheet> {
             }),
           ),
           const SizedBox(height: 20),
-          Field(
+          // The other tab's field sits unseen under this one, so the sheet keeps one height whichever tab is chosen (their
+          // help lines differ in length).
+          Stack(
+            children: [
+              IgnorePointer(
+                child: ExcludeSemantics(
+                  child: Opacity(
+                    opacity: 0,
+                    child: Field(
+                      label: (_email ? 'account.new_phone' : 'account.new_email').tr,
+                      icon: PhosphorIconsRegular.phone,
+                      help: _email ? 'field.phone' : 'field.email',
+                    ),
+                  ),
+                ),
+              ),
+              Field(
             controller: _value,
             label: (_email ? 'account.new_email' : 'account.new_phone').tr,
             icon: _email ? PhosphorIconsRegular.at : PhosphorIconsRegular.phone,
@@ -111,6 +127,8 @@ class _ContactSheetState extends State<_ContactSheet> {
             // The key changes with the kind, so switching clears the other kind's message.
             key: ValueKey(_email),
             validator: _email ? Validators.email : Validators.phone,
+          ),
+            ],
           ),
         ] else
           Field(controller: _code, label: 'auth.code'.tr, icon: PhosphorIconsRegular.hash, keyboard: TextInputType.number, maxLength: 6, help: 'field.code', validator: Validators.otp),

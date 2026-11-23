@@ -163,7 +163,9 @@ class _Score extends StatelessWidget {
                 spacing: 6,
                 runSpacing: 6,
                 children: [
-                  _Tag('results.rank'.trp({'rank': '${result.rank}', 'total': '${result.totalStudents}'}), color: c.ink),
+                  // A school that does not rank (or an exam not ranked yet) sends 0: no "Rank 0 of 0".
+                  if (result.rank > 0 && result.totalStudents > 0)
+                    _Tag('results.rank'.trp({'rank': '${result.rank}', 'total': '${result.totalStudents}'}), color: c.ink),
                   if (change != null && change != 0)
                     _Tag(
                       (change > 0 ? 'results.up_n' : 'results.down_n').trp({'n': '${change.abs()}'}),

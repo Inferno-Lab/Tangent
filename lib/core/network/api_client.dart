@@ -15,6 +15,14 @@ import 'package:tangent/core/utils/clock.dart';
 /// Talks to the school's API. Every call names the school, carries the signed-in person's token and, when the token
 /// has expired, asks for a new one once and repeats the call. Family routes live under `/v1/f`; the sign-in routes
 /// (`/v1/auth/...`) are reached with their full path.
+/// The app as the school's server should name its signed-in device: the app and the phone's system ("Tangent app, Android").
+String get appUserAgent => 'Tangent/${AppConfig.version} (${Platform.operatingSystem} ${Platform.operatingSystemVersion})';
+
+/// Every request the app makes says what it is (Settings → Signed-in devices reads it).
+HttpClient appHttpClient({Duration? timeout}) => HttpClient()
+  ..userAgent = appUserAgent
+  ..connectionTimeout = timeout;
+
 class ApiClient {
   ApiClient({
     StorageService? storage,
@@ -100,7 +108,7 @@ class ApiClient {
       await _send('POST', '/v1/files', body: {'kind': kind, 'ownerId': ownerId, 'name': name, 'mime': mime, 'bytes': bytes.length}) as Map,
     );
     final up = Map<String, dynamic>.from(start['upload'] as Map);
-    final client = HttpClient()..connectionTimeout = _timeout;
+    final client = appHttpClient(timeout: _timeout);
     try {
       final req = await client.openUrl(up['method'] as String, Uri.parse(up['url'] as String));
       Map<String, dynamic>.from(up['headers'] as Map).forEach((k, v) => req.headers.set(k, '$v'));
@@ -134,7 +142,7 @@ class ApiClient {
   /// A public file's bytes (a script's font): no sign-in, no cache of its own (the caller keeps it).
   Future<Uint8List> bytes(String path) async {
     if (_base.isEmpty) throw const AppException('errors.remote_unconfigured');
-    final client = HttpClient()..connectionTimeout = _timeout;
+    final client = appHttpClient(timeout: _timeout);
     try {
       final res = await (await client.getUrl(_uri(path, null)).timeout(_timeout)).close().timeout(_timeout);
       if (res.statusCode != 200) throw const AppException('errors.remote_unconfigured');
@@ -154,7 +162,7 @@ class ApiClient {
   Future<HttpClientResponse> openStream() async {
     if (_base.isEmpty || _school.isEmpty) throw const AppException('errors.remote_unconfigured');
     for (var attempt = 0; attempt < 2; attempt++) {
-      final req = await HttpClient().getUrl(_uri('/stream', null)).timeout(_timeout);
+      final req = await appHttpClient().getUrl(_uri('/stream', null)).timeout(_timeout);
       req.headers
         ..set('x-school', _school)
         ..set('accept', 'text/event-stream');
@@ -181,7 +189,7 @@ class ApiClient {
     if (_base.isEmpty || _school.isEmpty) throw const AppException('errors.remote_unconfigured');
     final open = path.startsWith('/v1/auth/');
     final uri = _uri(path, query);
-    final client = HttpClient()..connectionTimeout = _timeout;
+    final client = appHttpClient(timeout: _timeout);
     final started = Clock.now();
     final hasToken = _storage.read<String>(StorageKeys.accessToken) != null;
     _logRequest(method: method, uri: uri, body: body, retried: retried, authed: hasToken && !open);

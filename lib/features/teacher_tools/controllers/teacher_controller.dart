@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/utils/app_exception.dart';
@@ -17,6 +18,7 @@ import 'package:tangent/data/repositories/academic_repository.dart';
 import 'package:tangent/data/repositories/campus_repository.dart';
 import 'package:tangent/data/repositories/directory_repository.dart';
 import 'package:tangent/core/utils/clock.dart';
+import 'package:tangent/core/utils/extensions.dart';
 
 /// "8 A" from a class.
 String classLabel(SchoolClass c) => c.label;
@@ -69,6 +71,7 @@ class TeacherHomeController extends GetxController with Loadable {
       final directory = Get.find<DirectoryRepository>();
       teacher = await directory.teacher(teacherId);
       classes = await directory.classesForTeacher(teacherId);
+      AppColors.setTeacherClasses([for (final c in classes) (id: c.id, name: c.label)]);
       own = classes.where((c) => c.classTeacherId == teacherId).firstOrNull;
       final key = weekdayKey(Clock.now());
       final periods = <TeacherPeriod>[];
@@ -272,7 +275,8 @@ class AssignHomeworkController extends GetxController {
 
   /// Homework already due per day for the chosen class, by subject.
   final dueByDay = <DateTime, List<String>>{}.obs;
-  final roster = 0.obs;
+  /// How many hear of it; null until the class is counted, so the bar never reads "0 students" while it loads.
+  final roster = RxnInt();
 
   Timer? _draftTimer;
 
@@ -319,6 +323,7 @@ class AssignHomeworkController extends GetxController {
 
   Future<void> pickClass(String? id) async {
     classId.value = id;
+    roster.value = null;
     if (id == null) return;
     due.value ??= days[1 < days.length ? 1 : 0];
     try {
@@ -655,16 +660,21 @@ class PostNoticeController extends GetxController {
       for (final c in classes) {
         school += (await directory.studentsIn(c.id)).length;
       }
-      preview.refresh();
+      counted.value = true;
     } on AppException {
       // Counts are a nicety; posting still works without them.
     }
   }
 
-  int get reach => switch (audience.value) {
-    'parents' => families,
-    'students' => students,
-    _ => school,
+  final counted = false.obs;
+
+  /// Who hears of the notice: the class's count once it is known, never a 0 while it loads; the whole school by name,
+  /// since a teacher's own classes are not all of it.
+  String get reachLine => switch (audience.value) {
+    'school' => 'teacher.notified_school'.tr,
+    _ when !counted.value => '',
+    'students' => 'teacher.notified_students'.trn(students),
+    _ => 'teacher.notified'.trn(families),
   };
 
   Future<void> submit() async {

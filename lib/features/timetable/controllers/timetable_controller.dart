@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/utils/extensions.dart';
@@ -101,6 +102,7 @@ class TimetableController extends GetxController with Loadable {
   /// The teacher's own lessons on each day, from every class they teach, in time order.
   Future<void> _loadTeacher(String teacherId) => run(() async {
     final classes = await Get.find<DirectoryRepository>().classesForTeacher(teacherId);
+    AppColors.setTeacherClasses([for (final c in classes) (id: c.id, name: c.label)]);
     final byDay = <String, List<PeriodSlot>>{};
     classOf.clear();
     for (final c in classes) {

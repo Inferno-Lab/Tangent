@@ -294,7 +294,7 @@ class _Suggested extends StatelessWidget {
               Avatar(teacher.name, size: 56, background: p.fill, foreground: p.on),
               const SizedBox(height: 6),
               Text(
-                '${teacher.name.split(' ').first} · ${subjectName(teacher.subject)}',
+                tidySeparators('${teacher.name.split(' ').first} · ${subjectName(teacher.subject)}'),
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 style: context.type.tiny,

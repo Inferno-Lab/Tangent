@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/network/api_client.dart';
 import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/services/storage_service.dart';
 
@@ -72,7 +73,7 @@ abstract final class ErrorReporter {
   }
 
   static Future<bool> _post(Map<String, dynamic> body) async {
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
+    final client = appHttpClient(timeout: const Duration(seconds: 8));
     try {
       final base = AppConfig.apiBase.replaceAll(RegExp(r'/$'), '');
       final req = await client.postUrl(Uri.parse('$base/v1/errors'));

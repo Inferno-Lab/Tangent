@@ -75,7 +75,7 @@ class _FeesViewState extends State<FeesView> {
             'fees.title',
             subtitle: account == null || student == null
                 ? null
-                : '${account.academicYear.replaceAll('-', '–')} · ${student.name.split(' ').first}${cls == null ? '' : ' · ${cls.name} ${cls.section}'}',
+                : '${account.academicYear.replaceAll('-', '–')} · ${student.name.split(' ').first}${cls == null ? '' : ' · ${cls.label}'}',
           ),
           if (account != null && account.installments.isNotEmpty) ...[
             const SizedBox(height: 16),
@@ -407,7 +407,7 @@ Future<void> _receipts(BuildContext context, FeeAccount account, FeesController 
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(r.title, style: context.type.t),
-                        Text('${DateFormat('d MMM y').format(r.paidOn)} · ${r.reference}', style: context.type.cap),
+                        Text(tidySeparators('${DateFormat('d MMM y').format(r.paidOn)} · ${r.reference}'), style: context.type.cap),
                       ],
                     ),
                   ),

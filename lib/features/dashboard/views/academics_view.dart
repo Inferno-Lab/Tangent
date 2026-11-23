@@ -247,11 +247,13 @@ class _Records extends StatelessWidget {
         'results.title'.tr,
         latest == null
             ? 'results.none'.tr
-            : 'academics.results_line'.trp({
-                    'exam': controller.latestExam?.name ?? '',
-                    'rank': '${latest.rank}',
-                    'total': '${latest.totalStudents}',
-                  }) +
+            : (latest.rank > 0 && latest.totalStudents > 0
+                      ? 'academics.results_line'.trp({
+                          'exam': controller.latestExam?.name ?? '',
+                          'rank': '${latest.rank}',
+                          'total': '${latest.totalStudents}',
+                        })
+                      : controller.latestExam?.name ?? '') +
                   (delta == null || delta == 0
                       ? ''
                       : ' · ${(delta > 0 ? 'academics.up' : 'academics.down').trp({'n': '${delta.abs()}'})}'),

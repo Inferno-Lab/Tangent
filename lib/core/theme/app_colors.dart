@@ -213,6 +213,18 @@ class AppColors extends ThemeExtension<AppColors> {
     };
   }
 
+  /// A teacher's classes, each with a colour of its own (by name, the spectrum in turn): a teacher of one subject tells
+  /// their lessons apart by class (9 A, 9 B), so the timetable, the day ribbon and the classes all colour by class.
+  static Map<String, String> _classColours = const {};
+
+  static void setTeacherClasses(Iterable<({String id, String name})> classes) {
+    final sorted = classes.toList()..sort((a, b) => a.name.compareTo(b.name));
+    _classColours = {for (final (i, c) in sorted.indexed) c.id: _spectrumOrder[i % _spectrumOrder.length]};
+  }
+
+  /// A teacher's class colour (one the teacher does not teach: teal).
+  static SubjectColor classColour(String id) => spectrum(_classColours[id] ?? 'teal');
+
   /// A subject's spectrum colour name: the school's own subject by its key, else a familiar name, else teal.
   static String colourOfSubject(String id) => _schoolSubjects[id] ?? _subjectSpectrum[id.toLowerCase().split(' ').first] ?? 'teal';
 
@@ -228,6 +240,9 @@ class AppColors extends ThemeExtension<AppColors> {
 
   /// A subject's spectrum colour in this theme (dark themes use the spectrum's dark soft fills and light inks).
   SubjectColor subjectFor(String id) => spectrumFor(colourOfSubject(id));
+
+  /// A teacher's class colour in this theme.
+  SubjectColor classFor(String id) => spectrumFor(_classColours[id] ?? 'teal');
 
   /// One spectrum colour in this theme.
   SubjectColor spectrumFor(String colour) {

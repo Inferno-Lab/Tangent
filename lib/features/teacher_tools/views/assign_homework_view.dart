@@ -42,7 +42,7 @@ class AssignHomeworkView extends GetView<AssignHomeworkController> {
         edgeBar: true,
         bottomBar: TeacherActionBar(
           text: Text(
-            'teacher.reach'.trn(controller.roster.value),
+            controller.roster.value == null ? '' : 'teacher.reach'.trn(controller.roster.value!),
           ),
           action: 'teacher.assign',
           loading: controller.saving.value,
