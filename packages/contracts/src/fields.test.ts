@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { checkCustom, customText, type FieldDef } from './fields.js';
 import { COUNTRY_PACKS } from './packs.js';
+import { setLocaleSource } from './locale.js';
 
 describe('the school’s own fields', () => {
   const defs: FieldDef[] = [
@@ -25,5 +26,16 @@ describe('the school’s own fields', () => {
   it('writes a value back in the reader’s language', () => {
     expect(customText(defs[0]!, 'veg', 'fr')).toBe('Végétarien');
     expect(customText(defs[1]!, ['chess', 'art'])).toBe('Chess, Art');
+  });
+});
+
+describe('a phone answer in the school’s own fields', () => {
+  it('follows the school’s country, as every other phone field does', () => {
+    const defs: FieldDef[] = [{ key: 'alt', label: 'Second phone', kind: 'phone' }];
+    setLocaleSource(() => ({ country: 'GB' }));
+    expect(checkCustom(defs, { alt: '07700 900123' }, true).errors).toEqual({});
+    expect(checkCustom(defs, { alt: '12345' }, true).errors.alt).toBeTruthy();
+    expect(checkCustom(defs, { alt: '+33 6 12 34 56 78' }, true).errors).toEqual({});
+    setLocaleSource(() => undefined);
   });
 });
