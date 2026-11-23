@@ -1309,4 +1309,11 @@ const enRedesign = <String, String>{
   'forms.help_number': 'A number, using digits.',
   'forms.help_phone': 'A mobile number. From another country, start with + and its code.',
   'forms.help_email': 'An email address, like name@example.com.',
+  'common.for_child': 'For',
+  'gate.may_collect': 'They may collect',
+  'certificates.which': 'Which certificate',
+  'visitors.why': 'Why they are coming',
+  'diary.kind': 'What it is',
+  'diary.subject': 'Subject',
+  'staff.leave_kind': 'Kind of leave',
 };

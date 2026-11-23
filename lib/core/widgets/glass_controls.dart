@@ -11,6 +11,29 @@ import 'package:tangent/core/utils/extensions.dart';
 import 'package:tangent/core/utils/haptics.dart';
 import 'package:tangent/core/widgets/glass.dart';
 
+/// The segmented control's track: floating glass on a page, or sunken in a sheet's or card's own surface.
+class _Track extends StatelessWidget {
+  const _Track({required this.flat, required this.height, required this.onPigment, required this.child});
+
+  final bool flat;
+  final double height;
+  final bool onPigment;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => flat
+      ? Container(
+          height: height,
+          decoration: BoxDecoration(
+            color: context.app.paper3,
+            borderRadius: BorderRadius.circular(height / 2),
+            border: Border.all(color: context.app.line),
+          ),
+          child: child,
+        )
+      : Glass(height: height, radius: height / 2, onPigment: onPigment, child: child);
+}
+
 /// Glass segmented control with a droplet that stretches as it slides.
 class GlassSegmented extends StatefulWidget {
   const GlassSegmented({
@@ -23,8 +46,12 @@ class GlassSegmented extends StatefulWidget {
     this.dropletText,
     this.fontSize = 15,
     this.semanticLabel,
+    this.flat = false,
     super.key,
   });
+
+  /// Inside a sheet or card: a sunken track in the surface's own shade, with no shadow, instead of floating glass.
+  final bool flat;
 
   final List<String> labels;
   final int index;
@@ -54,9 +81,9 @@ class _GlassSegmentedState extends State<GlassSegmented> {
     return Semantics(
       label: widget.semanticLabel,
       container: true,
-      child: Glass(
+      child: _Track(
+        flat: widget.flat,
         height: widget.height,
-        radius: widget.height / 2,
         onPigment: widget.onPigment,
         child: LayoutBuilder(
           builder: (context, box) {

@@ -88,18 +88,19 @@ class _ContactSheetState extends State<_ContactSheet> {
         Text('account.phone_email'.tr, style: context.type.h2),
         const SizedBox(height: 6),
         Text(_challenge == null ? 'account.phone_email_body'.tr : 'auth.code_sent_to'.trp({'to': _sentTo}), style: context.type.s),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         if (_challenge == null) ...[
           GlassSegmented(
             labels: const ['account.new_phone', 'account.new_email'],
             index: _email ? 1 : 0,
+            flat: true,
             semanticLabel: 'account.phone_email'.tr,
             onChanged: (i) => setState(() {
               _email = i == 1;
               _value.clear();
             }),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 20),
           Field(
             controller: _value,
             label: (_email ? 'account.new_email' : 'account.new_phone').tr,

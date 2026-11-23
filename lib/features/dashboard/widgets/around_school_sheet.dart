@@ -16,6 +16,7 @@ import 'package:tangent/core/utils/extensions.dart';
 import 'package:tangent/core/utils/formatters.dart';
 import 'package:tangent/core/utils/schedule.dart';
 import 'package:tangent/core/widgets/sheets.dart';
+import 'package:tangent/core/widgets/empty_kit.dart';
 import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/data/models/user.dart';
 import 'package:tangent/features/dashboard/controllers/around_school_controller.dart';
@@ -420,7 +421,7 @@ class _NoticesTile extends StatelessWidget {
           const SizedBox(height: 10),
           Expanded(
             child: n == null
-                ? Align(alignment: AlignmentDirectional.bottomStart, child: Text('school.notices_none'.tr, style: context.type.cap))
+                ? const _Nothing(art: EmptyArt.notices, line: 'school.notices_none')
                 : _Grow(
                     delay: AppMotion.t2,
                     builder: (context, t) => Stack(
@@ -494,7 +495,7 @@ class _EventsTile extends StatelessWidget {
           Text('menu.events'.tr, maxLines: 1, overflow: TextOverflow.ellipsis, style: context.type.t),
           Expanded(
             child: e == null
-                ? Align(alignment: AlignmentDirectional.bottomStart, child: Text('school.events_none'.tr, style: context.type.cap))
+                ? const _Nothing(art: EmptyArt.events, line: 'school.events_none')
                 : Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -596,7 +597,7 @@ class _MeetingTile extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: context.type.cap,
           ),
-          const Spacer(),
+          if (slots.isEmpty) const Expanded(child: _Nothing(art: EmptyArt.events)) else const Spacer(),
           if (slots.isNotEmpty)
             Row(
               children: [
@@ -800,6 +801,32 @@ class _GalleryTile extends StatelessWidget {
       ),
     );
   }
+}
+
+/// What a tile shows when it has nothing yet: its section's small animated drawing and, when the tile has room, a line
+/// saying so (instead of a bare line under an empty box).
+class _Nothing extends StatelessWidget {
+  const _Nothing({required this.art, this.line});
+
+  final EmptyArt art;
+  final String? line;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, box) {
+      final withLine = line != null && box.maxHeight >= 84;
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Flexible(child: EmptyArtView(art, height: (box.maxHeight - (withLine ? 22 : 0)).clamp(0, 72))),
+          if (withLine) ...[
+            const SizedBox(height: 4),
+            Text(line!.tr, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: context.type.cap),
+          ],
+        ],
+      );
+    },
+  );
 }
 
 class _SmallTile extends StatelessWidget {

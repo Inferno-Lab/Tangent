@@ -196,12 +196,13 @@ class _AskSheetState extends State<_AskSheet> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text('gate.leave_early'.tr, style: context.type.h2),
-          const SizedBox(height: 12),
-          if (_c.children.length > 1)
-            Wrap(spacing: 8, runSpacing: 8, children: [
+          const SizedBox(height: kFormGap),
+          if (_c.children.length > 1) ...[
+            FormGroup('common.for_child', child: Wrap(spacing: 8, runSpacing: 8, children: [
               for (final id in _c.children) Chip2((_c.names[id] ?? '').split(' ').first, on: id == _child, onTap: () => setState(() { _child = id; _person = null; })),
-            ]),
-          const SizedBox(height: 12),
+            ])),
+            const SizedBox(height: kFormGap),
+          ],
           Pressable(
             label: 'gate.when'.tr,
             onTap: () async {
@@ -215,16 +216,14 @@ class _AskSheetState extends State<_AskSheet> {
               child: Row(children: [Expanded(child: Text('gate.when'.tr, style: context.type.ts)), Text(_when(at), style: context.type.cap)]),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: kFormGap),
           Field(controller: _reason, label: 'gate.reason'.tr, help: 'field.gate_reason', maxLines: 2, maxLength: 300, validator: Validators.text(min: 3, max: 300)),
-          const SizedBox(height: 12),
-          Text('gate.who_collects'.tr, style: context.type.cap),
-          const SizedBox(height: 6),
-          Wrap(spacing: 8, runSpacing: 8, children: [
+          const SizedBox(height: kFormGap),
+          FormGroup('gate.who_collects', child: Wrap(spacing: 8, runSpacing: 8, children: [
             for (final p in people) Chip2(p.name, on: p.id == _person, onTap: () => setState(() => _person = p.id)),
             Chip2('gate.someone_else'.tr, on: _person == null, onTap: () => setState(() => _person = null)),
-          ]),
-          if (_person == null) ...[const SizedBox(height: 8), Field(controller: _collector, label: 'gate.their_name'.tr, help: 'field.person_name', keyboard: TextInputType.name, maxLength: 80, validator: Validators.name)],
+          ])),
+          if (_person == null) ...[const SizedBox(height: kFormGap), Field(controller: _collector, label: 'gate.their_name'.tr, help: 'field.person_name', keyboard: TextInputType.name, maxLength: 80, validator: Validators.name)],
         ],
       ),
     );
@@ -268,17 +267,18 @@ class _PersonSheetState extends State<_PersonSheet> {
         Text('gate.add_person'.tr, style: context.type.h2),
         const SizedBox(height: 6),
         Text('gate.add_person_body'.tr, style: context.type.s),
-        const SizedBox(height: 12),
-        if (_c.children.length > 1)
-          Wrap(spacing: 8, runSpacing: 8, children: [
+        const SizedBox(height: kFormGap),
+        if (_c.children.length > 1) ...[
+          FormGroup('gate.may_collect', child: Wrap(spacing: 8, runSpacing: 8, children: [
             for (final id in _c.children)
               Chip2((_c.names[id] ?? '').split(' ').first, on: _for.contains(id), onTap: () => setState(() => _for.contains(id) ? _for.remove(id) : _for.add(id))),
-          ]),
-        const SizedBox(height: 12),
+          ])),
+          const SizedBox(height: kFormGap),
+        ],
         Field(controller: _name, label: 'gate.their_name'.tr, help: 'field.person_name', keyboard: TextInputType.name, maxLength: 80, validator: Validators.name),
-        const SizedBox(height: 8),
+        const SizedBox(height: kFormGap),
         Field(controller: _relation, label: 'gate.relation'.tr, hint: 'gate.relation_hint'.tr, help: 'field.relation', maxLength: 40, validator: Validators.text(min: 2, max: 40)),
-        const SizedBox(height: 8),
+        const SizedBox(height: kFormGap),
         Field(controller: _phone, label: 'gate.phone_optional'.tr, help: 'field.phone_optional', keyboard: TextInputType.phone, maxLength: 24, validator: (v) => Validators.phone(v, optional: true)),
       ],
     ),

@@ -122,17 +122,17 @@ class _AskSheetState extends State<_AskSheet> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text('certificates.ask'.tr, style: context.type.h2),
-          const SizedBox(height: 12),
-          Wrap(spacing: 8, runSpacing: 8, children: [
+          const SizedBox(height: kFormGap),
+          FormGroup('certificates.which', child: Wrap(spacing: 8, runSpacing: 8, children: [
             for (final t in types) Chip2(t.fee > 0 ? '${t.name} · ${Formatters.money(t.fee)}' : t.name, on: t.key == _type, onTap: () => setState(() => _type = t.key)),
-          ]),
+          ])),
           if (_children.length > 1) ...[
-            const SizedBox(height: 12),
-            Wrap(spacing: 8, runSpacing: 8, children: [
+            const SizedBox(height: kFormGap),
+            FormGroup('common.for_child', child: Wrap(spacing: 8, runSpacing: 8, children: [
               for (final id in _children) Chip2((_c.names[id] ?? '').split(' ').first, on: id == _child, onTap: () => setState(() => _child = id)),
-            ]),
+            ])),
           ],
-          const SizedBox(height: 12),
+          const SizedBox(height: kFormGap),
           Field(controller: _purpose, label: 'certificates.purpose'.tr, hint: 'certificates.purpose_hint'.tr, help: 'field.purpose', maxLength: 200, validator: Validators.text(max: 200, optional: true)),
         ],
       ),

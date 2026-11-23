@@ -169,6 +169,32 @@ class _BtnState extends State<Btn> {
   }
 }
 
+/// The space between the parts of a form (fields, choices, a day), and under its title.
+const kFormGap = 16.0;
+
+/// One labelled part of a form that is not a text field (a choice of chips, a segmented choice): its label over it, as a
+/// Field's label, so every part of a form reads the same.
+class FormGroup extends StatelessWidget {
+  const FormGroup(this.label, {required this.child, super.key});
+
+  /// A translation key.
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Padding(
+        padding: const EdgeInsetsDirectional.only(start: 4, bottom: 8),
+        child: Text(label.tr, style: AppText.capB(color: context.app.ink2, height: 1.2)),
+      ),
+      child,
+    ],
+  );
+}
+
 /// Text field in the paper style: label above, ring, focus ring in ink.
 class Field extends StatefulWidget {
   const Field({
