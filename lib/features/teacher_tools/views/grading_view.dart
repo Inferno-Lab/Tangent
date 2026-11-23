@@ -530,7 +530,7 @@ class _GradeSheetViewState extends State<GradeSheetView> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Field(controller: _feedback, hint: 'teacher.feedback_hint', minHeight: 52, maxLines: 3, maxLength: 300),
+                  Field(controller: _feedback, hint: 'teacher.feedback_hint', help: 'field.feedback', keyboard: TextInputType.multiline, minHeight: 52, maxLines: 3, maxLength: 300),
                 ],
               ),
             ),

@@ -6,7 +6,16 @@ import 'package:tangent/data/datasources/remote_datasource.dart';
 
 /// One question of a school form (the school's field kinds), and when it is asked.
 class FormQuestion {
-  const FormQuestion({required this.key, required this.label, required this.kind, this.required = false, this.hint = '', this.options = const []});
+  const FormQuestion({
+    required this.key,
+    required this.label,
+    required this.kind,
+    this.required = false,
+    this.hint = '',
+    this.options = const [],
+    this.pattern = '',
+    this.patternHint = '',
+  });
 
   factory FormQuestion.fromJson(Map<String, dynamic> j) => FormQuestion(
     key: j['key'] as String,
@@ -14,6 +23,8 @@ class FormQuestion {
     kind: j['kind'] as String? ?? 'text',
     required: j['required'] == true,
     hint: j['hint'] as String? ?? '',
+    pattern: j['pattern'] as String? ?? '',
+    patternHint: j['patternHint'] as String? ?? '',
     options: [for (final o in (j['options'] as List? ?? const [])) (key: '${(o as Map)['key']}', name: '${o['name']}')],
   );
 
@@ -23,6 +34,20 @@ class FormQuestion {
   final bool required;
   final String hint;
   final List<({String key, String name})> options;
+
+  /// A shape the answer must have (an ID number's in the school's country), and what to say when it does not fit.
+  final String pattern;
+  final String patternHint;
+
+  /// Whether [value] has the [pattern] shape, compared as the server compares it: without spaces and dashes, in capitals.
+  bool fits(String value) {
+    if (pattern.isEmpty) return true;
+    try {
+      return RegExp(pattern).hasMatch(value.replaceAll(RegExp(r'[\s-]'), '').toUpperCase());
+    } on FormatException {
+      return true;
+    }
+  }
 }
 
 /// A form the school asked this person to answer, and the children still to answer for (one null: once for the family).

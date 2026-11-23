@@ -190,11 +190,15 @@ class Field extends StatefulWidget {
     this.fill,
     this.borderless = false,
     this.maxLength,
+    this.help,
     super.key,
   });
 
   /// The most characters it takes (typing stops there): every free-text field has a bound.
   final int? maxLength;
+
+  /// A line under the box saying what to write, and in what shape (a translation key); its message replaces it when wrong.
+  final String? help;
 
   final TextEditingController? controller;
   final String? label;
@@ -326,6 +330,14 @@ class _FieldState extends State<Field> with WidgetsBindingObserver {
                       focusNode: _focus,
                       obscureText: widget.obscure,
                       keyboardType: widget.keyboard,
+                      // A name starts each word in capitals, a message each sentence; addresses, numbers and codes none.
+                      textCapitalization: widget.obscure
+                          ? TextCapitalization.none
+                          : widget.keyboard == TextInputType.name
+                          ? TextCapitalization.words
+                          : widget.keyboard == null || widget.keyboard == TextInputType.text || widget.keyboard == TextInputType.multiline
+                          ? TextCapitalization.sentences
+                          : TextCapitalization.none,
                       maxLines: widget.maxLines,
                       minLines: 1,
                       textInputAction: widget.textInputAction,
@@ -352,6 +364,11 @@ class _FieldState extends State<Field> with WidgetsBindingObserver {
                 ],
               ),
             ),
+            if (error == null && widget.help != null)
+              Padding(
+                padding: const EdgeInsetsDirectional.only(top: 8, start: 4),
+                child: Text(widget.help!.tr, style: AppText.cap(color: c.ink3)),
+              ),
             if (error != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8, left: 4),

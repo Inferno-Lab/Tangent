@@ -1,6 +1,6 @@
-import { customText, listLabel, listOptions, type AddressFormat, type AddressParts, type CustomValue, type CustomValues, type FieldDef } from '@tangent/contracts';
+import { customText, listLabel, listOptions, schoolCountry, type AddressFormat, type AddressParts, type CustomValue, type CustomValues, type FieldDef } from '@tangent/contracts';
 import { Checkbox, DateField, NumberField } from './fields';
-import { Field, SelectField } from './forms';
+import { Field, PhoneField, SelectField } from './forms';
 import { currentLanguage, t as tr } from './i18n';
 
 const labelOf = (f: FieldDef) => f.names?.[currentLanguage()] || f.label;
@@ -44,8 +44,13 @@ export function CustomFieldInputs({ defs, values, onChange, errors = {}, disable
               </div>
             );
           }
+          case 'phone':
+            // The school's country decides what a local number looks like, as the server checks it.
+            return <PhoneField key={f.key} {...common} country={schoolCountry()} value={typeof v === 'string' ? v : ''} onChange={(x) => set(f.key, x)} />;
           default:
-            return <Field key={f.key} {...common} type={f.kind === 'email' ? 'email' : f.kind === 'phone' ? 'tel' : 'text'} maxLength={f.kind === 'longText' ? 2000 : 200} value={typeof v === 'string' ? v : ''} onChange={(x) => set(f.key, x)} />;
+            return <Field key={f.key} {...common} hint={f.hint || f.patternHint} type={f.kind === 'email' ? 'email' : 'text'} maxLength={f.kind === 'longText' ? 2000 : 200}
+              format={f.pattern ? { pattern: f.pattern, message: f.patternHint || tr('ui.custom_fields.not_right') } : undefined}
+              value={typeof v === 'string' ? v : ''} onChange={(x) => set(f.key, x)} />;
         }
       })}
     </div>
@@ -68,7 +73,9 @@ export function AddressFields({ format, parts, onChange, errors = {}, optional }
     <div className="two" style={{ flexWrap: 'wrap' }}>
       {format.map((p) => (
         <Field key={p.key} label={optional ? tr('ui.custom_fields.optional', { label: p.label }) : p.label} value={parts[p.key] ?? ''} maxLength={120}
-          error={errors[`address.${p.key}`]} hint={p.patternHint} onChange={(v) => onChange({ ...parts, [p.key]: v })} />
+          error={errors[`address.${p.key}`]} hint={p.patternHint}
+          format={p.pattern ? { pattern: p.pattern, message: p.patternHint || tr('ui.custom_fields.not_right') } : undefined}
+          onChange={(v) => onChange({ ...parts, [p.key]: v })} />
       ))}
     </div>
   );

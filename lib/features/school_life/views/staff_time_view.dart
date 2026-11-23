@@ -241,7 +241,7 @@ class _LeaveSheetState extends State<_LeaveSheet> {
           }),
           if (!halves || _half == 0) ...[const SizedBox(height: 8), _date('staff.to', _to, (d) => _to = d, first: _from)],
           const SizedBox(height: 12),
-          Field(controller: _reason, label: 'staff.reason_optional'.tr, maxLines: 2, maxLength: 500, validator: Validators.text(max: 500, optional: true)),
+          Field(controller: _reason, label: 'staff.reason_optional'.tr, help: 'field.staff_reason', maxLines: 2, maxLength: 500, validator: Validators.text(max: 500, optional: true)),
         ],
       ),
     );

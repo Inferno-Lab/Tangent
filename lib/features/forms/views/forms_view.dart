@@ -197,12 +197,13 @@ class _FormPageState extends State<_FormPage> {
         return Field(
           controller: _ctl(q.key),
           label: label,
-          hint: q.hint.isEmpty ? null : q.hint,
+          help: q.hint.isNotEmpty ? q.hint : q.patternHint.isNotEmpty ? q.patternHint : 'forms.help_${q.kind}',
           maxLines: q.kind == 'longText' ? 4 : 1,
           keyboard: switch (q.kind) {
             'number' => const TextInputType.numberWithOptions(decimal: true),
             'phone' => TextInputType.phone,
             'email' => TextInputType.emailAddress,
+            'longText' => TextInputType.multiline,
             _ => TextInputType.text,
           },
           maxLength: q.kind == 'longText' ? 2000 : 500,
@@ -213,7 +214,7 @@ class _FormPageState extends State<_FormPage> {
               'number' => double.tryParse(t.replaceAll(',', '.')) == null ? 'validation.number_invalid' : null,
               'phone' => Validators.phone(t),
               'email' => Validators.email(t),
-              _ => null,
+              _ => q.fits(t) ? null : (q.patternHint.isNotEmpty ? q.patternHint : 'validation.format'),
             };
           },
           onChanged: (_) => setState(() {}),

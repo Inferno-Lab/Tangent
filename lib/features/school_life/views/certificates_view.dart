@@ -133,7 +133,7 @@ class _AskSheetState extends State<_AskSheet> {
             ]),
           ],
           const SizedBox(height: 12),
-          Field(controller: _purpose, label: 'certificates.purpose'.tr, hint: 'certificates.purpose_hint'.tr, maxLength: 200, validator: Validators.text(max: 200, optional: true)),
+          Field(controller: _purpose, label: 'certificates.purpose'.tr, hint: 'certificates.purpose_hint'.tr, help: 'field.purpose', maxLength: 200, validator: Validators.text(max: 200, optional: true)),
         ],
       ),
     );

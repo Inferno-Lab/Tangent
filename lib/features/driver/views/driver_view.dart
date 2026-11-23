@@ -155,7 +155,7 @@ class _RouteCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            Field(controller: controller.reason, label: 'driver.late_reason', hint: 'driver.late_hint', maxLength: 160, validator: Validators.text(max: 160, optional: true)),
+            Field(controller: controller.reason, label: 'driver.late_reason', hint: 'driver.late_hint', help: 'field.late_reason', maxLength: 160, validator: Validators.text(max: 160, optional: true)),
             const SizedBox(height: 16),
             Btn('driver.late_send', expand: true, onPressed: () {
               if (SheetBody.valid()) Get.back<bool>(result: true);

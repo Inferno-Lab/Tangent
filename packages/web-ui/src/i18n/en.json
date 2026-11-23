@@ -385,5 +385,6 @@
  "ui.unsaved.leave_body": "What you changed on this page is not saved yet. Leave and it is lost.",
  "ui.unsaved.stay": "Stay",
  "ui.unsaved.leave": "Leave",
- "ui.skeleton.loading": "Loading"
+ "ui.skeleton.loading": "Loading",
+ "ui.custom_fields.not_right": "This does not look right. Check it and try again."
 }

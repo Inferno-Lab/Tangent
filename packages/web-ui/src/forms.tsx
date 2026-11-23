@@ -31,7 +31,13 @@ interface FieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'onChan
   error?: string;
   hint?: string;
   icon?: IconName;
+  /** A shape the value must have (an ID number's or a postcode's in the school's country), checked when the field is left,
+   *  the way the server checks it: without the spaces and dashes people type between groups, in capitals. */
+  format?: { pattern: string; message: string };
 }
+
+/** Whether [value] has the [pattern] shape, compared as the server compares it (packages/contracts/src/fields.ts). */
+export const fitsFormat = (value: string, pattern: string): boolean => new RegExp(pattern).test(value.replace(/[\s-]/g, '').toUpperCase());
 
 // What an email address looks like to every server it will be sent through: one @, a dot in the domain, no spaces.
 const EMAIL = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
@@ -40,10 +46,13 @@ const EMAIL = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
  * A labelled input. The error turns it red, makes it vibrate, and says what to do. An email field checks itself when the
  * person leaves it, the way the server will.
  */
-export function Field({ label, value, onChange, error, hint, icon, onBlur, ...rest }: FieldProps) {
+export function Field({ label, value, onChange, error, hint, icon, onBlur, format, ...rest }: FieldProps) {
   const id = useId();
   const [left, setLeft] = useState(false);
-  const own = rest.type === 'email' && left && value.trim() && !EMAIL.test(value.trim()) ? tr('ui.forms.email_invalid') : '';
+  const typed = value.trim();
+  const own = !left || !typed ? ''
+    : rest.type === 'email' && !EMAIL.test(typed) ? tr('ui.forms.email_invalid')
+    : format && !fitsFormat(typed, format.pattern) ? format.message : '';
   error = error || own || undefined;
   return (
     <div className="fld">

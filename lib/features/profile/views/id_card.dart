@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -72,6 +73,26 @@ class _IdBadgeState extends State<IdBadge> with TickerProviderStateMixin {
 
   void _flip() => _turn.value < .5 ? _turn.forward() : _turn.reverse();
 
+  // A sideways swipe turns the card under the finger, from either face; letting go settles on the nearer face, or the one a
+  // flick points to. A drag that starts mid-turn picks the card up where it is.
+  double _width = 1;
+  void _drag(DragUpdateDetails d) {
+    _turn.stop();
+    final dir = Directionality.of(context) == TextDirection.rtl ? -1 : 1;
+    _turn.value = (_turn.value - dir * d.delta.dx / _width).clamp(0.0, 1.0);
+  }
+
+  void _let(DragEndDetails d) {
+    final dir = Directionality.of(context) == TextDirection.rtl ? -1 : 1;
+    final v = -dir * (d.primaryVelocity ?? 0) / _width;
+    final toBack = v.abs() > 1.5 ? v > 0 : _turn.value > .5;
+    if (context.reduceMotion) {
+      _turn.value = toBack ? 1 : 0;
+    } else {
+      _turn.animateTo(toBack ? 1 : 0, curve: kEase);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final still = context.reduceMotion;
@@ -80,7 +101,13 @@ class _IdBadgeState extends State<IdBadge> with TickerProviderStateMixin {
         constraints: const BoxConstraints(maxWidth: 420),
         child: AspectRatio(
           aspectRatio: 350 / 220,
-          child: Pressable(
+          child: LayoutBuilder(
+            builder: (context, box) {
+              _width = box.maxWidth;
+              return GestureDetector(
+                onHorizontalDragUpdate: _drag,
+                onHorizontalDragEnd: _let,
+                child: Pressable(
             onTap: still ? () => _turn.value = _turn.value < .5 ? 1 : 0 : _flip,
             scale: .985,
             label: 'profile.card_label'.trp({'name': widget.name}),
@@ -101,6 +128,9 @@ class _IdBadgeState extends State<IdBadge> with TickerProviderStateMixin {
                 );
               },
             ),
+          ),
+              );
+            },
           ),
         ),
       ),

@@ -231,7 +231,7 @@ class _WriteSheetState extends State<_WriteSheet> {
             Wrap(spacing: 8, runSpacing: 8, children: [for (final s in cls.subjects) Chip2(s.name, on: s.key == _subject, onTap: () => setState(() => _subject = s.key))]),
           ],
           const SizedBox(height: 12),
-          Field(controller: _text, label: 'diary.entry'.tr, maxLines: 5, maxLength: 2000, validator: Validators.text(min: 2, max: 2000)),
+          Field(controller: _text, label: 'diary.entry'.tr, help: 'field.diary_entry', keyboard: TextInputType.multiline, maxLines: 5, maxLength: 2000, validator: Validators.text(min: 2, max: 2000)),
         ],
       ),
     );

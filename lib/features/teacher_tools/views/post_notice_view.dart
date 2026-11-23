@@ -79,11 +79,12 @@ class PostNoticeView extends GetView<PostNoticeController> {
             ],
           ),
           const SizedBox(height: 12),
-          Field(controller: controller.title, hint: 'teacher.notice_title', textInputAction: TextInputAction.next, maxLength: 120, validator: Validators.text(min: 3, max: 120)),
+          Field(controller: controller.title, hint: 'teacher.notice_title', help: 'field.notice_title', textInputAction: TextInputAction.next, maxLength: 120, validator: Validators.text(min: 3, max: 120)),
           const SizedBox(height: 10),
           Field(
             controller: controller.body,
             hint: 'teacher.notice_body',
+            help: 'field.notice_body',
             maxLines: 5,
             minHeight: 66,
             keyboard: TextInputType.multiline,

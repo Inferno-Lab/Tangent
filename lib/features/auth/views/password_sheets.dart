@@ -94,11 +94,11 @@ class _ForgotSheetState extends State<_ForgotSheet> {
       Text(_challenge == null ? 'auth.forgot_body'.tr : 'auth.code_sent_to'.trp({'to': _sentTo}), style: context.type.s),
       const SizedBox(height: 16),
       if (_challenge == null)
-        Field(controller: _who, label: 'auth.email_or_phone'.tr, icon: PhosphorIconsRegular.at, keyboard: TextInputType.emailAddress, maxLength: 254, validator: Validators.emailOrPhone)
+        Field(controller: _who, label: 'auth.email_or_phone'.tr, icon: PhosphorIconsRegular.at, keyboard: TextInputType.emailAddress, maxLength: 254, help: 'field.sign_in_id', validator: Validators.emailOrPhone)
       else ...[
-        Field(controller: _code, label: 'auth.code'.tr, icon: PhosphorIconsRegular.hash, keyboard: TextInputType.number, maxLength: 6, validator: Validators.otp),
+        Field(controller: _code, label: 'auth.code'.tr, icon: PhosphorIconsRegular.hash, keyboard: TextInputType.number, maxLength: 6, help: 'field.code', validator: Validators.otp),
         const SizedBox(height: 12),
-        Field(controller: _password, label: 'auth.new_password'.tr, icon: PhosphorIconsRegular.lockSimple, obscure: true, validator: Validators.newPassword),
+        Field(controller: _password, label: 'auth.new_password'.tr, icon: PhosphorIconsRegular.lockSimple, obscure: true, help: 'auth.password_rule'.trp({'n': '${SchoolConfig.passwordMinLength}'}), validator: Validators.newPassword),
       ],
       ],
     ),
@@ -139,11 +139,9 @@ class _ChangeSheetState extends State<_ChangeSheet> {
       children: [
       Text('auth.change_password'.tr, style: context.type.h2),
       const SizedBox(height: 16),
-      Field(controller: _current, label: 'auth.current_password'.tr, icon: PhosphorIconsRegular.lockSimple, obscure: true, validator: Validators.password),
+      Field(controller: _current, label: 'auth.current_password'.tr, icon: PhosphorIconsRegular.lockSimple, obscure: true, help: 'field.current_password', validator: Validators.password),
       const SizedBox(height: 12),
-      Field(controller: _next, label: 'auth.new_password'.tr, icon: PhosphorIconsRegular.lockSimpleOpen, obscure: true, validator: (v) => Validators.newPassword(v) ?? (v == _current.text ? 'validation.password_same' : null)),
-      const SizedBox(height: 8),
-      Text('auth.password_rule'.trp({'n': '${SchoolConfig.passwordMinLength}'}), style: context.type.cap),
+      Field(controller: _next, label: 'auth.new_password'.tr, icon: PhosphorIconsRegular.lockSimpleOpen, obscure: true, help: 'auth.password_rule'.trp({'n': '${SchoolConfig.passwordMinLength}'}), validator: (v) => Validators.newPassword(v) ?? (v == _current.text ? 'validation.password_same' : null)),
       ],
     ),
   );

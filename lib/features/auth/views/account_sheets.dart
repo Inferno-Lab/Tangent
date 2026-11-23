@@ -105,13 +105,14 @@ class _ContactSheetState extends State<_ContactSheet> {
             label: (_email ? 'account.new_email' : 'account.new_phone').tr,
             icon: _email ? PhosphorIconsRegular.at : PhosphorIconsRegular.phone,
             keyboard: _email ? TextInputType.emailAddress : TextInputType.phone,
+            help: _email ? 'field.email' : 'field.phone',
             maxLength: _email ? 254 : 24,
             // The key changes with the kind, so switching clears the other kind's message.
             key: ValueKey(_email),
             validator: _email ? Validators.email : Validators.phone,
           ),
         ] else
-          Field(controller: _code, label: 'auth.code'.tr, icon: PhosphorIconsRegular.hash, keyboard: TextInputType.number, maxLength: 6, validator: Validators.otp),
+          Field(controller: _code, label: 'auth.code'.tr, icon: PhosphorIconsRegular.hash, keyboard: TextInputType.number, maxLength: 6, help: 'field.code', validator: Validators.otp),
       ],
     ),
   );
