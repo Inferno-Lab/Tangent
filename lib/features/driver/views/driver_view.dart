@@ -13,6 +13,8 @@ import 'package:tangent/data/models/driver.dart';
 import 'package:tangent/features/driver/controllers/driver_controller.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:tangent/core/routes/app_routes.dart';
+import 'package:tangent/core/widgets/glass.dart';
 import 'package:tangent/core/utils/clock.dart';
 
 /// The driver's Home and Trips: today's routes, start a trip, mark each child at their stop, say the bus is late, end the trip.
@@ -26,6 +28,14 @@ class DriverView extends GetView<DriverController> {
       return PageFrame(
         dockPage: true,
         onRefresh: controller.load,
+        // Search, as on every role's home: the school's notices, events and people.
+        actions: [
+          GlassIconButton(
+            icon: PhosphorIconsRegular.magnifyingGlass,
+            label: 'common.search'.tr,
+            onTap: () => Get.toNamed<void>(AppRoutes.search),
+          ),
+        ],
         children: [
           Rise(child: PageTitle('driver.title', subtitle: DateFormat('EEEE d MMMM').format(Clock.now()))),
           ViewStateView(
