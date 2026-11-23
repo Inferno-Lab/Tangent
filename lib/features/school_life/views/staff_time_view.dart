@@ -239,7 +239,16 @@ class _LeaveSheetState extends State<_LeaveSheet> {
             _from = d;
             if (_to.isBefore(d)) _to = d;
           }),
-          if (!halves || _half == 0) ...[const SizedBox(height: 8), _date('staff.to', _to, (d) => _to = d, first: _from)],
+          // A half day has no end date; its row keeps its room so the sheet does not jump as the choice changes.
+          if (halves)
+            Visibility(
+              visible: _half == 0,
+              maintainSize: true,
+              maintainAnimation: true,
+              maintainState: true,
+              child: Padding(padding: const EdgeInsets.only(top: 8), child: _date('staff.to', _to, (d) => _to = d, first: _from)),
+            )
+          else ...[const SizedBox(height: 8), _date('staff.to', _to, (d) => _to = d, first: _from)],
           const SizedBox(height: kFormGap),
           Field(controller: _reason, label: 'staff.reason_optional'.tr, help: 'field.staff_reason', maxLines: 2, maxLength: 500, validator: Validators.text(max: 500, optional: true)),
         ],

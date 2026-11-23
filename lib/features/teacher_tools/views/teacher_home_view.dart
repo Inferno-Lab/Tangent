@@ -66,6 +66,7 @@ class TeacherHomeView extends GetView<TeacherHomeController> {
                   DayRibbon(
                     periods: periods,
                     subject: t.subject,
+                    colourOf: (p) => classOf[p.id] == null ? c.subjectFor(p.subject) : c.classFor(classOf[p.id]!.id),
                     height: inset.top + 230,
                     label: (p) => classOf[p.id] == null ? subjectName(p.subject) : classLabel(classOf[p.id]!),
                   )
@@ -180,8 +181,8 @@ class _NowLesson extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.app;
-    final pigment = c.subjectFor(subject);
     final cls = period.schoolClass!;
+    final pigment = c.classFor(cls.id);
     final a = minutesOf(period.slot.start);
     final b = minutesOf(period.slot.end);
     final room = period.slot.room.isEmpty ? cls.room : period.slot.room;
@@ -615,7 +616,7 @@ class _ClassCard extends StatelessWidget {
       when = 'teacher.not_today'.tr;
     }
     final taken = controller.taken(cls.id);
-    final pigment = AppColors.subject(subject);
+    final pigment = AppColors.classColour(cls.id);
     final (Color tile, Color tileOn) = mine
         ? (context.app.brand, context.app.onBrand)
         : live != null

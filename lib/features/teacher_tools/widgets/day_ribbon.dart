@@ -14,7 +14,10 @@ import 'package:tangent/data/models/academics.dart';
 /// lesson, drawn to the length of the lesson; free time and breaks hatched; an amber line at now with the time; the hours
 /// underneath. It scrolls sideways and opens on now.
 class DayRibbon extends StatefulWidget {
-  const DayRibbon({required this.periods, required this.label, required this.subject, this.height = 282, super.key});
+  const DayRibbon({required this.periods, required this.label, required this.subject, this.height = 282, this.colourOf, super.key});
+
+  /// A lesson's own colour (the teacher's: its class's); null takes the subject's.
+  final SubjectColor Function(PeriodSlot)? colourOf;
 
   final List<PeriodSlot> periods;
 
@@ -99,7 +102,7 @@ class _DayRibbonState extends State<DayRibbon> with SingleTickerProviderStateMix
                     child: FractionalTranslation(
                       // Each column drops in from above, a beat after the one before.
                       translation: Offset(0, still ? 0 : -1.04 * (1 - Interval(math.min(.5, i * .07), math.min(1, .5 + i * .07), curve: kEase).transform(_drop.value))),
-                      child: p != null && p.kind == PeriodKind.klass ? _lesson(context, p, now, p.subject.isEmpty ? pigment : c.subjectFor(p.subject)) : _gap(context, p),
+                      child: p != null && p.kind == PeriodKind.klass ? _lesson(context, p, now, widget.colourOf?.call(p) ?? pigment) : _gap(context, p),
                     ),
                   ),
                 if (now >= _start && now <= _end) ...[

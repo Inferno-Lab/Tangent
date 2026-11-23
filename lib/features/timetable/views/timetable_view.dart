@@ -164,7 +164,8 @@ class _Block extends StatelessWidget {
         ),
       );
     }
-    final pigment = AppColors.subject(period.subject);
+    final cls = controller.classOf[period];
+    final pigment = cls != null ? AppColors.classColour(cls.id) : AppColors.subject(period.subject);
     final now = controller.isNow(period);
     final hw = controller.homeworkDue.contains(period.subject);
     // A teacher's block names the class; a family's the teacher.

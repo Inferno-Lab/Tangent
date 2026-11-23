@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/utils/app_exception.dart';
@@ -69,6 +70,7 @@ class TeacherHomeController extends GetxController with Loadable {
       final directory = Get.find<DirectoryRepository>();
       teacher = await directory.teacher(teacherId);
       classes = await directory.classesForTeacher(teacherId);
+      AppColors.setTeacherClasses([for (final c in classes) (id: c.id, name: c.label)]);
       own = classes.where((c) => c.classTeacherId == teacherId).firstOrNull;
       final key = weekdayKey(Clock.now());
       final periods = <TeacherPeriod>[];
