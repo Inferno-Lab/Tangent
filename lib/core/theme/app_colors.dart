@@ -192,7 +192,29 @@ class AppColors extends ThemeExtension<AppColors> {
 
   static Map<String, SubjectColor> get subjects => {for (final id in _subjectIds) id: subject(id)};
 
-  static SubjectColor subject(String id) => spectrum(_subjectSpectrum[id.toLowerCase().split(' ').first] ?? 'teal');
+  static SubjectColor subject(String id) => spectrum(colourOfSubject(id));
+
+  /// The spectrum, in the order a school's other subjects take it.
+  static const _spectrumOrder = ['blue', 'green', 'red', 'violet', 'orange', 'teal', 'pink', 'amber', 'indigo', 'cyan', 'lime', 'rose'];
+
+  /// Each of the school's subjects by its key, set from the school's setup (SchoolConfig): a subject named like a familiar one
+  /// keeps its colour (Mathematics blue, English red), the rest take the colours left in turn, so no two lessons look alike.
+  /// A school's subject keys are its own ids ("s6fdm78a9f"), which the name list alone never matched: every lesson was teal.
+  static Map<String, String> _schoolSubjects = const {};
+
+  static void setSchoolSubjects(Map<String, String> names) {
+    final byName = {for (final e in names.entries) e.key: _subjectSpectrum[e.value.toLowerCase().split(' ').first]};
+    final free = _spectrumOrder.where((c) => !byName.values.contains(c)).toList();
+    final rest = names.keys.where((k) => byName[k] == null).toList()..sort((a, b) => names[a]!.compareTo(names[b]!));
+    _schoolSubjects = {
+      for (final e in byName.entries) if (e.value != null) e.key: e.value!,
+      // ponytail: past twelve subjects the colours repeat in turn; a thirteenth hue would no longer read apart.
+      for (final (i, k) in rest.indexed) k: free.isEmpty ? _spectrumOrder[i % _spectrumOrder.length] : free[i % free.length],
+    };
+  }
+
+  /// A subject's spectrum colour name: the school's own subject by its key, else a familiar name, else teal.
+  static String colourOfSubject(String id) => _schoolSubjects[id] ?? _subjectSpectrum[id.toLowerCase().split(' ').first] ?? 'teal';
 
   /// Whether the app's theme is dark (set by AppTheme.resolve): the spectrum lookups below follow it.
   static bool activeDark = false;
@@ -205,7 +227,7 @@ class AppColors extends ThemeExtension<AppColors> {
   }
 
   /// A subject's spectrum colour in this theme (dark themes use the spectrum's dark soft fills and light inks).
-  SubjectColor subjectFor(String id) => spectrumFor(_subjectSpectrum[id.toLowerCase().split(' ').first] ?? 'teal');
+  SubjectColor subjectFor(String id) => spectrumFor(colourOfSubject(id));
 
   /// One spectrum colour in this theme.
   SubjectColor spectrumFor(String colour) {

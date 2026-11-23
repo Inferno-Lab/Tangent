@@ -21,7 +21,7 @@ class DayRibbon extends StatefulWidget {
   /// What a column says: the class for a teacher.
   final String Function(PeriodSlot) label;
 
-  /// The colour the lessons take (the teacher's subject).
+  /// The teacher's subject: the colour of a lesson whose own subject is not known (each lesson takes its subject's colour).
   final String subject;
   final double height;
 
@@ -99,7 +99,7 @@ class _DayRibbonState extends State<DayRibbon> with SingleTickerProviderStateMix
                     child: FractionalTranslation(
                       // Each column drops in from above, a beat after the one before.
                       translation: Offset(0, still ? 0 : -1.04 * (1 - Interval(math.min(.5, i * .07), math.min(1, .5 + i * .07), curve: kEase).transform(_drop.value))),
-                      child: p != null && p.kind == PeriodKind.klass ? _lesson(context, p, now, pigment) : _gap(context, p),
+                      child: p != null && p.kind == PeriodKind.klass ? _lesson(context, p, now, p.subject.isEmpty ? pigment : c.subjectFor(p.subject)) : _gap(context, p),
                     ),
                   ),
                 if (now >= _start && now <= _end) ...[
