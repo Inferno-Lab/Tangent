@@ -394,7 +394,7 @@ class _DetailBody extends StatelessWidget {
                     children: [
                       Expanded(child: Overline('homework.your_work'.tr)),
                       if (status == HomeworkStatus.graded)
-                        Stamp('${mine!.grade ?? ''} · ${mine!.marks ?? 0}/${item.maxMarks}', color: AppColors.ok)
+                        Stamp(tidySeparators('${mine!.grade ?? ''} · ${mine!.marks ?? 0}/${item.maxMarks}'), color: AppColors.ok)
                       else
                         Stamp('homework.stamp_sent'.tr, color: AppColors.ok),
                     ],

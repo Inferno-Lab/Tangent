@@ -48,8 +48,9 @@ class EmptyArtView extends StatefulWidget {
 }
 
 class _EmptyArtViewState extends State<EmptyArtView> with SingleTickerProviderStateMixin {
-  // One loop: parts enter at 0.6, 1.8, 3.0, 4.2, 5.4 and 6.6 s, hold to 9.2 s, then fade and start again.
-  late final AnimationController _t = AnimationController(vsync: this, duration: const Duration(seconds: 10));
+  // One loop: parts enter at 0.4, 1.3, 2.1, 3.0, 3.8 and 4.6 s, hold to 6.4 s, then fade and start again. It opens with its
+  // first part already in, so a page never shows an empty drawing while the scene builds.
+  late final AnimationController _t = AnimationController(vsync: this, duration: const Duration(seconds: 7));
 
   @override
   void didChangeDependencies() {
@@ -59,7 +60,9 @@ class _EmptyArtViewState extends State<EmptyArtView> with SingleTickerProviderSt
         ..stop()
         ..value = .9;
     } else if (!_t.isAnimating) {
-      _t.repeat();
+      _t
+        ..value = .12
+        ..repeat();
     }
   }
 

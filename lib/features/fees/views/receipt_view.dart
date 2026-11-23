@@ -50,7 +50,7 @@ class ReceiptView extends StatelessWidget {
       if (args['student'] != null)
         (
           'fees.student'.tr,
-          '${args['student']} · ${args['class'] ?? ''} · ${'fees.roll'.trp({'n': '${args['roll'] ?? ''}'.padLeft(2, '0')})}',
+          tidySeparators([args['student'], args['class'], if ('${args['roll'] ?? ''}'.isNotEmpty) 'fees.roll'.trp({'n': '${args['roll']}'.padLeft(2, '0')})].whereType<Object>().join(' · ')),
           false,
         ),
       ('fees.paid_on'.tr, DateFormat('EEE d MMM y, HH:mm').format(receipt.paidOn), false),

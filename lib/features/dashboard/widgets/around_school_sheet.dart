@@ -313,7 +313,7 @@ class _BusTile extends StatelessWidget {
     final bus = glance.bus!;
     final mine = bus.stops.indexWhere((s) => s.isMine);
     final line = mine < 0
-        ? 'school.bus_stops'.trn(bus.stops.length)
+        ? (bus.stops.isEmpty ? 'school.bus_no_stops'.tr : 'school.bus_stops'.trn(bus.stops.length))
         : 'school.bus_line'.trp({'first': bus.stops.first.time, 'stop': bus.stops[mine].name, 'time': bus.stops[mine].time});
     return _Frame(
       onTap: onTap,

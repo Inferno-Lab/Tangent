@@ -149,7 +149,7 @@ class _MineRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          Cover(subject: book.category.toLowerCase(), label: '', width: 38, height: 50),
+          SizedBox(width: 38, child: Book3D(height: 56, radius: 5, colour: AppColors.subject(book.category.toLowerCase()).fill, child: const SizedBox.expand())),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -223,38 +223,37 @@ class _Book extends StatelessWidget {
       ],
       _ => const <Widget>[],
     };
-    const radius = BorderRadius.only(
-      topLeft: Radius.circular(7),
-      bottomLeft: Radius.circular(7),
-      topRight: Radius.circular(10),
-      bottomRight: Radius.circular(10),
-    );
-    final cover = Container(
-      height: 150,
-      decoration: BoxDecoration(
-        color: pigment.fill,
-        borderRadius: radius,
-        boxShadow: [
-          BoxShadow(color: AppColors.light.ink.withValues(alpha: 0.5), blurRadius: 18, spreadRadius: -12, offset: const Offset(0, 10)),
-        ],
-      ),
-      foregroundDecoration: spineDecoration,
-      child: ClipRRect(
-        borderRadius: radius,
+    final cover = Book3D(
+      height: 184,
+      colour: pigment.fill,
+      child: ClipRect(
         child: Stack(
           children: [
             ...shapes,
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 10, 10),
+              padding: const EdgeInsets.fromLTRB(10, 12, 8, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    book.title,
-                    maxLines: 5,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppText.chip(color: pigment.on, height: 1.05),
+                  // A narrow cover breaks a long word mid-way ("Environmen-tal"): the title shrinks until its longest word fits.
+                  LayoutBuilder(
+                    builder: (context, box) {
+                      final style = AppText.chip(color: pigment.on, height: 1.05);
+                      final longest = book.title.split(RegExp(r'\s+')).fold(0.0, (w, word) {
+                        final p = TextPainter(text: TextSpan(text: word, style: style), textDirection: Directionality.of(context), textScaler: MediaQuery.textScalerOf(context))..layout();
+                        final width = p.width;
+                        p.dispose();
+                        return width > w ? width : w;
+                      });
+                      final scale = longest > box.maxWidth ? (box.maxWidth / longest).clamp(.58, 1.0) : 1.0;
+                      return Text(
+                        book.title,
+                        maxLines: 5,
+                        overflow: TextOverflow.ellipsis,
+                        style: style.copyWith(fontSize: (style.fontSize ?? 14) * scale),
+                      );
+                    },
                   ),
                   SizedBox(
                     width: double.infinity,

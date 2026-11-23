@@ -4,4 +4,5 @@ export 'ui/controls.dart';
 export 'ui/cover.dart';
 export 'ui/labels.dart';
 export 'ui/motion.dart';
+export 'ui/subject_motif.dart';
 export 'ui/surfaces.dart';

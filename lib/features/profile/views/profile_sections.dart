@@ -270,7 +270,7 @@ class AccountCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        Center(child: Text('Tangent · ${AppConfig.schoolName} · ${AppConfig.version}', textAlign: TextAlign.center, style: context.type.tiny)),
+        Center(child: Text(tidySeparators('Tangent · ${AppConfig.schoolName} · ${AppConfig.version}'), textAlign: TextAlign.center, style: context.type.tiny)),
       ],
     );
   }

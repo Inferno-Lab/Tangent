@@ -66,6 +66,7 @@ class TeacherHomeView extends GetView<TeacherHomeController> {
                   DayRibbon(
                     periods: periods,
                     subject: t.subject,
+                    colourOf: (p) => classOf[p.id] == null ? c.subjectFor(p.subject) : c.classFor(classOf[p.id]!.id),
                     height: inset.top + 230,
                     label: (p) => classOf[p.id] == null ? subjectName(p.subject) : classLabel(classOf[p.id]!),
                   )
@@ -180,8 +181,8 @@ class _NowLesson extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.app;
-    final pigment = c.subjectFor(subject);
     final cls = period.schoolClass!;
+    final pigment = c.classFor(cls.id);
     final a = minutesOf(period.slot.start);
     final b = minutesOf(period.slot.end);
     final room = period.slot.room.isEmpty ? cls.room : period.slot.room;
@@ -215,7 +216,7 @@ class _NowLesson extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            [classLabel(cls), subjectName(period.slot.subject), if (room.isNotEmpty) 'teacher.room_n'.trp({'room': room})].join(' · '),
+            [classLabel(cls), subjectName(period.slot.subject), if (room.isNotEmpty) roomLabel(room)].join(' · '),
             style: AppText.h3(color: ink),
           ),
           const SizedBox(height: 12),
@@ -302,7 +303,7 @@ class _Body extends StatelessWidget {
         _Task(
           big: '${controller.leave.length}',
           title: controller.leave.length == 1 ? 'teacher.leave_one'.tr : 'teacher.leave_many'.tr,
-          sub: '${controller.names[controller.leave.first.studentId] ?? ''} · ${_range(controller.leave.first)}',
+          sub: tidySeparators('${controller.names[controller.leave.first.studentId] ?? ''} · ${_range(controller.leave.first)}'),
           onTap: () => unawaited(showSheet<void>(_LeaveSheet(controller: controller))),
         ),
     ];
@@ -461,7 +462,7 @@ class _LeaveSheet extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(controller.names[l.studentId] ?? '', style: context.type.t),
-                Text('${l.reason} · ${_range(l)}', style: context.type.cap),
+                Text(tidySeparators('${l.reason} · ${_range(l)}'), style: context.type.cap),
                 if (l.note != null && l.note!.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text('“${l.note}”', style: context.type.s),
@@ -615,7 +616,7 @@ class _ClassCard extends StatelessWidget {
       when = 'teacher.not_today'.tr;
     }
     final taken = controller.taken(cls.id);
-    final pigment = AppColors.subject(subject);
+    final pigment = AppColors.classColour(cls.id);
     final (Color tile, Color tileOn) = mine
         ? (context.app.brand, context.app.onBrand)
         : live != null

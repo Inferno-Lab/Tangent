@@ -382,8 +382,8 @@ class _StopsSheet extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Overline('transport.to'.trp({'stop': stops.isEmpty ? '' : stops.last.name})),
-                      const SizedBox(height: 8),
+                      // A route with no stops yet has nowhere to say it goes.
+                      if (stops.isNotEmpty) ...[Overline('transport.to'.trp({'stop': stops.last.name})), const SizedBox(height: 8)],
                       Text(route.routeName, style: context.type.h3),
                     ],
                   ),
@@ -400,8 +400,7 @@ class _StopsSheet extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Overline('transport.to'.trp({'stop': stops.isEmpty ? '' : stops.last.name})),
-                    const SizedBox(height: 8),
+                    if (stops.isNotEmpty) ...[Overline('transport.to'.trp({'stop': stops.last.name})), const SizedBox(height: 8)],
                     Text.rich(
                       TextSpan(
                         text: '${route.etaMinutes}',
@@ -457,20 +456,24 @@ class _StopsSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          // The driver is named; the call goes to the attendant or the office, never to someone driving.
+          // The driver is named; the call goes to the attendant or the office, never to someone driving. With neither a driver
+          // nor a bus number set yet, only the call is left (no "?" in place of a name).
           Row(
             children: [
-              Avatar(route.driverName.isEmpty ? route.busNumber : route.driverName, background: c.paper2, foreground: c.ink),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(route.driverName.isEmpty ? route.busNumber : route.driverName, style: context.type.t),
-                    Text(route.driverName.isEmpty ? 'transport.bus'.tr : 'transport.driver'.tr, style: context.type.cap),
-                  ],
+              if (route.driverName.isNotEmpty || route.busNumber.isNotEmpty) ...[
+                Avatar(route.driverName.isEmpty ? route.busNumber : route.driverName, background: c.paper2, foreground: c.ink),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(route.driverName.isEmpty ? route.busNumber : route.driverName, style: context.type.t),
+                      Text(route.driverName.isEmpty ? 'transport.bus'.tr : 'transport.driver'.tr, style: context.type.cap),
+                    ],
+                  ),
                 ),
-              ),
+              ] else
+                const Spacer(),
               if (route.call != null)
                 Semantics(
                   label: 'transport.call_driver'.trp({'name': route.call!.name}),
