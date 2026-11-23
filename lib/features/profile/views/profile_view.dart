@@ -226,7 +226,7 @@ class _ChildPicker extends StatelessWidget {
         padding: const EdgeInsets.only(top: 24),
         child: Container(
           height: 60,
-          padding: const EdgeInsets.all(5),
+          padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
             color: c.paper3,
             borderRadius: BorderRadius.circular(AppRadius.pill),

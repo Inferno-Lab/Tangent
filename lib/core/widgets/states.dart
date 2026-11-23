@@ -277,7 +277,7 @@ class _SignalState extends State<_Signal> with SingleTickerProviderStateMixin {
                   builder: (context) {
                     final p = (_c.value + shift) % 1;
                     return Transform.scale(
-                      scale: .55 + .45 * Curves.easeOut.transform(p),
+                      scale: .55 + .45 * kEase.transform(p),
                       child: Container(
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
