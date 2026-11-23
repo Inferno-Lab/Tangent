@@ -149,7 +149,7 @@ class _MineRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          SizedBox(width: 40, child: Book3D(height: 54, radius: 6, child: ColoredBox(color: AppColors.subject(book.category.toLowerCase()).fill))),
+          SizedBox(width: 38, child: Book3D(height: 56, radius: 5, colour: AppColors.subject(book.category.toLowerCase()).fill, child: const SizedBox.expand())),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -223,23 +223,15 @@ class _Book extends StatelessWidget {
       ],
       _ => const <Widget>[],
     };
-    const radius = BorderRadius.only(
-      topLeft: Radius.circular(7),
-      bottomLeft: Radius.circular(7),
-      topRight: Radius.circular(10),
-      bottomRight: Radius.circular(10),
-    );
     final cover = Book3D(
-      height: 156,
-      child: ColoredBox(
-      color: pigment.fill,
-      child: ClipRRect(
-        borderRadius: radius,
+      height: 184,
+      colour: pigment.fill,
+      child: ClipRect(
         child: Stack(
           children: [
             ...shapes,
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 8, 10),
+              padding: const EdgeInsets.fromLTRB(10, 12, 8, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -278,7 +270,6 @@ class _Book extends StatelessWidget {
             ),
           ],
         ),
-      ),
       ),
     );
     return Semantics(

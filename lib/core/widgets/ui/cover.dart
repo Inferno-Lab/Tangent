@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
@@ -166,122 +168,129 @@ String _abbr(String name) {
   return name.length <= 3 ? name.toUpperCase() : name.substring(0, 3).toUpperCase();
 }
 
-/// A cover as a book in the hand: turned a little, its pages showing along the open edge and the foot, the spine
-/// shaded with its hinge, a gloss across the board. [child] is the flat cover; it fills the front board.
+/// A cover as a hardback seen from the front: a rounded spine down the left in the cover's deeper shade, the board, a
+/// thick block of pages under it held in the back board's edge, and a golden ribbon hanging out below. [child] is the
+/// flat cover; it fills the board.
 class Book3D extends StatelessWidget {
-  const Book3D({required this.child, required this.height, this.radius = 10, super.key});
+  const Book3D({required this.child, required this.height, required this.colour, this.radius = 10, super.key});
 
   final Widget child;
   final double height;
+
+  /// The board's colour; the spine and the back board take its deeper shade.
+  final Color colour;
+
+  /// The roundness of the spine's corners (the open side stays almost square, as a board is cut).
   final double radius;
 
   @override
   Widget build(BuildContext context) {
-    // The page block is thinner on a small book, so a 38-wide one in a row still reads as a book, not a box.
-    final depth = (height * .045).clamp(3.0, 7.0);
-    final board = BorderRadius.only(
-      topLeft: Radius.circular(radius * .5),
-      bottomLeft: Radius.circular(radius * .5),
-      topRight: Radius.circular(radius),
-      bottomRight: Radius.circular(radius),
-    );
-    return Transform(
-      alignment: Alignment.center,
-      transform: Matrix4.identity()
-        ..setEntry(3, 2, .0012)
-        ..rotateY(-.14),
-      child: SizedBox(
-        height: height,
-        child: Stack(
-          children: [
-            // The pages, cream in every theme, a line for every few leaves.
-            Positioned(
-              left: depth * 2,
-              top: depth * .7,
-              right: 0,
-              bottom: 0,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: AppColors.light.paper,
-                  borderRadius: BorderRadius.only(topRight: Radius.circular(radius), bottomRight: Radius.circular(radius)),
-                  boxShadow: [BoxShadow(color: AppColors.light.ink.withValues(alpha: .45), blurRadius: 14, spreadRadius: -6, offset: Offset(depth, depth * 1.6))],
-                ),
-                child: CustomPaint(painter: _Leaves(AppColors.light.ink3.withValues(alpha: .35), depth)),
-              ),
-            ),
-            // The front board.
-            Positioned(
-              left: 0,
-              top: 0,
-              right: depth,
-              bottom: depth * .7,
-              child: ClipRRect(
-                borderRadius: board,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    child,
-                    IgnorePointer(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              AppColors.amoled.chalk.withValues(alpha: .34),
-                              AppColors.amoled.chalk.withValues(alpha: .1),
-                              AppColors.white.withValues(alpha: .22),
-                              AppColors.amoled.chalk.withValues(alpha: .08),
-                              AppColors.white.withValues(alpha: 0),
-                              AppColors.white.withValues(alpha: .1),
-                            ],
-                            stops: const [0, .06, .085, .12, .55, 1],
-                          ),
-                        ),
-                      ),
+    final ink = AppColors.light.ink;
+    final deep = Color.lerp(colour, ink, .28)!;
+    final paper = AppColors.light.paper;
+    final gold = Color.lerp(AppColors.late, AppColors.white, .12)!;
+    // The ribbon hangs below the book; the book itself takes the rest of the height.
+    final tail = height * .075;
+    final body = height - tail;
+    final edge = (body * .035).clamp(1.5, 5.0);
+    final pages = (body * .14).clamp(5.0, 22.0);
+    final board = body - pages - edge;
+    const corner = Radius.circular(AppRadius.hair);
+    return LayoutBuilder(
+      builder: (context, box) {
+        final w = box.maxWidth.isFinite ? box.maxWidth : height * .7;
+        final spine = (w * .11).clamp(4.0, 14.0);
+        final round = Radius.circular(math.min(radius * 1.6, spine * 2.2));
+        return SizedBox(
+          width: w,
+          height: height,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // The case: spine and back board in one, rounded down the spine side.
+              Positioned(
+                left: 0,
+                top: 0,
+                right: 0,
+                height: body,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.only(topLeft: round, bottomLeft: round, topRight: corner, bottomRight: corner),
+                    gradient: LinearGradient(
+                      colors: [deep, Color.lerp(deep, AppColors.white, .1)!, deep, deep],
+                      stops: [0, spine / w * .45, spine / w, 1],
                     ),
-                    // Light from the top left catches the board.
-                    IgnorePointer(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [AppColors.white.withValues(alpha: .16), AppColors.white.withValues(alpha: 0), AppColors.amoled.chalk.withValues(alpha: .14)],
-                            stops: const [0, .45, 1],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
+              // The pages: a cream block, its end rounded into the spine, shaded where the board lies on it.
+              Positioned(
+                left: spine * .8,
+                right: 0,
+                top: board,
+                height: pages,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.horizontal(left: Radius.circular(pages / 2)),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color.lerp(paper, ink, .16)!, paper, paper, Color.lerp(paper, ink, .06)!],
+                      stops: const [0, .3, .8, 1],
+                    ),
+                  ),
+                ),
+              ),
+              // The ribbon, from under the board down past the foot, its end cut in a notch.
+              Positioned(
+                left: w * .7,
+                top: board,
+                width: (w * .12).clamp(4.0, 14.0),
+                height: height - board,
+                child: CustomPaint(painter: _Ribbon(gold, Color.lerp(gold, ink, .14)!)),
+              ),
+              // The board, flat against the spine.
+              Positioned(
+                left: spine,
+                top: 0,
+                right: 0,
+                height: board,
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.horizontal(right: corner),
+                  child: ColoredBox(color: colour, child: child),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
 
-/// The lines of a book's leaves along its open edge and its foot.
-class _Leaves extends CustomPainter {
-  _Leaves(this.line, this.depth);
+/// A ribbon marker: a strip with a notch cut in its end, lighter down its middle.
+class _Ribbon extends CustomPainter {
+  _Ribbon(this.fill, this.shade);
 
-  final Color line;
-  final double depth;
+  final Color fill;
+  final Color shade;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final p = Paint()
-      ..color = line
-      ..strokeWidth = .6;
-    for (var x = size.width - depth + 1.5; x < size.width - 1; x += 1.6) {
-      canvas.drawLine(Offset(x, 4), Offset(x, size.height - 2), p);
-    }
-    for (var y = size.height - depth * .7 + 1.2; y < size.height - .8; y += 1.6) {
-      canvas.drawLine(Offset(4, y), Offset(size.width - 2, y), p);
-    }
+    final notch = size.width * .5;
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width, size.height)
+      ..lineTo(size.width / 2, size.height - notch)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(
+      path,
+      Paint()..shader = LinearGradient(colors: [shade, fill, shade]).createShader(Offset.zero & size),
+    );
   }
 
   @override
-  bool shouldRepaint(_Leaves old) => old.line != line || old.depth != depth;
+  bool shouldRepaint(_Ribbon old) => old.fill != fill || old.shade != shade;
 }
