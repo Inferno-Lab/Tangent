@@ -367,6 +367,7 @@ class LeaveApplyView extends GetView<LeaveApplyController> {
                 ? '${'leave.note'.tr} · ${'common.optional'.tr}'
                 : '${'leave.note_for'.trp({'name': controller.teacherName!})} · ${'common.optional'.tr}',
             hint: past ? 'leave.note_hint_past' : 'leave.note_hint',
+            help: 'field.leave_note',
             maxLines: 4,
             minHeight: 76,
             textInputAction: TextInputAction.newline,

@@ -316,13 +316,10 @@ class _Hero extends StatelessWidget {
     final pigment = AppColors.subject(hw.subject);
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: context.reduceMotion ? 1 : .6, end: 1),
-      duration: AppMotion.t4,
-      curve: const Cubic(.2, .8, .2, 1),
-      builder: (context, t, child) => Transform(
-        alignment: Alignment.topCenter,
-        transform: Matrix4.diagonal3Values(1, t, 1),
-        child: child,
-      ),
+      duration: AppMotion.t3,
+      curve: kEase,
+      // Revealed from the top, never scaled: scaling squashed the title and the due line while it opened.
+      builder: (context, t, child) => ClipRect(child: Align(alignment: Alignment.topCenter, heightFactor: t, child: child)),
       child: Container(
         height: height,
         padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),

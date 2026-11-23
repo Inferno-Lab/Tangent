@@ -229,7 +229,7 @@ class TeacherMeetingsView extends GetView<TeacherMeetingsController> {
           children: [
             Text('meetings.link_for'.trp({'name': s.studentName ?? ''}), style: context.type.h2),
             const SizedBox(height: 12),
-            Field(controller: ctl, label: 'meetings.link'.tr, hint: 'https://', keyboard: TextInputType.url, maxLength: 500, validator: Validators.link),
+            Field(controller: ctl, label: 'meetings.link'.tr, hint: 'https://', help: 'field.meeting_link', keyboard: TextInputType.url, maxLength: 500, validator: Validators.link),
           ],
         ),
       ),

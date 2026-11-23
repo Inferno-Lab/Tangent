@@ -94,7 +94,7 @@ class _PrivacySheetState extends State<PrivacySheet> {
           children: [
             Text('privacy.ask_$kind'.tr, style: context.type.h2),
             const SizedBox(height: 12),
-            Field(controller: note, label: 'privacy.what_you_need'.tr, maxLines: 4, maxLength: 400, validator: Validators.text(min: 3, max: 400)),
+            Field(controller: note, label: 'privacy.what_you_need'.tr, help: 'field.privacy_need', keyboard: TextInputType.multiline, maxLines: 4, maxLength: 400, validator: Validators.text(min: 3, max: 400)),
           ],
         ),
       ),

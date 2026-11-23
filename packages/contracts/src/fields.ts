@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { ListItem, listKey } from './lists.js';
 import { isLanguage, tx } from './i18n.js';
+import { schoolCountry } from './locale.js';
+import { phoneProblem } from './phones.js';
 
 /**
  * The school's own fields on its records (docs/one-shot-plan.md §3.6.3): a school that keeps a passport number, a bus pass or
@@ -91,9 +93,13 @@ export function checkCustom(defs: readonly FieldDef[], input: Record<string, unk
       case 'email':
         if (EMAIL.test(text)) values[f.key] = text.toLowerCase(); else errors[f.key] = tx('Check the email.');
         break;
-      case 'phone':
-        if (/^\+?[\d\s()-]{6,20}$/.test(text)) values[f.key] = text; else errors[f.key] = tx('Check the phone number.');
+      case 'phone': {
+        // The school's country decides what a local number looks like (its length, its trunk 0), as everywhere else.
+        const country = schoolCountry();
+        const problem = country ? phoneProblem(text, country) : /^\+?[\d\s()-]{6,20}$/.test(text) ? null : tx('Check the phone number.');
+        if (problem) errors[f.key] = tx(problem); else values[f.key] = text;
         break;
+      }
       default:
         // An ID's format is checked without the spaces and dashes people type between groups of digits.
         if (f.pattern && !new RegExp(f.pattern).test(text.replace(/[\s-]/g, '').toUpperCase())) errors[f.key] = f.patternHint || tx('This does not look right.');

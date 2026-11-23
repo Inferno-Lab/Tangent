@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:tangent/core/theme/tokens.dart';
 import 'package:tangent/core/utils/extensions.dart';
 
-/// Fade-and-rise entrance with a 35ms stagger (first five items), skipped under Reduce motion.
+/// Fade-and-rise entrance with a 35ms stagger (first five items); under Reduce motion, the fade alone.
 class Rise extends StatefulWidget {
   const Rise({required this.child, this.index = 0, super.key});
 
@@ -45,7 +45,8 @@ class _RiseState extends State<Rise> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    if (context.reduceMotion) return widget.child;
+    // Reduce motion: the fade stays (a change is still followable), the movement goes.
+    if (context.reduceMotion) return FadeTransition(opacity: _a, child: widget.child);
     // Transitions, not an Opacity rebuilt every frame: the fade is a layer property and the child is never rebuilt.
     return FadeTransition(
       opacity: _a,

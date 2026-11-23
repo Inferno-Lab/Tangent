@@ -169,6 +169,32 @@ class _BtnState extends State<Btn> {
   }
 }
 
+/// The space between the parts of a form (fields, choices, a day), and under its title.
+const kFormGap = 16.0;
+
+/// One labelled part of a form that is not a text field (a choice of chips, a segmented choice): its label over it, as a
+/// Field's label, so every part of a form reads the same.
+class FormGroup extends StatelessWidget {
+  const FormGroup(this.label, {required this.child, super.key});
+
+  /// A translation key.
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Padding(
+        padding: const EdgeInsetsDirectional.only(start: 4, bottom: 8),
+        child: Text(label.tr, style: AppText.capB(color: context.app.ink2, height: 1.2)),
+      ),
+      child,
+    ],
+  );
+}
+
 /// Text field in the paper style: label above, ring, focus ring in ink.
 class Field extends StatefulWidget {
   const Field({
@@ -190,11 +216,15 @@ class Field extends StatefulWidget {
     this.fill,
     this.borderless = false,
     this.maxLength,
+    this.help,
     super.key,
   });
 
   /// The most characters it takes (typing stops there): every free-text field has a bound.
   final int? maxLength;
+
+  /// A line under the box saying what to write, and in what shape (a translation key); its message replaces it when wrong.
+  final String? help;
 
   final TextEditingController? controller;
   final String? label;
@@ -300,6 +330,7 @@ class _FieldState extends State<Field> with WidgetsBindingObserver {
               ),
             AnimatedContainer(
               duration: AppMotion.t2,
+              curve: kEase,
               constraints: BoxConstraints(minHeight: widget.minHeight),
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
@@ -326,6 +357,14 @@ class _FieldState extends State<Field> with WidgetsBindingObserver {
                       focusNode: _focus,
                       obscureText: widget.obscure,
                       keyboardType: widget.keyboard,
+                      // A name starts each word in capitals, a message each sentence; addresses, numbers and codes none.
+                      textCapitalization: widget.obscure
+                          ? TextCapitalization.none
+                          : widget.keyboard == TextInputType.name
+                          ? TextCapitalization.words
+                          : widget.keyboard == null || widget.keyboard == TextInputType.text || widget.keyboard == TextInputType.multiline
+                          ? TextCapitalization.sentences
+                          : TextCapitalization.none,
                       maxLines: widget.maxLines,
                       minLines: 1,
                       textInputAction: widget.textInputAction,
@@ -352,6 +391,11 @@ class _FieldState extends State<Field> with WidgetsBindingObserver {
                 ],
               ),
             ),
+            if (error == null && widget.help != null)
+              Padding(
+                padding: const EdgeInsetsDirectional.only(top: 8, start: 4),
+                child: Text(widget.help!.tr, style: AppText.cap(color: c.ink3)),
+              ),
             if (error != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8, left: 4),

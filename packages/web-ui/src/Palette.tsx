@@ -74,7 +74,7 @@ export function SearchDialog(props: PaletteProps) {
   useReturnFocus(leaving);
   return (
     <>
-      <div className="scrim" onClick={leaving ? undefined : props.onClose} {...leavingProps(leaving)}></div>
+      <div className="scrim now" onClick={leaving ? undefined : props.onClose} {...leavingProps(leaving)}></div>
       <div className="mod top" {...leavingProps(leaving)}>
         <div style={{ width: 'min(560px, 100%)' }}><Palette {...props} /></div>
       </div>

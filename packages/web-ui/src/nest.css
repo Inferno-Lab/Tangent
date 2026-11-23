@@ -183,17 +183,18 @@ html:has(.nest .scrim){overflow:hidden}
 .nest .mod{position:fixed;inset:0;z-index:51;display:grid;grid-template:minmax(0,1fr)/minmax(0,1fr);place-items:center;padding:16px;pointer-events:none}
 .nest .mod.top{place-items:start center;padding-top:18vh}
 .nest .mod>*{pointer-events:auto;animation:nIn var(--t3) var(--e) both}
-.nest .mod.top>*{transform-origin:top center}
+/* The search box opens from Ctrl+K many times a day: at once, with no entrance, and gone the moment it closes. */
+.nest .mod.top>*,.nest .scrim.now{animation:none}
+.nest :is(.mod.top,.scrim.now)[data-leaving]{visibility:hidden}
 .nest .mod[data-leaving]>*{pointer-events:none;animation:nOut var(--t2) var(--ei) forwards}
 .nest .dlg{width:460px;max-width:calc(100% - 32px);background:var(--s1);border-radius:28px;box-shadow:var(--sh3);padding:32px;border:1px solid var(--line)}
 .nest .dlg.dk{background:var(--deep);color:var(--on-deep);border-color:color-mix(in srgb,var(--on-deep) 10%,transparent)}
 .nest .dlg h3{margin:12px 0 6px;font:700 22px/1.15 var(--fd);letter-spacing:-.025em}
 .nest .dlg p{margin:0 0 20px;font:500 15px/1.55 var(--fb);color:var(--ink2)}
 .nest .dlg.dk p{color:color-mix(in srgb,var(--on-deep) 72%,transparent)}
-.nest .toast{display:flex;align-items:center;gap:12px;padding-block:16px 16px;padding-inline:20px 16px;border-radius:24px;background:var(--deep);color:var(--on-deep);box-shadow:var(--sh3);font:600 14px var(--fb);animation:nToast var(--t3) var(--e) both}
-@keyframes nToast{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
-.nest .toast[data-leaving]{animation:nToastO var(--t2) var(--ei) forwards}
-@keyframes nToastO{to{opacity:0;transform:translateY(10px)}}
+.nest .toast{display:flex;align-items:center;gap:12px;padding-block:16px 16px;padding-inline:20px 16px;border-radius:24px;background:var(--deep);color:var(--on-deep);box-shadow:var(--sh3);font:600 14px var(--fb);transition:opacity var(--t3) var(--e),transform var(--t3) var(--e)}
+@starting-style{.nest .toast{opacity:0;transform:translateY(16px)}}
+.nest .toast[data-leaving]{opacity:0;transform:translateY(10px);transition-duration:var(--t2)}
 /* One place for every toast: the bottom middle of the window, centred with margins so the animation's transform cannot move it. */
 .nest .toasts{position:fixed;inset-inline-start:0;inset-inline-end:0;bottom:calc(28px + env(safe-area-inset-bottom));z-index:80;display:flex;justify-content:center;pointer-events:none;padding:0 16px}
 .nest .toasts>.toast{pointer-events:auto;max-width:100%}
@@ -216,9 +217,10 @@ html:has(.nest .scrim){overflow:hidden}
 .nest .skc::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 20%,color-mix(in srgb,var(--s1) 80%,transparent) 50%,transparent 80%);transform:translateX(calc(-100% * var(--dir,1)));animation:nSh 1.4s infinite}
 @keyframes nSh{to{transform:translateX(calc(100% * var(--dir,1)))}}
 /* reduce motion */
-.theme-swap .nest *,.theme-swap .nest *::before,.theme-swap .nest *::after,.nest.rm *,.nest.rm *::before,.nest.rm *::after{animation-duration:1ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition:none!important}
+.theme-swap .nest *,.theme-swap .nest *::before,.theme-swap .nest *::after{animation-duration:1ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition:none!important}
 /* transition:none, not a 1 ms duration: a duration on its own turns on `transition: all` for every element. */
-@media (prefers-reduced-motion:reduce){.nest *,.nest *::before,.nest *::after{animation-duration:1ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition:none!important}}
+@media (prefers-reduced-motion:reduce){.nest *,.nest *::before,.nest *::after{transition-property:opacity,color,background-color,border-color,box-shadow,fill,stroke!important}.nest :is(.rise,.hb>.g>*,.hb>section,.hb>.card,.es,.es-host,.en,.mod>*,.drw,.sheet,.sxp,.popm,.pvr,.emsg,.unsaved,.ll,.bt,.fc,.det,.call,.il>*){animation-name:nFade!important;animation-delay:0s!important}.nest :is(.mod>*,.drw,.sheet,.sxp,.popm,.pvr)[data-leaving]{animation-name:nFadeO!important}.nest :is(.float,.en .eni,.skc,.orb,.tst,.shake,.bar>i,.hb .bar>i,.mp i,.pr b,.tk i){animation:none!important}.nest .skc::after{animation:none!important}.nest :is(.toast,.toast[data-leaving]){transform:none!important}}
+.nest.rm *,.nest.rm *::before,.nest.rm *::after{transition-property:opacity,color,background-color,border-color,box-shadow,fill,stroke!important}.nest.rm :is(.rise,.hb>.g>*,.hb>section,.hb>.card,.es,.es-host,.en,.mod>*,.drw,.sheet,.sxp,.popm,.pvr,.emsg,.unsaved,.ll,.bt,.fc,.det,.call,.il>*){animation-name:nFade!important;animation-delay:0s!important}.nest.rm :is(.mod>*,.drw,.sheet,.sxp,.popm,.pvr)[data-leaving]{animation-name:nFadeO!important}.nest.rm :is(.float,.en .eni,.skc,.orb,.tst,.shake,.bar>i,.hb .bar>i,.mp i,.pr b,.tk i){animation:none!important}.nest.rm .skc::after{animation:none!important}.nest.rm :is(.toast,.toast[data-leaving]){transform:none!important}
 /* Icons (Tangent Hue's set, packages/web-ui/src/Icon.tsx). */
 .nest .ic{flex:none;display:block}
 .nest .itile{width:56px;height:56px;border-radius:16px;background:var(--brand-soft);color:var(--brand-ink);display:grid;place-items:center;flex:none}

@@ -59,9 +59,6 @@
  "ui.login.view.welcome": "Welcome",
  "ui.login.view.you_re_in": "You’re in,",
  "ui.login.view.your_password": "Your password",
- "ui.menu.bottom": "bottom {x}",
- "ui.menu.left_bottom": "left bottom",
- "ui.menu.top": "top {x}",
  "ui.more.more": "more",
  "ui.more.not_shown": "not shown",
  "ui.more.show": "Show",
@@ -385,5 +382,6 @@
  "ui.unsaved.leave_body": "What you changed on this page is not saved yet. Leave and it is lost.",
  "ui.unsaved.stay": "Stay",
  "ui.unsaved.leave": "Leave",
- "ui.skeleton.loading": "Loading"
+ "ui.skeleton.loading": "Loading",
+ "ui.custom_fields.not_right": "This does not look right. Check it and try again."
 }

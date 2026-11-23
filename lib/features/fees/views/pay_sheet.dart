@@ -111,6 +111,7 @@ class _PaySheetState extends State<PaySheet> {
                   scale: .985,
                   child: AnimatedContainer(
                     duration: AppMotion.t2,
+                    curve: kEase,
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       color: _method == m.$1 ? c.paper2 : Colors.transparent,
@@ -255,7 +256,8 @@ class _SlideToPay extends StatelessWidget {
             onHorizontalDragUpdate: paid || busy ? null : (d) => onMove((x + d.delta.dx).clamp(0, max)),
             onHorizontalDragEnd: paid || busy ? null : (d) => onEnd(max, d.primaryVelocity ?? 0),
             child: AnimatedContainer(
-            duration: AppMotion.t4,
+            duration: AppMotion.t3,
+            curve: kEase,
             height: 64,
             decoration: BoxDecoration(
               color: paid ? AppColors.ok : AppColors.light.ink,

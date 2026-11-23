@@ -20,7 +20,7 @@ import 'package:tangent/data/models/campus.dart';
 import 'package:tangent/data/models/student.dart';
 import 'package:tangent/features/dashboard/views/dashboard_view.dart' show todayLine;
 import 'package:tangent/features/dashboard/widgets/around_school_sheet.dart';
-import 'package:tangent/features/dashboard/widgets/parent_home.dart' show HomeHeading;
+import 'package:tangent/features/dashboard/widgets/parent_home.dart' show HomeHeading, QuickTiles;
 import 'package:tangent/features/teacher_tools/widgets/day_ribbon.dart';
 import 'package:tangent/features/dashboard/widgets/home_cards.dart' show SchoolLinks;
 import 'package:tangent/features/shell/shell_controller.dart';
@@ -53,7 +53,10 @@ class TeacherHomeView extends GetView<TeacherHomeController> {
       // then the greeting, the lesson on now, the check-in, the quick buttons and what needs the teacher.
       return Scaffold(
         backgroundColor: c.chalk,
-        body: ListView(
+        body: PullToRefresh(
+          onRefresh: controller.load,
+          top: inset.top + 14,
+          child: ListView(
           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           padding: EdgeInsets.only(bottom: kDockClearance + inset.bottom),
           children: [
@@ -72,12 +75,15 @@ class TeacherHomeView extends GetView<TeacherHomeController> {
                   start: 16,
                   end: 16,
                   top: inset.top + 8,
+                  // The capsule takes what the buttons leave, so Search stays beside the bell before the teacher has loaded too.
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      if (t != null)
-                        Flexible(
-                          child: Pressable(
+                      Expanded(
+                        child: t == null
+                            ? const SizedBox.shrink()
+                            : Align(
+                                alignment: AlignmentDirectional.centerStart,
+                                child: Pressable(
                             onTap: () => ShellController.showTab('profile'),
                             label: t.name,
                             child: Container(
@@ -115,8 +121,15 @@ class TeacherHomeView extends GetView<TeacherHomeController> {
                               ),
                             ),
                           ),
-                        ),
+                              ),
+                      ),
                       const SizedBox(width: 12),
+                      GlassIconButton(
+                        icon: PhosphorIconsRegular.magnifyingGlass,
+                        label: 'common.search'.tr,
+                        onTap: () => Get.toNamed<void>(AppRoutes.search),
+                      ),
+                      const SizedBox(width: 10),
                       GlassIconButton(
                         icon: PhosphorIconsRegular.bell,
                         label: 'menu.notifications'.tr,
@@ -149,6 +162,7 @@ class TeacherHomeView extends GetView<TeacherHomeController> {
               ),
             ),
           ],
+          ),
         ),
       );
     });
@@ -251,49 +265,6 @@ class _Pill extends StatelessWidget {
 }
 
 /// The quick buttons as one row of pills that scrolls sideways, "More" last (it opens Around school).
-class _QuickPills extends StatelessWidget {
-  const _QuickPills({required this.items});
-
-  final List<(IconData, String, VoidCallback?)> items;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.app;
-    return SizedBox(
-      height: 44,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        clipBehavior: Clip.none,
-        physics: const BouncingScrollPhysics(),
-        itemCount: items.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          final (icon, key, onTap) = items[i];
-          return Pressable(
-            onTap: onTap,
-            label: key.tr,
-            child: Opacity(
-              opacity: onTap == null ? .5 : 1,
-              child: Container(
-                padding: const EdgeInsetsDirectional.only(start: 12, end: 16),
-                decoration: BoxDecoration(color: c.paper, borderRadius: BorderRadius.circular(AppRadius.pill), border: Border.all(color: c.line2)),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(icon, size: 18, color: c.mariText),
-                    const SizedBox(width: 8),
-                    Text(key.tr, style: AppText.ts(color: c.ink, height: 1)),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
 class _Body extends StatelessWidget {
   const _Body({required this.controller, required this.teacher});
 
@@ -356,21 +327,21 @@ class _Body extends StatelessWidget {
           index: 2,
           child: Obx(() {
             final cls = controller.own ?? focus;
-            final buttons = <String, (IconData, String, VoidCallback?)>{
-              'markAttendance': (PhosphorIconsBold.check, 'teacher.qa_attendance', cls == null ? null : () => Get.toNamed<void>(_attendanceRoute(cls.id))),
-              'assignHomework': (PhosphorIconsRegular.fileText, 'teacher.qa_assign', () => Get.toNamed<void>(AppRoutes.teacherAssign, arguments: {'classId': focus?.id})),
-              'grade': (PhosphorIconsRegular.pencilSimple, 'teacher.qa_grade', () => Get.toNamed<void>(AppRoutes.teacherGrade)),
-              'enterMarks': (PhosphorIconsRegular.exam, 'teacher.qa_marks', cls == null ? null : () => Get.toNamed<void>(_marksRoute(cls.id))),
-              'postNotice': (PhosphorIconsRegular.megaphone, 'teacher.qa_notice', () => Get.toNamed<void>(AppRoutes.teacherNotice)),
-              'staffLeave': (PhosphorIconsRegular.calendarPlus, 'teacher.qa_leave', () => Get.toNamed<void>(AppRoutes.staffMe)),
-              'writeDiary': (PhosphorIconsRegular.notebook, 'teacher.qa_diary', () => Get.toNamed<void>(AppRoutes.teacherDiary)),
-              'mySlots': (PhosphorIconsRegular.calendarDots, 'teacher.qa_slots', () => Get.toNamed<void>(AppRoutes.teacherMeetings)),
-              'inviteVisitor': (PhosphorIconsRegular.userPlus, 'teacher.qa_visitor', () => Get.toNamed<void>(AppRoutes.inviteVisitor)),
+            final buttons = <String, (IconData, String, VoidCallback?, String)>{
+              'markAttendance': (PhosphorIconsBold.check, 'teacher.qa_attendance', cls == null ? null : () => Get.toNamed<void>(_attendanceRoute(cls.id)), 'green'),
+              'assignHomework': (PhosphorIconsRegular.fileText, 'teacher.qa_assign', () => Get.toNamed<void>(AppRoutes.teacherAssign, arguments: {'classId': focus?.id}), 'blue'),
+              'grade': (PhosphorIconsRegular.pencilSimple, 'teacher.qa_grade', () => Get.toNamed<void>(AppRoutes.teacherGrade), 'violet'),
+              'enterMarks': (PhosphorIconsRegular.exam, 'teacher.qa_marks', cls == null ? null : () => Get.toNamed<void>(_marksRoute(cls.id)), 'indigo'),
+              'postNotice': (PhosphorIconsRegular.megaphone, 'teacher.qa_notice', () => Get.toNamed<void>(AppRoutes.teacherNotice), 'orange'),
+              'staffLeave': (PhosphorIconsRegular.calendarPlus, 'teacher.qa_leave', () => Get.toNamed<void>(AppRoutes.staffMe), 'teal'),
+              'writeDiary': (PhosphorIconsRegular.notebook, 'teacher.qa_diary', () => Get.toNamed<void>(AppRoutes.teacherDiary), 'amber'),
+              'mySlots': (PhosphorIconsRegular.calendarDots, 'teacher.qa_slots', () => Get.toNamed<void>(AppRoutes.teacherMeetings), 'cyan'),
+              'inviteVisitor': (PhosphorIconsRegular.userPlus, 'teacher.qa_visitor', () => Get.toNamed<void>(AppRoutes.inviteVisitor), 'pink'),
             };
-            return _QuickPills(
+            return QuickTiles(
               items: [
                 for (final k in SchoolConfig.quick) ?buttons[k],
-                if (AroundSchoolSheet.hasAny()) (PhosphorIconsRegular.squaresFour, 'teacher.more_school', () => unawaited(openAroundSchool())),
+                if (AroundSchoolSheet.hasAny()) (PhosphorIconsRegular.squaresFour, 'teacher.more_school', () => unawaited(openAroundSchool()), 'brand'),
               ],
             );
           }),

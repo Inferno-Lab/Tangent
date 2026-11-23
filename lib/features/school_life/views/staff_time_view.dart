@@ -224,24 +224,24 @@ class _LeaveSheetState extends State<_LeaveSheet> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text('staff.ask_for_leave'.tr, style: context.type.h2),
-          const SizedBox(height: 12),
-          Wrap(
+          const SizedBox(height: kFormGap),
+          FormGroup('staff.leave_kind', child: Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [for (final t in widget.day.types) Chip2(t.name, on: t.key == _type.key, onTap: () => setState(() => _type = t))],
-          ),
+          )),
           if (halves) ...[
-            const SizedBox(height: 12),
-            GlassSegmented(labels: const ['staff.whole_days', 'staff.morning', 'staff.afternoon'], index: _half, semanticLabel: 'staff.how_long'.tr, onChanged: (i) => setState(() => _half = i)),
+            const SizedBox(height: kFormGap),
+            FormGroup('staff.how_long', child: GlassSegmented(labels: const ['staff.whole_days', 'staff.morning', 'staff.afternoon'], index: _half, flat: true, semanticLabel: 'staff.how_long'.tr, onChanged: (i) => setState(() => _half = i))),
           ],
-          const SizedBox(height: 12),
+          const SizedBox(height: kFormGap),
           _date('staff.from', _from, (d) {
             _from = d;
             if (_to.isBefore(d)) _to = d;
           }),
           if (!halves || _half == 0) ...[const SizedBox(height: 8), _date('staff.to', _to, (d) => _to = d, first: _from)],
-          const SizedBox(height: 12),
-          Field(controller: _reason, label: 'staff.reason_optional'.tr, maxLines: 2, maxLength: 500, validator: Validators.text(max: 500, optional: true)),
+          const SizedBox(height: kFormGap),
+          Field(controller: _reason, label: 'staff.reason_optional'.tr, help: 'field.staff_reason', maxLines: 2, maxLength: 500, validator: Validators.text(max: 500, optional: true)),
         ],
       ),
     );

@@ -36,3 +36,15 @@ export function clearBusy(mutation: unknown): void {
   working.get(mutation)?.removeAttribute('aria-busy');
   working.delete(mutation);
 }
+
+/** A change worked (MutationCache onSuccess): the row or card its button sits in flashes as it settles (blocks.css). */
+export function markDone(mutation: unknown): void {
+  const where = working.get(mutation)?.closest<HTMLElement>('.rw,.exr,[role="row"],article,.tile,.card');
+  if (!where) return;
+  where.removeAttribute('data-done');
+  // A frame apart, so a second save on the same row flashes again.
+  requestAnimationFrame(() => {
+    where.setAttribute('data-done', '');
+    where.addEventListener('animationend', () => where.removeAttribute('data-done'), { once: true });
+  });
+}

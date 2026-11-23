@@ -713,7 +713,20 @@ class _Typing extends StatefulWidget {
 }
 
 class _TypingState extends State<_Typing> with SingleTickerProviderStateMixin {
-  late final _c = AnimationController(vsync: this, duration: const Duration(seconds: 1))..repeat();
+  late final _c = AnimationController(vsync: this, duration: AppMotion.loopFast);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Still under Reduce motion, as every loop: the three dots and the words "typing" still say it.
+    if (context.reduceMotion) {
+      _c
+        ..stop()
+        ..value = .5;
+    } else if (!_c.isAnimating) {
+      _c.repeat();
+    }
+  }
 
   @override
   void dispose() {

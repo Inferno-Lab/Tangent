@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:tangent/core/services/language_packs.dart';
 import 'package:tangent/core/services/storage_service.dart';
 import 'package:tangent/core/services/theme_service.dart';
+import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/utils/schedule.dart';
 import 'package:tangent/core/widgets/toast.dart';
 import 'package:tangent/data/datasources/remote_datasource.dart';
@@ -241,6 +242,8 @@ abstract final class SchoolConfig {
 
   static Future<void> _apply(Map<String, dynamic> json) async {
     _json = json;
+    final names = json['subjects'];
+    AppColors.setSchoolSubjects(names is Map ? {for (final e in names.entries) '${e.key}': '${e.value}'} : const {});
     _settings = Map<String, dynamic>.from((json['settings'] as Map?) ?? const {});
     modules.assignAll(List<String>.from((json['modules'] as List?) ?? const []));
     features.assignAll(List<String>.from((json['features'] as List?) ?? const []));

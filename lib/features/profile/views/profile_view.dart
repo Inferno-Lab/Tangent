@@ -221,50 +221,67 @@ class _ChildPicker extends StatelessWidget {
       if (kids.length < 2) return const SizedBox.shrink();
       final c = context.app;
       final family = [for (final k in kids) k.student.name];
+      // The children as tabs on a sunken track, as the app's segmented choices in a sheet: the chosen one raised on paper.
       return Padding(
         padding: const EdgeInsets.only(top: 24),
         child: Container(
-          height: 56,
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(color: c.paper3, borderRadius: BorderRadius.circular(AppRadius.pill)),
-          child: Row(
-            children: [
-              for (final (i, k) in kids.indexed) ...[
-                if (i > 0) const SizedBox(width: 4),
-                Expanded(
-                  child: Pressable(
-                    onTap: k.student.id == active ? null : () => unawaited(auth.switchChild(k.student.id)),
-                    label: k.student.name,
-                    child: AnimatedContainer(
-                      duration: AppMotion.t2,
-                      curve: kEase,
-                      decoration: BoxDecoration(
-                        color: k.student.id == active ? c.paper : c.paper3,
-                        borderRadius: BorderRadius.circular(AppRadius.pill),
-                        boxShadow: k.student.id == active ? [BoxShadow(color: c.ink.withValues(alpha: .12), blurRadius: 8, offset: const Offset(0, 2))] : null,
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Avatar(k.student.name, size: 28, initials: Avatar.siblingInitials(k.student.name, family), background: childColour(k.student.name, family), foreground: AppColors.white),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              k.student.name.split(' ').first,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppText.ts(color: k.student.id == active ? c.ink : c.ink3, height: 1),
-                            ),
+          height: 60,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: c.paper3,
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            border: Border.all(color: c.line),
+          ),
+          child: LayoutBuilder(
+            builder: (context, box) {
+              // The class only where a tab has room for it beside the name (two children on a phone; not four).
+              final roomy = (box.maxWidth - 4 * (kids.length - 1)) / kids.length >= 150;
+              return Row(
+                children: [
+                  for (final (i, k) in kids.indexed) ...[
+                    if (i > 0) const SizedBox(width: 4),
+                    Expanded(
+                      child: Pressable(
+                        onTap: k.student.id == active ? null : () => unawaited(auth.switchChild(k.student.id)),
+                        label: k.student.name,
+                        child: AnimatedContainer(
+                          duration: AppMotion.t2,
+                          curve: kEase,
+                          padding: const EdgeInsetsDirectional.only(start: 6, end: 12),
+                          decoration: BoxDecoration(
+                            color: k.student.id == active ? c.paper : Colors.transparent,
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                            border: Border.all(color: k.student.id == active ? c.line2 : Colors.transparent),
+                            boxShadow: k.student.id == active ? [BoxShadow(color: c.shadow, blurRadius: 10, offset: const Offset(0, 2))] : null,
                           ),
-                          const SizedBox(width: 6),
-                          Text(k.schoolClass.label, maxLines: 1, style: AppText.cap(color: c.ink3, height: 1)),
-                        ],
+                          child: Row(
+                            children: [
+                              Avatar(k.student.name, size: 36, initials: Avatar.siblingInitials(k.student.name, family), background: childColour(k.student.name, family), foreground: AppColors.white),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      k.student.name.split(' ').first,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppText.ts(color: k.student.id == active ? c.ink : c.ink2, height: 1.15),
+                                    ),
+                                    if (roomy) Text(k.schoolClass.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.tiny(color: c.ink3, height: 1.2)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              ],
-            ],
+                  ],
+                ],
+              );
+            },
           ),
         ),
       );

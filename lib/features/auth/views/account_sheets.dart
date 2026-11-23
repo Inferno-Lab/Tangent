@@ -88,30 +88,32 @@ class _ContactSheetState extends State<_ContactSheet> {
         Text('account.phone_email'.tr, style: context.type.h2),
         const SizedBox(height: 6),
         Text(_challenge == null ? 'account.phone_email_body'.tr : 'auth.code_sent_to'.trp({'to': _sentTo}), style: context.type.s),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         if (_challenge == null) ...[
           GlassSegmented(
             labels: const ['account.new_phone', 'account.new_email'],
             index: _email ? 1 : 0,
+            flat: true,
             semanticLabel: 'account.phone_email'.tr,
             onChanged: (i) => setState(() {
               _email = i == 1;
               _value.clear();
             }),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 20),
           Field(
             controller: _value,
             label: (_email ? 'account.new_email' : 'account.new_phone').tr,
             icon: _email ? PhosphorIconsRegular.at : PhosphorIconsRegular.phone,
             keyboard: _email ? TextInputType.emailAddress : TextInputType.phone,
+            help: _email ? 'field.email' : 'field.phone',
             maxLength: _email ? 254 : 24,
             // The key changes with the kind, so switching clears the other kind's message.
             key: ValueKey(_email),
             validator: _email ? Validators.email : Validators.phone,
           ),
         ] else
-          Field(controller: _code, label: 'auth.code'.tr, icon: PhosphorIconsRegular.hash, keyboard: TextInputType.number, maxLength: 6, validator: Validators.otp),
+          Field(controller: _code, label: 'auth.code'.tr, icon: PhosphorIconsRegular.hash, keyboard: TextInputType.number, maxLength: 6, help: 'field.code', validator: Validators.otp),
       ],
     ),
   );

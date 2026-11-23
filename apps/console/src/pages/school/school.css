@@ -19,9 +19,9 @@
 .pg-school .stp:last-child::before{display:none}
 .pg-school .stp.done::before{background:var(--brand)}
 .pg-school .dot{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;border:2px solid var(--line2);background:var(--s1);position:relative;z-index:1;font:700 13px var(--fb);color:var(--ink3);transition:background var(--t3),border-color var(--t3)}
-.pg-school .stp.done .dot{background:var(--brand);border-color:var(--brand);color:var(--on-brand);animation:nPop var(--t3) var(--e)}
+.pg-school .stp.done .dot{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
 .pg-school .stp.run .dot{border-color:var(--brand);border-top-color:transparent;animation:nSpin .8s linear infinite;color:transparent}
-.pg-school .stp.fail .dot{background:var(--bad);border-color:var(--bad);color:var(--on-bad);animation:nPop var(--t3) var(--e)}
+.pg-school .stp.fail .dot{background:var(--bad);border-color:var(--bad);color:var(--on-bad)}
 .pg-school .stp b{display:block;font:700 15px var(--fb)}
 .pg-school .stp small{display:block;font:500 13px/1.4 var(--fb);color:var(--ink3);margin-top:2px}
 .pg-school .stp.fail small{color:var(--bad);font-weight:700}

@@ -47,8 +47,6 @@
  "ui.login.view.welcome": "Bienvenue",
  "ui.login.view.you_re_in": "Vous êtes connecté,",
  "ui.login.view.your_password": "Votre mot de passe",
- "ui.menu.bottom": "derniers {x}",
- "ui.menu.left_bottom": "en bas à gauche",
  "ui.more.more": "plus",
  "ui.more.not_shown": "non affiché",
  "ui.more.show": "Afficher",

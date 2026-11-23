@@ -178,6 +178,8 @@ class ClosedNotebooks extends StatelessWidget {
   }
 }
 
+/// What a screen shows when it could not load: in the middle of the space it has, a drawing that says why (the school's
+/// server out of reach, the phone offline, or something else), what happened, and a way to try again.
 class ErrorState extends StatelessWidget {
   const ErrorState({required this.onRetry, this.messageKey, super.key});
 
@@ -186,19 +188,115 @@ class ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Overline('errors.title'.tr, color: context.app.badText),
-          const SizedBox(height: 10),
-          Text('errors.didnt_load'.tr, style: context.type.h2),
-          const SizedBox(height: 8),
-          Text((messageKey ?? 'errors.generic').tr, style: context.type.b.copyWith(color: context.app.ink2)),
-          const SizedBox(height: 16),
-          Btn('common.retry', kind: BtnKind.ink, icon: PhosphorIconsRegular.arrowClockwise, onPressed: onRetry),
-        ],
+    final c = context.app;
+    final key = messageKey ?? 'errors.generic';
+    final offline = Get.isRegistered<ConnectivityService>() && !Get.find<ConnectivityService>().isOnline.value;
+    final unreachable = key == 'errors.network';
+    final (icon, title) = offline
+        ? (PhosphorIconsRegular.wifiSlash, 'errors.offline_title')
+        : unreachable
+        ? (PhosphorIconsRegular.cloudSlash, 'errors.unreachable_title')
+        : (PhosphorIconsRegular.warningCircle, 'errors.didnt_load');
+    // As tall as most of a phone's page, so it sits in the middle of the screen however little is above it.
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: MediaQuery.sizeOf(context).height * .55),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Rise(child: _Signal(icon: icon)),
+              const SizedBox(height: 20),
+              Rise(index: 1, child: Text(title.tr, textAlign: TextAlign.center, style: context.type.h2)),
+              const SizedBox(height: 8),
+              Rise(
+                index: 2,
+                child: Text(
+                  (offline ? 'errors.offline_body' : key).tr,
+                  textAlign: TextAlign.center,
+                  style: context.type.b.copyWith(color: c.ink2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Rise(index: 3, child: Btn('common.retry', kind: BtnKind.ink, icon: PhosphorIconsRegular.arrowClockwise, onPressed: onRetry)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The could-not-load drawing: its icon on a soft disc, with rings going out from it and fading, a signal that does not
+/// arrive. Still under Reduce motion.
+class _Signal extends StatefulWidget {
+  const _Signal({required this.icon});
+
+  final IconData icon;
+
+  @override
+  State<_Signal> createState() => _SignalState();
+}
+
+class _SignalState extends State<_Signal> with SingleTickerProviderStateMixin {
+  late final _c = AnimationController(vsync: this, duration: AppMotion.loop * 1.5);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (context.reduceMotion) {
+      _c
+        ..stop()
+        ..value = .35;
+    } else if (!_c.isAnimating) {
+      _c.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.app;
+    return ExcludeSemantics(
+      child: SizedBox.square(
+        dimension: 148,
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (context, child) => Stack(
+            alignment: Alignment.center,
+            children: [
+              // Two rings half a loop apart, each growing from the disc and fading as it goes.
+              for (final shift in const [0.0, .5])
+                Builder(
+                  builder: (context) {
+                    final p = (_c.value + shift) % 1;
+                    return Transform.scale(
+                      scale: .55 + .45 * kEase.transform(p),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: c.badText.withValues(alpha: .35 * (1 - p)), width: 2),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              child!,
+            ],
+          ),
+          child: Container(
+            width: 84,
+            height: 84,
+            decoration: BoxDecoration(color: c.badSoft, shape: BoxShape.circle),
+            child: Icon(widget.icon, size: 38, color: c.badText),
+          ),
+        ),
       ),
     );
   }

@@ -125,8 +125,9 @@ class _PasswordScreen extends StatelessWidget {
                       child: Field(
                         controller: controller.email,
                         label: 'auth.email_or_phone',
+                        help: 'field.sign_in_id',
                         icon: PhosphorIconsRegular.envelopeSimple,
-                        keyboard: TextInputType.text,
+                        keyboard: TextInputType.emailAddress,
                         autofillHints: const [AutofillHints.email, AutofillHints.username],
                         textInputAction: TextInputAction.next,
                         validator: Validators.emailOrPhone,
@@ -221,6 +222,7 @@ class _PasswordFieldState extends State<_PasswordField> {
           controller: widget.controller.password,
           icon: PhosphorIconsRegular.lockSimple,
           obscure: !_shown,
+          help: 'field.password',
           autofillHints: const [AutofillHints.password],
           textInputAction: TextInputAction.done,
           onSubmitted: (_) => widget.controller.submit(),
@@ -437,6 +439,7 @@ class _Cell extends StatelessWidget {
     final c = context.app;
     return AnimatedContainer(
       duration: AppMotion.t2,
+      curve: kEase,
       width: 48,
       height: 60,
       alignment: Alignment.center,

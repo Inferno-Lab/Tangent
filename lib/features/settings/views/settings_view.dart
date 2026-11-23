@@ -273,7 +273,8 @@ class _ThemeTile extends StatelessWidget {
           child: Column(
             children: [
               AnimatedContainer(
-                duration: AppMotion.t3,
+                duration: AppMotion.t2,
+                curve: kEase,
                 height: 64,
                 decoration: BoxDecoration(
                   color: bg,
@@ -703,7 +704,8 @@ class _Faq extends StatelessWidget {
                 Expanded(child: Text(question, style: context.type.ts)),
                 AnimatedRotation(
                   turns: open ? .5 : 0,
-                  duration: AppMotion.t3,
+                  duration: AppMotion.t2,
+                  curve: kEase,
                   child: Icon(PhosphorIconsRegular.caretDown, size: 18, color: context.app.ink),
                 ),
               ],
