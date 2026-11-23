@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/painting.dart';
+import 'package:tangent/core/network/api_client.dart';
 import 'package:tangent/core/config/app_config.dart';
 import 'package:tangent/core/services/storage_service.dart';
 import 'package:tangent/core/theme/app_colors.dart';
@@ -13,7 +14,7 @@ class SchoolProfileService {
   const SchoolProfileService._();
 
   static Future<void> load(StorageService storage) async {
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
+    final client = appHttpClient(timeout: const Duration(seconds: 8));
     try {
       final base = AppConfig.apiBase.replaceAll(RegExp(r'/$'), '');
       final req = await client.getUrl(Uri.parse('$base/v1/brand')).timeout(const Duration(seconds: 8));
