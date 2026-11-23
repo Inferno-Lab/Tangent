@@ -165,3 +165,123 @@ String _abbr(String name) {
   if (words.length > 1) return words.take(3).map((w) => w[0]).join().toUpperCase();
   return name.length <= 3 ? name.toUpperCase() : name.substring(0, 3).toUpperCase();
 }
+
+/// A cover as a book in the hand: turned a little, its pages showing along the open edge and the foot, the spine
+/// shaded with its hinge, a gloss across the board. [child] is the flat cover; it fills the front board.
+class Book3D extends StatelessWidget {
+  const Book3D({required this.child, required this.height, this.radius = 10, super.key});
+
+  final Widget child;
+  final double height;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    // The page block is thinner on a small book, so a 38-wide one in a row still reads as a book, not a box.
+    final depth = (height * .045).clamp(3.0, 7.0);
+    final board = BorderRadius.only(
+      topLeft: Radius.circular(radius * .5),
+      bottomLeft: Radius.circular(radius * .5),
+      topRight: Radius.circular(radius),
+      bottomRight: Radius.circular(radius),
+    );
+    return Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.identity()
+        ..setEntry(3, 2, .0012)
+        ..rotateY(-.14),
+      child: SizedBox(
+        height: height,
+        child: Stack(
+          children: [
+            // The pages, cream in every theme, a line for every few leaves.
+            Positioned(
+              left: depth * 2,
+              top: depth * .7,
+              right: 0,
+              bottom: 0,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.light.paper,
+                  borderRadius: BorderRadius.only(topRight: Radius.circular(radius), bottomRight: Radius.circular(radius)),
+                  boxShadow: [BoxShadow(color: AppColors.light.ink.withValues(alpha: .45), blurRadius: 14, spreadRadius: -6, offset: Offset(depth, depth * 1.6))],
+                ),
+                child: CustomPaint(painter: _Leaves(AppColors.light.ink3.withValues(alpha: .35), depth)),
+              ),
+            ),
+            // The front board.
+            Positioned(
+              left: 0,
+              top: 0,
+              right: depth,
+              bottom: depth * .7,
+              child: ClipRRect(
+                borderRadius: board,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    child,
+                    IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.amoled.chalk.withValues(alpha: .34),
+                              AppColors.amoled.chalk.withValues(alpha: .1),
+                              AppColors.white.withValues(alpha: .22),
+                              AppColors.amoled.chalk.withValues(alpha: .08),
+                              AppColors.white.withValues(alpha: 0),
+                              AppColors.white.withValues(alpha: .1),
+                            ],
+                            stops: const [0, .06, .085, .12, .55, 1],
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Light from the top left catches the board.
+                    IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [AppColors.white.withValues(alpha: .16), AppColors.white.withValues(alpha: 0), AppColors.amoled.chalk.withValues(alpha: .14)],
+                            stops: const [0, .45, 1],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The lines of a book's leaves along its open edge and its foot.
+class _Leaves extends CustomPainter {
+  _Leaves(this.line, this.depth);
+
+  final Color line;
+  final double depth;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color = line
+      ..strokeWidth = .6;
+    for (var x = size.width - depth + 1.5; x < size.width - 1; x += 1.6) {
+      canvas.drawLine(Offset(x, 4), Offset(x, size.height - 2), p);
+    }
+    for (var y = size.height - depth * .7 + 1.2; y < size.height - .8; y += 1.6) {
+      canvas.drawLine(Offset(4, y), Offset(size.width - 2, y), p);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_Leaves old) => old.line != line || old.depth != depth;
+}

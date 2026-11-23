@@ -149,7 +149,7 @@ class _MineRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          Cover(subject: book.category.toLowerCase(), label: '', width: 38, height: 50),
+          SizedBox(width: 40, child: Book3D(height: 54, radius: 6, child: ColoredBox(color: AppColors.subject(book.category.toLowerCase()).fill))),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -229,23 +229,17 @@ class _Book extends StatelessWidget {
       topRight: Radius.circular(10),
       bottomRight: Radius.circular(10),
     );
-    final cover = Container(
-      height: 150,
-      decoration: BoxDecoration(
-        color: pigment.fill,
-        borderRadius: radius,
-        boxShadow: [
-          BoxShadow(color: AppColors.light.ink.withValues(alpha: 0.5), blurRadius: 18, spreadRadius: -12, offset: const Offset(0, 10)),
-        ],
-      ),
-      foregroundDecoration: spineDecoration,
+    final cover = Book3D(
+      height: 156,
+      child: ColoredBox(
+      color: pigment.fill,
       child: ClipRRect(
         borderRadius: radius,
         child: Stack(
           children: [
             ...shapes,
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 10, 10),
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -260,7 +254,7 @@ class _Book extends StatelessWidget {
                         p.dispose();
                         return width > w ? width : w;
                       });
-                      final scale = longest > box.maxWidth ? (box.maxWidth / longest).clamp(.7, 1.0) : 1.0;
+                      final scale = longest > box.maxWidth ? (box.maxWidth / longest).clamp(.58, 1.0) : 1.0;
                       return Text(
                         book.title,
                         maxLines: 5,
@@ -284,6 +278,7 @@ class _Book extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
     return Semantics(
