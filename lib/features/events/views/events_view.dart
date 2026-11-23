@@ -36,6 +36,13 @@ String _time(String hhmm) {
   return DateFormat(t.minute == 0 ? 'h a' : 'h:mm a').format(t).toLowerCase();
 }
 
+/// When and where, as one line: its time ("All day" for one starting at midnight, a holiday's), then its place when it has
+/// one; never a time nobody set or a separator with nothing after it.
+String _whenWhere(SchoolEvent e, {bool lower = false}) => [
+  if (e.time == '00:00' || e.time.isEmpty) 'events.all_day'.tr else _time(e.time),
+  if (e.venue.trim().isNotEmpty) lower ? e.venue.trim().toLowerCase() : e.venue.trim(),
+].join(' · ');
+
 void _openEvent(SchoolEvent e) => unawaited(Get.toNamed<void>('/events/${e.id}'));
 
 class EventsView extends GetView<EventsController> {
@@ -138,7 +145,7 @@ class _Featured extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Overline(
-                      '${DateFormat('EEE d MMM').format(event.date)} · ${event.time} · ${event.venue.toLowerCase()}',
+                      '${DateFormat('EEE d MMM').format(event.date)} · ${_whenWhere(event, lower: true)}',
                       color: pigment.on.withValues(alpha: .8),
                     ),
                     const SizedBox(height: 10),
@@ -233,7 +240,7 @@ class _Row extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(event.title, style: context.type.t),
-                  Text('${_time(event.time)} · ${event.venue.toLowerCase()}', style: context.type.cap),
+                  Text(_whenWhere(event, lower: true), style: context.type.cap),
                 ],
               ),
             ),
@@ -431,7 +438,7 @@ class EventDetailView extends GetView<EventsController> {
               addToCalendar(
                 title: event.title,
                 first: event.date,
-                details: '${_time(event.time)} · ${event.venue}\n${event.description}',
+                details: '${_whenWhere(event)}\n${event.description}',
               ),
             ),
           ),
@@ -515,13 +522,16 @@ class EventDetailView extends GetView<EventsController> {
                   child: EduCard(
                     child: Column(
                       children: [
+                        // An all-day event (a holiday) has no time and no gates; one with no place has no place row.
                         _Fact(
                           icon: PhosphorIconsRegular.clock,
-                          title: _time(event.time),
-                          sub: 'events.gates'.trp({'time': DateFormat('h:mm').format(gates)}),
+                          title: event.time == '00:00' || event.time.isEmpty ? 'events.all_day'.tr : _time(event.time),
+                          sub: event.time == '00:00' || event.time.isEmpty ? null : 'events.gates'.trp({'time': DateFormat('h:mm').format(gates)}),
                         ),
-                        const Hr(indent: 46),
-                        _Fact(icon: PhosphorIconsRegular.mapPin, title: event.venue),
+                        if (event.venue.trim().isNotEmpty) ...[
+                          const Hr(indent: 46),
+                          _Fact(icon: PhosphorIconsRegular.mapPin, title: event.venue),
+                        ],
                         if (event.needsRsvp && event.rsvpBy != null) ...[
                           const Hr(indent: 46),
                           _Fact(

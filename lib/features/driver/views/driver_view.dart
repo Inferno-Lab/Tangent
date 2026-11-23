@@ -82,7 +82,7 @@ class _RouteCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(route.name, style: context.type.h3),
-                      Text('${route.vehicle} · ${'driver.trips_done'.trn(done)}', style: context.type.cap),
+                      Text(tidySeparators('${route.vehicle} · ${'driver.trips_done'.trn(done)}'), style: context.type.cap),
                     ],
                   ),
                 ),
@@ -105,7 +105,7 @@ class _RouteCard extends StatelessWidget {
                   child: Text('driver.late_told'.trp({'n': '${trip.lateMinutes}'}), style: context.type.s),
                 ),
               for (final stop in route.stops) ...[
-                SectionLabel('${stop.time} · ${stop.name}', top: 12),
+                SectionLabel(tidySeparators('${stop.time} · ${stop.name}'), top: 12),
                 if (stop.riders.isEmpty) Text('driver.no_riders'.tr, style: context.type.cap),
                 for (final rider in stop.riders) _RiderRow(route: route, trip: trip, stop: stop, rider: rider, controller: controller),
               ],

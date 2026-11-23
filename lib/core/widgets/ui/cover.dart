@@ -43,7 +43,8 @@ class Cover extends StatelessWidget {
     return Container(
       width: w,
       height: h,
-      padding: EdgeInsets.only(left: large ? 12 : 10, bottom: large ? 10 : 6),
+      // A narrow cover (30 wide beside the class chips) keeps its label inside: less inset, and the label shrinks to fit.
+      padding: EdgeInsets.only(left: large ? 12 : (w < 40 ? 7 : 10), right: 3, bottom: large ? 10 : 6),
       alignment: Alignment.bottomLeft,
       decoration: BoxDecoration(
         color: pigment.fill,
@@ -55,10 +56,14 @@ class Cover extends StatelessWidget {
         ),
       ),
       foregroundDecoration: const _SpineDecoration(),
-      child: Text(
-        label ?? subjectAbbr[subject] ?? _abbr(subjectName(subject)),
-        style: hueText(large ? 13 : 11, 760, width: 122, height: 1, em: .05, color: pigment.on),
-        maxLines: 1,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.bottomLeft,
+        child: Text(
+          label ?? subjectAbbr[subject] ?? _abbr(subjectName(subject)),
+          style: hueText(large ? 13 : 11, 760, width: 122, height: 1, em: .05, color: pigment.on),
+          maxLines: 1,
+        ),
       ),
     );
   }

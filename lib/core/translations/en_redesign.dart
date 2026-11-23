@@ -244,7 +244,7 @@ const enRedesign = <String, String>{
 
   // timetable
   'timetable.add_calendar': 'Add to calendar',
-  'timetable.subtitle': '@class · room @room · @n classes',
+  'timetable.subtitle': '@class · @room · @n classes',
   'timetable.lessons': 'You teach @n lessons',
   'timetable.lessons_one': 'You teach one lesson',
   'timetable.break_line': '@name · @n min',
@@ -641,8 +641,8 @@ const enRedesign = <String, String>{
 
   // teacher
   'teacher.free': 'Free',
-  'teacher.now_line': 'Now · @class · room @room · until @until',
-  'teacher.next_line': 'Next · @class · room @room · at @at',
+  'teacher.now_line': 'Now · @class · @room · until @until',
+  'teacher.next_line': 'Next · @class · @room · at @at',
   'teacher.day_done': 'No more classes today',
   'teacher.qa_attendance': 'Roll call',
   'teacher.qa_assign': 'Set homework',
@@ -1238,7 +1238,7 @@ const enRedesign = <String, String>{
   'teacher.capsule_line': '@subject · class teacher @class',
   'teacher.until_left': 'until @time · @n min left',
   'teacher.at_time': 'at @time',
-  'teacher.room_n': 'room @room',
+  'teacher.room_n': 'Room @room',
   'teacher.take_roll_call': 'Take roll call',
   'teacher.class_list': 'Class list',
   'teacher.more_school': 'More',
@@ -1319,4 +1319,9 @@ const enRedesign = <String, String>{
   'errors.unreachable_title': "Can't reach the school",
   'errors.offline_title': "You're offline",
   'errors.offline_body': 'Connect to the internet, then try again. What you saw last stays on your other screens.',
+  'events.all_day': 'All day',
+  'school.bus_no_stops': 'Stops not set yet',
+  // A teacher with no class of their own: the families and students of the classes they teach.
+  'teacher.aud_parents_plain': 'Parents',
+  'teacher.aud_students_plain': 'Students',
 };

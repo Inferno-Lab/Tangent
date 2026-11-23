@@ -250,11 +250,24 @@ class _Book extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    book.title,
-                    maxLines: 5,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppText.chip(color: pigment.on, height: 1.05),
+                  // A narrow cover breaks a long word mid-way ("Environmen-tal"): the title shrinks until its longest word fits.
+                  LayoutBuilder(
+                    builder: (context, box) {
+                      final style = AppText.chip(color: pigment.on, height: 1.05);
+                      final longest = book.title.split(RegExp(r'\s+')).fold(0.0, (w, word) {
+                        final p = TextPainter(text: TextSpan(text: word, style: style), textDirection: Directionality.of(context), textScaler: MediaQuery.textScalerOf(context))..layout();
+                        final width = p.width;
+                        p.dispose();
+                        return width > w ? width : w;
+                      });
+                      final scale = longest > box.maxWidth ? (box.maxWidth / longest).clamp(.7, 1.0) : 1.0;
+                      return Text(
+                        book.title,
+                        maxLines: 5,
+                        overflow: TextOverflow.ellipsis,
+                        style: style.copyWith(fontSize: (style.fontSize ?? 14) * scale),
+                      );
+                    },
                   ),
                   SizedBox(
                     width: double.infinity,

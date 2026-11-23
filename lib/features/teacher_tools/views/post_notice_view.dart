@@ -59,7 +59,7 @@ class PostNoticeView extends GetView<PostNoticeController> {
             children: [
               for (final a in PostNoticeController.audiences)
                 Chip2(
-                  a == 'school' ? 'teacher.aud_school'.tr : 'teacher.aud_$a'.trp({'class': cls}),
+                  a == 'school' ? 'teacher.aud_school'.tr : cls.isEmpty ? 'teacher.aud_${a}_plain'.tr : 'teacher.aud_$a'.trp({'class': cls}),
                   on: controller.audience.value == a,
                   onTap: () => controller.audience.value = a,
                 ),

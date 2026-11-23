@@ -53,7 +53,7 @@ class TimetableView extends GetView<TimetableController> {
                 ? (controller.forTeacher && day != null ? 'timetable.lessons'.trn(classes) : null)
                 : 'timetable.subtitle'.trp({
                     'class': cls.label,
-                    'room': cls.room,
+                    'room': roomLabel(cls.room),
                     'n': '$classes',
                   }),
           ),

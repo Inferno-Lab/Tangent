@@ -281,7 +281,7 @@ class _SearchViewState extends State<SearchView> {
                               on: AppColors.white,
                             ),
                             title: _mark(context, e.title, q),
-                            sub: '${DateFormat('EEE d MMM').format(e.date)} · ${e.venue}',
+                            sub: tidySeparators('${DateFormat('EEE d MMM').format(e.date)} · ${e.venue}'),
                             onTap: () => _go('/events/${e.id}'),
                           ),
                       ]),

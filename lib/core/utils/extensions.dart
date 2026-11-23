@@ -41,6 +41,26 @@ extension DateOnly on DateTime {
   bool isSameDay(DateTime other) => year == other.year && month == other.month && day == other.day;
 }
 
+/// [text] without the separators an empty part left: none at either end, never two in a row, its first letter capital
+/// where one was dropped from the front.
+String tidySeparators(String text) {
+  final hadLead = RegExp(r'^\s*[·•|,]\s*').hasMatch(text);
+  var out = text
+      .replaceAll(RegExp(r'(\s*·\s*){2,}'), ' · ')
+      .replaceAll(RegExp(r'^\s*[·•|,]\s*|\s*[·•|,]\s*$'), '')
+      .replaceAll(RegExp(r'\s{2,}'), ' ')
+      .trim();
+  if (hadLead && out.isNotEmpty) out = out[0].toUpperCase() + out.substring(1);
+  return out;
+}
+
+/// A room as people read it: a school's own name for it as written ("Room 8A", "Science lab"), a bare number with the word
+/// ("12" is "Room 12"). Lines that show a room take this, never "room" in front of the school's own name.
+String roomLabel(String room) {
+  final r = room.trim();
+  return r.isEmpty || RegExp(r'^\p{L}', unicode: true).hasMatch(r) ? r : 'teacher.room_n'.trp({'room': r});
+}
+
 extension SafeTranslate on String {
   /// Translates this key and fills `@name` placeholders.
   ///
@@ -52,6 +72,9 @@ extension SafeTranslate on String {
     for (final key in keys) {
       out = out.replaceAll('@$key', params[key]!);
     }
+    // A value that is empty (a book with no author, an event with no place) leaves no separator behind it:
+    // "· return by Wed 11 Nov" reads "Return by Wed 11 Nov".
+    if (params.values.any((v) => v.trim().isEmpty)) out = tidySeparators(out);
     return out;
   }
 

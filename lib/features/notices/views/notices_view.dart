@@ -196,7 +196,7 @@ class _Slip extends StatelessWidget {
                     const SizedBox(height: 10),
                     Text(notice.title, style: context.type.t),
                     const SizedBox(height: 6),
-                    Text('${_when(notice.date)} · ${notice.author}', style: context.type.cap),
+                    Text(tidySeparators('${_when(notice.date)} · ${notice.author}'), style: context.type.cap),
                   ],
                 ),
               ),
@@ -290,7 +290,7 @@ class _Row extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(notice.title, style: context.type.t),
-                        Text('${_when(notice.date)} · ${notice.author}', style: context.type.cap),
+                        Text(tidySeparators('${_when(notice.date)} · ${notice.author}'), style: context.type.cap),
                       ],
                     ),
                   ),
@@ -455,7 +455,7 @@ class NoticeDetailView extends GetView<NoticeDetailController> {
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                '${notice.author} · ${_whenInline(notice.date)}',
+                                tidySeparators('${notice.author} · ${_whenInline(notice.date)}'),
                                 style: AppText.capB(color: c.ink2),
                               ),
                             ),

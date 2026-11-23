@@ -216,7 +216,7 @@ class _NowLesson extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            [classLabel(cls), subjectName(period.slot.subject), if (room.isNotEmpty) 'teacher.room_n'.trp({'room': room})].join(' · '),
+            [classLabel(cls), subjectName(period.slot.subject), if (room.isNotEmpty) roomLabel(room)].join(' · '),
             style: AppText.h3(color: ink),
           ),
           const SizedBox(height: 12),
@@ -303,7 +303,7 @@ class _Body extends StatelessWidget {
         _Task(
           big: '${controller.leave.length}',
           title: controller.leave.length == 1 ? 'teacher.leave_one'.tr : 'teacher.leave_many'.tr,
-          sub: '${controller.names[controller.leave.first.studentId] ?? ''} · ${_range(controller.leave.first)}',
+          sub: tidySeparators('${controller.names[controller.leave.first.studentId] ?? ''} · ${_range(controller.leave.first)}'),
           onTap: () => unawaited(showSheet<void>(_LeaveSheet(controller: controller))),
         ),
     ];
@@ -462,7 +462,7 @@ class _LeaveSheet extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(controller.names[l.studentId] ?? '', style: context.type.t),
-                Text('${l.reason} · ${_range(l)}', style: context.type.cap),
+                Text(tidySeparators('${l.reason} · ${_range(l)}'), style: context.type.cap),
                 if (l.note != null && l.note!.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text('“${l.note}”', style: context.type.s),
