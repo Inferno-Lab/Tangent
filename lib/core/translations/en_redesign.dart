@@ -1316,4 +1316,7 @@ const enRedesign = <String, String>{
   'diary.kind': 'What it is',
   'diary.subject': 'Subject',
   'staff.leave_kind': 'Kind of leave',
+  'errors.unreachable_title': "Can't reach the school",
+  'errors.offline_title': "You're offline",
+  'errors.offline_body': 'Connect to the internet, then try again. What you saw last stays on your other screens.',
 };
