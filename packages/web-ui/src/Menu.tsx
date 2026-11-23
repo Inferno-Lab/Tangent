@@ -3,7 +3,6 @@ import { Icon } from './Icon';
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { leavingProps, useExit } from './Presence';
-import { t } from './i18n';
 
 const GAP = 6;
 const EDGE = 12;
@@ -16,7 +15,7 @@ export function placeBy(anchor: HTMLElement, side: 'auto' | 'right', min = 220):
   const r = anchor.getBoundingClientRect();
   // Beside the whole menu rail, not just the button, so the popup never sits over the rail.
   const rail = anchor.closest('.sb')?.getBoundingClientRect().right ?? r.right;
-  if (side === 'right') return { left: Math.max(r.right, rail) + 12, minWidth: min, bottom: window.innerHeight - r.bottom, maxH: r.bottom - EDGE, origin: t('ui.menu.left_bottom') };
+  if (side === 'right') return { left: Math.max(r.right, rail) + 12, minWidth: min, bottom: window.innerHeight - r.bottom, maxH: r.bottom - EDGE, origin: 'left bottom' };
   const below = window.innerHeight - r.bottom - EDGE;
   const above = r.top - EDGE;
   const up = below < 240 && above > below;
@@ -25,8 +24,9 @@ export function placeBy(anchor: HTMLElement, side: 'auto' | 'right', min = 220):
   // Lined up with the button's left edge, or with its right edge when that would run off the window (a button at the right).
   const fromRight = r.left + minWidth > window.innerWidth - EDGE;
   const edge = fromRight ? { right: Math.max(EDGE, window.innerWidth - r.right) } : { left: Math.max(EDGE, r.left) };
+  // A CSS value, never a translated word: a catalogue's "en bas" made every menu grow from its middle in that language.
   const x = fromRight ? 'right' : 'left';
-  return up ? { ...edge, minWidth, bottom: window.innerHeight - r.top + GAP, maxH, origin: t('ui.menu.bottom', { x }) } : { ...edge, minWidth, top: r.bottom + GAP, maxH, origin: t('ui.menu.top', { x }) };
+  return up ? { ...edge, minWidth, bottom: window.innerHeight - r.top + GAP, maxH, origin: `bottom ${x}` } : { ...edge, minWidth, top: r.bottom + GAP, maxH, origin: `top ${x}` };
 }
 
 export interface PopProps {

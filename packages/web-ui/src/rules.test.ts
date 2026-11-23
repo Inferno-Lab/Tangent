@@ -191,7 +191,8 @@ describe('every word in a language catalogue', () => {
 
   it('keeps code out of the catalogues (CSS, class names)', () => {
     const code = catalogues.flatMap((d) => Object.entries(JSON.parse(read(path.join(root, d, 'en.json'))) as Record<string, string>)
-      .filter(([, v]) => /minmax\(|var\(--|\d(px|fr)\b|\bsp-\{|!important/.test(v)).map(([k]) => `${d}/en.json ${k}`));
+      // A CSS position too ("top {x}"): translated, it is no longer one, and the popup grows from its middle.
+      .filter(([, v]) => /minmax\(|var\(--|\d(px|fr)\b|\bsp-\{|!important/.test(v) || /^(top|bottom|left|right|center)( (top|bottom|left|right|center|\{\w+\}))+$/.test(v)).map(([k]) => `${d}/en.json ${k}`));
     expect(code, 'put the CSS back in the code: only words a person reads belong in a catalogue').toEqual([]);
   });
 

@@ -92,7 +92,7 @@ class _GlassSegmentedState extends State<GlassSegmented> {
             return Stack(
               children: [
                 AnimatedPositioned(
-                  duration: still ? Duration.zero : AppMotion.t4,
+                  duration: still ? Duration.zero : AppMotion.spring,
                   curve: kSpring,
                   left: pad + math.max(0, widget.index) * slot,
                   top: pad,
@@ -359,6 +359,7 @@ class _GlassSliderState extends State<GlassSlider> {
                     child: AnimatedScale(
                       scale: _dragging && !context.reduceMotion ? 1.08 : 1,
                       duration: AppMotion.t2,
+                      curve: kEase,
                       child: Glass(
                         kind: GlassKind.lens,
                         radius: 18,

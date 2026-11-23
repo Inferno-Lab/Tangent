@@ -330,6 +330,7 @@ class _FieldState extends State<Field> with WidgetsBindingObserver {
               ),
             AnimatedContainer(
               duration: AppMotion.t2,
+              curve: kEase,
               constraints: BoxConstraints(minHeight: widget.minHeight),
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(

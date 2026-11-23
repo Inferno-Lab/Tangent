@@ -439,6 +439,7 @@ class _Cell extends StatelessWidget {
     final c = context.app;
     return AnimatedContainer(
       duration: AppMotion.t2,
+      curve: kEase,
       width: 48,
       height: 60,
       alignment: Alignment.center,

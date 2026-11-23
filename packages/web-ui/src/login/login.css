@@ -24,9 +24,8 @@
 .pg-login .fa{inset-inline-start:0;top:30px;width:236px;rotate:-3deg}
 .pg-login .fb{inset-inline-end:0;top:110px;width:248px;rotate:2.5deg}
 .pg-login .mp{display:flex;align-items:flex-end;gap:4px;height:44px;margin-top:12px}
-.pg-login .mp i{flex:1;border-radius:6px 6px 6px 6px;background:color-mix(in srgb,var(--brand) 28%,var(--on-deep));clip-path:polygon(0 22%,50% 0,100% 22%,100% 100%,0 100%);animation:grow var(--t3) var(--e) both;animation-delay:var(--d)}
+.pg-login .mp i{flex:1;border-radius:6px 6px 6px 6px;background:color-mix(in srgb,var(--brand) 28%,var(--on-deep));clip-path:polygon(0 22%,50% 0,100% 22%,100% 100%,0 100%)}
 .pg-login .mp i.hi{background:var(--brand)}
-@keyframes grow{from{height:0 !important}}
 .pg-login .cons .mp i{background:color-mix(in srgb,var(--brand) 30%,var(--deep))}
 .pg-login .pr{height:10px;border-radius:6px;background:color-mix(in srgb,var(--brand) 10%,var(--on-deep));margin-top:12px;overflow:hidden}
 .pg-login .pr b{display:block;height:100%;border-radius:6px;background:var(--brand);animation:fillw var(--t3) .4s var(--e) both}

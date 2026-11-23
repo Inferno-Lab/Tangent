@@ -205,7 +205,8 @@ class _SubjectBar extends StatelessWidget {
                   child: Pressable(
                     onTap: () => onPick(id),
                     child: AnimatedContainer(
-                      duration: AppMotion.t3,
+                      duration: AppMotion.t2,
+                      curve: kEase,
                       height: 40,
                       constraints: const BoxConstraints(minWidth: 72),
                       alignment: Alignment.center,
@@ -292,6 +293,7 @@ class _MarkRow extends StatelessWidget {
         onTap: active ? null : onTap,
         child: AnimatedContainer(
           duration: AppMotion.t2,
+          curve: kEase,
           color: active ? c.mariSoft : Colors.transparent,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(

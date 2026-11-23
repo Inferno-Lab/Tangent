@@ -107,6 +107,7 @@ class AssignHomeworkView extends GetView<AssignHomeworkController> {
                       onTap: () => controller.due.value = d,
                       child: AnimatedContainer(
                         duration: AppMotion.t2,
+                        curve: kEase,
                         height: 58,
                         decoration: BoxDecoration(
                           color: due != null && DateUtils.isSameDay(d, due) ? c.ink : c.paper,

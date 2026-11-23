@@ -685,7 +685,8 @@ class NowCard extends StatelessWidget {
                     children: [
                       Container(height: 4, color: c.line),
                       AnimatedFractionallySizedBox(
-                        duration: AppMotion.t4,
+                        duration: AppMotion.t3,
+                        curve: kEase,
                         widthFactor: pct,
                         child: Container(height: 4, color: c.ink),
                       ),

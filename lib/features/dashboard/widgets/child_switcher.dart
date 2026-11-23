@@ -143,17 +143,20 @@ class _ChildCapsuleState extends State<ChildCapsule> {
       barrierDismissible: true,
       barrierLabel: 'common.close'.tr,
       barrierColor: Colors.transparent,
-      transitionDuration: context.reduceMotion ? Duration.zero : AppMotion.t4,
+      transitionDuration: context.reduceMotion ? Duration.zero : AppMotion.t2,
       pageBuilder: (context, _, _) => _SwitcherPopover(kids: _kids, top: origin.dy + 52, left: origin.dx),
       transitionBuilder: (context, animation, _, child) {
-        final t = CurvedAnimation(parent: animation, curve: kSpring, reverseCurve: kEase);
+        // Grows out of the capsule that opened it (the popover fills the screen, so its own corner is the wrong place),
+        // from just under full size, with no bounce: it is a list to pick from.
+        final screen = MediaQuery.sizeOf(context);
+        final from = FractionalOffset(
+          ((origin.dx + (box?.size.width ?? 0) / 2) / screen.width).clamp(0.0, 1.0),
+          ((origin.dy + (box?.size.height ?? 0)) / screen.height).clamp(0.0, 1.0),
+        );
+        final t = CurvedAnimation(parent: animation, curve: kEase, reverseCurve: kEase);
         return FadeTransition(
           opacity: animation,
-          child: ScaleTransition(
-            alignment: Alignment.topLeft,
-            scale: Tween<double>(begin: .6, end: 1).animate(t),
-            child: child,
-          ),
+          child: ScaleTransition(alignment: from, scale: Tween<double>(begin: .95, end: 1).animate(t), child: child),
         );
       },
     );

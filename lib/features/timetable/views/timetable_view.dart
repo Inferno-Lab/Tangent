@@ -233,8 +233,8 @@ class _DayPicker extends StatelessWidget {
           return Stack(
             children: [
               AnimatedPositioned(
-                duration: context.reduceMotion ? Duration.zero : AppMotion.t4,
-                curve: const Cubic(.3, 1.45, .45, 1),
+                duration: context.reduceMotion ? Duration.zero : AppMotion.spring,
+                curve: kSpring,
                 left: 4 + index * slot + (slot - 56).clamp(0, 99) / 2,
                 top: 4,
                 width: slot.clamp(0, 56),
