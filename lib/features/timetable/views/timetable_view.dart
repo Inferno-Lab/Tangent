@@ -98,6 +98,16 @@ class _Timeline extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
+          // Time between lessons (a teacher's free periods; a class's gaps) reads as free, never as blank page.
+          for (final (i, p) in periods.indexed)
+            if (i > 0 && minutesOf(p.start) - minutesOf(periods[i - 1].end) >= 15)
+              Positioned(
+                left: 44,
+                right: 0,
+                top: y(minutesOf(periods[i - 1].end)) + 2,
+                height: (minutesOf(p.start) - minutesOf(periods[i - 1].end)) * k - 6,
+                child: _Free(minutes: minutesOf(p.start) - minutesOf(periods[i - 1].end)),
+              ),
           for (final p in periods) ...[
             if (p.kind == PeriodKind.klass)
               Positioned(
@@ -170,37 +180,60 @@ class _Block extends StatelessWidget {
     final hw = controller.homeworkDue.contains(period.subject);
     // A teacher's block names the class; a family's the teacher.
     final teacher = controller.classOf[period]?.label ?? controller.teachers[period.teacherId];
-    Widget block = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+    final block = Container(
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(color: pigment.fill, borderRadius: BorderRadius.circular(12)),
-      child: Row(
+      child: Stack(
         children: [
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  subjectName(period.subject),
-                  maxLines: 1,
-                  style: AppText.t(color: pigment.on, height: 1.1),
-                ),
-                if (teacher != null)
-                  Text(
-                    period.room.isEmpty ? teacher : '$teacher · ${period.room}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppText.cap(color: pigment.on.withValues(alpha: .88), height: 1.2),
+          Positioned.fill(child: SubjectMotif(subject: period.subject, color: pigment.on)),
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                subjectName(period.subject),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppText.t(color: pigment.on, height: 1.1),
+                              ),
+                            ),
+                            if (past) ...[
+                              const SizedBox(width: 6),
+                              Icon(PhosphorIconsBold.checkCircle, size: 16, color: pigment.on, semanticLabel: 'common.done'.tr),
+                            ],
+                          ],
+                        ),
+                        if (teacher != null)
+                          Text(
+                            period.room.isEmpty ? teacher : '$teacher · ${period.room}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppText.cap(color: pigment.on.withValues(alpha: .88), height: 1.2),
+                          ),
+                      ],
+                    ),
                   ),
-              ],
+                  // A lesson that is over keeps its colour (after school every lesson is over); a check says it is done.
+                  if (now)
+                    Stamp('home.now'.tr, color: pigment.on)
+                  else if (hw)
+                    Stamp('timetable.hw_due'.tr, color: pigment.on),
+                ],
+              ),
             ),
           ),
-          if (now) Stamp('home.now'.tr, color: pigment.on) else if (hw) Stamp('timetable.hw_due'.tr, color: pigment.on),
         ],
       ),
     );
-    // Past periods go grey but keep full strength: fading them too left white text washed out on a pale card.
-    if (past) block = ColorFiltered(colorFilter: _gray, child: block);
     return Semantics(
       label:
           '${subjectName(period.subject)}, ${clockOf(minutesOf(period.start))} – ${clockOf(minutesOf(period.end))}${teacher == null ? '' : ', $teacher'}',
@@ -209,12 +242,36 @@ class _Block extends StatelessWidget {
   }
 }
 
-const _gray = ColorFilter.matrix(<double>[
-  .4825, .4649, .0526, 0, 0, //
-  .1382, .8148, .0470, 0, 0, //
-  .1382, .4649, .3969, 0, 0, //
-  0, 0, 0, 1, 0,
-]);
+/// Free time between two lessons, said with its length.
+class _Free extends StatelessWidget {
+  const _Free({required this.minutes});
+
+  final int minutes;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.app;
+    final h = minutes ~/ 60;
+    final m = minutes % 60;
+    final span = h == 0
+        ? 'timetable.span_m'.trp({'m': '$m'})
+        : m == 0
+            ? 'timetable.span_h'.trp({'h': '$h'})
+            : 'timetable.span_hm'.trp({'h': '$h', 'm': '$m'});
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: c.line),
+      ),
+      alignment: AlignmentDirectional.centerStart,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text('timetable.free_line'.trp({'span': span}), maxLines: 1, style: context.type.tiny),
+      ),
+    );
+  }
+}
 
 class _DayPicker extends StatelessWidget {
   const _DayPicker({required this.controller, required this.index});

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/app_typography.dart';
 import 'package:tangent/core/theme/tokens.dart';
@@ -138,25 +139,40 @@ class _DayRibbonState extends State<DayRibbon> with SingleTickerProviderStateMix
     final a = minutesOf(p.start);
     final b = minutesOf(p.end);
     final past = b <= now;
-    final ground = past ? pigment.soft : pigment.fill;
-    final ink = past ? pigment.ink : pigment.on;
+    // A lesson that is over keeps its colour (after school every lesson is over); a check says it is done.
+    final ground = pigment.fill;
+    final ink = pigment.on;
     return Semantics(
       label: tidySeparators('${widget.label(p)} · ${p.room} · ${clockOf(a)} – ${clockOf(b)}'),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(10, 0, 6, 16),
+      child: DecoratedBox(
         decoration: BoxDecoration(color: ground, borderRadius: const BorderRadius.vertical(bottom: Radius.circular(AppRadius.panel))),
-        alignment: AlignmentDirectional.bottomStart,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
           children: [
-            Text(widget.label(p), maxLines: 1, overflow: TextOverflow.clip, style: AppText.h3(color: ink)),
-            if (p.room.isNotEmpty) Text(p.room, maxLines: 1, overflow: TextOverflow.clip, style: AppText.capB(color: ink.withValues(alpha: .86))),
-            const SizedBox(height: 4),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: AlignmentDirectional.centerStart,
-              child: Text('${clockOf(a)}–${clockOf(b)}', maxLines: 1, style: AppText.mono(color: ink.withValues(alpha: .86))),
+            // The subject's signs fill the tall column above the words.
+            Positioned.fill(bottom: 76, child: ClipRect(child: SubjectMotif(subject: p.subject, color: ink))),
+            Positioned.fill(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 0, 6, 16),
+                child: Align(
+                  alignment: AlignmentDirectional.bottomStart,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (past) Icon(PhosphorIconsBold.checkCircle, size: 18, color: ink, semanticLabel: 'common.done'.tr),
+                      Text(widget.label(p), maxLines: 1, overflow: TextOverflow.clip, style: AppText.h3(color: ink)),
+                      if (p.room.isNotEmpty)
+                        Text(p.room, maxLines: 1, overflow: TextOverflow.clip, style: AppText.capB(color: ink.withValues(alpha: .86))),
+                      const SizedBox(height: 4),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Text('${clockOf(a)}–${clockOf(b)}', maxLines: 1, style: AppText.mono(color: ink.withValues(alpha: .86))),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ],
         ),
