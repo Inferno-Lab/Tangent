@@ -9,6 +9,9 @@ const KIND: Record<MigrationRow['kind'], string> = { expand: 'v', backfill: 'v',
 const KIND_WORD: Record<MigrationRow['kind'], string> = { expand: t('console.migrations_tab.adds'), backfill: t('console.migrations_tab.fills_in'), contract: t('console.migrations_tab.removes') };
 const KIND_HELP: Record<MigrationRow['kind'], string> = { expand: t('console.migrations_tab.adds_something_new_safe_to'), backfill: t('console.migrations_tab.fills_in_old_rows'), contract: t('console.migrations_tab.removes_something_old_runs_last') };
 
+/** A migration's file name can break after each underscore, so a long one wraps on a phone instead of running past its card. */
+const breakable = (tag: string) => tag.replace(/_/g, '_\u200b');
+
 /** Releases → Database changes: each change to the schools' tables and which schools have it. */
 export function MigrationsTab({ tabs }: { tabs: React.ReactNode }) {
   const app = useApp();
@@ -24,7 +27,7 @@ export function MigrationsTab({ tabs }: { tabs: React.ReactNode }) {
         const applied = m.schools.filter((s) => s.state === 'applied').length;
         const bad = m.schools.filter((s) => s.state === 'failed');
         return (
-          <Card key={m.tag} title={m.tag} chip={<span className={`chip ${KIND[m.kind]}`}>{KIND_WORD[m.kind]}</span>}>
+          <Card key={m.tag} title={breakable(m.tag)} chip={<span className={`chip ${KIND[m.kind]}`}>{KIND_WORD[m.kind]}</span>}>
             <div className="help">{KIND_HELP[m.kind]}</div>
             <div className="us" style={{ marginTop: 12 }}>
               <div className="r">{t('console.migrations_tab.schools_with_it')}<b>{applied} {t('console.migrations_tab.of')}{' '}{m.schools.length}</b></div>

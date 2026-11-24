@@ -119,7 +119,7 @@ function Compose({ n, onClose, onDone }: { n?: NoticeRow; onClose: () => void; o
       for (const file of files) await uploadFile(app.api, 'notice_attachment', saved.id, file).catch(() => failed.push(file.name));
       return { saved, failed };
     },
-    onSuccess: ({ saved, failed }) => onDone(`${published ? (f.tellAgain ? t('admin.notices_page.corrected_and_everyone_it_is') : t('admin.notices_page.corrected_it_shows_as_edited'))
+    onSuccess: ({ saved, failed }) => onDone(`${published ? (saved.status === 'pending' ? t('admin.notices_page.changes_sent_for_approval') : f.tellAgain ? t('admin.notices_page.corrected_and_everyone_it_is') : t('admin.notices_page.corrected_it_shows_as_edited'))
       : saved.status === 'published' ? t('admin.notices_page.sent_to_everyone_it_is') : saved.status === 'pending' ? t('admin.notices_page.saved_and_sent_for_approval') : saved.status === 'scheduled' ? t('admin.notices_page.scheduled_for', { when: when(saved.publishAt) }) : t('admin.notices_page.saved_as_a_draft')}${failed.length ? t('admin.notices_page.could_not_be_attached', { p0: failed.join(', ') }) : ''}`),
     onError: (e) => { setErr(e instanceof HttpError && Object.keys(e.fields).length ? e.fields : { _: (e as Error).message }); shake.hit(); },
   });

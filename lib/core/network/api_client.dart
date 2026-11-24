@@ -71,28 +71,39 @@ class ApiClient {
   static bool _queueable(String path) => path == '/attendance';
   static const _outboxKey = 'outbox';
 
-  Future<void> _queue(String path, Map<String, dynamic> body) async {
+  Future<void> _queue(String path, Map<String, dynamic> body, Map<String, dynamic>? query) async {
     final list = [...(_storage.read<List<dynamic>>(_outboxKey) ?? const [])];
-    list.add({'path': path, 'body': body});
+    // The query keeps the day the marks were for: sent tomorrow, they are still today's register.
+    list.add({'path': path, 'body': body, 'query': query});
     await _storage.write(_outboxKey, list);
   }
 
-  /// Sends what was queued while offline, oldest first. Returns how many went through.
-  Future<int> flushOutbox() async {
+  /// Whether anything waits to be sent (a teacher signing out is warned first).
+  bool get hasOutbox => (_storage.read<List<dynamic>>(_outboxKey) ?? const []).isNotEmpty;
+
+  /// Throws away what was queued (the person signed out: it is never sent under someone else's account).
+  Future<void> clearOutbox() => _storage.remove(_outboxKey);
+
+  /// Sends what was queued while offline, oldest first. Returns how many went through and the messages of those the school
+  /// refused (a day locked meanwhile, say), so the person is told instead of losing them quietly.
+  Future<({int sent, List<String> refused})> flushOutbox() async {
     final list = [...(_storage.read<List<dynamic>>(_outboxKey) ?? const [])];
     var sent = 0;
+    final refused = <String>[];
     while (list.isNotEmpty) {
       final item = Map<String, dynamic>.from(list.first as Map);
+      final query = item['query'] is Map ? Map<String, dynamic>.from(item['query'] as Map) : null;
       try {
-        await _send('POST', item['path'] as String, body: Map<String, dynamic>.from(item['body'] as Map), canQueue: false);
+        await _send('POST', item['path'] as String, query: query, body: Map<String, dynamic>.from(item['body'] as Map), canQueue: false);
+        sent++;
       } on AppException catch (e) {
         if (e.message == 'errors.network') break;
+        refused.add(e.message);
       }
       list.removeAt(0);
-      sent++;
       await _storage.write(_outboxKey, list);
     }
-    return sent;
+    return (sent: sent, refused: refused);
   }
 
   /// Uploads a file straight to the school's storage (the API hands out a short-lived address), then tells the API it
@@ -129,11 +140,13 @@ class ApiClient {
     return id;
   }
 
+  static final _public = RegExp(r'^/v1/auth/(login|verify|code|refresh|reset/start|reset/finish)$');
+
   static final _quiet = RegExp(r'^/v1/auth/|/(position|typing|read|link|calendar-link|order|devices)$|/devices/');
 
   Future<dynamic> get(String path, {Map<String, dynamic>? query}) => _send('GET', path, query: query);
 
-  Future<dynamic> post(String path, Map<String, dynamic> body) => _send('POST', path, body: body);
+  Future<dynamic> post(String path, Map<String, dynamic> body, {Map<String, dynamic>? query}) => _send('POST', path, query: query, body: body);
 
   Future<dynamic> patch(String path, Map<String, dynamic> body) => _send('PATCH', path, body: body);
 
@@ -187,7 +200,8 @@ class ApiClient {
 
   Future<dynamic> _send(String method, String path, {Map<String, dynamic>? query, Map<String, dynamic>? body, bool retried = false, bool canQueue = true}) async {
     if (_base.isEmpty || _school.isEmpty) throw const AppException('errors.remote_unconfigured');
-    final open = path.startsWith('/v1/auth/');
+    // Only signing in needs no token: signing out, a new password and the rest of /v1/auth are the signed-in person's.
+    final open = _public.hasMatch(path);
     final uri = _uri(path, query);
     final client = appHttpClient(timeout: _timeout);
     final started = Clock.now();
@@ -253,7 +267,7 @@ class ApiClient {
         }
       }
       if (method == 'POST' && canQueue && _queueable(path) && body != null) {
-        await _queue(path, body);
+        await _queue(path, body, query);
         return {'queued': true};
       }
       throw const AppException('errors.network');

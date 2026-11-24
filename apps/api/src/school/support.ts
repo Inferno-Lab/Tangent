@@ -130,6 +130,19 @@ export class SettingsService {
     return (date) => off.includes(new Date(`${date}T00:00:00Z`).getUTCDay()) || holidays.has(date);
   }
 
+  /**
+   * The latest day the school is open (`from` itself when it is) and the `count` open days ending on it: weekly off days and
+   * holidays on its calendar are left out, so nothing counts a closed day as one where attendance or fees were missing.
+   */
+  async openDays(t: TenantCtx, count = 0, from = schoolToday()): Promise<{ last: string; days: string[] }> {
+    const closed = await this.closed(t);
+    let last = from;
+    for (let i = 0; i < 400 && closed(last); i++) last = addDays(last, -1);
+    const days: string[] = [];
+    for (let d = last, i = 0; days.length < count && i < 800; d = addDays(d, -1), i++) if (!closed(d)) days.unshift(d);
+    return { last, days };
+  }
+
   /** The timetable day a date uses (the weekday, week B's weekday + 7, or the day of a cycle), or null when the school is closed. */
   async slotDay(t: TenantCtx, date: string): Promise<number | null> {
     return slotDayOf(await this.cycle(t), date, await this.closed(t));
@@ -239,21 +252,22 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
  */
 /**
  * A class a person acts on (marks its attendance, enters its marks, sets or grades its homework): any class with `classes.all`,
- * otherwise one they teach, as its class teacher, a teacher in its timetable, or covering a period of it.
+ * otherwise one they teach, as its class teacher, a teacher in its timetable, or covering a period of it (a day's cover, for two weeks).
  */
 export async function mayTeach(t: TenantCtx, user: { id: string; permissions: readonly string[] }, classId: string): Promise<void> {
   if (user.permissions.includes('classes.all')) return;
   const ok = await t.pool.query(
-    'select 1 from classes where id = $1 and class_teacher_id = $2 union all select 1 from timetable_slots where class_id = $1 and (teacher_id = $2 or cover_teacher_id = $2) limit 1',
-    [classId, user.id]);
+    `select 1 from classes where id = $1 and class_teacher_id = $2 union all select 1 from live_slots where class_id = $1 and (teacher_id = $2 or cover_teacher_id = $2)
+     union all select 1 from substitutions s join live_slots x on x.id = s.slot_id where x.class_id = $1 and s.teacher_id = $2 and s.date between $3::date - 14 and $3::date limit 1`,
+    [classId, user.id, schoolToday()]);
   if (!ok.rowCount) throw forbidden(tx('You can do this only for the classes you teach.'));
 }
 
-export async function checkLeaveClash(q: { query: TenantCtx['pool']['query'] }, studentId: string, from: string, to: string, halfDay: string | null | undefined): Promise<void> {
+export async function checkLeaveClash(q: { query: TenantCtx['pool']['query'] }, studentId: string, from: string, to: string, halfDay: string | null | undefined, except?: string): Promise<void> {
   const r = await q.query(
     `select 1 from approvals where kind = 'leave' and status in ('pending','approved') and payload->>'studentId' = $1
        and (payload->>'from')::date <= $3::date and (payload->>'to')::date >= $2::date
-       and not ($4::text is not null and payload->>'halfDay' is not null and payload->>'halfDay' <> $4)`, [studentId, from, to, halfDay ?? null]);
+       and not ($4::text is not null and payload->>'halfDay' is not null and payload->>'halfDay' <> $4) and id <> $5`, [studentId, from, to, halfDay ?? null, except ?? '']);
   if (r.rowCount) throw new ApiError('conflict', tx('There is already leave for some of these days.'), { fields: { from: tx('Overlaps other leave.') } });
 }
 

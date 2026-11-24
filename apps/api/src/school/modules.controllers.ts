@@ -273,8 +273,8 @@ export class OfficeController {
   }
 
   @Get('messages/:id') @RequireModule('chat') @Require('messages.read')
-  thread(@Tenant() t: TenantCtx, @Param('id') id: string): Promise<ThreadDetail> {
-    return this.office.thread(t, id);
+  thread(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string): Promise<ThreadDetail> {
+    return this.office.thread(t, id, !u.id.startsWith('support:'));
   }
 
   @Post('messages/:id/reply') @HttpCode(200) @RequireModule('chat') @Require('messages.write')

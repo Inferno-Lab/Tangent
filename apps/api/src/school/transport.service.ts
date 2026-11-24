@@ -17,11 +17,14 @@ const STALE_MS = 10 * 60_000;
  * no class (a teacher on bus duty keeps the teachers' app).
  */
 export const BUS_CREW_SQL = `select 1 from transport_routes where driver_user_id = $1 or (attendant_user_id = $1
-  and not exists (select 1 from classes where class_teacher_id = $1) and not exists (select 1 from timetable_slots where teacher_id = $1)) limit 1`;
+  and not exists (select 1 from classes where class_teacher_id = $1) and not exists (select 1 from live_slots where teacher_id = $1)) limit 1`;
 
 /** Routes with their stops and times, who rides which bus to which stop, the route fee, and the bus's live position. */
 @Injectable()
 export class TransportService implements OnModuleInit {
+  /** When "near your stop" was last worked out for a running trip, so a position every few seconds does not ask the maps service each time. */
+  private readonly asked = new Map<string, number>();
+
   constructor(
     private readonly audit: AuditService,
     private readonly hubs: HubService,
@@ -333,9 +336,23 @@ export class TransportService implements OnModuleInit {
     const today = schoolToday();
     const stops = (await t.pool.query<{ id: string; name: string; lat: number; lng: number }>(
       'select id, name, lat, lng from transport_stops s where route_id = $1 and lat is not null and not exists (select 1 from bus_near_sent n where n.stop_id = s.id and n.day = $2 and n.kind = $3)', [routeId, today, kind])).rows;
+    if (!stops.length) return 0;
+    // A paid maps service is asked only about stops the bus could reach in time even on a clear road (60 km/h in a straight
+    // line), and at most once a minute for a trip: a position arrives every few seconds.
+    const key = `${t.info.slug}|${routeId}|${kind}`;
+    if (Date.now() - (this.asked.get(key) ?? 0) < 60_000) return 0;
+    this.asked.set(key, Date.now());
+    if (this.asked.size > 5000) for (const [k, at] of this.asked) if (Date.now() - at > 600_000) this.asked.delete(k);
+    const reach = (s: { lat: number; lng: number }) => {
+      const rad = Math.PI / 180;
+      const a = Math.sin(((s.lat - p.lat) * rad) / 2) ** 2 + Math.cos(p.lat * rad) * Math.cos(s.lat * rad) * Math.sin(((s.lng - p.lng) * rad) / 2) ** 2;
+      return 12_742 * Math.asin(Math.sqrt(a)) <= near;
+    };
+    const close = stops.filter(reach);
+    if (!close.length) return 0;
     const maps = await this.hubs.hub.resolve('maps', t.info.id, t.info.slug).catch(() => null);
     let told = 0;
-    for (const s of stops) {
+    for (const s of close) {
       const eta = await maps?.adapter.maps?.eta(maps.ctx, [p.lat, p.lng], [s.lat, s.lng]).catch(() => null);
       if (!eta || eta.minutes > near) continue;
       const claimed = await t.pool.query('insert into bus_near_sent (stop_id, day, kind) values ($1,$2,$3) on conflict do nothing', [s.id, today, kind]);

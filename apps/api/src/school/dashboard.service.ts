@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { schoolZone, DEFAULT_BRAND, addDays, dayLabel, hueOf, dayMonth, dayName, schoolMinutes, schoolNow, schoolToday, latestSchoolDay, schoolDaysEnding, type DashboardData, type Vocabulary, type FeeSummary, type SearchHit, type ShellData } from '@tangent/contracts';
+import { schoolZone, DEFAULT_BRAND, addDays, dayLabel, hueOf, dayMonth, dayName, schoolMinutes, schoolNow, schoolToday, type DashboardData, type Vocabulary, type FeeSummary, type SearchHit, type ShellData } from '@tangent/contracts';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { ApprovalsService } from './approvals.service.js';
 import { AttendanceService } from './attendance.service.js';
@@ -26,9 +26,8 @@ export class DashboardService {
   ) {}
 
   async get(t: TenantCtx, user: { id: string; name: string; permissions: readonly string[] }, count = 6): Promise<DashboardData> {
-    const OFF_DAYS = await this.settings.offDays(t);
     const today = schoolToday();
-    const last = latestSchoolDay(today, OFF_DAYS);
+    const { last, days } = await this.settings.openDays(t, count);
     const doc = await this.settings.doc(t);
     const v = doc.values;
     // The classes this person chose for the roll-call widget, else the school's choice (People → Academic year), else the first six.
@@ -49,7 +48,7 @@ export class DashboardService {
       on('attendance', () => this.attendance.unmarked(t), []),
       on('attendance', () => t.pool.query<{ present: string }>("select count(*) filter (where d.status in ('present','late','half_day')) present from attendance_days d where d.date = $1", [last]), { rows: [{ present: '0' }] }),
       on('attendance', () => t.pool.query<{ pct: number | null }>("select avg(case when m.status in ('present','late','half_day') then 1.0 else 0.0 end) pct from attendance_sessions s join attendance_marks m on m.session_id = s.id where s.date = $1", [addDays(last, -7)]), { rows: [{ pct: null }] }),
-      on('homework', () => this.homeworkWeek(t, last, count), Array.from({ length: count }, () => 0)),
+      on('homework', () => this.homeworkWeek(t, days), days.map(() => 0)),
       on('attendance', () => this.classRolls(t, last, rollIds), []),
       on('events', () => t.pool.query<{ id: string; at: Date; title: string; note: string }>("select id, starts_at at, title, note from events where (starts_at at time zone $2)::date = $1 order by starts_at", [last, schoolZone()]), noRows),
       t.pool.query<{ n: string }>('select count(*) n from classes'),
@@ -75,7 +74,6 @@ export class DashboardService {
     const progress = !isToday ? 100 : Math.max(0, Math.min(100, Math.round(((mins - first) / Math.max(1, lastM - first)) * 100)));
     const goalA = Number(v['attendance.goalPct'] ?? 95);
     const goalH = Number(v['homework.goalPct'] ?? 85);
-    const days = schoolDaysEnding(last, count, OFF_DAYS);
     return {
       modules,
       greetingName: me.rows[0]?.name ?? user.name, roleLabel: me.rows[0]?.role_name ?? (user.id.startsWith('support:') ? 'Tangent support' : ''), schoolName: String(v['school.name'] ?? t.info.name),
@@ -102,9 +100,7 @@ export class DashboardService {
     };
   }
 
-  private async homeworkWeek(t: TenantCtx, last: string, count: number): Promise<number[]> {
-    const OFF_DAYS = await this.settings.offDays(t);
-    const days = schoolDaysEnding(last, count, OFF_DAYS);
+  private async homeworkWeek(t: TenantCtx, days: string[]): Promise<number[]> {
     const { rows } = await t.pool.query<{ d: string; pct: number | null }>(
       `select to_char(h.assigned_on,'YYYY-MM-DD') d, avg(case when hs.on_time then 100.0 else 0.0 end) pct from homework h join homework_submissions hs on hs.homework_id = h.id where h.assigned_on = any($1::date[]) group by 1`, [days]);
     const m = new Map(rows.map((r) => [r.d, Math.round(Number(r.pct ?? 0))]));
@@ -113,7 +109,7 @@ export class DashboardService {
 
   private async classRolls(t: TenantCtx, last: string, ids: string[]): Promise<DashboardData['classRolls']> {
     const { rows } = await t.pool.query<{ id: string; name: string; size: string; present: string; late: string; absent: string; marked: string }>(
-      `select c.id, c.name, (select count(*) from students s where s.class_id = c.id) size,
+      `select c.id, c.name, (select count(*) from students s where s.class_id = c.id and s.status = 'active') size,
          count(m.status) filter (where m.status in ('present','half_day')) present, count(m.status) filter (where m.status = 'late') late,
          count(m.status) filter (where m.status in ('absent','leave')) absent, count(m.status) marked
        from classes c left join attendance_days m on m.class_id = c.id and m.date = $2

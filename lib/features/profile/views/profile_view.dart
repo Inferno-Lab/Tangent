@@ -106,16 +106,16 @@ class ProfileView extends GetView<ProfileController> {
       );
     }
     final t = teacher!;
-    final code = t.id.toUpperCase().replaceAll('_', '-');
     return IdBadge(
       accent: AppColors.subject(t.subject).fill,
       school: AppConfig.schoolName,
       kind: 'profile.kind_staff'.tr,
       name: t.name,
       line: 'profile.teacher_of'.trp({'subject': subjectName(t.subject)}),
-      fields: [('profile.id_number'.tr, code), ('profile.subject'.tr, subjectName(t.subject)), ('profile.year'.tr, year)],
-      code: code,
-      codeTitle: 'profile.id_number'.tr,
+      // Staff have no number of their own at the school: the card never shows the account's internal ID as one.
+      fields: [('profile.subject'.tr, subjectName(t.subject)), ('profile.year'.tr, year)],
+      code: '',
+      codeTitle: '',
       back: [
         ('profile.classes'.tr, controller.teaching.map((c) => c.label).join(', ')),
         if (t.phone.isNotEmpty) ('profile.phone'.tr, t.phone),

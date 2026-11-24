@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { slotDays, tx, type Clash, type CoverRequest, type PeriodDef, type PeriodTimesPut, type PeriodTimesRow, type RoomBookingCreate, type RoomDay, type RoomRow, type RoomSave, type SlotCreate, type SlotPatch, type SlotRow, type TeacherLoad, type TeacherOption, type TimetableDay, type TimetableView, type WeekOf } from '@tangent/contracts';
+import { slotDays, tx, type Clash, type CoverRequest, type CoverRow, type LessonOn, type PeriodDef, type PeriodTimesPut, type PeriodTimesRow, type RoomBookingCreate, type RoomDay, type RoomRow, type RoomSave, type SlotCreate, type SlotPatch, type SlotRow, type TeacherLoad, type TeacherOption, type TimetableDay, type TimetableView, type WeekOf } from '@tangent/contracts';
 import { newId } from '@tangent/db';
 import { schoolToday } from '@tangent/contracts';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
@@ -21,14 +21,14 @@ const RELATED: Record<string, string[]> = {
 /** Teachers needing to be in two rooms in the same period. Cover (when set) replaces the class's own teacher. */
 const CLASH_SQL = `
   select eff.teacher_id, u.name teacher_name, eff.day, eff.period, array_agg(eff.id order by c.grade, c.section) slot_ids, array_agg(c.name order by c.grade, c.section) class_names
-  from (select id, class_id, day, period, coalesce(cover_teacher_id, teacher_id) teacher_id from timetable_slots) eff
+  from (select id, class_id, day, period, coalesce(cover_teacher_id, teacher_id) teacher_id from draft_slots) eff
   join classes c on c.id = eff.class_id join users u on u.id = eff.teacher_id
   group by eff.teacher_id, u.name, eff.day, eff.period having count(*) > 1 order by eff.day, eff.period`;
 
 /** Two classes timetabled in one room in the same period (once the school keeps a rooms list: before, a room is only words). */
 const ROOM_CLASH_SQL = `
   select lower(ts.room) room_key, min(ts.room) room, ts.day, ts.period, array_agg(ts.id order by c.grade, c.section) slot_ids, array_agg(c.name order by c.grade, c.section) class_names
-  from timetable_slots ts join classes c on c.id = ts.class_id where coalesce(ts.room, '') <> '' and exists (select 1 from rooms r where lower(r.name) = lower(ts.room))
+  from draft_slots ts join classes c on c.id = ts.class_id where coalesce(ts.room, '') <> '' and exists (select 1 from rooms r where lower(r.name) = lower(ts.room))
   group by lower(ts.room), ts.day, ts.period having count(*) > 1 order by ts.day, ts.period`;
 
 @Injectable()
@@ -49,7 +49,7 @@ export class TimetableService {
     const [teachers, rooms, mine] = await Promise.all([
       t.pool.query<{ teacher_id: string; teacher_name: string; day: number; period: number; slot_ids: string[]; class_names: string[] }>(CLASH_SQL),
       t.pool.query<{ room_key: string; room: string; day: number; period: number; slot_ids: string[]; class_names: string[] }>(ROOM_CLASH_SQL),
-      classId ? t.pool.query<{ id: string }>('select id from timetable_slots where class_id = $1', [classId]) : null,
+      classId ? t.pool.query<{ id: string }>('select id from draft_slots where class_id = $1', [classId]) : null,
     ]);
     // Only the clashes this class is part of, when a class is asked for.
     const own = mine ? new Set(mine.rows.map((r) => r.id)) : null;
@@ -79,7 +79,7 @@ export class TimetableService {
     const found = listed.find((r) => r.name.toLowerCase() === name.toLowerCase());
     if (listed.length && !found) throw new ApiError('validation', tx('Choose one of the school’s rooms.'), { fields: { room: tx('Not one of the rooms.') } });
     // Without a rooms list a room is only a name ("Lab" may be three rooms), so only a listed room is kept to one class at a time.
-    if (found && (await t.pool.query('select 1 from timetable_slots where lower(room) = lower($1) and day = $2 and period = $3 and id is distinct from $4', [name, day, period, slotId])).rowCount) {
+    if (found && (await t.pool.query('select 1 from draft_slots where lower(room) = lower($1) and day = $2 and period = $3 and id is distinct from $4', [name, day, period, slotId])).rowCount) {
       throw new ApiError('conflict', tx('Another class is in {room} then.', { room: name }), { fields: { room: tx('Taken then.') } });
     }
     return found?.name ?? name;
@@ -87,13 +87,13 @@ export class TimetableService {
 
   /** Someone who already teaches one of the classes and is free then: a related subject first, then the lightest week. */
   private async suggest(t: TenantCtx, slotIds: string[], day: number, period: number): Promise<Clash['suggestion']> {
-    const subject = await t.pool.query<{ subject_id: string }>('select subject_id from timetable_slots where id = $1', [slotIds[0]]);
+    const subject = await t.pool.query<{ subject_id: string }>('select subject_id from draft_slots where id = $1', [slotIds[0]]);
     const related = RELATED[subject.rows[0]?.subject_id ?? ''] ?? [];
     const { rows } = await t.pool.query<{ id: string; name: string; load: string; subject: string }>(
-      `with cls as (select distinct class_id from timetable_slots where id = any($1)),
-       busy as (select coalesce(cover_teacher_id, teacher_id) tid from timetable_slots where day = $2 and period = $3)
-       select u.id, u.name, s.name subject, (select count(*) from timetable_slots x where coalesce(x.cover_teacher_id, x.teacher_id) = u.id) load
-       from timetable_slots ts join cls on cls.class_id = ts.class_id join users u on u.id = ts.teacher_id join subjects s on s.id = ts.subject_id
+      `with cls as (select distinct class_id from draft_slots where id = any($1)),
+       busy as (select coalesce(cover_teacher_id, teacher_id) tid from draft_slots where day = $2 and period = $3)
+       select u.id, u.name, s.name subject, (select count(*) from draft_slots x where coalesce(x.cover_teacher_id, x.teacher_id) = u.id) load
+       from draft_slots ts join cls on cls.class_id = ts.class_id join users u on u.id = ts.teacher_id join subjects s on s.id = ts.subject_id
        where u.id not in (select tid from busy) group by u.id, u.name, s.name, s.id order by array_position($4::text[], s.id) nulls last, load, u.name limit 1`, [slotIds, day, period, related]);
     const r = rows[0];
     return r ? { teacherId: r.id, teacherName: r.name, reason: `${r.name.split(' ')[0]} teaches ${r.subject} to this class and is free then.` } : null;
@@ -107,15 +107,15 @@ export class TimetableService {
       t.pool.query<SlotQ>(
         `select ts.id, ts.class_id, ts.day, ts.period, ts.subject_id, s.name subject_name, s.color subject_color, ts.teacher_id, u.name teacher_name, ts.room,
            ts.cover_teacher_id cover_id, cu.name cover_name
-         from timetable_slots ts join subjects s on s.id = ts.subject_id join users u on u.id = ts.teacher_id left join users cu on cu.id = ts.cover_teacher_id
+         from draft_slots ts join subjects s on s.id = ts.subject_id join users u on u.id = ts.teacher_id left join users cu on cu.id = ts.cover_teacher_id
          where ts.class_id = $1 order by ts.day, ts.period`, [classId]),
       this.clashes(t, classId),
       t.pool.query<{ key: string; value: unknown }>("select key, value from meta where key in ('timetable.version','timetable.publishedAt')"),
       t.pool.query<{ id: string; name: string; color: string; missing: number }>(
-        `select s.id, s.name, s.color, s.per_week - count(ts.id)::int missing from subjects s left join timetable_slots ts on ts.subject_id = s.id and ts.class_id = $1
+        `select s.id, s.name, s.color, s.per_week - count(ts.id)::int missing from subjects s left join draft_slots ts on ts.subject_id = s.id and ts.class_id = $1
          group by s.id, s.name, s.color, s.per_week having s.per_week - count(ts.id) > 0 order by s.name`, [classId]),
       t.pool.query<{ n: string }>(
-        `select count(*) n from timetable_slots where (teacher_id is distinct from published_teacher_id or subject_id is distinct from published_subject_id or cover_teacher_id is distinct from published_cover_id)`),
+        `select count(*) n from timetable_slots where removed or teacher_id is distinct from published_teacher_id or subject_id is distinct from published_subject_id or cover_teacher_id is distinct from published_cover_id or room is distinct from published_room`),
       this.days(t),
       // The class's own times win over the school's for that day.
       t.pool.query<{ day: number; period: number; starts_at: string; ends_at: string }>(
@@ -142,12 +142,12 @@ export class TimetableService {
     if (patch.subjectId) add('subject_id', patch.subjectId);
     if (patch.teacherId) { add('teacher_id', patch.teacherId); sets.push('cover_teacher_id = null'); }
     if (patch.room !== undefined) {
-      const at = (await t.pool.query<{ day: number; period: number }>('select day, period from timetable_slots where id = $1', [id])).rows[0];
+      const at = (await t.pool.query<{ day: number; period: number }>('select day, period from draft_slots where id = $1', [id])).rows[0];
       if (!at) throw notFound('That period');
       add('room', await this.checkRoom(t, patch.room, at.day, at.period, id));
     }
     if (!sets.length) throw new ApiError('validation', 'Nothing to change.');
-    const res = await t.pool.query(`update timetable_slots set ${sets.join(', ')} where id = $1`, params);
+    const res = await t.pool.query(`update timetable_slots set ${sets.join(', ')} where id = $1 and not removed`, params);
     if (!res.rowCount) throw notFound('That period');
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'timetable.slot_changed', entity: 'slot', entityId: id, detail: patch as Record<string, unknown> });
   }
@@ -160,22 +160,26 @@ export class TimetableService {
   async createSlot(t: TenantCtx, user: { id: string; name: string }, b: SlotCreate): Promise<{ id: string }> {
     await this.editable(t);
     if (!(await this.days(t)).some((d) => d.day === b.day)) throw new ApiError('validation', tx('That day is not one of your timetable’s days.'));
-    if ((await t.pool.query('select 1 from timetable_slots where class_id = $1 and day = $2 and period = $3', [b.classId, b.day, b.period])).rowCount) throw new ApiError('conflict', 'That period already has a lesson. Change it instead.');
+    if ((await t.pool.query('select 1 from draft_slots where class_id = $1 and day = $2 and period = $3', [b.classId, b.day, b.period])).rowCount) throw new ApiError('conflict', 'That period already has a lesson. Change it instead.');
     if (!(await t.pool.query("select 1 from periods where idx = $1 and kind = 'period'", [b.period])).rowCount) throw new ApiError('validation', 'That is not a teaching period.');
-    if ((await t.pool.query('select 1 from timetable_slots where day = $1 and period = $2 and coalesce(cover_teacher_id, teacher_id) = $3', [b.day, b.period, b.teacherId])).rowCount) {
+    if ((await t.pool.query('select 1 from draft_slots where day = $1 and period = $2 and coalesce(cover_teacher_id, teacher_id) = $3', [b.day, b.period, b.teacherId])).rowCount) {
       throw new ApiError('conflict', 'That teacher already has a class in this period.', { fields: { teacherId: 'Busy then.' } });
     }
     const room = await this.checkRoom(t, b.room, b.day, b.period, null);
-    const id = newId('slt');
-    await t.pool.query('insert into timetable_slots (id, class_id, day, period, subject_id, teacher_id, room) values ($1,$2,$3,$4,$5,$6,$7)', [id, b.classId, b.day, b.period, b.subjectId, b.teacherId, room]);
+    // A lesson taken out but not yet published holds the period: placing one there again takes its place in the draft.
+    const back = (await t.pool.query<{ id: string }>('update timetable_slots set subject_id = $4, teacher_id = $5, room = $6, cover_teacher_id = null, removed = false where class_id = $1 and day = $2 and period = $3 and removed returning id',
+      [b.classId, b.day, b.period, b.subjectId, b.teacherId, room])).rows[0];
+    const id = back?.id ?? newId('slt');
+    if (!back) await t.pool.query('insert into timetable_slots (id, class_id, day, period, subject_id, teacher_id, room) values ($1,$2,$3,$4,$5,$6,$7)', [id, b.classId, b.day, b.period, b.subjectId, b.teacherId, room]);
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'timetable.slot_placed', entity: 'slot', entityId: id, detail: { class: b.classId, day: b.day, period: b.period } });
     return { id };
   }
 
-  /** Frees a period: the class has no lesson then. */
+  /** Frees a period: the class has no lesson then. A lesson families already see stays theirs until the timetable is published. */
   async removeSlot(t: TenantCtx, user: { id: string; name: string }, id: string): Promise<void> {
     await this.editable(t);
-    const r = await t.pool.query('delete from timetable_slots where id = $1', [id]);
+    const marked = await t.pool.query('update timetable_slots set removed = true where id = $1 and not removed and published_subject_id is not null', [id]);
+    const r = marked.rowCount ? marked : await t.pool.query('delete from timetable_slots where id = $1 and not removed', [id]);
     if (!r.rowCount) throw notFound('That period');
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'timetable.slot_freed', entity: 'slot', entityId: id });
   }
@@ -188,7 +192,7 @@ export class TimetableService {
       t.pool.query<SlotQ & { class_name: string }>(
         `select ts.id, ts.class_id, c.name class_name, ts.day, ts.period, ts.subject_id, s.name subject_name, s.color subject_color, ts.teacher_id, u.name teacher_name, ts.room,
            ts.cover_teacher_id cover_id, cu.name cover_name
-         from timetable_slots ts join classes c on c.id = ts.class_id join subjects s on s.id = ts.subject_id join users u on u.id = ts.teacher_id left join users cu on cu.id = ts.cover_teacher_id
+         from draft_slots ts join classes c on c.id = ts.class_id join subjects s on s.id = ts.subject_id join users u on u.id = ts.teacher_id left join users cu on cu.id = ts.cover_teacher_id
          where ${where} order by ts.day, ts.period`, [by.teacherId ?? by.room]),
       by.teacherId ? t.pool.query<{ name: string }>('select name from users where id = $1', [by.teacherId]) : null,
       this.days(t),
@@ -205,14 +209,14 @@ export class TimetableService {
 
   /** The rooms the timetable uses, for the room view: the school's list, and any room a lesson names that is not on it. */
   async rooms(t: TenantCtx): Promise<string[]> {
-    return (await t.pool.query<{ room: string }>("select name room from rooms union select distinct room from timetable_slots where coalesce(room, '') <> '' order by 1")).rows.map((r) => r.room);
+    return (await t.pool.query<{ room: string }>("select name room from rooms union select distinct room from draft_slots where coalesce(room, '') <> '' order by 1")).rows.map((r) => r.room);
   }
 
   // Rooms and their bookings
 
   async roomList(t: TenantCtx): Promise<RoomRow[]> {
     const { rows } = await t.pool.query<{ id: string; name: string; capacity: number | null; note: string; bookable: boolean; lessons: string }>(
-      'select r.*, (select count(*) from timetable_slots ts where lower(ts.room) = lower(r.name)) lessons from rooms r order by lower(r.name)');
+      'select r.*, (select count(*) from draft_slots ts where lower(ts.room) = lower(r.name)) lessons from rooms r order by lower(r.name)');
     return rows.map((r) => ({ id: r.id, name: r.name, capacity: r.capacity, note: r.note, bookable: r.bookable, lessons: Number(r.lessons) }));
   }
 
@@ -226,7 +230,7 @@ export class TimetableService {
       const was = (await t.pool.query<{ name: string }>('select name from rooms where id = $1', [id])).rows[0];
       if (!was) throw notFound('That room');
       await t.pool.query('update rooms set name = $2, capacity = $3, note = $4, bookable = $5 where id = $1', [id, b.name, b.capacity ?? null, b.note, b.bookable]);
-      if (was.name !== b.name) await t.pool.query('update timetable_slots set room = $2 where lower(room) = lower($1)', [was.name, b.name]);
+      if (was.name !== b.name) await t.pool.query('update timetable_slots set room = case when lower(room) = lower($1) then $2 else room end, published_room = case when lower(published_room) = lower($1) then $2 else published_room end where lower(room) = lower($1) or lower(published_room) = lower($1)', [was.name, b.name]);
     } else {
       await t.pool.query('insert into rooms (id, name, capacity, note, bookable) values ($1,$2,$3,$4,$5)', [newId('rm'), b.name, b.capacity ?? null, b.note, b.bookable]);
     }
@@ -252,7 +256,7 @@ export class TimetableService {
     const day = await this.settings.slotDay(t, date);
     const [lessons, bookings] = await Promise.all([
       day === null ? { rows: [] } : t.pool.query<{ start: string; end: string; label: string }>(
-        `select st.starts_at start, st.ends_at "end", c.name || ' · ' || s.name label from timetable_slots ts join slot_times st on st.slot_id = ts.id
+        `select st.starts_at start, st.ends_at "end", c.name || ' · ' || s.name label from live_slots ts join slot_times st on st.slot_id = ts.id
          join classes c on c.id = ts.class_id join subjects s on s.id = ts.subject_id where lower(ts.room) = lower($1) and ts.day = $2 order by st.starts_at`, [room.name, day]),
       t.pool.query<{ id: string; starts_at: string; ends_at: string; purpose: string; booked_by: string | null; who: string | null }>(
         'select b.id, b.starts_at, b.ends_at, b.purpose, b.booked_by, u.name who from room_bookings b left join users u on u.id = b.booked_by where b.room_id = $1 and b.date = $2 order by b.starts_at', [roomId, date]),
@@ -317,25 +321,100 @@ export class TimetableService {
     return this.periodTimes(t);
   }
 
+  /**
+   * Someone else takes a lesson. With a date, for that day only (a teacher away): the published lesson keeps its own teacher
+   * every other week. Without one, from now on in the draft timetable (a clash fixed), until it is changed again.
+   */
   async cover(t: TenantCtx, user: { id: string; name: string }, body: CoverRequest): Promise<void> {
+    await this.editable(t);
+    if (!(await t.pool.query("select 1 from users where id = $1 and kind = 'staff' and status = 'active'", [body.teacherId])).rowCount) {
+      throw new ApiError('validation', tx('Choose someone from the staff list.'), { fields: { teacherId: tx('Choose from the list.') } });
+    }
+    if (body.date) return this.coverDay(t, user, body.slotId, body.teacherId, body.date);
     const busy = await t.pool.query<{ n: string }>(
-      `select count(*) n from timetable_slots x join timetable_slots me on me.id = $1 where x.day = me.day and x.period = me.period and x.id <> me.id and coalesce(x.cover_teacher_id, x.teacher_id) = $2`, [body.slotId, body.teacherId]);
+      `select count(*) n from draft_slots x join draft_slots me on me.id = $1 where x.day = me.day and x.period = me.period and x.id <> me.id and coalesce(x.cover_teacher_id, x.teacher_id) = $2`, [body.slotId, body.teacherId]);
     if (Number(busy.rows[0]!.n) > 0) throw new ApiError('conflict', 'That teacher already has a class in this period.');
     const res = await t.pool.query('update timetable_slots set cover_teacher_id = $2 where id = $1', [body.slotId, body.teacherId]);
     if (!res.rowCount) throw notFound('That period');
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'timetable.cover_set', entity: 'slot', entityId: body.slotId, detail: { teacher: body.teacherId } });
   }
 
+  private async coverDay(t: TenantCtx, user: { id: string; name: string }, slotId: string, teacherId: string, date: string): Promise<void> {
+    const slot = (await t.pool.query<{ day: number; period: number; teacher_id: string }>('select day, period, coalesce(cover_teacher_id, teacher_id) teacher_id from live_slots where id = $1', [slotId])).rows[0];
+    if (!slot) throw new ApiError('conflict', tx('This lesson is not in the published timetable yet. Publish it first.'));
+    if (date < schoolToday()) throw new ApiError('validation', tx('Pick today or a later day.'), { fields: { date: tx('That day has passed.') } });
+    if ((await this.settings.slotDay(t, date)) !== slot.day) throw new ApiError('validation', tx('This lesson is not on that day.'), { fields: { date: tx('No such lesson that day.') } });
+    // Back to its own teacher: the day's cover is taken away.
+    if (teacherId === slot.teacher_id) { await this.uncover(t, user, slotId, date); return; }
+    // Free then: no lesson of their own that day and period (unless someone covers it), and no other cover then.
+    const busy = await t.pool.query(
+      `select 1 from live_slots x where x.day = $1 and x.period = $2 and x.id <> $3 and coalesce(x.cover_teacher_id, x.teacher_id) = $4
+         and not exists (select 1 from substitutions s where s.slot_id = x.id and s.date = $5)
+       union all select 1 from substitutions s join live_slots x on x.id = s.slot_id where s.date = $5 and x.period = $2 and s.slot_id <> $3 and s.teacher_id = $4 limit 1`,
+      [slot.day, slot.period, slotId, teacherId, date]);
+    if (busy.rowCount) throw new ApiError('conflict', 'That teacher already has a class in this period.');
+    await t.pool.query(`insert into substitutions (id, slot_id, date, teacher_id, created_by) values ($1,$2,$3,$4,$5)
+      on conflict (slot_id, date) do update set teacher_id = excluded.teacher_id, created_by = excluded.created_by, created_at = now()`, [newId('sub'), slotId, date, teacherId, user.id]);
+    await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'timetable.cover_day', entity: 'slot', entityId: slotId, detail: { teacher: teacherId, date } });
+  }
+
+  /** Takes a day's cover away: the lesson's own teacher takes it that day. */
+  async uncover(t: TenantCtx, user: { id: string; name: string }, slotId: string, date: string): Promise<void> {
+    await this.editable(t);
+    const r = await t.pool.query('delete from substitutions where slot_id = $1 and date = $2', [slotId, date]);
+    if (!r.rowCount) throw notFound(tx('That cover'));
+    await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'timetable.cover_removed', entity: 'slot', entityId: slotId, detail: { date } });
+  }
+
+  /** Covers arranged from today on, for the timetable page's list (and a teacher's lessons on a day, from Staff attendance). */
+  async covers(t: TenantCtx, q: { teacherId?: string; date?: string } = {}): Promise<CoverRow[]> {
+    const { rows } = await t.pool.query<{ slot_id: string; date: string; class_name: string; subject: string; period: number; label: string; teacher_id: string; teacher: string; own_id: string; own: string }>(
+      `select s.slot_id, s.date::text date, c.name class_name, sb.name subject, x.period, p.label, s.teacher_id, u.name teacher, coalesce(x.cover_teacher_id, x.teacher_id) own_id, ou.name own
+       from substitutions s join live_slots x on x.id = s.slot_id join classes c on c.id = x.class_id join subjects sb on sb.id = x.subject_id join periods p on p.idx = x.period
+         join users u on u.id = s.teacher_id join users ou on ou.id = coalesce(x.cover_teacher_id, x.teacher_id)
+       where s.date >= $1 and ($2::date is null or s.date = $2) and ($3::text is null or coalesce(x.cover_teacher_id, x.teacher_id) = $3)
+       order by s.date, x.period, c.grade, c.section limit 300`, [schoolToday(), q.date ?? null, q.teacherId ?? null]);
+    return rows.map((r) => ({ slotId: r.slot_id, date: r.date, className: r.class_name, subject: r.subject, period: r.period, periodLabel: r.label, teacherId: r.teacher_id, teacherName: r.teacher, ownTeacherId: r.own_id, ownTeacherName: r.own }));
+  }
+
+  /** A teacher's published lessons on one date, with any cover already arranged, so cover can be arranged for each. */
+  async lessonsOn(t: TenantCtx, teacherId: string, date: string): Promise<LessonOn[]> {
+    const day = await this.settings.slotDay(t, date);
+    if (day === null) return [];
+    const { rows } = await t.pool.query<{ id: string; class_name: string; subject: string; period: number; label: string; starts_at: string; ends_at: string; cover_id: string | null; cover: string | null }>(
+      `select x.id, c.name class_name, sb.name subject, x.period, p.label, st.starts_at, st.ends_at, s.teacher_id cover_id, u.name cover
+       from live_slots x join classes c on c.id = x.class_id join subjects sb on sb.id = x.subject_id join periods p on p.idx = x.period join slot_times st on st.slot_id = x.id
+         left join substitutions s on s.slot_id = x.id and s.date = $3 left join users u on u.id = s.teacher_id
+       where x.day = $2 and coalesce(x.cover_teacher_id, x.teacher_id) = $1 order by st.starts_at`, [teacherId, day, date]);
+    return rows.map((r) => ({ slotId: r.id, className: r.class_name, subject: r.subject, period: r.period, periodLabel: r.label, starts: r.starts_at, ends: r.ends_at, coverId: r.cover_id, coverName: r.cover }));
+  }
+
+  /** Who is free to cover one lesson on a date: staff with no lesson then and no other cover then, the lightest week first. */
+  async freeOn(t: TenantCtx, slotId: string, date: string): Promise<TeacherOption[]> {
+    const slot = (await t.pool.query<{ day: number; period: number }>('select day, period from live_slots where id = $1', [slotId])).rows[0];
+    if (!slot) throw notFound('That period');
+    const { rows } = await t.pool.query<{ id: string; name: string; subjects: string[]; load: string; max: number; free: boolean }>(
+      `select u.id, u.name, array(select s.name from staff_subjects ss join subjects s on s.id = ss.subject_id where ss.user_id = u.id order by s.name) subjects,
+         (select count(*) from live_slots x where coalesce(x.cover_teacher_id, x.teacher_id) = u.id) load, st.max_periods_per_week max,
+         not exists (select 1 from live_slots x where x.day = $1 and x.period = $2 and coalesce(x.cover_teacher_id, x.teacher_id) = u.id
+             and not exists (select 1 from substitutions s where s.slot_id = x.id and s.date = $3))
+           and not exists (select 1 from substitutions s join live_slots x on x.id = s.slot_id where s.date = $3 and x.period = $2 and s.teacher_id = u.id and s.slot_id <> $4) free
+       from users u join staff st on st.user_id = u.id where u.kind = 'staff' and u.status = 'active' order by free desc, load, u.name`, [slot.day, slot.period, date, slotId]);
+    return rows.map((r) => ({ id: r.id, name: r.name, subjects: r.subjects, load: Number(r.load), max: r.max, free: r.free }));
+  }
+
   /** Makes the draft the live timetable and tells the people it changes for. Refuses while any clash is open. */
   async publish(t: TenantCtx, user: { id: string; name: string }): Promise<{ families: number; teachers: number; version: number }> {
     if ((await this.clashes(t)).length) throw new ApiError('conflict', 'Fix the clash before publishing.');
     const changed = await t.pool.query<{ class_id: string; teacher_id: string }>(
-      `select class_id, coalesce(cover_teacher_id, teacher_id) teacher_id from timetable_slots
-       where teacher_id is distinct from published_teacher_id or subject_id is distinct from published_subject_id or cover_teacher_id is distinct from published_cover_id`);
+      `select class_id, coalesce(cover_teacher_id, teacher_id) teacher_id from timetable_slots where removed or teacher_id is distinct from published_teacher_id or subject_id is distinct from published_subject_id or cover_teacher_id is distinct from published_cover_id or room is distinct from published_room
+       union select class_id, coalesce(published_cover_id, published_teacher_id) from timetable_slots where (removed or teacher_id is distinct from published_teacher_id or subject_id is distinct from published_subject_id or cover_teacher_id is distinct from published_cover_id or room is distinct from published_room) and published_teacher_id is not null`);
     const classes = [...new Set(changed.rows.map((r) => r.class_id))];
     const teachers = [...new Set(changed.rows.map((r) => r.teacher_id))];
     const fam = classes.length ? await t.pool.query<{ n: string }>('select count(distinct sg.guardian_id) n from students s join student_guardians sg on sg.student_id = s.id where s.class_id = any($1)', [classes]) : null;
-    await t.pool.query('update timetable_slots set published_teacher_id = teacher_id, published_subject_id = subject_id, published_cover_id = cover_teacher_id');
+    // Lessons taken out leave now; every other lesson's draft becomes what families, teachers and the bus read.
+    await t.pool.query('delete from timetable_slots where removed');
+    await t.pool.query('update timetable_slots set published_teacher_id = teacher_id, published_subject_id = subject_id, published_cover_id = cover_teacher_id, published_room = room');
     await t.pool.query("update meta set value = to_jsonb((value)::int + 1) where key = 'timetable.version'");
     await t.pool.query("update meta set value = to_jsonb($1::text) where key = 'timetable.publishedAt'", [new Date().toISOString()]);
     const v = await t.pool.query<{ value: number }>("select value from meta where key = 'timetable.version'");
@@ -351,25 +430,25 @@ export class TimetableService {
   async teachers(t: TenantCtx, slotId: string): Promise<TeacherOption[]> {
     const { rows } = await t.pool.query<{ id: string; name: string; subjects: string[]; load: string; max: number; free: boolean }>(
       `select u.id, u.name, array(select s.name from staff_subjects ss join subjects s on s.id = ss.subject_id where ss.user_id = u.id order by s.name) subjects,
-         (select count(*) from timetable_slots x where coalesce(x.cover_teacher_id, x.teacher_id) = u.id) load, st.max_periods_per_week max,
-         not exists (select 1 from timetable_slots x join timetable_slots me on me.id = $1 where x.day = me.day and x.period = me.period and x.id <> me.id and coalesce(x.cover_teacher_id, x.teacher_id) = u.id) free
+         (select count(*) from draft_slots x where coalesce(x.cover_teacher_id, x.teacher_id) = u.id) load, st.max_periods_per_week max,
+         not exists (select 1 from draft_slots x join draft_slots me on me.id = $1 where x.day = me.day and x.period = me.period and x.id <> me.id and coalesce(x.cover_teacher_id, x.teacher_id) = u.id) free
        from users u join staff st on st.user_id = u.id where u.kind = 'staff' and u.status = 'active' and st.designation = 'Teacher' order by free desc, load, u.name`, [slotId]);
     return rows.map((r) => ({ id: r.id, name: r.name, subjects: r.subjects, load: Number(r.load), max: r.max, free: r.free }));
   }
 
   async loads(t: TenantCtx, classId: string): Promise<TeacherLoad[]> {
     const { rows } = await t.pool.query<{ id: string; name: string; load: string; max: number; subjects: string[] }>(
-      `select u.id, u.name, (select count(*) from timetable_slots x where coalesce(x.cover_teacher_id, x.teacher_id) = u.id) load, st.max_periods_per_week max,
+      `select u.id, u.name, (select count(*) from draft_slots x where coalesce(x.cover_teacher_id, x.teacher_id) = u.id) load, st.max_periods_per_week max,
          array(select s.name from staff_subjects ss join subjects s on s.id = ss.subject_id where ss.user_id = u.id) subjects
        from users u join staff st on st.user_id = u.id
-       where u.id in (select teacher_id from timetable_slots where class_id = $1 union select cover_teacher_id from timetable_slots where class_id = $1 and cover_teacher_id is not null)
+       where u.id in (select teacher_id from draft_slots where class_id = $1 union select cover_teacher_id from draft_slots where class_id = $1 and cover_teacher_id is not null)
        order by 3 desc, u.name`, [classId]);
     return rows.map((r) => ({ teacherId: r.id, name: r.name, periodsPerWeek: Number(r.load), max: r.max, subjects: r.subjects }));
   }
 
   async classes(t: TenantCtx): Promise<{ id: string; name: string; grade: number; section: string; studentCount: number; classTeacherId: string | null; classTeacherName: string | null }[]> {
     const { rows } = await t.pool.query<{ id: string; name: string; grade: number; section: string; n: string; tid: string | null; tname: string | null }>(
-      `select c.id, c.name, c.grade, c.section, (select count(*) from students s where s.class_id = c.id) n, c.class_teacher_id tid, u.name tname
+      `select c.id, c.name, c.grade, c.section, (select count(*) from students s where s.class_id = c.id and s.status = 'active') n, c.class_teacher_id tid, u.name tname
        from classes c left join users u on u.id = c.class_teacher_id order by c.grade, c.section`);
     return rows.map((r) => ({ id: r.id, name: r.name, grade: r.grade, section: r.section, studentCount: Number(r.n), classTeacherId: r.tid, classTeacherName: r.tname }));
   }

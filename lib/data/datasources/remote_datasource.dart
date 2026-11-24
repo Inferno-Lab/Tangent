@@ -9,8 +9,8 @@ class RemoteDataSource {
   Future<dynamic> get(String path, {Map<String, dynamic>? query}) =>
       client.get(path, query: query);
 
-  Future<dynamic> post(String path, Map<String, dynamic> body) =>
-      client.post(path, body);
+  Future<dynamic> post(String path, Map<String, dynamic> body, {Map<String, dynamic>? query}) =>
+      client.post(path, body, query: query);
 
   Future<dynamic> patch(String path, Map<String, dynamic> body) =>
       client.patch(path, body);

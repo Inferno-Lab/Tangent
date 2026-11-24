@@ -174,7 +174,7 @@ class DashboardController extends GetxController with Loadable {
           final tone = moneyStatus(item);
           if (tone == MoneyStatus.due || tone == MoneyStatus.overdue) {
             due.add(DueItem(kind: DueKind.fee, when: item.dueDate, installment: item, childName: name, studentId: id));
-            dueTotal += item.amount;
+            dueTotal += item.due;
           }
         }
         final work = await Get.find<HomeworkRepository>().forClass(child.classId);

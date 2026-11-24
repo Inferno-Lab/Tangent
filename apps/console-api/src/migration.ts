@@ -85,8 +85,8 @@ export class Migration implements OnModuleInit {
         n(pool, 'select count(*) n from fee_invoices'),
       ]);
       const [slots, outstanding] = await Promise.all([
-        n(pool, 'select count(*) n from timetable_slots'),
-        n(pool, 'select coalesce(sum(i.amount - i.waived_amount - coalesce((select sum(p.amount) from payments p where p.invoice_id = i.id), 0)), 0) n from fee_invoices i'),
+        n(pool, 'select count(*) n from live_slots'),
+        n(pool, 'select coalesce(sum(i.amount - i.waived_amount - coalesce((select sum(p.amount - p.refunded) from payments p where p.invoice_id = i.id), 0)), 0) n from fee_invoices i'),
       ]);
       const oldDues = typeof s.checklist['golive.old_dues'] === 'number' ? (s.checklist['golive.old_dues'] as number) : null;
       const ticked = (k: string) => s.checklist[`golive.${k}`] === true;

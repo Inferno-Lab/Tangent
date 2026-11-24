@@ -35,6 +35,7 @@ class Installment {
     this.paidOn,
     this.method,
     this.reference,
+    this.balance,
   });
 
   factory Installment.fromJson(Map<String, dynamic> json) =>
@@ -49,6 +50,15 @@ class Installment {
   final DateTime? paidOn;
   final String? method;
   final String? reference;
+
+  /// What is still to pay after any part payments (null from an older server: all of it until paid).
+  final num? balance;
+
+  /// What the family still owes on it: what Pay charges.
+  num get due => paid ? 0 : (balance ?? amount);
+
+  /// Paid so far, part payments at the desk included.
+  num get paidSoFar => amount - due;
 
   Installment copyWith({
     bool? paid,
@@ -65,6 +75,7 @@ class Installment {
       paidOn: paidOn ?? this.paidOn,
       method: method ?? this.method,
       reference: reference ?? this.reference,
+      balance: balance,
     );
   }
 

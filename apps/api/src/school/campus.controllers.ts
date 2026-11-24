@@ -447,7 +447,7 @@ export class FamilyCampusController {
     if (k === null && u.permissions.includes('gallery.read')) return this.g.albums(t);
     // A family sees its children's classes' published albums; staff who do not manage the gallery, the classes they teach.
     const classes = k === null
-      ? (await t.pool.query<{ id: string }>('select id from classes where class_teacher_id = $1 union select class_id from timetable_slots where teacher_id = $1 or cover_teacher_id = $1', [u.id])).rows.map((r) => r.id)
+      ? (await t.pool.query<{ id: string }>('select id from classes where class_teacher_id = $1 union select class_id from live_slots where teacher_id = $1 or cover_teacher_id = $1', [u.id])).rows.map((r) => r.id)
       : (await t.pool.query<{ class_id: string }>('select distinct class_id from students where id = any($1)', [k])).rows.map((r) => r.class_id);
     return this.g.albums(t, classes);
   }

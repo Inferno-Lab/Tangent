@@ -23,7 +23,8 @@ export const RequireModule = (key: string) => SetMetadata('module', key);
 export const Core = () => SetMetadata('module', 'core');
 export const CurrentUser = createParamDecorator((_: unknown, ctx: ExecutionContext): AuthedUser => ctx.switchToHttp().getRequest<FastifyRequest>().user!);
 
-const FAMILY_PATHS = /^\/v1\/(f\/|auth\/|me(\?|$)|config(\?|$)|brand(\?|$)|errors(\?|$))/;
+// A family's own choices (the language they read) are theirs to save, as staff save theirs.
+const FAMILY_PATHS = /^\/v1\/(f\/|auth\/|me(\/prefs)?(\?|$)|config(\?|$)|brand(\?|$)|errors(\?|$))/;
 
 @Injectable()
 export class AuthGuard implements CanActivate {

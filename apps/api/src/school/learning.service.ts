@@ -21,7 +21,7 @@ export class LearningService {
 
   // Homework
 
-  async homework(t: TenantCtx, q: { classId?: string; subjectId?: string; draftsOf?: string }): Promise<HomeworkRow[]> {
+  async homework(t: TenantCtx, q: { classId?: string; subjectId?: string; draftsOf?: string; id?: string }): Promise<HomeworkRow[]> {
     const { rows } = await t.pool.query<{
       id: string; class_id: string; class_name: string; subject_id: string; subject_name: string; title: string; description: string; assigned_on: string; due_on: string; max_marks: number;
       graded: boolean; handed: string; on_time: string; total: string; created_by: string | null; teacher_name: string | null;
@@ -29,8 +29,8 @@ export class LearningService {
       `select h.id, h.class_id, c.name class_name, h.subject_id, s.name subject_name, h.title, h.description, h.assigned_on::text, h.due_on::text, h.max_marks, h.graded, h.created_by, tu.name teacher_name,
          count(*) filter (where sub.handed_at is not null) handed, count(*) filter (where sub.on_time) on_time, count(sub.student_id) total
        from homework h join classes c on c.id = h.class_id join subjects s on s.id = h.subject_id left join users tu on tu.id = h.created_by left join homework_submissions sub on sub.homework_id = h.id
-       where ($1::text is null or h.class_id = $1) and ($2::text is null or h.subject_id = $2) and (h.status = 'set' or h.created_by = $3)
-       group by h.id, c.id, s.id, tu.name order by h.assigned_on desc, c.grade, c.section, h.id limit 120`, [q.classId ?? null, q.subjectId ?? null, q.draftsOf ?? '']);
+       where ($1::text is null or h.class_id = $1) and ($2::text is null or h.subject_id = $2) and ($4::text is null or h.id = $4) and (h.status = 'set' or h.created_by = $3 or $4::text is not null)
+       group by h.id, c.id, s.id, tu.name order by h.assigned_on desc, c.grade, c.section, h.id limit 120`, [q.classId ?? null, q.subjectId ?? null, q.draftsOf ?? '', q.id ?? null]);
     return rows.map((r) => ({
       id: r.id, classId: r.class_id, className: r.class_name, subjectId: r.subject_id, subjectName: r.subject_name, title: r.title, description: r.description,
       assignedOn: r.assigned_on, dueOn: r.due_on, maxMarks: r.max_marks, graded: r.graded, handedIn: Number(r.handed), onTime: Number(r.on_time), total: Number(r.total),
@@ -59,8 +59,8 @@ export class LearningService {
   }
 
   private async homeworkRow(t: TenantCtx, id: string): Promise<HomeworkRow> {
-    const cls = (await t.pool.query<{ class_id: string }>('select class_id from homework where id = $1', [id])).rows[0];
-    const hit = cls && (await this.homework(t, { classId: cls.class_id })).find((h) => h.id === id);
+    // Looked up by its id, however much newer homework the class has had since.
+    const [hit] = await this.homework(t, { id });
     if (!hit) throw notFound('That homework');
     return hit;
   }
@@ -73,14 +73,14 @@ export class LearningService {
 
   /** Changes homework already set (or still a draft); setting a draft tells the families. */
   async updateHomework(t: TenantCtx, user: User, id: string, body: HomeworkCreate): Promise<HomeworkDetail> {
-    const h = (await t.pool.query<{ created_by: string | null; status: string; class_id: string }>('select created_by, status, class_id from homework where id = $1', [id])).rows[0];
+    const h = (await t.pool.query<{ created_by: string | null; status: string; class_id: string; due_on: string }>('select created_by, status, class_id, due_on::text from homework where id = $1', [id])).rows[0];
     if (!h) throw notFound('That homework');
     if (h.class_id !== body.classId) throw new ApiError('validation', 'Homework stays with its class. Delete it and set it for the other class instead.');
-    await this.writeHomework(t, user, id, body, false, h.status);
+    await this.writeHomework(t, user, id, body, false, h.status, h.due_on);
     return this.homeworkDetail(t, id);
   }
 
-  private async writeHomework(t: TenantCtx, user: User, id: string, body: HomeworkCreate, isNew: boolean, was = 'draft'): Promise<void> {
+  private async writeHomework(t: TenantCtx, user: User, id: string, body: HomeworkCreate, isNew: boolean, was = 'draft', wasDue?: string): Promise<void> {
     await mayTeach(t, user, body.classId);
     const [cls, sub] = await Promise.all([
       t.pool.query<{ name: string }>('select name from classes where id = $1', [body.classId]),
@@ -89,7 +89,8 @@ export class LearningService {
     if (!cls.rows[0]) throw new ApiError('validation', 'Choose a class from the list.', { fields: { classId: 'Choose a class from the list.' } });
     if (!sub.rows[0]) throw new ApiError('validation', 'Choose a subject from the list.', { fields: { subjectId: 'Choose a subject from the list.' } });
     const today = schoolToday();
-    if (body.dueOn < today) throw new ApiError('validation', 'The due date cannot be in the past.', { fields: { dueOn: 'Pick today or a later day.' } });
+    // A due date already past stays as it was when other things are corrected; a new or moved one cannot be in the past.
+    if (body.dueOn < today && body.dueOn !== wasDue) throw new ApiError('validation', 'The due date cannot be in the past.', { fields: { dueOn: 'Pick today or a later day.' } });
     const status = body.draft ? 'draft' : 'set';
     const client = await t.pool.connect();
     try {
@@ -176,13 +177,13 @@ export class LearningService {
 
   // Exams
 
-  async exams(t: TenantCtx, classId?: string): Promise<ExamRow[]> {
+  async exams(t: TenantCtx, classId?: string, id?: string): Promise<ExamRow[]> {
     // An exam that has begun is being marked, whether or not a mark is in yet (it is never "coming up" once written).
     const today = schoolToday();
     const { rows } = await t.pool.query<{ id: string; name: string; kind: string; class_id: string; class_name: string; grade: number; starts_on: string; ends_on: string; status: ExamRow['status']; students: string; reopened_note: string }>(
       `select e.id, e.name, e.kind, e.class_id, c.name class_name, c.grade, e.starts_on::text, e.ends_on::text, e.status, e.reopened_note,
          (select count(*) from students s where s.class_id = e.class_id and s.status = 'active') students
-       from exams e join classes c on c.id = e.class_id where ($1::text is null or e.class_id = $1) order by e.starts_on desc, c.grade, c.section limit 100`, [classId ?? null]);
+       from exams e join classes c on c.id = e.class_id where ($1::text is null or e.class_id = $1) and ($2::text is null or e.id = $2) order by e.starts_on desc, c.grade, c.section limit 100`, [classId ?? null, id ?? null]);
     if (!rows.length) return [];
     const ids = rows.map((r) => r.id);
     const [subs, entered] = await Promise.all([
@@ -212,9 +213,10 @@ export class LearningService {
   }
 
   private async exam(t: TenantCtx, id: string): Promise<ExamRow> {
-    const cls = (await t.pool.query<{ class_id: string }>('select class_id from exams where id = $1', [id])).rows[0];
-    if (!cls) throw notFound('That exam');
-    return (await this.exams(t, cls.class_id)).find((e) => e.id === id)!;
+    // Looked up by its id, however many exams the class has had since.
+    const [e] = await this.exams(t, undefined, id);
+    if (!e) throw notFound('That exam');
+    return e;
   }
 
   /**
@@ -445,7 +447,10 @@ export class LearningService {
   /** Every student's result in the exams of the same name for the same year group (for a rank across the year). */
   private async yearRows(t: TenantCtx, exam: ExamRow, own: { pct: number }[]): Promise<{ pct: number }[]> {
     const others = (await t.pool.query<{ id: string }>(
-      'select e.id from exams e join classes c on c.id = e.class_id where e.name = $1 and e.id <> $2 and c.grade = (select grade from classes where id = $3)', [exam.name, exam.id, exam.classId])).rows;
+      // Only this year's sitting: the same name in another year was another year group's.
+      `select e.id from exams e join classes c on c.id = e.class_id where e.name = $1 and e.id <> $2 and c.grade = (select grade from classes where id = $3)
+         and e.starts_on between coalesce((select starts_on from academic_years where starts_on <= $4 and ends_on >= $4 order by starts_on desc limit 1), $4::date - 182)
+                             and coalesce((select ends_on from academic_years where starts_on <= $4 and ends_on >= $4 order by starts_on desc limit 1), $4::date + 182)`, [exam.name, exam.id, exam.classId, exam.startsOn])).rows;
     const out = [...own];
     for (const o of others) out.push(...(await this.scoreExam(t, o.id)).rows);
     return out;
@@ -476,7 +481,9 @@ export class LearningService {
       await client.query('begin');
       await client.query("update exams set status = 'published', published_at = now() where id = $1", [id]);
       for (const r of res.rows) {
-        await client.query('insert into exam_results (student_id, exam, grade, pct) values ($1,$2,$3,$4) on conflict (student_id, exam) do update set grade = excluded.grade, pct = excluded.pct', [r.studentId, res.exam.name, r.grade, r.pct]);
+        // Kept by the exam itself (its name comes back every year), with its name and first day for the trend and the record.
+        await client.query(`insert into exam_results (student_id, exam, grade, pct, exam_id, exam_name, taken_on) values ($1,$2,$3,$4,$2,$5,$6)
+          on conflict (student_id, exam) do update set grade = excluded.grade, pct = excluded.pct, exam_name = excluded.exam_name, taken_on = excluded.taken_on`, [r.studentId, res.exam.id, r.grade, r.pct, res.exam.name, res.exam.startsOn]);
       }
       await client.query('commit');
     } catch (err) {

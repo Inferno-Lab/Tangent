@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { type AttendanceMarkDef, type RegisterPart, markMeaning, schoolMinutes, schoolZone, addDays, dayName, schoolToday, latestSchoolDay, schoolDaysEnding, type AttendanceDay, type AttendanceDayPut, type AttendanceWeekPoint, type PeriodMarksPut, type PeriodRoll, tx } from '@tangent/contracts';
+import { type AttendanceMarkDef, type RegisterPart, markMeaning, schoolMinutes, schoolZone, addDays, dayName, schoolToday, type AttendanceDay, type AttendanceDayPut, type AttendanceWeekPoint, type PeriodMarksPut, type PeriodRoll, tx } from '@tangent/contracts';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { AuditService, Messenger, SettingsService, mayTeach } from './support.js';
@@ -95,6 +95,9 @@ export class AttendanceService {
     const bad = body.marks.find((m) => !ids.has(m.studentId));
     if (bad) throw new ApiError('validation', 'One of those students is not in this class.');
     const { part } = await this.partOf(t, body.part, body.date);
+    // What each student was marked before this save: families hear only about a mark that changed to absent or late.
+    const before = new Map((await t.pool.query<{ student_id: string; status: string }>(
+      'select m.student_id, m.status from attendance_marks m join attendance_sessions x on x.id = m.session_id where x.class_id = $1 and x.date = $2 and x.part = $3', [body.classId, body.date, part])).rows.map((r) => [r.student_id, r.status]));
     const client = await t.pool.connect();
     let sid = `att_${body.classId}_${body.date}${part === 'day' ? '' : `_${part}`}`;
     try {
@@ -121,7 +124,7 @@ export class AttendanceService {
       const wasAway = part === 'pm' ? new Set((await t.pool.query<{ student_id: string }>(
         "select m.student_id from attendance_marks m join attendance_sessions s on s.id = m.session_id where s.class_id = $1 and s.date = $2 and s.part = 'am' and m.status in ('absent','leave')",
         [body.classId, body.date])).rows.map((r) => r.student_id)) : new Set<string>();
-      const away = marks.filter((m) => (m.meaning === 'absent' || m.meaning === 'late') && !wasAway.has(m.studentId));
+      const away = marks.filter((m) => (m.meaning === 'absent' || m.meaning === 'late') && before.get(m.studentId) !== m.meaning && !wasAway.has(m.studentId));
       if (away.length) {
         const g = await t.pool.query<{ phone: string | null; name: string; student_id: string }>(
           'select g.phone, s.name, s.id student_id from students s join student_guardians sg on sg.student_id = s.id and sg.gets_messages join guardians g on g.id = sg.guardian_id where s.id = any($1)', [away.map((a) => a.studentId)]);
@@ -139,9 +142,10 @@ export class AttendanceService {
     const slotDay = (await this.settings.slotDay(t, date)) ?? 0;
     const [slots, marks, boss] = await Promise.all([
       t.pool.query<{ period: number; label: string; starts_at: string; ends_at: string; subject: string; teacher_id: string; teacher_name: string }>(
-        `select ts.period, p.label, st.starts_at, st.ends_at, s.name subject, coalesce(ts.cover_teacher_id, ts.teacher_id) teacher_id, u.name teacher_name
-         from timetable_slots ts join periods p on p.idx = ts.period join slot_times st on st.slot_id = ts.id join subjects s on s.id = ts.subject_id join users u on u.id = coalesce(ts.cover_teacher_id, ts.teacher_id)
-         where ts.class_id = $1 and ts.day = $2 order by st.starts_at`, [classId, slotDay]),
+        `select ts.period, p.label, st.starts_at, st.ends_at, s.name subject, coalesce(sub.teacher_id, ts.cover_teacher_id, ts.teacher_id) teacher_id, u.name teacher_name
+         from live_slots ts join periods p on p.idx = ts.period join slot_times st on st.slot_id = ts.id join subjects s on s.id = ts.subject_id
+           left join substitutions sub on sub.slot_id = ts.id and sub.date = $3 join users u on u.id = coalesce(sub.teacher_id, ts.cover_teacher_id, ts.teacher_id)
+         where ts.class_id = $1 and ts.day = $2 order by st.starts_at`, [classId, slotDay, date]),
       t.pool.query<{ period: number; student_id: string; status: PeriodRoll['periods'][number]['marks'][string]; marked_by: string | null }>(
         'select pm.period, pm.student_id, pm.status, u.name marked_by from period_marks pm left join users u on u.id = pm.marked_by where pm.class_id = $1 and pm.date = $2', [classId, date]),
       this.approves(t, user.id),
@@ -187,10 +191,7 @@ export class AttendanceService {
 
   /** Percentage present for each of the last six school days, with the same weekday a week earlier for comparison. */
   async week(t: TenantCtx, count = 6): Promise<AttendanceWeekPoint[]> {
-    const OFF_DAYS = await this.settings.offDays(t);
-    const today = schoolToday();
-    const last = latestSchoolDay(today, OFF_DAYS);
-    const days = schoolDaysEnding(last, count, OFF_DAYS);
+    const { last, days } = await this.settings.openDays(t, count);
     const before = days.map((d) => addDays(d, -7));
     const { rows } = await t.pool.query<{ d: string; present: string; total: string }>(
       `select to_char(s.date,'YYYY-MM-DD') d, count(*) filter (where m.status in ('present','late','half_day')) present, count(*) total
@@ -204,11 +205,11 @@ export class AttendanceService {
   }
 
   async unmarked(t: TenantCtx): Promise<{ id: string; name: string; teacherId: string | null }[]> {
-    const OFF_DAYS = await this.settings.offDays(t);
-    const last = latestSchoolDay(schoolToday(), OFF_DAYS);
+    // The latest day the school was open: never a weekly off day or a holiday, when there is nothing to mark.
+    const { last } = await this.settings.openDays(t);
     const { rows } = await t.pool.query<{ id: string; name: string; teacher: string | null }>(
       `select c.id, c.name, c.class_teacher_id teacher from classes c where not exists (select 1 from attendance_sessions a where a.class_id = c.id and a.date = $1)
-       and exists (select 1 from students s where s.class_id = c.id) order by c.grade, c.section`, [last]);
+       and exists (select 1 from students s where s.class_id = c.id and s.status = 'active') order by c.grade, c.section`, [last]);
     return rows.map((r) => ({ id: r.id, name: r.name, teacherId: r.teacher }));
   }
 

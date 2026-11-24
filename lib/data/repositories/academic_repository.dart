@@ -31,10 +31,18 @@ class AttendanceRepository {
     };
   }
 
-  Future<void> markToday(Map<String, AttendanceStatus> byStudent) async {
-    await _remote.post('/attendance', {
-      for (final entry in byStudent.entries) entry.key: entry.value == AttendanceStatus.lateArrival ? 'late' : entry.value.name,
-    });
+  /// A class's register for one day as the school keeps it: each student's mark by the school's own key (null: not marked
+  /// yet), with leave the school approved already filled in.
+  Future<Map<String, String?>> rollCall(String classId, String date) async {
+    final json = Map<String, dynamic>.from(await _remote.get('/attendance/roll', query: {'classId': classId, 'date': date}) as Map);
+    return {for (final m in (json['marks'] as List? ?? const [])) '${(m as Map)['studentId']}': m['status'] as String?};
+  }
+
+  /// Marks a class's register for [date], every student by the school's mark key. True when it waits on the phone to be
+  /// sent (no signal); it is still that day's register when it goes.
+  Future<bool> markDay(String date, Map<String, String> byStudent) async {
+    final r = await _remote.post('/attendance', byStudent, query: {'date': date});
+    return r is Map && r['queued'] == true;
   }
 }
 

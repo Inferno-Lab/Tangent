@@ -16,7 +16,8 @@ class FeesController extends GetxController with Loadable {
 
   num get total => account?.installments.fold<num>(0, (sum, i) => sum + i.amount) ?? 0;
 
-  num get paid => account?.installments.where((i) => i.paid).fold<num>(0, (sum, i) => sum + i.amount) ?? 0;
+  /// Paid so far, part payments at the desk included.
+  num get paid => account?.installments.fold<num>(0, (sum, i) => sum + i.paidSoFar) ?? 0;
 
   /// The installment to pay next: overdue first, then the soonest due.
   Installment? get next {

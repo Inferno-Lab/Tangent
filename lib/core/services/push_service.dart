@@ -49,8 +49,19 @@ class PushService extends GetxService {
     if (first != null) _open(first);
   }
 
+  /// Before signing out, while the session still works: the school stops sending this account's notifications here.
+  Future<void> forget() async {
+    final token = _token;
+    if (token == null) return;
+    try {
+      await _remote.delete('/devices/${Uri.encodeComponent(token)}');
+    } on Object {
+      // Offline: the token is thrown away below, and the Hub forgets it when Google calls it unregistered.
+    }
+  }
+
   /// On sign-out: this phone's token is thrown away, so nothing more reaches it for this account (the Hub forgets the
-  /// token when Google calls it unregistered). Not a call to the school: a refused session would sign out again.
+  /// token when Google calls it unregistered).
   Future<void> stop() async {
     for (final s in _subs) {
       unawaited(s.cancel());

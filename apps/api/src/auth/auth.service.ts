@@ -349,6 +349,9 @@ export class AuthService {
         throw new ApiError('locked', 'Too many wrong codes at your school just now. Try again in a little while.', { retryAfter: 900 });
       }
     }
+    // A try is taken before the code is checked, in one step: many guesses sent at once cannot all slip under the limit.
+    const took = await t.pool.query('update otp_challenges set attempts = attempts + 1 where id = $1 and used_at is null and attempts < $2', [challengeId, OTP_TRIES]);
+    if (!took.rowCount) throw new ApiError('locked', 'Too many wrong codes. Go back and ask for a new one.');
     let good: boolean;
     if (row.method === 'code') good = constantTimeEqual(sha256(`${challengeId}:${code}`), row.code_hash);
     else {
@@ -358,11 +361,10 @@ export class AuthService {
       const secret = row.method === 'enroll' ? row.pending_secret : row.totp_secret;
       good = !replay && !!secret && verifyTotp(unseal(secret, this.env.SECRETS_KEY), code);
     }
-    if (!good) {
-      await t.pool.query('update otp_challenges set attempts = attempts + 1 where id = $1', [challengeId]);
-      throw new ApiError('unauthenticated', 'That code isn’t right.', { attemptsLeft: OTP_TRIES - row.attempts - 1, fields: { code: 'That code isn’t right.' } });
-    }
-    await t.pool.query('update otp_challenges set used_at = now() where id = $1', [challengeId]);
+    if (!good) throw new ApiError('unauthenticated', 'That code isn’t right.', { attemptsLeft: Math.max(0, OTP_TRIES - row.attempts - 1), fields: { code: 'That code isn’t right.' } });
+    // Spent once: two sign-ins with the same right code cannot both get in. A right code is not counted as a wrong try.
+    const spent = await t.pool.query('update otp_challenges set used_at = now(), attempts = attempts - 1 where id = $1 and used_at is null', [challengeId]);
+    if (!spent.rowCount) throw new ApiError('unauthenticated', 'That code has expired. Go back and ask for a new one.', { fields: { code: 'That code has expired.' } });
     if (row.method !== 'code') {
       await t.pool.query('update users set totp_last = $2, totp_secret = coalesce($3, totp_secret) where id = $1', [row.user_id, `${code}@${Math.floor(Date.now() / 1000)}`, row.method === 'enroll' ? row.pending_secret : null]);
       if (row.method === 'enroll') await this.audit.record(t, { actorId: row.user_id, actorName: 'self', action: 'auth.authenticator_added', entity: 'user', entityId: row.user_id });

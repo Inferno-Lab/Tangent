@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
-import { tx, schoolNow, slotDayOf, slotKey, hasReachedAge, customText, listKey, listLabel, listOptions, SchoolSettingsSchema, DEFAULT_LEAVE_REASONS, type ListItem, type CustomFieldsSetting, type CustomValues, type FieldDef, type AttendanceMarkDef, MESSAGE_EVENTS, addDays, schoolToday, type AttendanceStatus, type NoticeCreate, type PeriodMarksPut } from '@tangent/contracts';
+import { tx, roundMoney, schoolNow, slotDayOf, slotKey, hasReachedAge, customText, listKey, listLabel, listOptions, SchoolSettingsSchema, DEFAULT_LEAVE_REASONS, type ListItem, type CustomFieldsSetting, type CustomValues, type FieldDef, type AttendanceMarkDef, MESSAGE_EVENTS, addDays, schoolToday, type AttendanceStatus, type NoticeCreate, type PeriodMarksPut } from '@tangent/contracts';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import { schoolContext, type Registry } from '@tangent/tenancy';
 import { REGISTRY, type AuthedUser, type TenantCtx } from '../tenancy/tenant.js';
@@ -85,9 +85,17 @@ export class FamilyService {
     if (w.children.includes(studentId)) return;
     if (w.kind === 'staff' && w.perms.includes('students.read')) return;
     if (w.kind === 'staff' && (await t.pool.query(
-      `select 1 from students s where s.id = $1 and (s.class_id in (select id from classes where class_teacher_id = $2 union select class_id from timetable_slots where teacher_id = $2)
-         or s.id in (select a.student_id from transport_assignments a join transport_routes r on r.id = a.route_id where r.driver_user_id = $2 or r.attendant_user_id = $2))`, [studentId, w.id])).rowCount) return;
+      `select 1 from students s where s.id = $1 and (s.class_id = any($3)
+         or s.id in (select a.student_id from transport_assignments a join transport_routes r on r.id = a.route_id where r.driver_user_id = $2 or r.attendant_user_id = $2))`, [studentId, w.id, await this.taught(t, w.id)])).rowCount) return;
     throw forbidden('That student is not yours to look at.');
+  }
+
+  /** The classes a member of staff teaches: as class teacher, in the timetable, or covering one of its lessons in the last two weeks. */
+  private async taught(t: TenantCtx, userId: string): Promise<string[]> {
+    return (await t.pool.query<{ c: string }>(
+      `select id c from classes where class_teacher_id = $1 union select class_id from live_slots where teacher_id = $1 or cover_teacher_id = $1
+       union select x.class_id from substitutions sb join live_slots x on x.id = sb.slot_id where sb.teacher_id = $1 and sb.date between $2::date - 14 and $2::date`,
+      [userId, schoolToday()])).rows.map((r) => r.c);
   }
 
   private async mayClass(t: TenantCtx, w: Who, classId: string): Promise<void> {
@@ -203,13 +211,13 @@ export class FamilyService {
     const until = (await t.pool.query<{ e: string }>(
       "select ends_on::text e from terms where starts_on <= $1 and ends_on >= $1 union all select ends_on::text from academic_years where current limit 1", [today])).rows[0]?.e ?? addDays(today, 120);
     const { rows } = await t.pool.query<{ day: number; subject: string; room: string | null; starts_at: string; ends_at: string; class_name: string }>(
-      `select ts.day, coalesce(sub.name, ts.subject_id) subject, ts.room, st.starts_at, st.ends_at, c.name class_name from timetable_slots ts join slot_times st on st.slot_id = ts.id
+      `select ts.day, coalesce(sub.name, ts.subject_id) subject, ts.room, st.starts_at, st.ends_at, c.name class_name from live_slots ts join slot_times st on st.slot_id = ts.id
          join classes c on c.id = ts.class_id left join subjects sub on sub.id = ts.subject_id
        where ${classId ? 'ts.class_id = $1' : 'coalesce(ts.cover_teacher_id, ts.teacher_id) = $1'} order by ts.day, st.starts_at`, [classId ?? by.teacherId]);
     const title = (r: (typeof rows)[number]) => (classId ? r.subject : `${r.subject} · ${r.class_name}`);
     const cycle = await this.settings.cycle(t);
     if (cycle.kind === 'week') {
-      // Each lesson starts on its weekday's next date from today (ISO weekday 1 is Monday, as timetable_slots counts) and repeats weekly.
+      // Each lesson starts on its weekday's next date from today (ISO weekday 1 is Monday, as live_slots counts) and repeats weekly.
       const iso = (d: string) => { const n = new Date(`${d}T00:00:00Z`).getUTCDay(); return n === 0 ? 7 : n; };
       const first = (dayNo: number) => addDays(today, (dayNo - iso(today) + 7) % 7);
       return rows.map((r) => ({ title: title(r), start: `${first(r.day)}T${r.starts_at}`, end: `${first(r.day)}T${r.ends_at}`, ...(r.room ? { place: r.room } : {}), weeklyUntil: until }));
@@ -268,8 +276,7 @@ export class FamilyService {
   async studentsIn(t: TenantCtx, user: AuthedUser, classId: string) {
     const w = await this.who(t, user);
     await this.mayClass(t, w, classId);
-    if (w.kind === 'staff' && !w.perms.includes('students.read') && !(await t.pool.query(
-      'select 1 from classes where id = $1 and class_teacher_id = $2 union select 1 from timetable_slots where class_id = $1 and teacher_id = $2', [classId, w.id])).rowCount) {
+    if (w.kind === 'staff' && !w.perms.includes('students.read') && !(await this.taught(t, w.id)).includes(classId)) {
       throw forbidden('That class is not yours to look at.');
     }
     const { rows } = await t.pool.query(`${this.studentSql} where s.class_id = $1 and s.status = 'active' order by s.roll_no, s.name`, [classId]);
@@ -296,7 +303,7 @@ export class FamilyService {
 
   private async classJson(t: TenantCtx, id: string) {
     const c = (await t.pool.query<{ id: string; name: string; grade: number; section: string; class_teacher_id: string | null; room: string | null }>(
-      `select c.id, c.name, c.grade, c.section, c.class_teacher_id, (select room from timetable_slots ts where ts.class_id = c.id and room is not null limit 1) room from classes c where c.id = $1`, [id])).rows[0];
+      `select c.id, c.name, c.grade, c.section, c.class_teacher_id, (select room from live_slots ts where ts.class_id = c.id and room is not null limit 1) room from classes c where c.id = $1`, [id])).rows[0];
     if (!c) throw notFound('That class');
     const ids = (await t.pool.query<{ id: string }>("select id from students where class_id = $1 and status = 'active' order by roll_no", [id])).rows.map((r) => r.id);
     // The school's own name for the class ("8 A", "Year 7 Blue"); the app adds the section only when the name lacks it.
@@ -308,28 +315,36 @@ export class FamilyService {
     return this.classJson(t, id);
   }
 
-  private async teacherJson(t: TenantCtx, rows: { id: string; name: string; email: string | null; phone: string | null; subject: string | null }[]) {
+  /** Staff contact details reach other staff only: families and students reach the school through the office and chat. */
+  private async teacherJson(t: TenantCtx, rows: { id: string; name: string; email: string | null; phone: string | null; subject: string | null }[], contact: boolean) {
     const ids = rows.map((r) => r.id);
     const cls = await t.pool.query<{ t: string; c: string }>(
-      `select class_teacher_id t, id c from classes where class_teacher_id = any($1) union select distinct teacher_id, class_id from timetable_slots where teacher_id = any($1)`, [ids]);
-    return rows.map((r) => ({ id: r.id, userId: r.id, name: r.name, subject: r.subject ?? '', email: r.email ?? '', phone: r.phone ?? '', avatarUrl: '', classIds: cls.rows.filter((c) => c.t === r.id).map((c) => c.c) }));
+      `select class_teacher_id t, id c from classes where class_teacher_id = any($1) union select distinct teacher_id, class_id from live_slots where teacher_id = any($1)`, [ids]);
+    return rows.map((r) => ({ id: r.id, userId: r.id, name: r.name, subject: r.subject ?? '', email: contact ? r.email ?? '' : '', phone: contact ? r.phone ?? '' : '', avatarUrl: '', classIds: cls.rows.filter((c) => c.t === r.id).map((c) => c.c) }));
   }
 
   private readonly teacherSql = `select u.id, u.name, u.email, u.phone, (select min(ss.subject_id) from staff_subjects ss where ss.user_id = u.id) subject from users u join staff s on s.user_id = u.id where u.status = 'active'`;
 
-  async teachers(t: TenantCtx) {
-    const { rows } = await t.pool.query<{ id: string; name: string; email: string | null; phone: string | null; subject: string | null }>(`${this.teacherSql} order by u.name limit 300`);
-    return this.teacherJson(t, rows.map((r) => ({ ...r, subject: r.subject ? key(r.subject) : null })));
+  private async readsStaffContacts(t: TenantCtx, user: AuthedUser): Promise<boolean> {
+    return (await t.pool.query("select 1 from users where id = $1 and kind = 'staff'", [user.id])).rowCount === 1;
   }
 
-  async teacher(t: TenantCtx, id: string) {
+  async teachers(t: TenantCtx, user: AuthedUser) {
+    const { rows } = await t.pool.query<{ id: string; name: string; email: string | null; phone: string | null; subject: string | null }>(`${this.teacherSql} order by u.name limit 300`);
+    return this.teacherJson(t, rows.map((r) => ({ ...r, subject: r.subject ? key(r.subject) : null })), await this.readsStaffContacts(t, user));
+  }
+
+  async teacher(t: TenantCtx, user: AuthedUser, id: string) {
     const { rows } = await t.pool.query<{ id: string; name: string; email: string | null; phone: string | null; subject: string | null }>(`${this.teacherSql} and u.id = $1`, [id]);
     if (!rows[0]) throw notFound('That teacher');
-    return (await this.teacherJson(t, rows.map((r) => ({ ...r, subject: r.subject ? key(r.subject) : null }))))[0]!;
+    return (await this.teacherJson(t, rows.map((r) => ({ ...r, subject: r.subject ? key(r.subject) : null })), user.id === id || (await this.readsStaffContacts(t, user))))[0]!;
   }
 
   async classesForTeacher(t: TenantCtx, id: string) {
-    const ids = (await t.pool.query<{ c: string }>('select id c from classes where class_teacher_id = $1 union select distinct class_id from timetable_slots where teacher_id = $1', [id])).rows.map((r) => r.c);
+    // Their classes, and today the class of any lesson they cover for an absent colleague.
+    const ids = (await t.pool.query<{ c: string }>(
+      `select id c from classes where class_teacher_id = $1 union select distinct class_id from live_slots where teacher_id = $1 or cover_teacher_id = $1
+       union select x.class_id from substitutions s join live_slots x on x.id = s.slot_id where s.teacher_id = $1 and s.date = $2`, [id, schoolToday()])).rows.map((r) => r.c);
     return Promise.all(ids.map((c) => this.classJson(t, c)));
   }
 
@@ -394,9 +409,13 @@ export class FamilyService {
 
   async timetable(t: TenantCtx, user: AuthedUser, classId: string) {
     await this.mayClass(t, await this.who(t, user), classId);
+    // Today's lessons name who takes them today: a colleague covering for an absent teacher, on that day only.
+    const today = schoolToday();
+    const todaySlot = (await this.settings.slotDay(t, today)) ?? -1;
     const [slots, periods, own] = await Promise.all([
       t.pool.query<{ day: number; period: number; subject_id: string; teacher_id: string; room: string | null; starts_at: string; ends_at: string }>(
-        `select ts.day, ts.period, ts.subject_id, coalesce(ts.cover_teacher_id, ts.teacher_id) teacher_id, ts.room, st.starts_at, st.ends_at from timetable_slots ts join slot_times st on st.slot_id = ts.id where ts.class_id = $1`, [classId]),
+        `select ts.day, ts.period, ts.subject_id, case when ts.day = $3 then coalesce(sub.teacher_id, ts.cover_teacher_id, ts.teacher_id) else coalesce(ts.cover_teacher_id, ts.teacher_id) end teacher_id,
+           ts.room, st.starts_at, st.ends_at from live_slots ts join slot_times st on st.slot_id = ts.id left join substitutions sub on sub.slot_id = ts.id and sub.date = $2 where ts.class_id = $1`, [classId, today, todaySlot]),
       t.pool.query<{ idx: number; kind: string; starts_at: string; ends_at: string }>("select idx, kind, starts_at, ends_at from periods where kind <> 'period'"),
       // A break's own times on a day (the class's first, then the school's).
       t.pool.query<{ day: number; period: number; starts_at: string; ends_at: string }>('select day, period, starts_at, ends_at from period_times where class_id is null or class_id = $1 order by class_id nulls first', [classId]),
@@ -481,7 +500,8 @@ export class FamilyService {
     const w = await this.who(t, user);
     await this.mayStudent(w, studentId, t);
     await this.mayHandIn(t, w);
-    const h = (await t.pool.query<{ due_on: string; status: string }>('select due_on::text, status from homework where id = $1', [id])).rows[0];
+    // Only homework set for the child's own class.
+    const h = (await t.pool.query<{ due_on: string; status: string }>("select h.due_on::text, h.status from homework h join students s on s.class_id = h.class_id and s.id = $2 where h.id = $1", [id, studentId])).rows[0];
     if (!h || h.status !== 'set') throw notFound('That homework');
     const sub = (await t.pool.query<{ score: number | null }>('select score from homework_submissions where homework_id = $1 and student_id = $2', [id, studentId])).rows[0];
     if (sub?.score != null) throw new ApiError('conflict', 'This homework has been graded, so it cannot be handed in again.');
@@ -523,7 +543,7 @@ export class FamilyService {
 
   /** The teacher's own subject for a class, from the timetable (a teacher may teach several). */
   private async subjectFor(t: TenantCtx, user: AuthedUser, classId: string, wanted?: string): Promise<string> {
-    const { rows } = await t.pool.query<{ subject_id: string }>('select distinct subject_id from timetable_slots where class_id = $1 and teacher_id = $2', [classId, user.id]);
+    const { rows } = await t.pool.query<{ subject_id: string }>('select distinct subject_id from live_slots where class_id = $1 and teacher_id = $2', [classId, user.id]);
     // Someone who teaches nothing in the class names its subject only if they act on every class (an office or a principal).
     if (wanted && (rows.some((r) => r.subject_id === wanted) || (!rows.length && user.permissions.includes('classes.all')))) return wanted;
     if (rows.length === 1) return rows[0]!.subject_id;
@@ -575,7 +595,9 @@ export class FamilyService {
     if (!row) throw notFound('That result');
     const marks = await t.pool.query<{ subject_id: string; score: string | null; max_marks: number }>(
       'select m.subject_id, m.score, x.max_marks from exam_marks m join exam_subjects x on x.exam_id = m.exam_id and x.subject_id = m.subject_id where m.exam_id = $1 and m.student_id = $2', [examId, studentId]);
-    const trend = await t.pool.query<{ exam: string; pct: number }>('select exam, pct from exam_results where student_id = $1 order by exam limit 6', [studentId]);
+    // The last six results in the order they were sat.
+    const trend = await t.pool.query<{ exam: string; pct: number }>(
+      'select * from (select coalesce(exam_name, exam) exam, pct, taken_on from exam_results where student_id = $1 order by taken_on desc nulls last limit 6) x order by taken_on nulls first', [studentId]);
     const year = (await t.pool.query<{ grade: number }>('select c.grade from students s join classes c on c.id = s.class_id where s.id = $1', [studentId])).rows[0]?.grade ?? null;
     const grading = await this.settings.grading(t, { grade: year });
     // The class rank reaches families only when the console says so (results.showRank).
@@ -652,7 +674,8 @@ export class FamilyService {
     const year = (await t.pool.query<{ label: string }>('select label from academic_years where current limit 1')).rows[0]?.label ?? '';
     return {
       studentId, academicYear: year,
-      installments: inv.rows.map((i) => { const due = i.amount - i.waived_amount; const paid = Number(i.paid) >= due; return { id: i.id, title: i.title, amount: due, dueDate: i.due_on, paid, ...(paid && i.last ? { paidOn: i.last, method: i.method, reference: i.reference } : {}) }; }),
+      // What is left after part payments, so the app shows (and Pay charges) the same amount the checkout will.
+      installments: inv.rows.map((i) => { const due = i.amount - i.waived_amount; const paid = Number(i.paid) >= due; return { id: i.id, title: i.title, amount: due, balance: roundMoney(Math.max(0, due - Number(i.paid))), dueDate: i.due_on, paid, ...(paid && i.last ? { paidOn: i.last, method: i.method, reference: i.reference } : {}) }; }),
       receipts: pay.rows.map((p) => ({ id: p.id, number: p.receipt_no, installmentId: p.invoice_id, title: p.title, amount: p.amount, paidOn: p.paid_on, method: p.method, reference: p.reference })),
     };
   }
@@ -713,7 +736,8 @@ export class FamilyService {
     const { rows } = await t.pool.query<{ id: string; title: string; starts_at: Date; ends_at: Date | null; kind: string; venue: string; note: string; audience: string; category: string; needs_rsvp: boolean; lat: number | null; lng: number | null; going: string; class_id: string | null; rsvp_by: string | null }>(
       `select e.id, e.title, e.starts_at, e.ends_at, e.kind, e.venue, e.note, e.audience, e.category, e.needs_rsvp, e.lat, e.lng, e.class_id, e.rsvp_by::text,
          (select count(*) from event_rsvps r where r.event_id = e.id and r.status = 'going') going
-       from events e where e.kind not in ('routine','cover') order by e.starts_at limit 150`);
+       from events e where e.kind not in ('routine','cover') and coalesce(e.ends_at, e.starts_at) >= now() - interval '120 days'
+       order by e.starts_at limit 400`);
     // A class's own event reaches only the families (and students) of that class.
     const classes = w.children.length ? (await t.pool.query<{ class_id: string }>('select distinct class_id from students where id = any($1)', [w.children])).rows.map((r) => r.class_id) : [];
     const mine = w.children.length ? await t.pool.query<{ event_id: string; student_id: string; status: string; adults: number }>('select event_id, student_id, status, adults from event_rsvps where student_id = any($1)', [w.children]) : { rows: [] as { event_id: string; student_id: string; status: string; adults: number }[] };
@@ -876,8 +900,8 @@ export class FamilyService {
     if (w.kind === 'staff') return [];
     const { rows } = await t.pool.query<{ id: string; name: string; subject: string | null; class_teacher: boolean }>(
       `select u.id, u.name, max(sub.name) subject, bool_or(c.class_teacher_id = u.id) class_teacher from students s join classes c on c.id = s.class_id
-       join users u on u.kind = 'staff' and u.status = 'active' and (u.id = c.class_teacher_id or u.id in (select tt.teacher_id from timetable_slots tt where tt.class_id = c.id))
-       left join timetable_slots tts on tts.class_id = c.id and tts.teacher_id = u.id left join subjects sub on sub.id = tts.subject_id
+       join users u on u.kind = 'staff' and u.status = 'active' and (u.id = c.class_teacher_id or u.id in (select tt.teacher_id from live_slots tt where tt.class_id = c.id))
+       left join live_slots tts on tts.class_id = c.id and tts.teacher_id = u.id left join subjects sub on sub.id = tts.subject_id
        where s.id = any($1) group by u.id, u.name order by bool_or(c.class_teacher_id = u.id) desc, u.name`, [w.children.length ? w.children : ['none']]);
     // The school's rule for who families (or students) may write to: class teachers, subject teachers, or both.
     const may = await this.settings.value<string[]>(t, w.kind === 'student' ? 'chat.studentsWriteTo' : 'chat.familiesWriteTo', ['classTeacher', 'subjectTeachers']);
@@ -915,7 +939,11 @@ export class FamilyService {
     const loans = w.kind === 'staff' ? await this.library.loans(t, undefined, w.id) : w.children.length ? await this.library.loans(t, w.children) : [];
     const open = loans.filter((l) => !l.returnedOn);
     const rules = await this.library.rules(t);
-    const catalogue = (await this.library.books(t)).map((b) => {
+    const reservations = w.children.length ? await this.library.reservations(t, w.children) : [];
+    // The catalogue's first titles, and always the ones this family has out or reserved, however far down the shelf they are.
+    const listed = await this.library.books(t);
+    const own = [...new Set([...open.map((l) => l.bookId), ...reservations.map((r) => r.bookId)].filter((x): x is string => !!x && !listed.some((b) => b.id === x)))];
+    const catalogue = [...listed, ...(own.length ? await this.library.books(t, '', own) : [])].map((b) => {
       const mine = open.find((l) => l.bookId === b.id);
       return {
         id: b.id, title: b.title, author: b.author, category: b.category, isbn: b.isbn, available: b.copies - b.out > 0, waiting: b.waiting, coverUrl: '',
@@ -923,7 +951,6 @@ export class FamilyService {
       };
     });
     const legacy = open.filter((l) => !l.bookId).map((l) => ({ id: l.id, title: l.title, author: '', category: 'Library', isbn: '', available: false, waiting: 0, coverUrl: '', borrowedBy: l.studentId ?? w.id, dueDate: l.dueOn, loanId: l.id, fine: l.fine, overdueDays: l.overdueDays, renewalsLeft: Math.max(0, l.maxRenewals - l.renewals) }));
-    const reservations = w.children.length ? await this.library.reservations(t, w.children) : [];
     return {
       books: [...legacy, ...catalogue],
       history: loans.filter((l) => l.returnedOn).map((l) => ({ id: l.id, title: l.title, borrowedBy: l.studentId ?? w.id, issuedOn: l.issuedOn, returnedOn: l.returnedOn, fine: l.fine })),
@@ -1027,6 +1054,8 @@ export class FamilyService {
     const row = await this.ownPending(t, user, id);
     if (row.subject_ref !== b.studentId) throw new ApiError('validation', 'A request stays with the child it was made for.');
     const leave = await this.checkLeave(t, b);
+    // A corrected request still may not overlap other leave for the child (its own old dates aside).
+    await checkLeaveClash(t.pool, b.studentId, leave.from, leave.to, b.halfDay, id);
     await t.pool.query("update approvals set subtitle = $2, payload = payload || $3 where id = $1",
       [id, leave.subtitle, JSON.stringify({ from: leave.from, to: leave.to, halfDay: b.halfDay ?? null, reason: b.reason, note: b.note ?? '', fileIds: b.fileIds ?? [] })]);
     return { id };
@@ -1056,10 +1085,13 @@ export class FamilyService {
    */
   async notifications(t: TenantCtx, user: AuthedUser) {
     const w = await this.who(t, user);
-    if (!w.phone) return [];
+    if (!w.phone && !w.email) return [];
+    // The newest 80 messages to this person's phone or email, one each however many channels carried it (push first).
     const { rows } = await this.registry.pool.query<{ id: string; body: string; created_at: Date; channel: string; message_key: string | null; vars: Record<string, string> | null }>(
-      `select distinct on (body, date_trunc('minute', created_at)) id, body, created_at, channel, message_key, vars from message_log where school_slug = $1 and to_addr = $2 and channel in ('push','sms')
-         and status in ('sent','delivered','read') order by body, date_trunc('minute', created_at), (channel = 'push') desc limit 80`, [t.info.slug, w.phone]);
+      `select * from (select distinct on (body, date_trunc('minute', created_at)) id, body, created_at, channel, message_key, vars from message_log
+         where school_slug = $1 and ((to_addr = $2 and channel in ('push','sms')) or (lower(to_addr) = lower($3) and channel = 'email'))
+           and status in ('sent','delivered','read') order by body, date_trunc('minute', created_at), (channel = 'push') desc, (channel = 'sms') desc) m
+       order by created_at desc limit 80`, [t.info.slug, w.phone ?? '', w.email ?? '']);
     const state = await t.pool.query<{ message_id: string; state: string }>('select message_id, state from notification_state where user_id = $1', [w.id]);
     const by = new Map(state.rows.map((s) => [s.message_id, s.state]));
     const cfg = await this.settings.effective(t);

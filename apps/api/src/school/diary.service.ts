@@ -33,7 +33,7 @@ export class DiaryService {
     const every = (await this.settings.value<string>(t, 'diary.writers', 'subjectTeachers')) === 'subjectTeachers';
     const { rows } = await t.pool.query<{ class_id: string; class_name: string; ct: boolean; subject_id: string | null; subject_name: string | null }>(
       `select c.id class_id, c.name class_name, c.class_teacher_id = $1 ct, x.subject_id, s.name subject_name from classes c
-       left join (select distinct class_id, subject_id from timetable_slots where coalesce(cover_teacher_id, teacher_id) = $1) x on x.class_id = c.id
+       left join (select distinct class_id, subject_id from live_slots where coalesce(cover_teacher_id, teacher_id) = $1) x on x.class_id = c.id
        left join subjects s on s.id = x.subject_id
        where c.class_teacher_id = $1 or ($2 and x.class_id is not null) order by c.grade, c.name, s.name`, [who.id, every]);
     const out = new Map<string, { classId: string; className: string; classTeacher: boolean; subjects: { id: string; name: string }[] }>();

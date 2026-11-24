@@ -176,7 +176,7 @@ export class MeetingsService implements OnModuleInit {
   private async teachersFor(t: TenantCtx, m: MeetingRow, studentId: string): Promise<string[]> {
     const { rows } = await t.pool.query<{ id: string; ct: boolean }>(
       `select c.class_teacher_id id, true ct from students s join classes c on c.id = s.class_id where s.id = $1 and c.class_teacher_id is not null
-       union select coalesce(ts.cover_teacher_id, ts.teacher_id), false from students s join timetable_slots ts on ts.class_id = s.class_id where s.id = $1`, [studentId]);
+       union select coalesce(ts.cover_teacher_id, ts.teacher_id), false from students s join live_slots ts on ts.class_id = s.class_id where s.id = $1`, [studentId]);
     if (!m.teacherIds.length) return rows.filter((r) => r.ct).map((r) => r.id);
     const theirs = rows.map((r) => r.id);
     return m.teacherIds.filter((x) => theirs.includes(x));

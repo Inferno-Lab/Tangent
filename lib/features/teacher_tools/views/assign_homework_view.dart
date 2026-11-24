@@ -6,7 +6,9 @@ import 'package:get/get.dart';
 import 'package:tangent/core/utils/validators.dart';
 import 'package:tangent/core/theme/app_typography.dart';
 import 'package:tangent/core/theme/tokens.dart';
+import 'package:tangent/core/utils/clock.dart';
 import 'package:tangent/core/utils/extensions.dart';
+import 'package:tangent/core/utils/schedule.dart';
 import 'package:tangent/core/widgets/page.dart';
 import 'package:tangent/core/widgets/toast.dart';
 import 'package:tangent/core/widgets/ui.dart';
@@ -63,9 +65,21 @@ class AssignHomeworkView extends GetView<AssignHomeworkController> {
                   ],
                 ),
               ),
-              Cover(subject: controller.subject, width: 30, height: 38),
+              Cover(subject: controller.subject.value, width: 30, height: 38),
             ],
           ),
+          // A teacher of more than one subject in this class says which the homework is for.
+          if (controller.subjects.length > 1) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final x in controller.subjects)
+                  Chip2(subjectName(x), on: x == controller.subject.value, onTap: () => controller.subject.value = x),
+              ],
+            ),
+          ],
           const SizedBox(height: 16),
           Field(
             controller: controller.title,
@@ -136,18 +150,28 @@ class AssignHomeworkView extends GetView<AssignHomeworkController> {
               ],
             ],
           ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: Chip2(
+              due != null && !days.any((d) => DateUtils.isSameDay(d, due)) ? DateFormat('EEE d MMM').format(due) : 'teacher.due_other'.tr,
+              on: due != null && !days.any((d) => DateUtils.isSameDay(d, due)),
+              icon: PhosphorIconsRegular.calendarBlank,
+              onTap: () => unawaited(_pickDue(context)),
+            ),
+          ),
           if (cls != null && due != null) ...[
             const SizedBox(height: 6),
             Text(
-              clash.contains(controller.subject)
+              clash.contains(controller.subject.value)
                   ? 'teacher.clash_same'.trp({
-                      'subject': subjectName(controller.subject),
+                      'subject': subjectName(controller.subject.value),
                       'class': classLabel(cls),
                     })
                   : clash.isEmpty
                   ? 'teacher.clash_none'.trp({'class': classLabel(cls)})
                   : 'teacher.clash_other'.trp({
-                      'subject': subjectName(controller.subject),
+                      'subject': subjectName(controller.subject.value),
                       'class': classLabel(cls),
                       'others': clash.toSet().map(subjectName).join(', '),
                     }),
@@ -195,6 +219,19 @@ class AssignHomeworkView extends GetView<AssignHomeworkController> {
         ],
       );
     });
+  }
+
+  /// A due day further off than the next five school days (a project), from today on.
+  Future<void> _pickDue(BuildContext context) async {
+    final today = DateUtils.dateOnly(Clock.now());
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: controller.due.value ?? today,
+      firstDate: today,
+      lastDate: DateTime(today.year + 1, today.month, today.day),
+      selectableDayPredicate: (d) => !isWeeklyOff(d),
+    );
+    if (picked != null) controller.due.value = picked;
   }
 
   Future<void> _pick(ImageSource source) async {

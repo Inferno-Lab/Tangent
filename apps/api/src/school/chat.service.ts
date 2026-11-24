@@ -19,12 +19,13 @@ export class ChatService {
   ) {}
 
   /** The people in a conversation who use the app: the family's account or the student, and the member of staff. */
-  async people(t: TenantCtx, threadId: string): Promise<{ users: string[]; family: { phone: string | null; userId: string | null } }> {
-    const r = (await t.pool.query<{ assigned_to: string | null; g_user: string | null; phone: string | null; student_user_id: string | null }>(
-      'select th.assigned_to, g.user_id g_user, g.phone, th.student_user_id from threads th left join guardians g on g.id = th.guardian_id where th.id = $1', [threadId])).rows[0];
+  async people(t: TenantCtx, threadId: string): Promise<{ users: string[]; family: { phone: string | null; userId: string | null }; staff: { phone: string | null } | null }> {
+    const r = (await t.pool.query<{ assigned_to: string | null; g_user: string | null; phone: string | null; student_user_id: string | null; staff_phone: string | null }>(
+      `select th.assigned_to, g.user_id g_user, case when th.student_user_id is not null then coalesce(su.phone, su.email) else g.phone end phone, th.student_user_id, coalesce(au.phone, au.email) staff_phone from threads th left join guardians g on g.id = th.guardian_id
+         left join users su on su.id = th.student_user_id left join users au on au.id = th.assigned_to and au.status = 'active' where th.id = $1`, [threadId])).rows[0];
     if (!r) throw notFound('That conversation');
     const familyUser = r.student_user_id ?? r.g_user;
-    return { users: [r.assigned_to, familyUser].filter((x): x is string => !!x), family: { phone: r.phone, userId: familyUser } };
+    return { users: [r.assigned_to, familyUser].filter((x): x is string => !!x), family: { phone: r.phone, userId: familyUser }, staff: r.assigned_to ? { phone: r.staff_phone } : null };
   }
 
   async post(t: TenantCtx, from: ChatSender, threadId: string, text: string, fileIds: string[] = []): Promise<string> {
@@ -42,6 +43,8 @@ export class ChatService {
     // The other side hears about it on their phone too (the app hides it while that conversation is open).
     const preview = `${from.name}: ${text.slice(0, 80)}${files.length ? ' 📎' : ''}`;
     if (from.kind === 'staff' && who.family.phone) await this.messenger.send(t, { channel: 'push', to: who.family.phone, body: preview, key: 'chat.message', vars: { from: from.name, text: text.slice(0, 80), route: `/chat/${threadId}` } });
+    // A family's message reaches the member of staff it is with on their phone; one waiting for the office is seen in Messages.
+    if (from.kind !== 'staff' && who.staff?.phone) await this.messenger.send(t, { channel: 'push', to: who.staff.phone, body: preview, key: 'chat.message', vars: { from: from.name, text: text.slice(0, 80), route: `/chat/${threadId}` } });
     return id;
   }
 

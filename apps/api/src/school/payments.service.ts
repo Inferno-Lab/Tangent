@@ -107,7 +107,9 @@ export class PaymentsService implements OnModuleInit {
       await t.pool.query('update payment_orders set payment_id = $2 where id = $1', [orderId, done.paymentId]);
       return `Paid ${fmtMoney(paid)}: receipt ${done.receiptNo}`;
     } catch (e) {
-      // Money arrived but no receipt could be written (the invoice was settled at the desk meanwhile): listed for the office to refund.
+      // Money arrived but no receipt could be written (the invoice was settled at the desk meanwhile): listed for the office to refund,
+      // and the family's app is told the school will sort it out rather than waiting for a receipt that will not come.
+      await t.pool.query("update payment_orders set status = 'review' where id = $1", [orderId]);
       await t.pool.query('insert into reconciliation (id, day, provider_payment_id, provider_amount, receipt_amount, problem) values ($1,$2,$3,$4,null,$5) on conflict do nothing',
         [newId('rec'), schoolToday(), ev.providerPaymentId, paid, `Paid online but not receipted: ${(e as Error).message}`]);
       return `Paid but not receipted: ${(e as Error).message}`;
@@ -129,10 +131,10 @@ export class PaymentsService implements OnModuleInit {
 
   // ── Refunds (admin) ─────────────────────────────────────────────────────────
 
-  async refunds(t: TenantCtx): Promise<RefundRow[]> {
+  async refunds(t: TenantCtx, id?: string): Promise<RefundRow[]> {
     const { rows } = await t.pool.query(
       `select r.*, p.receipt_no, s.name student, ru.name requested_name, au.name approved_name from refunds r join payments p on p.id = r.payment_id join fee_invoices i on i.id = p.invoice_id
-       join students s on s.id = i.student_id left join users ru on ru.id = r.requested_by left join users au on au.id = r.approved_by order by r.created_at desc limit 100`);
+       join students s on s.id = i.student_id left join users ru on ru.id = r.requested_by left join users au on au.id = r.approved_by where $1::text is null or r.id = $1 order by r.created_at desc limit 100`, [id ?? null]);
     return rows.map((r) => ({ id: r.id, paymentId: r.payment_id, receiptNo: r.receipt_no, student: r.student, amount: r.amount, reason: r.reason, status: r.status,
       requestedBy: r.requested_name, approvedBy: r.approved_name, error: r.error, createdAt: r.created_at.toISOString(), decisionNote: r.decision_note ?? '' }));
   }
@@ -162,7 +164,7 @@ export class PaymentsService implements OnModuleInit {
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'refund.requested', entity: 'payment', entityId: paymentId, detail: { amount } });
     const limit = await this.settings.value<number>(t, 'fees.refundApprovalAbove', 5000);
     if (amount <= limit && (await this.claim(t, user, id))) await this.send(t, user, id);
-    return (await this.refunds(t)).find((r) => r.id === id)!;
+    return (await this.refunds(t, id))[0]!;
   }
 
   /** Takes a waiting refund for one decision, once: two approvals at once (two people, or a double click) send it once. */
@@ -182,7 +184,7 @@ export class PaymentsService implements OnModuleInit {
     } else {
       await this.send(t, user, id);
     }
-    return (await this.refunds(t)).find((x) => x.id === id)!;
+    return (await this.refunds(t, id))[0]!;
   }
 
   /** Sends an approved refund to the provider and takes it off the receipt. */

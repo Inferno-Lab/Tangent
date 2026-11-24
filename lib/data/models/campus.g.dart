@@ -17,6 +17,7 @@ Installment _$InstallmentFromJson(Map<String, dynamic> json) => Installment(
       : DateTime.parse(json['paidOn'] as String),
   method: json['method'] as String?,
   reference: json['reference'] as String?,
+  balance: json['balance'] as num?,
 );
 
 Map<String, dynamic> _$InstallmentToJson(Installment instance) =>
@@ -29,6 +30,7 @@ Map<String, dynamic> _$InstallmentToJson(Installment instance) =>
       'paidOn': ?instance.paidOn?.toIso8601String(),
       'method': ?instance.method,
       'reference': ?instance.reference,
+      'balance': ?instance.balance,
     };
 
 Receipt _$ReceiptFromJson(Map<String, dynamic> json) => Receipt(

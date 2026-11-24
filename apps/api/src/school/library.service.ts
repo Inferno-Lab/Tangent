@@ -64,14 +64,14 @@ export class LibraryService {
   }
 
   /** The catalogue, or the titles a search finds: by title or author, or by ISBN or barcode in any of their written forms. */
-  async books(t: TenantCtx, q = ''): Promise<BookRow[]> {
+  async books(t: TenantCtx, q = '', ids?: string[]): Promise<BookRow[]> {
     const s = q.trim();
     const { rows } = await t.pool.query(
       `select b.*, (select count(*) from library_loans l where l.book_id = b.id and l.returned_on is null)::int out,
          (select count(*) from library_reservations r where r.book_id = b.id and r.status in ('waiting','ready'))::int waiting
-       from library_books b where $1 = '' or b.title ilike '%' || $1 || '%' or b.author ilike '%' || $1 || '%'
-         or upper(regexp_replace(b.isbn, '[\s-]', '', 'g')) = any($2) or (b.barcode <> '' and upper(regexp_replace(b.barcode, '[\s-]', '', 'g')) = any($2))
-       order by b.title limit 500`, [s, s ? codeForms(s) : []]);
+       from library_books b where ($3::text[] is not null and b.id = any($3)) or $3::text[] is null and ($1 = '' or b.title ilike '%' || $1 || '%' or b.author ilike '%' || $1 || '%'
+         or upper(regexp_replace(b.isbn, '[\s-]', '', 'g')) = any($2) or (b.barcode <> '' and upper(regexp_replace(b.barcode, '[\s-]', '', 'g')) = any($2)))
+       order by b.title limit 500`, [s, s ? codeForms(s) : [], ids ?? null]);
     return rows.map((b) => ({ id: b.id, title: b.title, author: b.author, isbn: b.isbn, category: b.category, shelf: b.shelf, copies: b.copies, itemType: b.item_type, barcode: b.barcode, out: b.out, waiting: b.waiting }));
   }
 
@@ -83,7 +83,7 @@ export class LibraryService {
       `select id from library_books where (barcode <> '' and upper(regexp_replace(barcode, '[\s-]', '', 'g')) = any($1)) or upper(regexp_replace(isbn, '[\s-]', '', 'g')) = any($1)
        order by (barcode <> '' and upper(regexp_replace(barcode, '[\s-]', '', 'g')) = any($1)) desc limit 1`, [forms]);
     if (!rows[0]) throw notFound(tx('A title with that code'));
-    return (await this.books(t)).find((b) => b.id === rows[0]!.id)!;
+    return (await this.books(t, '', [rows[0].id]))[0]!;
   }
 
   /** Open loans (the desk), or every loan of some students or one member of staff (the app's shelf and history). */
@@ -130,7 +130,7 @@ export class LibraryService {
       await t.pool.query('insert into library_books (id, title, author, isbn, category, shelf, copies, item_type, barcode) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [id, b.title, b.author, b.isbn, b.category, b.shelf, b.copies, b.itemType, b.barcode]);
     }
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'library.book.saved', entity: 'book', entityId: id, detail: { title: b.title, copies: b.copies } });
-    return (await this.books(t)).find((x) => x.id === id)!;
+    return (await this.books(t, '', [id]))[0]!;
   }
 
   async deleteBook(t: TenantCtx, user: User, id: string): Promise<void> {

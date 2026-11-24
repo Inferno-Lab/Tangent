@@ -197,6 +197,13 @@ class MarkAttendanceController extends GetxController with Loadable {
 
   /// Only the exceptions; everyone else is present.
   final marks = <String, AttendanceStatus>{}.obs;
+
+  /// Marks the school keeps that the roll call does not cycle through (leave it approved, a half day, its own codes), by their
+  /// key: kept as they are when the register is saved, unless the teacher taps the child.
+  final kept = <String, String>{}.obs;
+
+  /// The day being marked, as the school writes it: marks queued without signal still go to this day.
+  String date = '';
   final saving = false.obs;
 
   @override
@@ -211,19 +218,33 @@ class MarkAttendanceController extends GetxController with Loadable {
       schoolClass = await directory.schoolClass(id);
       students = await directory.studentsIn(id)
         ..sort((a, b) => a.rollNo.compareTo(b.rollNo));
-      final existing = await Get.find<AttendanceRepository>().todayForClass(students.map((s) => s.id).toList());
-      marks
-        ..clear()
-        ..addAll({
-          for (final e in existing.entries)
-            if (e.value == AttendanceStatus.absent || e.value == AttendanceStatus.lateArrival) e.key: e.value,
-        });
+      final now = Clock.now();
+      date = '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final roll = await Get.find<AttendanceRepository>().rollCall(id, date);
+      marks.clear();
+      kept.clear();
+      for (final MapEntry(key: sid, value: key) in roll.entries) {
+        switch (key) {
+          case null || 'present':
+            break;
+          case 'absent':
+            marks[sid] = AttendanceStatus.absent;
+          case 'late':
+            marks[sid] = AttendanceStatus.lateArrival;
+          default:
+            kept[sid] = key;
+        }
+      }
     }, isEmpty: () => students.isEmpty);
   }
 
-  /// Present → absent → late → present.
+  /// Present → absent → late → present. A child on leave (or another of the school's marks) who is tapped is here after all.
   void cycle(String id) {
     Haptics.selection();
+    if (kept.remove(id) != null) {
+      marks.remove(id);
+      return;
+    }
     marks[id] = switch (marks[id]) {
       null => AttendanceStatus.absent,
       AttendanceStatus.absent => AttendanceStatus.lateArrival,
@@ -239,18 +260,24 @@ class MarkAttendanceController extends GetxController with Loadable {
 
   int get absent => marks.values.where((m) => m == AttendanceStatus.absent).length;
   int get late => marks.values.where((m) => m == AttendanceStatus.lateArrival).length;
-  int get present => students.length - absent - late;
+  int get away => kept.length;
+  int get present => students.length - absent - late - away;
 
   Future<void> submit() async {
     if (!SchoolConfig.allows('attendance.teacherApp')) return;
     if (saving.value) return;
     saving.value = true;
     try {
-      await Get.find<AttendanceRepository>().markToday({
-        for (final s in students) s.id: marks[s.id] ?? AttendanceStatus.present,
+      final queued = await Get.find<AttendanceRepository>().markDay(date, {
+        for (final s in students)
+          s.id: kept[s.id] ?? switch (marks[s.id]) {
+            AttendanceStatus.absent => 'absent',
+            AttendanceStatus.lateArrival => 'late',
+            _ => 'present',
+          },
       });
       Get.back<void>();
-      ToastHelper.show('teacher.attendance_saved', kind: ToastKind.success);
+      ToastHelper.show(queued ? 'teacher.attendance_queued' : 'teacher.attendance_saved', kind: ToastKind.success);
     } on AppException catch (error) {
       ToastHelper.show(error.message, kind: ToastKind.error);
     } finally {
@@ -271,7 +298,12 @@ class AssignHomeworkController extends GetxController {
   final attachments = <String>[].obs;
 
   List<SchoolClass> classes = [];
-  String subject = 'maths';
+  /// The subject the homework is for: one the teacher teaches the chosen class (they pick when there are several).
+  final subject = ''.obs;
+  final subjects = <String>[].obs;
+
+  /// The teacher's own subject, for a class where the timetable names none of theirs.
+  String _own = '';
 
   /// Homework already due per day for the chosen class, by subject.
   final dueByDay = <DateTime, List<String>>{}.obs;
@@ -300,7 +332,7 @@ class AssignHomeworkController extends GetxController {
     if (teacherId == null) return;
     try {
       final directory = Get.find<DirectoryRepository>();
-      subject = (await directory.teacher(teacherId)).subject;
+      _own = (await directory.teacher(teacherId)).subject;
       classes = await directory.classesForTeacher(teacherId);
       final args = Get.arguments;
       final preferred = args is Map ? args['classId'] as String? : null;
@@ -333,6 +365,14 @@ class AssignHomeworkController extends GetxController {
         map.putIfAbsent(DateUtils.dateOnly(h.dueOn), () => []).add(h.subject);
       }
       dueByDay.assignAll(map);
+      final me = Get.find<AuthService>().user.value?.teacherId;
+      final taught = <String>{
+        for (final d in await Get.find<TimetableRepository>().forClass(id))
+          for (final p in d.periods)
+            if (p.kind == PeriodKind.klass && p.teacherId == me) p.subject,
+      }.toList()..sort();
+      subjects.assignAll(taught.isEmpty && _own.isNotEmpty ? [_own] : taught);
+      if (!subjects.contains(subject.value)) subject.value = subjects.firstOrNull ?? '';
       roster.value = (await Get.find<DirectoryRepository>().studentsIn(id)).length;
     } on AppException {
       dueByDay.clear();
@@ -355,6 +395,10 @@ class AssignHomeworkController extends GetxController {
       return;
     }
     if (teacherId == null || id == null || date == null) return;
+    if (subject.value.isEmpty) {
+      ToastHelper.show('teacher.need_subject', kind: ToastKind.error);
+      return;
+    }
     saving.value = true;
     try {
       final students = await Get.find<DirectoryRepository>().studentsIn(id);
@@ -362,7 +406,7 @@ class AssignHomeworkController extends GetxController {
         Homework(
           id: 'hw_${Clock.now().microsecondsSinceEpoch}',
           classId: id,
-          subject: subject,
+          subject: subject.value,
           title: title.text.trim(),
           description: body.text.trim(),
           assignedOn: Clock.now(),

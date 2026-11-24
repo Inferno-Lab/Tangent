@@ -149,6 +149,9 @@ abstract final class SchoolConfig {
 
   /// The school's leave reasons (a school list), each in the reader's language where the school named it there; retired ones are
   /// not offered. A list of plain words (sample content, an older server) reads as it is. The server takes any of these names.
+  /// What the school calls one of its attendance marks ("On leave", "Half day"), by its key; the key itself when unnamed.
+  static String markName(String key) => '${_list('attendance.statuses').firstWhereOrNull((m) => m['key'] == key)?['name'] ?? key}';
+
   static List<String> get leaveReasons => _names('leave.reasons', const ['Other']);
 
   /// Short replies staff pick when answering (the school's list, in the reader's language); empty when the school has none.

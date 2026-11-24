@@ -66,11 +66,12 @@ class _Fake {
         'studentId': 'stu_aarav', 'academicYear': '2026–27',
         'installments': [
           {'id': 'inv1', 'title': 'Term 1 tuition', 'amount': 18500, 'dueDate': '2026-04-20', 'paid': true, 'paidOn': '2026-04-22', 'method': 'upi', 'reference': 'UPI123'},
-          {'id': 'inv2', 'title': 'Term 2 tuition', 'amount': 18500, 'dueDate': '2026-10-23', 'paid': false},
+          {'id': 'inv2', 'title': 'Term 2 tuition', 'amount': 18500, 'balance': 8500, 'dueDate': '2026-10-23', 'paid': false},
         ],
         'receipts': [{'id': 'pay1', 'installmentId': 'inv1', 'title': 'Term 1 tuition', 'amount': 18500, 'paidOn': '2026-04-22', 'method': 'upi', 'reference': 'UPI123'}],
       }),
       '/v1/f/attendance/today' => send(200, {'stu_aarav': 'late', 'stu_diya': 'absent'}),
+      '/v1/f/attendance/roll' => send(200, {'marks': [{'studentId': 'stu_aarav', 'status': 'late'}, {'studentId': 'stu_diya', 'status': 'leave', 'onLeave': true}, {'studentId': 'stu_ira', 'status': null}]}),
       '/v1/f/classes/cls_8a/marks' => send(200, {'marks': {'stu_aarav': 44}, 'maxMarks': 50}),
       '/v1/f/students/stu_aarav/transport' => send(200, null),
       '/v1/f/library/books/b1/reserve' => send(409, {'code': 'conflict', 'message': 'The library catalogue is not online yet.'}),
@@ -178,6 +179,9 @@ void main() {
     test('the fee account, with receipts', () async {
       final account = await FeeRepository(RemoteDataSource(client)).forStudent('stu_aarav');
       expect(account!.installments.map((i) => i.paid), [true, false]);
+      // A part payment at the desk: what is left is what the family pays.
+      expect(account.installments.map((i) => i.due), [0, 8500]);
+      expect(account.installments.last.paidSoFar, 10000);
       expect(account.receipts.single.reference, 'UPI123');
       expect(account.academicYear, '2026–27');
     });
@@ -186,8 +190,26 @@ void main() {
       final repo = AttendanceRepository(RemoteDataSource(client));
       final today = await repo.todayForClass(['stu_aarav', 'stu_diya']);
       expect(today, {'stu_aarav': AttendanceStatus.lateArrival, 'stu_diya': AttendanceStatus.absent});
-      await repo.markToday({'stu_aarav': AttendanceStatus.lateArrival, 'stu_diya': AttendanceStatus.present});
-      expect(fake.seen.last.body, {'stu_aarav': 'late', 'stu_diya': 'present'});
+    });
+
+    test('the register as the school keeps it (approved leave filled in), and marks sent for their own day', () async {
+      final repo = AttendanceRepository(RemoteDataSource(client));
+      final roll = await repo.rollCall('cls_8a', '2026-11-24');
+      expect(roll, {'stu_aarav': 'late', 'stu_diya': 'leave', 'stu_ira': null});
+      expect(fake.seen.last.path, '/v1/f/attendance/roll?classId=cls_8a&date=2026-11-24');
+      final queued = await repo.markDay('2026-11-24', {'stu_aarav': 'late', 'stu_diya': 'leave'});
+      expect(queued, isFalse);
+      expect(fake.seen.last.path, '/v1/f/attendance?date=2026-11-24');
+      expect(fake.seen.last.body, {'stu_aarav': 'late', 'stu_diya': 'leave'});
+    });
+
+    test('signing out, everywhere or here, and a new password carry the person’s token; signing in does not', () async {
+      for (final path in ['/v1/auth/logout', '/v1/auth/logout-all', '/v1/auth/password']) {
+        await client.post(path, const {}).catchError((Object _) => null);
+        expect(fake.seen.firstWhere((c) => c.path == path).headers['authorization'], 'Bearer access-1', reason: path);
+      }
+      await client.post('/v1/auth/code', const {'identifier': 'x'}).catchError((Object _) => null);
+      expect(fake.seen.firstWhere((c) => c.path == '/v1/auth/code').headers['authorization'], '');
     });
 
     test('the marks draft, and no transport as nothing rather than a crash', () async {

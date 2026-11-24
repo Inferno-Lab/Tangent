@@ -264,7 +264,9 @@ export class StaffTimeService implements OnModuleInit {
     const leave = await this.leaveOn(t, day, null);
     const slot = await this.settings.slotDay(t, day);
     const lessons = slot === null ? new Map<string, number>() : new Map((await t.pool.query<{ tid: string; n: string }>(
-      'select coalesce(cover_teacher_id, teacher_id) tid, count(*) n from timetable_slots where day = $1 group by 1', [slot])).rows.map((r) => [r.tid, Number(r.n)]));
+      // Who teaches each lesson that date: a cover arranged for the day first, so a lesson already covered is not counted again.
+      `select coalesce(sub.teacher_id, ls.cover_teacher_id, ls.teacher_id) tid, count(*) n from live_slots ls left join substitutions sub on sub.slot_id = ls.id and sub.date = $2
+       where ls.day = $1 group by 1`, [slot, day])).rows.map((r) => [r.tid, Number(r.n)]));
     const leaveMark = this.markFor(await this.marks(t), 'leave');
     return staff.map((s) => {
       const m = by.get(s.id);
