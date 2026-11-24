@@ -288,6 +288,8 @@ class _IdBadgeState extends State<IdBadge> with TickerProviderStateMixin {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // A card with no number to show at the gate (staff, whose account has none) keeps only its details.
+              if (w.code.isNotEmpty) ...[
               Container(
                 width: 124 * k,
                 height: 124 * k,
@@ -301,12 +303,15 @@ class _IdBadgeState extends State<IdBadge> with TickerProviderStateMixin {
                 ),
               ),
               const SizedBox(width: 16),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(w.codeTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.ts(color: on)),
-                    Text('profile.show_at_gate'.tr, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.cap(color: on.withValues(alpha: .7))),
+                    if (w.code.isNotEmpty) ...[
+                      Text(w.codeTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.ts(color: on)),
+                      Text('profile.show_at_gate'.tr, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.cap(color: on.withValues(alpha: .7))),
+                    ],
                     for (final (key, value) in w.back.take(2)) ...[
                       const SizedBox(height: 8),
                       Text(key.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.o(color: on.withValues(alpha: .55))),

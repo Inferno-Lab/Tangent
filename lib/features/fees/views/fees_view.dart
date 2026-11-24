@@ -129,7 +129,7 @@ class _Due extends StatelessWidget {
           style: context.type.capB,
         ),
         const SizedBox(height: 4),
-        Text(Formatters.money(next.amount), style: context.type.dl.copyWith(color: c.bright)),
+        Text(Formatters.money(next.due), style: context.type.dl.copyWith(color: c.bright)),
         const SizedBox(height: 4),
         Text(
           '${next.title} · ${overdue ? 'fees.days_late'.trn(-days) : 'fees.due_in'.trn(days)}',
@@ -138,7 +138,7 @@ class _Due extends StatelessWidget {
         if (SchoolConfig.allows('fees.onlinePayment')) ...[
           const SizedBox(height: 16),
           Btn(
-            'fees.pay_amount'.trp({'amount': Formatters.money(next.amount)}),
+            'fees.pay_amount'.trp({'amount': Formatters.money(next.due)}),
             kind: BtnKind.bright,
             expand: true,
             onPressed: () => unawaited(openPaySheet(next)),
@@ -326,7 +326,7 @@ class _PlanRow extends StatelessWidget {
           Stamp(tag, color: colour),
         ],
       ),
-      value: Text(Formatters.money(item.amount), style: context.type.t),
+      value: Text(Formatters.money(item.paid ? item.amount : item.due), style: context.type.t),
     );
   }
 }

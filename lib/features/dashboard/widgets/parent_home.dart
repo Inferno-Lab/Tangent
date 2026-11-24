@@ -199,11 +199,11 @@ class _FeeCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              Text(Formatters.money(fee.amount), style: context.type.num),
+              Text(Formatters.money(fee.due), style: context.type.num),
             ],
           ),
           const SizedBox(height: 16),
-          Btn('home.pay_amount'.trp({'amount': Formatters.money(fee.amount)}), expand: true, onPressed: () => unawaited(openFees(item, pay: true))),
+          Btn('home.pay_amount'.trp({'amount': Formatters.money(fee.due)}), expand: true, onPressed: () => unawaited(openFees(item, pay: true))),
         ],
       ),
     );

@@ -162,7 +162,7 @@ class ChildFigures extends StatelessWidget {
       final first = data.student.name.split(' ').first;
       final mine = data.due.where((d) => d.studentId != null ? d.studentId == data.student.id : (d.childName == null || d.childName == first));
       final homework = mine.where((d) => d.kind == DueKind.homework).length;
-      final fees = mine.where((d) => d.kind == DueKind.fee && !(d.installment?.paid ?? true)).fold<num>(0, (s, d) => s + d.installment!.amount);
+      final fees = mine.where((d) => d.kind == DueKind.fee && !(d.installment?.paid ?? true)).fold<num>(0, (s, d) => s + d.installment!.due);
       final marked = data.summary.present + data.summary.absent + data.summary.lateCount;
       final teacher = data.teacherNames[data.schoolClass.classTeacherId] ?? '';
       return _Figures(id: data.student.id, items: [

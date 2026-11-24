@@ -7,6 +7,7 @@ import 'package:tangent/core/routes/app_routes.dart';
 import 'package:tangent/core/services/live_stream.dart';
 import 'package:tangent/core/services/storage_service.dart';
 import 'package:tangent/core/theme/tokens.dart';
+import 'package:tangent/data/datasources/remote_datasource.dart';
 import 'package:tangent/data/models/user.dart';
 
 class AuthService extends GetxService {
@@ -58,7 +59,34 @@ class AuthService extends GetxService {
 
   /// Signs out: forgets the saved session, shows the sign-in screen and drops
   /// the session once the old screens have left, so none rebuild with no user.
-  Future<void> signOut() async {
+  ///
+  /// [server]: the school is told too, so this device's session ends there and the phone gets no more of this account's
+  /// notifications; attendance still waiting for signal is sent first. Not when the school already ended the session.
+  Future<void> signOut({bool server = true}) async {
+    if (_leaving) return;
+    _leaving = true;
+    try {
+      await _leave(server);
+    } finally {
+      _leaving = false;
+    }
+  }
+
+  bool _leaving = false;
+
+  Future<void> _leave(bool server) async {
+    final remote = Get.isRegistered<RemoteDataSource>() ? Get.find<RemoteDataSource>() : null;
+    if (server && remote != null) {
+      try {
+        await remote.client.flushOutbox().timeout(const Duration(seconds: 10));
+        if (Get.isRegistered<PushService>()) await Get.find<PushService>().forget().timeout(const Duration(seconds: 5));
+        await remote.post('/v1/auth/logout', const {}).timeout(const Duration(seconds: 5));
+      } on Object {
+        // Offline or refused: the session still ends on this phone, and on the server when it expires.
+      }
+    }
+    // Never sent later under whoever signs in next on this phone.
+    await remote?.client.clearOutbox();
     if (Get.isRegistered<LiveStream>()) Get.find<LiveStream>().stop();
     if (Get.isRegistered<PushService>()) unawaited(Get.find<PushService>().stop());
     await _storage.remove(StorageKeys.sessionUser);

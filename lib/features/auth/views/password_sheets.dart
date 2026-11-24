@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/services/push_service.dart';
 import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/utils/validators.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -22,12 +23,15 @@ Future<void> showChangePassword() => showSheet<void>(const _ChangeSheet());
 /// Signs this person out on every phone and computer, then here.
 Future<void> signOutEverywhere() async {
   try {
+    // This phone stops getting the account's notifications while the session still works.
+    if (Get.isRegistered<PushService>()) await Get.find<PushService>().forget();
     await Get.find<RemoteDataSource>().post('/v1/auth/logout-all', const {});
   } on AppException catch (e) {
     ToastHelper.show(e.message, kind: ToastKind.error);
     return;
   }
-  await Get.find<AuthService>().signOut();
+  // The school already ended every session, this one too.
+  await Get.find<AuthService>().signOut(server: false);
 }
 
 Future<bool> _send(String path, Map<String, dynamic> body, {void Function(dynamic json)? then}) async {

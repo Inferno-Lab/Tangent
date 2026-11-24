@@ -67,7 +67,7 @@ abstract final class LanguagePacks {
   static Future<void> remember(String lang) async {
     if (!Get.isRegistered<RemoteDataSource>() || !Get.isRegistered<AuthService>() || !Get.find<AuthService>().isLoggedIn) return;
     try {
-      await Get.find<RemoteDataSource>().client.send('PUT', '/v1/auth/me/prefs', {'key': 'language', 'value': lang});
+      await Get.find<RemoteDataSource>().client.send('PUT', '/v1/me/prefs', {'key': 'language', 'value': lang});
     } on Object {
       // Offline: the next start says it again.
     }

@@ -33,6 +33,8 @@ class FeeRepository {
         return Receipt.fromJson(Map<String, dynamic>.from(status['receipt'] as Map));
       }
       if (status['status'] == 'failed') throw const AppException('fees.pay_failed');
+      // Paid, but the fee was settled another way meanwhile: the office refunds or receipts it.
+      if (status['status'] == 'review') throw const AppException('fees.pay_review');
     }
     return null;
   }

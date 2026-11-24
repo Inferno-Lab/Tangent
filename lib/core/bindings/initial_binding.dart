@@ -7,6 +7,8 @@ import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/services/connectivity_service.dart';
 import 'package:tangent/core/services/live_stream.dart';
 import 'package:tangent/core/services/school_config.dart';
+import 'package:tangent/core/utils/extensions.dart';
+import 'package:tangent/core/widgets/toast.dart';
 import 'package:tangent/data/datasources/remote_datasource.dart';
 import 'package:tangent/data/repositories/academic_repository.dart';
 import 'package:tangent/data/repositories/assistant_repository.dart';
@@ -20,7 +22,7 @@ class InitialBinding extends Bindings {
   @override
   void dependencies() {
     final remote = Get.put(
-      RemoteDataSource(ApiClient(onSignedOut: () => unawaited(Get.find<AuthService>().signOut()), onLocked: () => unawaited(SchoolConfig.load()))),
+      RemoteDataSource(ApiClient(onSignedOut: () => unawaited(Get.find<AuthService>().signOut(server: false)), onLocked: () => unawaited(SchoolConfig.load()))),
       permanent: true,
     );
     Get
@@ -28,7 +30,11 @@ class InitialBinding extends Bindings {
       ..put(PushService(remote), permanent: true);
     // Attendance marked without a signal is sent as soon as the phone is back online.
     if (Get.isRegistered<ConnectivityService>()) {
-      Get.find<ConnectivityService>().onBackOnline.add(() async { await remote.client.flushOutbox(); });
+      // What the school refused (a day locked meanwhile) is said, not dropped quietly.
+      Get.find<ConnectivityService>().onBackOnline.add(() async {
+        final r = await remote.client.flushOutbox();
+        if (r.refused.isNotEmpty) ToastHelper.show('teacher.attendance_not_sent'.trp({'reason': r.refused.first.tr}), kind: ToastKind.error);
+      });
     }
     Get
       ..lazyPut<AuthRepository>(() => AuthRepository(remote), fenix: true)

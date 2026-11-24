@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/theme/app_colors.dart';
 import 'package:tangent/core/theme/tokens.dart';
 import 'package:tangent/core/utils/extensions.dart';
@@ -70,6 +71,10 @@ class MarkAttendanceView extends GetView<MarkAttendanceController> {
                       _Count('teacher.absent_t', controller.absent, AppPalette.of(mode, 'bad-d')),
                       const SizedBox(width: 24),
                       _Count('teacher.late_t', controller.late, AppPalette.of(mode, 'warn-d')),
+                      if (controller.away > 0) ...[
+                        const SizedBox(width: 24),
+                        _Count('teacher.away_t', controller.away, AppPalette.of(mode, 'info-d')),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -83,6 +88,7 @@ class MarkAttendanceView extends GetView<MarkAttendanceController> {
                             (controller.present, c.bright),
                             (controller.absent, AppPalette.of(mode, 'bad-d')),
                             (controller.late, AppPalette.of(mode, 'warn-d')),
+                            (controller.away, AppPalette.of(mode, 'info-d')),
                           ])
                             if (v > 0) Expanded(flex: v, child: ColoredBox(color: colour)),
                         ],
@@ -106,7 +112,7 @@ class MarkAttendanceView extends GetView<MarkAttendanceController> {
                 Text('teacher.attendance_hint'.tr, style: context.type.s),
                 const SizedBox(height: 8),
                 for (final (i, s) in controller.students.indexed)
-                  _Kid(student: s, first: i == 0, mark: controller.marks[s.id], onTap: () => controller.cycle(s.id)),
+                  _Kid(student: s, first: i == 0, mark: controller.marks[s.id], kept: controller.kept[s.id], onTap: () => controller.cycle(s.id)),
               ],
             ),
           ),
@@ -134,25 +140,30 @@ class _Count extends StatelessWidget {
 }
 
 class _Kid extends StatelessWidget {
-  const _Kid({required this.student, required this.first, required this.mark, required this.onTap});
+  const _Kid({required this.student, required this.first, required this.mark, required this.kept, required this.onTap});
 
   final Student student;
   final bool first;
   final AttendanceStatus? mark;
+
+  /// One of the school's own marks (approved leave, a half day), shown by its name until the child is tapped.
+  final String? kept;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final c = context.app;
-    final (label, soft, ink, icon) = switch (mark) {
-      AttendanceStatus.absent => ('teacher.absent_t', c.badSoft, c.badText, AppIcons.absent),
-      AttendanceStatus.lateArrival => ('teacher.late_t', c.lateSoft, c.lateText, AppIcons.late),
-      _ => ('teacher.present_t', c.okSoft, c.okText, AppIcons.present),
-    };
+    final (label, soft, ink, icon) = kept != null
+        ? (SchoolConfig.markName(kept!), c.infoSoft, c.infoText, AppIcons.calendar)
+        : switch (mark) {
+            AttendanceStatus.absent => ('teacher.absent_t'.tr, c.badSoft, c.badText, AppIcons.absent),
+            AttendanceStatus.lateArrival => ('teacher.late_t'.tr, c.lateSoft, c.lateText, AppIcons.late),
+            _ => ('teacher.present_t'.tr, c.okSoft, c.okText, AppIcons.present),
+          };
     final av = c.spectrumFor(_avatar[student.name.hashCode.abs() % _avatar.length]);
     return Semantics(
       button: true,
-      label: '${student.name}, ${label.tr}. ${'teacher.tap_to_change'.tr}',
+      label: '${student.name}, $label. ${'teacher.tap_to_change'.tr}',
       excludeSemantics: true,
       child: Pressable(
         onTap: onTap,
@@ -193,7 +204,7 @@ class _Kid extends StatelessWidget {
                   children: [
                     Icon(icon, size: 16, color: ink),
                     const SizedBox(width: 6),
-                    Text(label.tr, style: context.type.ts.copyWith(color: ink)),
+                    Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: context.type.ts.copyWith(color: ink)),
                   ],
                 ),
               ),
