@@ -117,6 +117,7 @@ export class HooksController {
     const status = await this.tenants.resolve(slug).then((t) => t.pool.query<{ status: string }>('select status from payment_orders where id = $1', [orderId])).then((r) => r.rows[0]?.status).catch(() => undefined);
     const [title, text] = status === 'paid' ? ['Payment received', 'Thank you. The receipt is in the app.']
       : status === 'failed' ? ['Payment did not go through', 'No money was taken. Go back to the app to try again.']
+      : status === 'review' ? ['Payment received', 'This fee had already been settled, so the school office will refund the payment or put it towards another fee.']
       : ['Checking your payment', 'This takes a few seconds. The app shows the receipt as soon as the bank confirms.'];
     void reply.type('text/html').send(page(title, `<h1>${title}</h1><p>${text}</p><form><a class="btn" href="tangent://open/fees">Back to the app</a></form>`));
   }
