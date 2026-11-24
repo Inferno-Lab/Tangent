@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { StaleSettings, newId, recordSettingsVersion, writeSettings } from '@tangent/db';
 import { checkSchoolChanges, resolveConfig, validateSettingsChanges } from '@tangent/config-engine';
-import { ApiError } from '@tangent/nest-kit';
+import { ApiError, forbidden } from '@tangent/nest-kit';
 import type { Registry } from '@tangent/tenancy';
 import { tx, TimetableCycle, slotDayOf, slotDays, slotKey, schoolToday, addDays, schoolZone, checkCustom, roundToCurrency, type CustomEntity, type CustomFieldsSetting, type CustomValues, rawOf, toE164, phoneProblem, MESSAGE_EVENTS, SETTINGS_META, schoolMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type GradingScheme, gradeIn, schemeFor, type SchoolSettingsPatch, type SchoolSettingsView, type SettingsDoc } from '@tangent/contracts';
 import { REGISTRY, type TenantCtx } from '../tenancy/tenant.js';
@@ -237,6 +237,18 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
  * Refuses leave that overlaps leave already asked for or given (a family asking twice, the office recording what a parent
  * already sent). Half days of the same date only clash when they are the same half.
  */
+/**
+ * A class a person acts on (marks its attendance, enters its marks, sets or grades its homework): any class with `classes.all`,
+ * otherwise one they teach, as its class teacher, a teacher in its timetable, or covering a period of it.
+ */
+export async function mayTeach(t: TenantCtx, user: { id: string; permissions: readonly string[] }, classId: string): Promise<void> {
+  if (user.permissions.includes('classes.all')) return;
+  const ok = await t.pool.query(
+    'select 1 from classes where id = $1 and class_teacher_id = $2 union all select 1 from timetable_slots where class_id = $1 and (teacher_id = $2 or cover_teacher_id = $2) limit 1',
+    [classId, user.id]);
+  if (!ok.rowCount) throw forbidden(tx('You can do this only for the classes you teach.'));
+}
+
 export async function checkLeaveClash(q: { query: TenantCtx['pool']['query'] }, studentId: string, from: string, to: string, halfDay: string | null | undefined): Promise<void> {
   const r = await q.query(
     `select 1 from approvals where kind = 'leave' and status in ('pending','approved') and payload->>'studentId' = $1

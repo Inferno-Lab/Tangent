@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { type AttendanceMarkDef, type RegisterPart, markMeaning, schoolMinutes, schoolZone, addDays, dayName, schoolToday, latestSchoolDay, schoolDaysEnding, type AttendanceDay, type AttendanceDayPut, type AttendanceWeekPoint, type PeriodMarksPut, type PeriodRoll, tx } from '@tangent/contracts';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
-import { AuditService, Messenger, SettingsService } from './support.js';
+import { AuditService, Messenger, SettingsService, mayTeach } from './support.js';
 
 
 @Injectable()
@@ -81,7 +81,8 @@ export class AttendanceService {
     if (holiday.rows[0]) throw new ApiError('validation', tx('The school is closed that day ({name}), so there is no roll call.', { name: holiday.rows[0].name }));
   }
 
-  async put(t: TenantCtx, user: { id: string; name: string }, body: AttendanceDayPut): Promise<AttendanceDay> {
+  async put(t: TenantCtx, user: { id: string; name: string; permissions: readonly string[] }, body: AttendanceDayPut): Promise<AttendanceDay> {
+    await mayTeach(t, user, body.classId);
     await this.markable(t, user.id, body.date);
     const used = await this.settings.value<AttendanceMarkDef[]>(t, 'attendance.statuses', []);
     const unused = body.marks.find((m) => !markMeaning(used, m.status));
