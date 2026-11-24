@@ -23,23 +23,24 @@ describe('sign-in', () => {
     return h.call('POST', '/v1/auth/verify', { body: { challengeId: step1.json.challenge.challengeId, code: await h.codeSentTo(p.phone!), client } });
   };
 
-  it('refuses a wrong password and says how many tries are left', async () => {
+  it('refuses a wrong password without saying how many tries are left', async () => {
     const r = await h.call('POST', '/v1/auth/login', { body: { identifier: h.people.principal.email, password: 'nope' } });
     expect(r.status).toBe(401);
-    expect(r.json).toMatchObject({ code: 'unauthenticated', attemptsLeft: 4, fields: { password: expect.any(String) } });
+    expect(r.json).toMatchObject({ code: 'unauthenticated', fields: { password: expect.any(String) } });
+    expect(r.json.attemptsLeft).toBeUndefined();
   });
-  it('locks the account after five wrong passwords', async () => {
-    let last: { status: number; json: any } | undefined;
-    for (let i = 0; i < 5; i++) last = await h.call('POST', '/v1/auth/login', { body: { identifier: h.people.driver.email, password: 'wrong' } });
-    expect(last!.status).toBe(423);
-    expect(last!.json.code).toBe('locked');
+  it('holds back the address after five wrong passwords', async () => {
+    for (let i = 0; i < 5; i++) expect((await h.call('POST', '/v1/auth/login', { body: { identifier: h.people.driver.email, password: 'wrong' } })).status).toBe(401);
     const again = await h.call('POST', '/v1/auth/login', { body: { identifier: h.people.driver.email, password: STAFF_PASSWORD } });
     expect(again.status).toBe(423);
+    expect(again.json.code).toBe('locked');
   });
   it('does not reveal whether an account exists', async () => {
     const r = await h.call('POST', '/v1/auth/login', { body: { identifier: 'nobody@nowhere.test', password: 'x' } });
+    const known = await h.call('POST', '/v1/auth/login', { body: { identifier: h.people.office.email, password: 'x' } });
     expect(r.status).toBe(401);
-    expect(r.json.fields.identifier).toBeDefined();
+    expect(r.json.message).toBe(known.json.message);
+    expect(r.json.fields).toEqual(known.json.fields);
   });
   it('sends a code to the phone, refuses a wrong one, and takes the one it sent', async () => {
     const p = h.people.principal;

@@ -47,7 +47,7 @@ export const settingOwner = (key: string): 'school' | 'tangent' => ((TANGENT_SET
  * Tangent's; `max`: not above; `on`: once Tangent turns it on, the school cannot turn it off.
  */
 export const TIGHTEN: Partial<Record<SettingKey, 'min' | 'max' | 'on'>> = {
-  'security.twoFactor': 'on', 'security.passwordMinLength': 'min', 'security.webSessionDays': 'max', 'security.appSessionDays': 'max',
+  'security.twoFactor': 'on', 'security.staffAuthenticator': 'on', 'security.passwordMinLength': 'min', 'security.webSessionDays': 'max', 'security.appSessionDays': 'max',
   'privacy.retentionMonths': 'min', 'privacy.photoConsent': 'on', 'privacy.consentRequired': 'on', 'privacy.consentAge': 'min',
 };
 
@@ -78,6 +78,7 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = localized({
   'app.layout': { group: 'The app', label: 'What each role sees', kind: 'appLayout', help: 'For each role: up to four bottom tabs (Profile is always added last), the Home cards and the quick buttons, in order. Only what the school’s modules offer that role can be chosen.' },
   'app.languages': { group: 'The app', label: 'Languages offered', kind: 'multi', options: LANGUAGES, help: 'The app’s language choices. Someone who picked one taken away gets the school’s default.' },
   'security.twoFactor': { group: 'Sign-in and security', label: 'Staff confirm sign-in with a code', kind: 'bool', risky: true, help: 'Turning this off weakens every staff account.' },
+  'security.staffAuthenticator': { group: 'Sign-in and security', label: 'Staff who run the school use an authenticator app', kind: 'bool', risky: true, help: 'Anyone who can change settings, staff or refunds confirms sign-in with a code from an authenticator app, which someone holding their phone number cannot pass. Turning this off lets a text message do instead.' },
   'security.passwordMinLength': { group: 'Sign-in and security', label: 'Shortest password allowed', kind: 'number', min: 8, max: 64 },
   'security.webSessionDays': { group: 'Sign-in and security', label: 'Admin sign-in lasts (days)', kind: 'number', min: 1, max: 30 },
   'security.appSessionDays': { group: 'Sign-in and security', label: 'App sign-in lasts (days)', kind: 'number', min: 1, max: 90 },

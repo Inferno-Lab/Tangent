@@ -142,6 +142,8 @@ function StaffDialog({ person, onClose, onDone }: { person: StaffRow | null; onC
     onSuccess: (r) => onDone(r.status === 'active' ? tr('admin.staff_page.can_sign_in_again', { name: r.name }) : tr('admin.staff_page.was_switched_off_and_signed', { name: r.name })),
     onError: fail });
   const resend = useMutation({ mutationFn: () => app.api.staff.invite(person!.id), onSuccess: (r) => onDone(tr('admin.staff_page.invite_sent_to', { to: r.to })), onError: fail });
+  // A lost phone: their authenticator is dropped, they are signed out, and they add a new one at their next sign-in.
+  const renew = useMutation({ mutationFn: () => app.api.staff.patch(person!.id, { resetAuthenticator: true }), onSuccess: (r) => onDone(tr('admin.staff_page.new_authenticator_done', { name: r.name })), onError: fail });
   const go = () => { const p: Record<string, string> = {};
     if (f.name.trim().length < 2) p.name = tr('admin.staff_page.enter_the_name');
     if ((!person || f.email.trim()) && !/^\S+@\S+\.\S+$/.test(f.email.trim())) p.email = tr('admin.staff_page.enter_a_valid_email');
@@ -186,7 +188,10 @@ function StaffDialog({ person, onClose, onDone }: { person: StaffRow | null; onC
         {err._ && <div className="emsg" role="alert">{err._}</div>}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
-        {person && !me ? <button className={`btn ${person.status === 'active' ? 'dng' : ''}`} disabled={toggle.isPending} onClick={() => toggle.mutate()}>{person.status === 'active' ? tr('admin.staff_page.switch_off') : tr('admin.staff_page.switch_on')}</button> : <span />}
+        {person && !me ? <span style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button className={`btn ${person.status === 'active' ? 'dng' : ''}`} disabled={toggle.isPending} onClick={() => toggle.mutate()}>{person.status === 'active' ? tr('admin.staff_page.switch_off') : tr('admin.staff_page.switch_on')}</button>
+          {person.status === 'active' && person.access === 'signed_in' && <button className="btn" disabled={renew.isPending} onClick={() => renew.mutate()} data-tip={tr('admin.staff_page.new_authenticator_tip')}>{tr('admin.staff_page.new_authenticator')}</button>}
+        </span> : <span />}
         <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <button className="btn" onClick={onClose}>{tr('admin.staff_page.cancel')}</button>
           <button className="btn pri" disabled={save.isPending} onClick={go}>{save.isPending ? tr('admin.staff_page.saving') : person ? tr('admin.staff_page.save') : tr('admin.staff_page.add_and_send_invite')}</button>

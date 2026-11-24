@@ -217,6 +217,8 @@ export const SchoolSettingsSchema = z.object({
   'homework.goalPct': z.number().min(50).max(100).default(85),
   'dashboard.rollClasses': z.array(z.string()).max(8).default([]),
   'security.twoFactor': z.boolean().default(true),
+  /** Staff who can change settings, people or refunds confirm sign-in with an authenticator app, not a text to their phone. */
+  'security.staffAuthenticator': z.boolean().default(true),
   'security.passwordMinLength': z.number().int().min(8).max(64).default(8),
   'security.webSessionDays': z.number().int().min(1).max(30).default(7),
   'security.appSessionDays': z.number().int().min(1).max(90).default(30),

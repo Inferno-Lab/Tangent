@@ -1,18 +1,29 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
 import { toE164, initials, type AppRoleKey, type ClientKind, type LoginChallenge, type LoginRequest, type LoginResponse, type Permission, type SessionUser, type TokenPair, tx, type ContactFinish, type ContactStart, type SessionRow } from '@tangent/contracts';
-import { hashPassword, maskEmail, maskPhone, passwordNeedsRehash, randomCode, randomToken, sha256, signJwt, verifyPassword, constantTimeEqual } from '@tangent/security';
+import { hashPassword, maskEmail, maskPhone, newTotpSecret, passwordNeedsRehash, randomCode, randomToken, seal, sha256, signJwt, totpUri, unseal, verifyPassword, verifyTotp, constantTimeEqual } from '@tangent/security';
 import { ENV, type Env } from '../env.js';
-import { ApiError } from '@tangent/nest-kit';
+import { ApiError, Limiter, alert } from '@tangent/nest-kit';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { AuditService, Messenger, SettingsService } from '../school/support.js';
 import { BUS_CREW_SQL } from '../school/transport.service.js';
-import type { TenantCtx } from '../tenancy/tenant.js';
+import { REGISTRY, type TenantCtx } from '../tenancy/tenant.js';
+import type { Registry } from '@tangent/tenancy';
 import { checkCookieCsrf, clearSchoolRefreshCookie, schoolCookieToken, setSchoolRefreshCookie } from './session-cookies.js';
 
 const ACCESS_SECONDS = 15 * 60;
-const MAX_PASSWORD_TRIES = 5;
+// Wrong passwords hold back one address after a few, the whole account only after many from everywhere: someone who knows a
+// principal's email cannot keep them locked out, and guessing from many addresses still stops.
+const DEVICE_TRIES = 5;
+const ACCOUNT_LOCK_AFTER = 30;
 const LOCK_MINUTES = 15;
+const deviceFails = new Limiter(DEVICE_TRIES, LOCK_MINUTES * 60_000);
+// The sign-in budgets below hold on real servers; local runs and tests sign the same people in again and again.
+const STRICT = process.env.NODE_ENV === 'production';
+// Wrong codes one account may type in an hour, across every code it asked for and every address asking.
+const CODE_FAILS_PER_ACCOUNT = 10;
+/** Staff who can change these confirm sign-in with an authenticator app (security.staffAuthenticator). */
+const AUTHENTICATOR_PERMS = ['settings.manage', 'staff.write', 'fees.refund'];
 const OTP_TRIES = 3;
 const OTP_MINUTES = 10;
 // Each code has OTP_TRIES guesses, so the number of codes is what bounds guessing (and the SMS bill).
@@ -26,6 +37,7 @@ interface UserRow {
   email: string | null;
   phone: string | null;
   password_hash: string | null;
+  totp_secret: string | null;
   status: string;
   failed_logins: number;
   locked_until: Date | null;
@@ -55,9 +67,11 @@ export function deviceOf(ua: string | null): string {
 @Injectable()
 export class AuthService {
   private readonly live = new Map<string, { at: number; ok: boolean }>();
+  private readonly warned = new Map<string, number>();
 
   constructor(
     @Inject(ENV) private readonly env: Env,
+    @Inject(REGISTRY) private readonly registry: Registry,
     private readonly settings: SettingsService,
     private readonly messenger: Messenger,
     private readonly audit: AuditService,
@@ -76,31 +90,32 @@ export class AuthService {
   }
 
   /** Step one: check the password. Returns a code challenge, or tokens when the school has two-step sign-in off. */
-  async login(t: TenantCtx, body: LoginRequest, userAgent?: string, reply?: FastifyReply): Promise<LoginResponse> {
+  async login(t: TenantCtx, body: LoginRequest, userAgent?: string, reply?: FastifyReply, ip = ''): Promise<LoginResponse> {
     const user = await this.findUser(t, body.identifier);
-    if (user?.locked_until && user.locked_until > new Date()) {
-      const retryAfter = Math.ceil((user.locked_until.getTime() - Date.now()) / 1000);
-      throw new ApiError('locked', tx('Too many wrong attempts. Try again in {p0} minutes, or reset your password by SMS.', { p0: Math.ceil(retryAfter / 60) }), { retryAfter });
-    }
-    if (user && !user.password_hash) throw new ApiError('validation', 'This account has no password. Sign in with a code sent to your phone instead.', { fields: { password: 'Sign in with a code instead.' } });
+    const device = `${t.info.slug}|${user?.id ?? body.identifier.trim().toLowerCase()}|${ip}`;
+    const lockedFor = user?.locked_until && user.locked_until > new Date() ? Math.ceil((user.locked_until.getTime() - Date.now()) / 1000) : 0;
+    const wait = Math.max(deviceFails.wait(device), lockedFor);
+    if (wait) throw new ApiError('locked', tx('Too many wrong attempts. Try again in {p0} minutes, or reset your password.', { p0: Math.ceil(wait / 60) }), { retryAfter: wait });
     dummyHash ??= hashPassword('not-a-real-password');
     const ok = await verifyPassword(body.password, user?.password_hash ?? (await dummyHash));
     if (!user || !ok || user.status !== 'active') {
-      if (user) {
+      deviceFails.hit(device);
+      if (user?.password_hash) {
         const failed = user.failed_logins + 1;
-        const lock = failed >= MAX_PASSWORD_TRIES;
+        const lock = failed >= ACCOUNT_LOCK_AFTER;
         await t.pool.query('update users set failed_logins = $2, locked_until = $3 where id = $1', [user.id, lock ? 0 : failed, lock ? new Date(Date.now() + LOCK_MINUTES * 60_000) : null]);
-        if (lock) throw new ApiError('locked', tx('Too many wrong attempts. Try again in {LOCK_MINUTES} minutes, or reset your password by SMS.', { LOCK_MINUTES }), { retryAfter: LOCK_MINUTES * 60 });
-        throw new ApiError('unauthenticated', 'That password isn’t right. Check it, or reset it by SMS.', { attemptsLeft: MAX_PASSWORD_TRIES - failed, fields: { password: 'That password isn’t right.' } });
+        if (lock) this.warn(t, `lock:${user.id}`, `Sign-in: ${ACCOUNT_LOCK_AFTER} wrong passwords for one account at ${t.info.slug} from several addresses; it is locked for ${LOCK_MINUTES} minutes.`);
       }
-      throw new ApiError('unauthenticated', 'We couldn’t find an account with those details.', { fields: { identifier: 'We couldn’t find an account with those details.' } });
+      // One answer whether or not the account exists, so the sign-in page does not tell anyone who has one.
+      throw new ApiError('unauthenticated', 'That email, phone or password isn’t right.', { fields: { password: 'Check your email or phone and your password.' } });
     }
     await t.pool.query('update users set failed_logins = 0, locked_until = null where id = $1', [user.id]);
     if (clientOf(body.client) === 'mobile') await this.mayUseApp(t, user);
     if (passwordNeedsRehash(user.password_hash)) {
       await t.pool.query('update users set password_hash = $2 where id = $1', [user.id, await hashPassword(body.password)]);
     }
-
+    const app = await this.authenticatorStep(t, user);
+    if (app) return { step: 'otp', challenge: app };
     const doc = await this.settings.doc(t);
     if (doc.values['security.twoFactor'] === false) {
       return { step: 'done', tokens: await this.issue(t, user.id, userAgent, clientOf(body.client), reply) };
@@ -108,12 +123,56 @@ export class AuthService {
     return { step: 'otp', challenge: await this.sendCode(t, user, 'sign_in') };
   }
 
+  /**
+   * Staff with an authenticator always use it; staff who run the school (settings, staff, refunds) add one at their next sign-in,
+   * unless the school turned that off. A text to a phone is not asked of them: whoever holds the number could pass it.
+   */
+  private async authenticatorStep(t: TenantCtx, user: UserRow & { kind: string }): Promise<LoginChallenge | null> {
+    if (user.kind !== 'staff') return null;
+    if (user.totp_secret) return this.authenticatorChallenge(t, user.id, null);
+    if ((await this.settings.doc(t)).values['security.staffAuthenticator'] === false) return null;
+    const { permissions } = await this.sessionUser(t, user.id);
+    if (!permissions.some((p) => AUTHENTICATOR_PERMS.includes(p))) return null;
+    return this.authenticatorChallenge(t, user.id, { secret: newTotpSecret(), account: user.email ?? user.phone ?? user.name });
+  }
+
+  private async authenticatorChallenge(t: TenantCtx, userId: string, enroll: { secret: string; account: string } | null): Promise<LoginChallenge> {
+    const id = newId('otp');
+    await t.pool.query("insert into otp_challenges (id, user_id, code_hash, channel, purpose, method, pending_secret, expires_at) values ($1,$2,'','app','sign_in',$3,$4,$5)",
+      [id, userId, enroll ? 'enroll' : 'app', enroll ? seal(enroll.secret, this.env.SECRETS_KEY) : null, new Date(Date.now() + OTP_MINUTES * 60_000)]);
+    return {
+      challengeId: id, channel: 'app', maskedTo: tx('your authenticator app'), expiresInSeconds: OTP_MINUTES * 60,
+      ...(enroll ? { enroll: { secret: enroll.secret, uri: totpUri(enroll.secret, `${enroll.account} (${t.info.shortName})`) } } : {}),
+    };
+  }
+
+  /** What an unknown phone or email gets: the same answer as a real one, with no code sent, so no one learns who has an account. */
+  private decoy(identifier: string): LoginChallenge {
+    const v = identifier.trim();
+    const email = v.includes('@');
+    return { challengeId: newId('otp'), channel: email ? 'email' : 'sms', maskedTo: email ? maskEmail(v) : maskPhone(v), expiresInSeconds: OTP_MINUTES * 60, resendInSeconds: 30 };
+  }
+
+  /** Tells Tangent once an hour per school and reason, so a flood of guesses is seen without a flood of alerts. */
+  private warn(t: TenantCtx, reason: string, text: string): void {
+    const key = `${t.info.slug}|${reason}`;
+    if ((this.warned.get(key) ?? 0) > Date.now() - 3600_000) return;
+    this.warned.set(key, Date.now());
+    alert(text);
+  }
+
+  /** How many codes a school may send, and how many wrong codes it takes, in an hour: enough for every family to sign in. */
+  private async budget(t: TenantCtx): Promise<{ sends: number; fails: number }> {
+    const n = Number((await t.pool.query<{ n: string }>("select count(*) n from users where status = 'active'")).rows[0]!.n);
+    return { sends: 50 + Math.ceil(n / 2), fails: 30 + Math.ceil(n / 10) };
+  }
+
   /** Families sign in with a code to their phone (or email). Staff are sent back to their password. */
   async requestCode(t: TenantCtx, identifier: string): Promise<LoginChallenge> {
     const user = await this.findUser(t, identifier);
-    if (!user || user.status !== 'active') throw new ApiError('unauthenticated', 'We couldn’t find an account with those details.', { fields: { identifier: 'We couldn’t find an account with those details.' } });
+    if (!user || user.status !== 'active') return this.decoy(identifier);
     if (user.kind === 'staff') throw new ApiError('validation', 'Staff sign in with their password, then a code.', { fields: { identifier: 'Staff sign in with their password.' } });
-    await this.mayUseApp(t, user);
+    // Whether the school lets this person use the app is said once the code proves the phone is theirs (verify).
     return this.sendCode(t, user, 'sign_in');
   }
 
@@ -138,7 +197,7 @@ export class AuthService {
   /** "Forgot it?": a code to the person's phone or email lets them choose a new password. */
   async resetStart(t: TenantCtx, identifier: string): Promise<LoginChallenge> {
     const user = await this.findUser(t, identifier);
-    if (!user || user.status !== 'active') throw new ApiError('unauthenticated', 'We couldn’t find an account with those details.', { fields: { identifier: 'We couldn’t find an account with those details.' } });
+    if (!user || user.status !== 'active') return this.decoy(identifier);
     return this.sendCode(t, user, 'reset');
   }
 
@@ -166,7 +225,12 @@ export class AuthService {
   }
 
   async verify(t: TenantCtx, challengeId: string, code: string, userAgent?: string, client?: ClientKind, reply?: FastifyReply): Promise<TokenPair> {
-    return this.issue(t, await this.useCode(t, challengeId, code, 'sign_in'), userAgent, clientOf(client), reply);
+    const userId = await this.useCode(t, challengeId, code, 'sign_in');
+    if (clientOf(client) === 'mobile') {
+      const u = (await t.pool.query<{ id: string; kind: string }>('select id, kind from users where id = $1', [userId])).rows[0]!;
+      await this.mayUseApp(t, u);
+    }
+    return this.issue(t, userId, userAgent, clientOf(client), reply);
   }
 
   private async findUser(t: TenantCtx, identifier: string): Promise<(UserRow & { kind: string }) | undefined> {
@@ -176,8 +240,8 @@ export class AuthService {
     if (!byEmail && digits.length < 8) return undefined;
     const { rows } = await t.pool.query<UserRow & { kind: string }>(
       byEmail
-        ? 'select id, name, email, phone, password_hash, status, failed_logins, locked_until, token_version, kind from users where lower(email) = $1 limit 1'
-        : 'select id, name, email, phone, password_hash, status, failed_logins, locked_until, token_version, kind from users where phone = $1 limit 1',
+        ? 'select id, name, email, phone, password_hash, totp_secret, status, failed_logins, locked_until, token_version, kind from users where lower(email) = $1 limit 1'
+        : 'select id, name, email, phone, password_hash, totp_secret, status, failed_logins, locked_until, token_version, kind from users where phone = $1 limit 1',
       // A number typed locally takes the school's country; one with + or 00 is taken as it is.
       [byEmail ? ident.toLowerCase() : toE164(ident, t.info.country) ?? `+${digits}`],
     );
@@ -185,11 +249,22 @@ export class AuthService {
   }
 
   private async sendCode(t: TenantCtx, user: { id: string; phone: string | null; email: string | null }, purpose: 'sign_in' | 'reset' | 'contact', target?: { channel: 'sms' | 'email'; to: string }): Promise<LoginChallenge> {
-    const { rows: [r] } = await t.pool.query<{ n: string; first: Date | null }>(
-      `select count(*) n, min(created_at) first from otp_challenges where user_id = $1 and created_at > now() - interval '${OTP_WINDOW_MINUTES} minutes'`, [user.id]);
+    const { rows: [r] } = await t.pool.query<{ n: string; first: Date | null; last: Date | null }>(
+      `select count(*) n, min(created_at) first, max(created_at) last from otp_challenges where user_id = $1 and method = 'code' and created_at > now() - interval '${OTP_WINDOW_MINUTES} minutes'`, [user.id]);
     if (Number(r!.n) >= OTP_SENDS) {
       const retryAfter = Math.max(60, Math.ceil((r!.first!.getTime() + OTP_WINDOW_MINUTES * 60_000 - Date.now()) / 1000));
       throw new ApiError('rate_limited', tx('Too many codes sent. Try again in {p0} minutes.', { p0: Math.ceil(retryAfter / 60) }), { retryAfter });
+    }
+    // The wait before another code (30 seconds, longer after each) is the server's, not only the screen's.
+    const gap = r!.last ? Math.ceil((r!.last.getTime() + 30_000 * Number(r!.n) - Date.now()) / 1000) : 0;
+    if (STRICT && gap > 0) throw new ApiError('rate_limited', tx('Wait {p0} seconds before asking for another code.', { p0: gap }), { retryAfter: gap });
+    if (STRICT) {
+      // The school's own budget for the hour, whoever asks and from wherever: it bounds the text-message bill.
+      const sent = Number((await t.pool.query<{ n: string }>("select count(*) n from otp_challenges where method = 'code' and created_at > now() - interval '1 hour'")).rows[0]!.n);
+      if (sent >= (await this.budget(t)).sends) {
+        this.warn(t, 'sends', `Sign-in: ${t.info.slug} sent ${sent} codes in the last hour, its limit. New codes wait until the hour has passed.`);
+        throw new ApiError('rate_limited', 'Your school has sent a lot of sign-in codes in the last hour. Try again in a little while.', { retryAfter: 900 });
+      }
     }
     const sends = Number(r!.n) + 1;
     const code = randomCode(6);
@@ -256,18 +331,42 @@ export class AuthService {
     if (!r.rowCount) throw new ApiError('not_found', tx('That device is already signed out.'));
   }
 
-  /** Checks a code for one purpose and spends it. Returns the user it belongs to. */
+  /** Checks a code for one purpose and spends it: a texted code, or one from the person's authenticator app. Returns the user it belongs to. */
   private async useCode(t: TenantCtx, challengeId: string, code: string, purpose: 'sign_in' | 'reset' | 'contact'): Promise<string> {
-    const { rows } = await t.pool.query<{ id: string; user_id: string; code_hash: string; attempts: number; expires_at: Date; used_at: Date | null; purpose: string }>(
-      'select id, user_id, code_hash, attempts, expires_at, used_at, purpose from otp_challenges where id = $1', [challengeId]);
+    const { rows } = await t.pool.query<{ id: string; user_id: string; code_hash: string; attempts: number; expires_at: Date; used_at: Date | null; purpose: string; method: string; pending_secret: string | null; totp_secret: string | null; totp_last: string | null }>(
+      `select o.id, o.user_id, o.code_hash, o.attempts, o.expires_at, o.used_at, o.purpose, o.method, o.pending_secret, u.totp_secret, u.totp_last
+       from otp_challenges o join users u on u.id = o.user_id where o.id = $1`, [challengeId]);
     const row = rows[0];
     if (!row || row.purpose !== purpose || row.used_at || row.expires_at < new Date()) throw new ApiError('unauthenticated', 'That code has expired. Go back and ask for a new one.', { fields: { code: 'That code has expired.' } });
     if (row.attempts >= OTP_TRIES) throw new ApiError('locked', 'Too many wrong codes. Go back and ask for a new one.');
-    if (!constantTimeEqual(sha256(`${challengeId}:${code}`), row.code_hash)) {
+    // Guessing is bounded per account and per school, across every code asked for and from every address.
+    if (STRICT) {
+      const r = (await t.pool.query<{ mine: string; all: string }>(
+        "select coalesce(sum(attempts) filter (where user_id = $1), 0) mine, coalesce(sum(attempts), 0) \"all\" from otp_challenges where created_at > now() - interval '1 hour'", [row.user_id])).rows[0]!;
+      if (Number(r.mine) >= CODE_FAILS_PER_ACCOUNT) throw new ApiError('locked', 'Too many wrong codes for this account. Try again in an hour.', { retryAfter: 3600 });
+      if (Number(r.all) >= (await this.budget(t)).fails) {
+        this.warn(t, 'fails', `Sign-in: ${r.all} wrong codes at ${t.info.slug} in the last hour. Code sign-in waits until the hour has passed.`);
+        throw new ApiError('locked', 'Too many wrong codes at your school just now. Try again in a little while.', { retryAfter: 900 });
+      }
+    }
+    let good: boolean;
+    if (row.method === 'code') good = constantTimeEqual(sha256(`${challengeId}:${code}`), row.code_hash);
+    else {
+      // An authenticator code is good for about 90 seconds; one already used in that time is refused, so it cannot be replayed.
+      const [lastCode, lastAt] = (row.totp_last ?? '').split('@');
+      const replay = lastCode === code && Date.now() / 1000 - Number(lastAt) < 120;
+      const secret = row.method === 'enroll' ? row.pending_secret : row.totp_secret;
+      good = !replay && !!secret && verifyTotp(unseal(secret, this.env.SECRETS_KEY), code);
+    }
+    if (!good) {
       await t.pool.query('update otp_challenges set attempts = attempts + 1 where id = $1', [challengeId]);
       throw new ApiError('unauthenticated', 'That code isn’t right.', { attemptsLeft: OTP_TRIES - row.attempts - 1, fields: { code: 'That code isn’t right.' } });
     }
     await t.pool.query('update otp_challenges set used_at = now() where id = $1', [challengeId]);
+    if (row.method !== 'code') {
+      await t.pool.query('update users set totp_last = $2, totp_secret = coalesce($3, totp_secret) where id = $1', [row.user_id, `${code}@${Math.floor(Date.now() / 1000)}`, row.method === 'enroll' ? row.pending_secret : null]);
+      if (row.method === 'enroll') await this.audit.record(t, { actorId: row.user_id, actorName: 'self', action: 'auth.authenticator_added', entity: 'user', entityId: row.user_id });
+    }
     return row.user_id;
   }
 
@@ -335,6 +434,18 @@ export class AuthService {
     this.live.set(key, { at: Date.now(), ok });
     if (this.live.size > 20_000) for (const [k, v] of this.live) if (Date.now() - v.at > 30_000) this.live.delete(k);
     if (!ok) throw new ApiError('unauthenticated', 'Your session has ended. Sign in again.');
+  }
+
+  /** A support session (from the console) is still open: not ended early, not past its time. */
+  async assertSupport(sid: string): Promise<void> {
+    const key = `support:${sid}`;
+    const hit = this.live.get(key);
+    let ok = hit && Date.now() - hit.at < 30_000 ? hit.ok : undefined;
+    if (ok === undefined) {
+      ok = !!(await this.registry.pool.query("select 1 from support_sessions where id = $1 and status = 'active' and expires_at > now()", [sid])).rowCount;
+      this.live.set(key, { at: Date.now(), ok });
+    }
+    if (!ok) throw new ApiError('unauthenticated', 'This support session has ended.');
   }
 
   async bumpVersion(t: TenantCtx, userId: string): Promise<void> {

@@ -46,6 +46,12 @@ export function RolesTab({ schoolId, say }: { schoolId: string; say: Say }) {
     onError: (e) => say((e as Error).message, 'bad'),
   });
 
+  const renew = useMutation({
+    mutationFn: (userId: string) => app.api.config.resetStaffAuthenticator(schoolId, userId),
+    onSuccess: () => say(tr('console.roles_tab.authenticator_reset')),
+    onError: (e) => say((e as Error).message, 'bad'),
+  });
+
   const people = (q.data?.staff ?? []).filter((s) => !find.trim() || `${s.name} ${s.designation}`.toLowerCase().includes(find.trim().toLowerCase()));
   const [shownPeople, morePeople] = useMore(people);
 
@@ -113,7 +119,8 @@ export function RolesTab({ schoolId, say }: { schoolId: string; say: Say }) {
         {shownPeople.map((s) => (
           <div key={s.id} className="kv" style={{ gap: 12 }}>
             <span style={{ minWidth: 0 }}>{s.name}<small style={{ display: 'block', color: 'var(--ink3)' }}>{s.designation}</small></span>
-            <b style={{ minWidth: 200 }}>
+            <b style={{ minWidth: 200, display: 'flex', gap: 8, alignItems: 'center' }}>
+              {can && <button type="button" className="btn sm" disabled={busyFor(renew, s.id)} onClick={() => renew.mutate(s.id)} data-tip={tr('console.roles_tab.lost_phone_tip')}>{tr('console.roles_tab.new_authenticator')}</button>}
               <Select value={s.roleId ?? ''} onChange={(roleId) => setMoving({ userId: s.id, name: s.name, roleId })} disabled={!can || busyFor(assign, s.id)} aria-label={tr('console.roles_tab.role_for', { name: s.name })}
                 options={[...(s.roleId ? [] : [{ value: '', label: tr('console.roles_tab.no_role_yet') }]), ...options]} />
             </b>

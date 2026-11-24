@@ -358,7 +358,9 @@ export function generateSchool({ today = iso(Date.now()), seed = 20261120, perCl
       color: '#1F6FB2', logoText: 'S', appName: 'Sunrise Valley', tagline: 'Learn. Lead. Serve.', contactName: principal.name, contactPhone: `+91 ${principal.phone}`, contactEmail: principal.email },
     // What Tangent sets for the school in the console before its files come in: the library keeps reference copies too, and
     // families, teachers and the bus drivers use the app.
-    settings: { 'library.itemTypes': [{ key: 'book', name: 'Book' }, { key: 'reference', name: 'Reference' }], 'app.roles': ['parent', 'teacher', 'driver'] },
+    // The tools sign its principal in many times at once, which an authenticator's one-use codes would refuse: this test school
+    // alone confirms staff sign-in with a texted code (the Test inbox). A real school keeps the authenticator on.
+    settings: { 'library.itemTypes': [{ key: 'book', name: 'Book' }, { key: 'reference', name: 'Reference' }], 'app.roles': ['parent', 'teacher', 'driver'], 'security.staffAuthenticator': false },
     modules: ['people', 'attendance', 'fees', 'notices', 'timetable', 'homework', 'events', 'exams', 'chat', 'transport', 'library', 'gallery', 'staffAttendance', 'diary', 'ptm', 'visitors', 'certificates'],
     // Each with the email and the phone (international form) their codes go to.
     people: {

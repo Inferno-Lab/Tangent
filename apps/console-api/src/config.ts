@@ -191,6 +191,16 @@ export class ConfigService implements OnModuleInit {
     await this.db.audit(by, 'staff.role_set', 'school', schoolId, { userId, roleId });
   }
 
+  /** A school's staff member lost their phone and no one at the school can reset it (the only principal): they add a new one at their next sign-in. */
+  async resetStaffAuthenticator(schoolId: string, by: string, userId: string): Promise<void> {
+    await this.school(schoolId, async (p) => {
+      const r = await p.query("update users set totp_secret = null, totp_last = null, token_version = token_version + 1 where id = $1 and kind = 'staff'", [userId]);
+      if (!r.rowCount) throw notFound('That person');
+      await p.query('update sessions set revoked_at = now() where user_id = $1 and revoked_at is null', [userId]);
+    });
+    await this.db.audit(by, 'staff.authenticator_reset', 'school', schoolId, { userId });
+  }
+
   // Templates: one school's setup, applied to others.
 
   async templates(): Promise<ConfigTemplateRow[]> {
@@ -327,6 +337,11 @@ export class ConfigController {
   @Put('schools/:id/staff/:userId/role') @HttpCode(204) @Needs('schools.configure')
   async setStaffRole(@Me() me: ConsoleUser, @Param('id') id: string, @Param('userId') userId: string, @Body(new ZodPipe(z.object({ roleId: z.string().min(1) }))) body: { roleId: string }): Promise<void> {
     await this.config.setStaffRole(id, me.email, userId, body.roleId);
+  }
+
+  @Post('schools/:id/staff/:userId/authenticator/reset') @HttpCode(204) @Needs('schools.configure')
+  async resetStaffAuthenticator(@Me() me: ConsoleUser, @Param('id') id: string, @Param('userId') userId: string): Promise<void> {
+    await this.config.resetStaffAuthenticator(id, me.email, userId);
   }
 
   @Get('config-templates') @Needs('schools.read')
