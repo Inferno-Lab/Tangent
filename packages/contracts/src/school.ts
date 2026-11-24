@@ -404,7 +404,9 @@ export interface NoticeRow {
 }
 
 // Approvals
-export type ApprovalKind = 'leave' | 'fee_waiver' | 'admission' | 'notice' | 'attendance' | 'photo' | 'receipt_cancel' | 'settings' | 'staff_leave' | 'gate_pass' | 'certificate' | 'visitor';
+/** Every kind of request the approvals queue holds: the type and the API's filter read this one list. */
+export const APPROVAL_KINDS = ['leave', 'fee_waiver', 'admission', 'notice', 'attendance', 'photo', 'receipt_cancel', 'settings', 'staff_leave', 'gate_pass', 'certificate', 'visitor'] as const;
+export type ApprovalKind = (typeof APPROVAL_KINDS)[number];
 export interface ApprovalRow {
   id: string;
   kind: ApprovalKind;
@@ -520,6 +522,10 @@ export type PeriodTimesPut = z.infer<typeof PeriodTimesPut>;
 export interface PeriodTimesRow { day: number; classId: string | null; period: number; starts: string; ends: string }
 export const CoverRequest = z.object({ slotId: z.string(), teacherId: z.string(), date: IsoDate.optional() });
 export type CoverRequest = z.infer<typeof CoverRequest>;
+/** A lesson someone else takes on one day (a teacher away), as the timetable page lists them. */
+export interface CoverRow { slotId: string; date: string; className: string; subject: string; period: number; periodLabel: string; teacherId: string; teacherName: string; ownTeacherId: string; ownTeacherName: string }
+/** A teacher's lesson on one date, with the cover arranged for it if there is one. */
+export interface LessonOn { slotId: string; className: string; subject: string; period: number; periodLabel: string; starts: string; ends: string; coverId: string | null; coverName: string | null }
 export interface TeacherLoad {
   teacherId: string;
   name: string;

@@ -68,7 +68,7 @@ export class PeopleService {
     const { rows } = await t.pool.query<StaffSql>(
       `select u.id, u.name, u.email, u.phone, u.status, s.designation, s.department, s.joined_on::text, s.max_periods_per_week max_periods, s.custom,
          u.invited_at is not null or u.password_hash is not null invited, u.last_login_at is not null signed_in, s.manager_id, m.name manager_name,
-         (select count(*) from timetable_slots ts where ts.teacher_id = u.id) periods
+         (select count(*) from draft_slots ts where ts.teacher_id = u.id) periods
        from users u join staff s on s.user_id = u.id left join users m on m.id = s.manager_id
        where ($1::text is null or u.id = $1) and ($2::text is null or u.name ilike '%' || $2 || '%' or s.designation ilike '%' || $2 || '%' or s.department ilike '%' || $2 || '%')
        order by (s.designation = 'Principal') desc, u.name limit 300`, [q.id ?? null, q.query?.replace(/[\\%_]/g, (c) => `\\${c}`) ?? null]);

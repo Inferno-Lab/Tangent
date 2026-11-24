@@ -592,7 +592,7 @@ const payments = kind<PayLookups>({
     return [{ label: 'Payments', value: String(rows.length) }, { label: 'Total paid', value: amountText([...methods.values()].reduce((a, b) => a + b, 0)) }, ...[...methods].map(([m, v]) => ({ label: `Paid by ${m}`, value: amountText(v) }))];
   },
   async notes(db) {
-    const { rows } = await db.query<{ n: string }>(`select count(*) n from fee_invoices i where i.amount - i.waived_amount < (select coalesce(sum(p.amount), 0) from payments p where p.invoice_id = i.id)`);
+    const { rows } = await db.query<{ n: string }>(`select count(*) n from fee_invoices i where i.amount - i.waived_amount < (select coalesce(sum(p.amount - p.refunded), 0) from payments p where p.invoice_id = i.id)`);
     const over = Number(rows[0]!.n);
     return over ? [`${over} fees now show more paid than due: check them against the old system before go-live.`] : [];
   },
@@ -711,16 +711,16 @@ const timetable = kind<SlotLookups>({
       ...(!l.staff.has(lc(r.teacher!)) ? [`No staff member has the email ${r.teacher}: import staff first.`] : [])];
     return ok(`${cls?.id}|${day}|${period}`, errors, !!cls && l.slots.has(`${cls.id}|${day}|${period}`));
   },
-  writes: (rows, l) => [{ table: 'timetable_slots', pk: ['id'], cols: ['subject_id', 'teacher_id', 'room', 'published_teacher_id', 'published_subject_id'], rows: rows.map((r) => {
+  writes: (rows, l) => [{ table: 'timetable_slots', pk: ['id'], cols: ['subject_id', 'teacher_id', 'room', 'published_teacher_id', 'published_subject_id', 'published_room', 'removed'], rows: rows.map((r) => {
     const cls = l.classes.get(classKey(r.class!))!;
     const [day, period] = [dayNum(r.day!)!, periodOf(r.period!, l)!];
     const [subjectId, teacherId] = [l.subjects.get(norm(r.subject!))!.id, l.staff.get(lc(r.teacher!))!];
-    return { id: l.slots.get(`${cls.id}|${day}|${period}`) ?? newId('slt'), class_id: cls.id, day, period, subject_id: subjectId, teacher_id: teacherId, room: r.room || null, published_teacher_id: teacherId, published_subject_id: subjectId };
+    return { id: l.slots.get(`${cls.id}|${day}|${period}`) ?? newId('slt'), class_id: cls.id, day, period, subject_id: subjectId, teacher_id: teacherId, room: r.room || null, published_teacher_id: teacherId, published_subject_id: subjectId, published_room: r.room || null, removed: false };
   }) }],
   totals: (rows) => [{ label: 'Lessons', value: String(rows.length) }, { label: 'Classes', value: String(new Set(rows.map((r) => classKey(r.class!))).size) }, { label: 'Teachers', value: String(new Set(rows.map((r) => lc(r.teacher!))).size) }],
   async export(db) {
     return (await db.query<Row & { d: number }>(`select c.name as class, t.day as d, t.period::text, sb.name as subject, u.email as teacher, coalesce(t.room, '') as room
-      from timetable_slots t join classes c on c.id = t.class_id join subjects sb on sb.id = t.subject_id join users u on u.id = t.teacher_id order by c.grade, c.section, t.day, t.period`)).rows.map(({ d, ...r }) => ({ ...r, day: DAY_NAMES[d - 1] ?? String(d) }));
+      from draft_slots t join classes c on c.id = t.class_id join subjects sb on sb.id = t.subject_id join users u on u.id = t.teacher_id order by c.grade, c.section, t.day, t.period`)).rows.map(({ d, ...r }) => ({ ...r, day: DAY_NAMES[d - 1] ?? String(d) }));
   },
 });
 

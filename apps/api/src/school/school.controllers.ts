@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Header, HttpCode, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import {
-  SchoolSettingsPatch, type SchoolSettingsView, StudentLeaveInput, REGISTER_PARTS, RoomSave, RoomBookingCreate, PeriodTimesPut, type RoomRow, type RoomDay, type PeriodTimesRow,
-  ApprovalDecision, AssignFee, FeeHeadsPut, AttendanceDayPut, PeriodMarksPut, CoverRequest, SlotCreate, WaiverRequest, ReceiptCancel, IsoDate, MessageRequest, NoticeCreate, PaymentCreate, SlotPatch, StudentCreate, StudentImport, StudentPatch, GuardiansPut, StudentQuery,
+  SchoolSettingsPatch, type SchoolSettingsView, StudentLeaveInput, REGISTER_PARTS, RoomSave, RoomBookingCreate, PeriodTimesPut, type RoomRow, type RoomDay, type PeriodTimesRow, type CoverRow, type LessonOn,
+  APPROVAL_KINDS, ApprovalDecision, AssignFee, FeeHeadsPut, AttendanceDayPut, PeriodMarksPut, CoverRequest, SlotCreate, WaiverRequest, ReceiptCancel, IsoDate, MessageRequest, NoticeCreate, PaymentCreate, SlotPatch, StudentCreate, StudentImport, StudentPatch, GuardiansPut, StudentQuery,
   type ApprovalRow, type AttendanceDay, type AttendanceWeekPoint, type PeriodRoll, type AuditRow, type ClassInfo, type ContactReveal, type DashboardData, type FeeHead, type FeeSummary, type ImportResult, type InvoiceRow, type InvoiceDetail,
   type NoticeRow, type SearchHit, type SettingsResponse, type ShellData, type GuardianRow, type StudentDetail, type StudentRow, type StudentSummary, type StudentViews, type TeacherLoad, type TeacherOption, type TimetableView, type WeekOf, type Paged,
 } from '@tangent/contracts';
@@ -23,12 +23,15 @@ import { TimetableService } from './timetable.service.js';
 const DayQuery = z.object({ classId: z.string().min(1), date: IsoDate, part: z.enum(REGISTER_PARTS).optional() });
 const InvoiceQuery = z.object({ studentId: z.string().min(1) });
 const NoticeEdit = NoticeCreate.and(z.object({ tellAgain: z.boolean().default(false) }));
-const ListApprovals = z.object({ view: z.enum(['waiting', 'sent', 'decided']).default('waiting'), kind: z.enum(['leave', 'fee_waiver', 'admission', 'notice', 'attendance', 'photo', 'receipt_cancel', 'settings']).optional() });
+const ListApprovals = z.object({ view: z.enum(['waiting', 'sent', 'decided']).default('waiting'), kind: z.enum(APPROVAL_KINDS).optional() });
 const ClassQuery = z.object({ classId: z.string().min(1) });
 const DashQuery = z.object({ days: z.coerce.number().int().min(1).max(30).default(6) });
 const SearchQuery = z.object({ q: z.string().max(80).default('') });
 const IdsQuery = z.object({ ids: z.string().optional() });
 const Summ = StudentQuery.pick({ classId: true, house: true });
+const CoverDay = z.object({ slotId: z.string().min(1), date: IsoDate });
+const CoversQuery = z.object({ teacherId: z.string().optional(), date: IsoDate.optional() });
+const LessonsOnQuery = z.object({ teacherId: z.string().min(1), date: IsoDate });
 
 @Controller('v1/classes')
 @Core()
@@ -350,6 +353,21 @@ export class TimetableController {
   async cover(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(CoverRequest)) body: CoverRequest): Promise<void> {
     await this.tt.cover(t, u, body);
   }
+
+  /** A day's cover taken away: the lesson's own teacher takes it. */
+  @Delete('cover') @RequireModule('timetable.cover') @HttpCode(204) @Require('timetable.edit')
+  async uncover(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Query(new ZodPipe(CoverDay)) q: z.infer<typeof CoverDay>): Promise<void> {
+    await this.tt.uncover(t, u, q.slotId, q.date);
+  }
+
+  @Get('covers') @RequireModule('timetable.cover') @Require('timetable.read')
+  covers(@Tenant() t: TenantCtx, @Query(new ZodPipe(CoversQuery)) q: z.infer<typeof CoversQuery>): Promise<CoverRow[]> { return this.tt.covers(t, q); }
+
+  @Get('lessons-on') @RequireModule('timetable.cover') @Require('timetable.read')
+  lessonsOn(@Tenant() t: TenantCtx, @Query(new ZodPipe(LessonsOnQuery)) q: z.infer<typeof LessonsOnQuery>): Promise<LessonOn[]> { return this.tt.lessonsOn(t, q.teacherId, q.date); }
+
+  @Get('free') @RequireModule('timetable.cover') @Require('timetable.read')
+  freeOn(@Tenant() t: TenantCtx, @Query(new ZodPipe(CoverDay)) q: z.infer<typeof CoverDay>): Promise<TeacherOption[]> { return this.tt.freeOn(t, q.slotId, q.date); }
 
   @Post('publish') @HttpCode(200) @Require('timetable.publish')
   publish(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser): Promise<{ families: number; teachers: number; version: number }> {

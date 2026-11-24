@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { DEFAULT_LEAVE_TYPES, DEFAULT_STAFF_MARKS, addDays, schoolToday, type AttendanceMarkDef, type LeaveType, type StaffDayRow, type StaffLeaveRow } from '@tangent/contracts';
-import { Checkbox, DateField, Dialog, EmptyNote, EmptyState, Field, MonthField, NumberField, Segmented, Select, SelectField, useShake, t } from '@tangent/web-ui';
+import { DEFAULT_LEAVE_TYPES, DEFAULT_STAFF_MARKS, addDays, schoolToday, type AttendanceMarkDef, type LeaveType, type StaffDayRow, type StaffLeaveRow, type LessonOn } from '@tangent/contracts';
+import { Checkbox, DateField, Dialog, EmptyNote, EmptyState, Field, MonthField, NumberField, Presence, Segmented, Select, SelectField, useShake, t } from '@tangent/web-ui';
+import { useShellChrome } from '../../app/Layout';
 import { useApp } from '../../app/context';
 import { Card, Page, useToast } from '../../app/Page';
 import { AddBtn, dateLabel, problem, stamp, useSetting } from '../../app/kit';
@@ -48,7 +49,12 @@ function Day({ canManage, say }: { canManage: boolean; say: Say }) { const app =
   const status = (r: StaffDayRow) => (r.userId in edits ? edits[r.userId]! : r.status);
   const counts = { in: rows.filter((r) => r.checkIn).length, late: rows.filter((r) => r.late).length, away: rows.filter((r) => r.leave && !r.leave.half).length, none: rows.filter((r) => !status(r) && !r.leave).length };
   const changed = Object.keys(edits).length;
+  // A day's cover for someone away: their lessons that day, each given to a colleague free then (the timetable stays as it is).
+  const { shell } = useShellChrome();
+  const canCover = app.user.permissions.includes('timetable.edit') && !!shell?.features.includes('timetable.cover');
+  const [covering, setCovering] = useState<StaffDayRow | null>(null);
   return <>
+    <Presence>{covering && <CoverDay person={covering} day={day} say={say} onClose={() => { setCovering(null); void qc.invalidateQueries({ queryKey: ['staff-day'] }); }} />}</Presence>
     <section className="grid">
       {[
         { label: t('admin.staff_time.checked_in'), value: counts.in, tone: 'g' }, { label: t('admin.staff_time.late'), value: counts.late, tone: 'a' },
@@ -69,7 +75,7 @@ function Day({ canManage, say }: { canManage: boolean; say: Say }) { const app =
           {r.late && <span className="chip a">{t('admin.staff_time.late')}</span>}
           {r.early && <span className="chip c">{t('admin.staff_time.left_early')}</span>}
           <small className="help" style={{ margin: 0, minWidth: 110 }}>{r.checkIn ? `${time(r.checkIn)} – ${r.checkOut ? time(r.checkOut) : '…'}` : t('admin.staff_time.no_check_in')}</small>
-          {r.leave && !r.leave.half && r.lessons > 0 && <a className="btn sm" href={`${app.base}/timetable`}>{t('admin.staff_time.arrange_cover')}</a>}
+          {r.leave && r.lessons > 0 && canCover && <button className="btn sm" onClick={() => setCovering(r)}>{t('admin.staff_time.arrange_cover')}</button>}
           <div style={{ width: 170 }}>
             <Select compact aria-label={t('admin.staff_time.mark_for', { name: r.name })} disabled={!canManage || save.isPending} value={status(r) ?? ''}
               onChange={(v) => setEdits({ ...edits, [r.userId]: v || null })}
@@ -246,4 +252,38 @@ function Month({ say }: { say: Say }) { const app = useApp();
       ))}</div>}
     </Card>
   );
+}
+
+/** One person's lessons on a day, each with who takes it: their own teacher, or a colleague free then. */
+function CoverDay({ person, day, say, onClose }: { person: StaffDayRow; day: string; say: Say; onClose: () => void }) { const app = useApp();
+  const qc = useQueryClient();
+  const lessons = useQuery({ queryKey: ['lessons-on', person.userId, day], queryFn: () => app.api.timetable.lessonsOn(person.userId, day) });
+  const set = useMutation({
+    mutationFn: (b: { slotId: string; teacherId: string }) => (b.teacherId === person.userId ? app.api.timetable.uncover(b.slotId, day) : app.api.timetable.cover({ ...b, date: day })),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['lessons-on'] }); void qc.invalidateQueries({ queryKey: ['cover-free'] }); say(t('admin.staff_time.cover_saved', { date: dateLabel(day) })); },
+    onError: (e) => say((e as Error).message, 'bad'),
+  });
+  const list = lessons.data ?? [];
+  return (
+    <Dialog title={t('admin.staff_time.cover_for', { name: person.name })} onClose={onClose} width={560}>
+      <p className="help" style={{ margin: '0 0 12px' }}>{t('admin.staff_time.cover_sub', { date: dateLabel(day) })}</p>
+      {lessons.isLoading ? null : !list.length ? <EmptyNote icon="timetable" title={t('admin.staff_time.cover_none')} body={t('admin.staff_time.cover_none_body')} /> : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {list.map((l) => <CoverLesson key={l.slotId} lesson={l} day={day} person={person} busy={set.isPending} onPick={(teacherId) => set.mutate({ slotId: l.slotId, teacherId })} />)}
+        </div>
+      )}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}><button className="btn pri" onClick={onClose}>{t('admin.staff_time.done')}</button></div>
+    </Dialog>
+  );
+}
+
+function CoverLesson({ lesson, day, person, busy, onPick }: { lesson: LessonOn; day: string; person: StaffDayRow; busy: boolean; onPick: (teacherId: string) => void }) { const app = useApp();
+  const free = useQuery({ queryKey: ['cover-free', lesson.slotId, day], queryFn: () => app.api.timetable.freeOn(lesson.slotId, day) });
+  const label = `${lesson.periodLabel} · ${lesson.className} · ${lesson.subject}`;
+  const options = [
+    { value: person.userId, label: t('admin.staff_time.cover_own', { name: person.name }) },
+    // Only colleagues free then (and whoever already covers it): the server refuses anyone busy.
+    ...(free.data ?? []).filter((x) => x.id !== person.userId && (x.free || x.id === lesson.coverId)).map((x) => ({ value: x.id, label: x.name })),
+  ];
+  return <SelectField label={t('admin.staff_time.cover_who', { lesson: label })} value={lesson.coverId ?? person.userId} disabled={busy || free.isLoading} onChange={(v) => { if (v && v !== (lesson.coverId ?? person.userId)) onPick(v); }} options={options} />;
 }
