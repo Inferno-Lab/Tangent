@@ -44,9 +44,9 @@ describe('who is signed in', () => {
     expect((await f(parent, '/me')).json).toMatchObject({ role: 'parent', name: h.people.parentOfTwo.name, childIds: expect.arrayContaining([aarav, ananya]) });
     expect((await f(parent, '/me')).json.childIds).toHaveLength(2);
     expect((await f(teacher, '/me')).json).toMatchObject({ role: 'teacher', name: h.people.classTeacher.name });
-    // A family has no password: it is sent to the code.
+    // A family has no password: the answer is the same as for any wrong one (the app sends families to the code).
     const blocked = await h.call('POST', '/v1/auth/login', { body: { identifier: h.people.parentOfTwo.phone, password: 'anything' } });
-    expect(blocked.status).toBe(400);
+    expect(blocked.status).toBe(401);
     expect(blocked.json?.step).toBeUndefined();
     expect((await h.call('GET', '/v1/f/me')).status).toBe(401);
   });
@@ -167,6 +167,17 @@ describe('money, notices, events', () => {
     expect((await h.call('POST', '/v1/fees/refunds', { token: admin, body: { paymentId: done.receipt.id, amount: 5000, reason: 'Too much' } })).status).toBe(400);
     expect((await h.call('GET', '/v1/fees/online', { token: admin })).json.find((p: any) => p.id === done.receipt.id).refunded).toBe(200);
     expect((await h.call('GET', '/v1/fees/reconciliation', { token: admin })).status).toBe(200);
+    // Two refunds asked for at once cannot take the same money, and two approvals at once send a refund once.
+    await h.setSettings({ 'fees.refundApprovalAbove': 0 });
+    const both = await Promise.all([600, 600].map((amount) => h.call('POST', '/v1/fees/refunds', { token: admin, body: { paymentId: done.receipt.id, amount, reason: 'Asked twice at once' } })));
+    expect(both.map((r) => r.status).sort()).toEqual([200, 400]);
+    const waiting = both.find((r) => r.status === 200)!.json;
+    expect(waiting.status).toBe('requested');
+    const accountant = await h.login(h.people.accountant.email);
+    const decided = await Promise.all([1, 2].map(() => h.call('POST', `/v1/fees/refunds/${waiting.id}/decide`, { token: accountant, body: { approve: true, note: '' } })));
+    expect(decided.map((r) => r.status).sort()).toEqual([200, 409]);
+    expect((await h.call('GET', '/v1/fees/online', { token: admin })).json.find((p: any) => p.id === done.receipt.id).refunded).toBe(800);
+    await h.setSettings({ 'fees.refundApprovalAbove': 5000 });
     expect((await f(parent, `/students/${aarav}/fees`)).json.installments.length).toBeGreaterThan(0);
   });
   it('lists published notices for the right people, and events with a reply', async () => {
@@ -326,7 +337,7 @@ describe('family accounts', () => {
     const me = (await h.call('GET', '/v1/f/me', { token: tokens.accessToken })).json;
     expect(me).toMatchObject({ role: 'parent', name: 'Meera Joshi' });
     expect(me.childIds).toHaveLength(2);
-    expect((await h.call('POST', '/v1/auth/login', { body: { identifier: '9988776655', password: 'anything' } })).status).toBe(400);
+    expect((await h.call('POST', '/v1/auth/login', { body: { identifier: '9988776655', password: 'anything' } })).status).toBe(401);
   });
   it('keeps staff on their password, and a reset code only resets', async () => {
     const me = h.people.classTeacher;
@@ -371,8 +382,11 @@ describe('what the console sets reaches families and the office', () => {
       const web = await h.call('POST', '/v1/auth/login', { body: { identifier: h.people.classTeacher.email, password: 'a-new-pass-123', client: 'web' } });
       expect(web.status).toBe(200);
       await h.setSettings({ 'app.roles': ['teacher'] });
+      // The code goes out; that the school keeps families off the app is said once the code proves the phone is theirs.
       const family = await h.call('POST', '/v1/auth/code', { body: { identifier: '99887 76655' } });
-      expect(family.status).toBe(403);
+      expect(family.status).toBe(200);
+      const signIn = await h.call('POST', '/v1/auth/verify', { body: { challengeId: family.json.challengeId, code: await h.codeSentTo('+919988776655'), client: 'mobile' } });
+      expect(signIn.status).toBe(403);
     } finally {
       await h.setSettings({ 'app.roles': ['parent', 'teacher'] });
     }
