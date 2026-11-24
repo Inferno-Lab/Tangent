@@ -81,7 +81,8 @@ export class ConsoleAuthGuard implements CanActivate {
     const req = ctx.switchToHttp().getRequest<FastifyRequest>();
     if (!req.url.startsWith('/console/') || this.reflector.getAllAndOverride<boolean>('public', targets)) return true;
     const header = req.headers.authorization;
-    const token = header?.startsWith('Bearer ') ? header.slice(7) : (req.query as { access_token?: string } | undefined)?.access_token;
+    // Only in the header: a token in an address ends up in logs and the browser's history.
+    const token = header?.startsWith('Bearer ') ? header.slice(7) : null;
     if (!token) throw new ApiError('unauthenticated', 'Sign in to continue.');
     const claims = verifyJwt<{ sub: string; aud: string; sid: string; name: string; email: string; roles: ConsoleRole[]; ver?: number }>(token, this.env.JWT_SECRET, this.env.JWT_SECRET_PREVIOUS);
     if (!claims || claims.aud !== 'console') throw new ApiError('unauthenticated', 'Your session has ended. Sign in again.');

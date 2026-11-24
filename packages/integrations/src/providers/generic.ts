@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { call } from '../http.js';
+import { callPublic } from '../http.js';
 import type { DeliveryStatus } from '@tangent/contracts';
 import { ProviderError, at, fill, type Adapter, type Ctx, type InboundRequest, type OutMessage, type SendResult } from '../types.js';
 
@@ -21,7 +21,7 @@ async function send(c: Ctx, m: OutMessage): Promise<SendResult> {
   const body = fill(raw, values, isJson);
   let url = fill(s(c, 'url'), Object.fromEntries(Object.entries(values).map(([k, v]) => [k, encodeURIComponent(v)])));
   if (method === 'GET' && body) url += (url.includes('?') ? '&' : '?') + body;
-  const r = await call(url, { method, headers: { ...(isJson ? { 'content-type': 'application/json' } : { 'content-type': 'application/x-www-form-urlencoded' }), ...headers }, body: method === 'GET' ? undefined : body });
+  const r = await callPublic(url, { method, headers: { ...(isJson ? { 'content-type': 'application/json' } : { 'content-type': 'application/x-www-form-urlencoded' }), ...headers }, body: method === 'GET' ? undefined : body });
   const path = s(c, 'successPath');
   if (path) {
     const got = at(r.json, path);
@@ -67,7 +67,7 @@ export const webhook: Adapter = {
   async webhook(c, e) {
     const body = JSON.stringify(e);
     const sig = createHmac('sha256', c.secrets.secret ?? '').update(body).digest('hex');
-    const r = await call(String(c.settings.url), { method: 'POST', headers: { 'content-type': 'application/json', 'x-tangent-event': e.type, 'x-tangent-signature': `sha256=${sig}` }, body });
+    const r = await callPublic(String(c.settings.url), { method: 'POST', headers: { 'content-type': 'application/json', 'x-tangent-event': e.type, 'x-tangent-signature': `sha256=${sig}` }, body });
     return { providerId: `${r.status}` };
   },
   async test(c) {

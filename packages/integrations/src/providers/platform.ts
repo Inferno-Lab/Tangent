@@ -1,7 +1,7 @@
 import { createSign } from 'node:crypto';
 import { connect } from 'node:net';
 import pg from 'pg';
-import { call } from '../http.js';
+import { call, callPublic } from '../http.js';
 import { ProviderError, at, fill, type Adapter, type Ctx } from '../types.js';
 import { fileText, googleToken } from './fcm.js';
 
@@ -251,7 +251,7 @@ export const gpsHttp: Adapter = {
       const values: Record<string, string> = Object.fromEntries(Object.entries(c.secrets).map(([k, v]) => [`secret.${k}`, v]));
       let headers: Record<string, string> = {};
       try { headers = typeof c.settings.headers === 'string' && c.settings.headers ? JSON.parse(String(c.settings.headers)) : {}; } catch { throw new ProviderError('The headers are not valid JSON.', true); }
-      const r = await call(String(c.settings.url), { headers: Object.fromEntries(Object.entries(headers).map(([k, v]) => [k, fill(String(v), values)])) });
+      const r = await callPublic(String(c.settings.url), { headers: Object.fromEntries(Object.entries(headers).map(([k, v]) => [k, fill(String(v), values)])) });
       const list = at(r.json, String(c.settings.listPath));
       if (!Array.isArray(list)) throw new ProviderError(`Nothing at “${String(c.settings.listPath)}” in the reply is a list.`, true);
       return list.map((v) => ({

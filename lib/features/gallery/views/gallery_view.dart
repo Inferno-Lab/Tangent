@@ -21,13 +21,11 @@ import 'package:tangent/data/models/campus.dart';
 import 'package:tangent/features/gallery/controllers/gallery_controller.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:tangent/core/utils/open_link.dart';
 
 /// Opens a photo at full size outside the app; sample photos (no web address) say there is nothing to save.
 Future<void> _openFull(GalleryPhoto photo) async {
-  final uri = Uri.tryParse(photo.url);
-  final ok = uri != null && uri.hasScheme && uri.scheme.startsWith('http') && await launchUrl(uri, mode: LaunchMode.externalApplication);
-  if (!ok) ToastHelper.show('gallery.save_unavailable', kind: ToastKind.error);
+  await openWeb(photo.url, failKey: 'gallery.save_unavailable');
 }
 
 /// Placeholder pigments while a photo loads or when it cannot.

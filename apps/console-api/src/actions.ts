@@ -464,6 +464,6 @@ export class ActionsController {
   /** The build workflow reports back here, once, with the same code. */
   @Public() @Post('builds/:id/finish') @HttpCode(204)
   async buildFinished(@Param('id') id: string, @Headers('x-build-token') token: string | undefined, @Body() body: { ok?: boolean; url?: string; note?: string }): Promise<void> {
-    await this.builds.finish(id, token, body?.ok !== false, typeof body?.url === 'string' ? body.url.slice(0, 500) : null, typeof body?.note === 'string' ? body.note.slice(0, 300) : null);
+    await this.builds.finish(id, token, body?.ok !== false, typeof body?.url === 'string' && /^https:\/\/\S+$/i.test(body.url) ? body.url.slice(0, 500) : null, typeof body?.note === 'string' ? body.note.slice(0, 300) : null);
   }
 }

@@ -13,7 +13,7 @@ import 'package:tangent/core/widgets/states.dart';
 import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/data/models/school_life.dart';
 import 'package:tangent/features/school_life/controllers/school_life_controllers.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:tangent/core/utils/open_link.dart';
 
 String _hm(DateTime t) => DateFormat.Hm(Get.locale?.toLanguageTag()).format(t);
 String _date(String d) => DateFormat('EEEE, d MMMM', Get.locale?.languageCode).format(DateTime.parse(d));
@@ -72,7 +72,7 @@ class MeetingsView extends GetView<MeetingsController> {
                                     if (t.booked!.link.isNotEmpty)
                                       Padding(
                                         padding: const EdgeInsets.only(right: 8),
-                                        child: Btn('meetings.join', small: true, onPressed: () => unawaited(launchUrl(Uri.parse(t.booked!.link), mode: LaunchMode.externalApplication))),
+                                        child: Btn('meetings.join', small: true, onPressed: () => unawaited(openWeb(t.booked!.link))),
                                       ),
                                     if (m.canCancel) Btn('meetings.cancel', small: true, kind: BtnKind.quiet, action: () => controller.cancel(t.booked!)),
                                   ],

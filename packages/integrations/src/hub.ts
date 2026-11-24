@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { CAPABILITY_LABELS, providerDef, type Capability, type DeliveryStatus } from '@tangent/contracts';
-import { seal, unseal } from '@tangent/security';
+import { constantTimeEqual, seal, unseal } from '@tangent/security';
 import { ADAPTERS } from './providers/index.js';
 import { ProviderError, segments, fill, type Adapter, type Ctx, type InboundRequest, type InboundResult, type MessageCapability } from './types.js';
 
@@ -383,7 +383,7 @@ export class Hub {
   /** A webhook from a provider: checks the token in the address, lets the adapter read it, applies delivery reports. */
   async inbound(connId: string, token: string, req: InboundRequest): Promise<InboundResult & { connection: Conn | null }> {
     const conn = await this.connection(connId);
-    if (!conn || conn.id === 'sandbox' || conn.hookToken.length !== token.length || conn.hookToken !== token) return { ok: false, summary: 'Unknown webhook address', reply: { status: 404, body: 'not found' }, connection: null };
+    if (!conn || conn.id === 'sandbox' || !conn.hookToken || !constantTimeEqual(conn.hookToken, token)) return { ok: false, summary: 'Unknown webhook address', reply: { status: 404, body: 'not found' }, connection: null };
     const a = this.adapter(conn);
     let res: InboundResult;
     try { res = a.inbound ? await a.inbound(this.ctx(conn, 'webhook'), req) : { ok: false, summary: 'This provider sends no webhooks' }; } catch (e) { res = { ok: false, summary: `Could not read it: ${(e as Error).message}` }; }

@@ -17,6 +17,14 @@ Future<void> openFromServer(Future<dynamic> Function(RemoteDataSource remote) as
   if (!ok) ToastHelper.show('errors.cant_open', kind: ToastKind.error);
 }
 
+/// Opens a web address someone typed (a meeting's video call) in the browser, and nothing else: another scheme could open any
+/// app on the phone with whatever the address carries. Says so when it cannot.
+Future<void> openWeb(String link, {String failKey = 'errors.cant_open'}) async {
+  final uri = Uri.tryParse(link.trim());
+  final ok = uri != null && (uri.scheme == 'https' || uri.scheme == 'http') && uri.host.isNotEmpty && await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (!ok) ToastHelper.show(failKey, kind: ToastKind.error);
+}
+
 /// A file the school attached (homework, a notice), opened outside the app to read or save.
 Future<void> openFile(String? fileId) =>
     fileId == null ? Future.sync(() => ToastHelper.show('common.file_missing')) : openFromServer((r) => r.get('/v1/files/$fileId/url', query: {'download': '1'}));

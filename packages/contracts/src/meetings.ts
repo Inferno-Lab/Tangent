@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+/** A link people open (a video call): empty, or a web address. Anything else (javascript:, an app's scheme) is refused. */
+export const WebLink = z.string().trim().max(300).refine((v) => v === '' || /^https?:\/\/[^\s]+$/i.test(v), 'Use a web address starting with https://');
+
 /**
  * Parent-teacher meetings (docs/one-shot-plan.md §6.21): the school sets a day, its hours and the length of a slot, and which
  * classes' families may book; each teacher's slots are made from that, a teacher can close some or give a link for online
@@ -21,7 +24,7 @@ export const MeetingInput = z.object({
   mode: z.enum(MEETING_MODES).default('inPerson'),
   place: z.string().trim().max(100).default(''),
   /** A link everyone joins for online meetings (a teacher can give their own). */
-  link: z.string().trim().max(300).default(''),
+  link: WebLink.default(''),
   classIds: z.array(z.string().max(60)).min(1, 'Choose the classes whose families book').max(200),
   /** Teachers who meet families; none means each class's class teacher. */
   teacherIds: z.array(z.string().max(60)).max(200).default([]),
@@ -69,7 +72,7 @@ export interface MeetingSlotRow {
 
 export const MeetingBookInput = z.object({ slotId: z.string().min(1).max(60), studentId: z.string().min(1).max(60), mode: z.enum(['inPerson', 'online']).optional(), note: z.string().trim().max(300).default('') });
 export type MeetingBookInput = z.infer<typeof MeetingBookInput>;
-export const MeetingSlotPatch = z.object({ closed: z.boolean().optional(), link: z.string().trim().max(300).optional() })
+export const MeetingSlotPatch = z.object({ closed: z.boolean().optional(), link: WebLink.optional() })
   .refine((p) => !p.link || /^https:\/\/\S+$/.test(p.link), { message: 'Give a link that starts with https://', path: ['link'] });
 export type MeetingSlotPatch = z.infer<typeof MeetingSlotPatch>;
 
