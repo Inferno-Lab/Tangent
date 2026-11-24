@@ -242,16 +242,21 @@ export class ApprovalsService implements OnModuleInit {
     }
     const next = body.decision === 'approve' ? 'approved' : body.decision === 'reject' ? 'rejected' : 'pending';
     if (r.kind === 'settings' && body.decision === 'undo') throw new ApiError('conflict', 'A setting that was changed is changed back from Settings.');
-    // A settings change applies first: if the settings moved on since it was asked for, nothing is marked decided.
-    if (r.kind === 'settings' && body.decision === 'approve') {
-      const p = r.payload as { changes: Record<string, unknown>; note?: string; expectedVersion?: number };
-      await this.settings.apply(t, { id: r.requested_by ?? user.id, name: `${r.requester_name}, approved by ${user.name}` }, p.changes, p.note ?? '', p.expectedVersion);
-    }
     const effect = this.effects.get(r.kind);
     if (effect?.check) await effect.check(t, r, body.decision);
     const client = await t.pool.connect();
     try {
       await client.query('begin');
+      // The request is held while it is decided, so two people deciding at once cannot both apply it.
+      const held = (await client.query<{ status: string; step: number }>('select status, step from approvals where id = $1 for update', [id])).rows[0];
+      if (!held || held.step !== r.step || (body.decision === 'undo' ? held.status === 'pending' : held.status !== 'pending')) {
+        throw new ApiError('conflict', body.decision === 'undo' ? 'That request is still open.' : 'Someone has already decided this request.');
+      }
+      // A settings change applies while the request is held: if the settings moved on since it was asked for, nothing is decided.
+      if (r.kind === 'settings' && body.decision === 'approve') {
+        const p = r.payload as { changes: Record<string, unknown>; note?: string; expectedVersion?: number };
+        await this.settings.apply(t, { id: r.requested_by ?? user.id, name: `${r.requester_name}, approved by ${user.name}` }, p.changes, p.note ?? '', p.expectedVersion);
+      }
       let payload = r.payload;
       if (effect?.apply) await effect.apply(client as unknown as Client, r, body.decision, { id: system ? '' : user.id, name: user.name }, t);
       if (r.kind === 'fee_waiver') payload = await this.applyWaiver(client, r, body.decision, payload);
@@ -270,7 +275,7 @@ export class ApprovalsService implements OnModuleInit {
     }
     await this.audit.record(t, { actorId: system ? null : user.id, actorName: user.name, action: `approval.${body.decision}`, entity: r.kind, entityId: id, detail: { title: r.title } });
     if (body.decision !== 'undo' && r.kind === 'leave') await this.tellLeave(t, r, next);
-    if (body.decision === 'approve' && r.kind === 'notice') await this.notices.approved(t, String((r.payload as { noticeId?: string }).noticeId ?? ''));
+    if (body.decision === 'approve' && r.kind === 'notice') await this.notices.approved(t, String((r.payload as { noticeId?: string }).noticeId ?? ''), (r.payload as { tell?: boolean }).tell !== false);
     if (body.decision !== 'undo' && effect?.tell) await effect.tell(t, r, next).catch(() => undefined);
     const after = await t.pool.query<Row>('select * from approvals where id = $1', [id]);
     return this.toRow(after.rows[0]!, await this.doneText(t, after.rows[0]!), steps);
@@ -317,37 +322,32 @@ export class ApprovalsService implements OnModuleInit {
     return (await t.pool.query(`${base} and u.id = (select c.class_teacher_id from students st join classes c on c.id = st.class_id where st.id = $1)`, [r.subject_ref])).rows;
   }
 
-  /** A concession takes a percentage off the student's first unpaid invoice of a head that takes concessions (tuition by default); undo puts it back. */
+  /**
+   * A waiver adds to what an invoice already has waived, never more than is left to pay; undo takes back only what this request
+   * added, so other waivers on the invoice stay. A request from an invoice names it and the amount; older ones take a percentage
+   * off the student's first unpaid fee of a head that takes concessions. A decline changes nothing: nothing was applied yet.
+   */
   private async applyWaiver(client: { query: (q: string, p?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> }, r: Row, decision: ApprovalDecision['decision'], payload: Record<string, unknown>): Promise<Record<string, unknown>> {
-    // A request from an invoice names it and the amount; older ones (from before) take a percentage off the first unpaid fee.
-    if (decision === 'approve' && payload.invoiceId && payload.amount) {
-      const inv = (await client.query('select amount, waived_amount from fee_invoices where id = $1', [payload.invoiceId])).rows[0] as { amount: number; waived_amount: number } | undefined;
-      if (!inv) throw new ApiError('conflict', 'That invoice no longer exists.');
-      const paid = Number(((await client.query('select coalesce(sum(amount - refunded),0) p from payments where invoice_id = $1', [payload.invoiceId])).rows[0] as { p: string }).p);
-      const waived = Math.min(inv.amount - paid, inv.waived_amount + Number(payload.amount));
-      if (waived <= inv.waived_amount) throw new ApiError('conflict', 'Nothing is left to waive on this invoice.');
-      await client.query('update fee_invoices set waived_amount = $2 where id = $1', [payload.invoiceId, waived]);
-      return { ...payload, before: inv.waived_amount, waived };
-    }
-    if (decision === 'undo' && payload.invoiceId && payload.before !== undefined) {
-      await client.query('update fee_invoices set waived_amount = $2 where id = $1', [payload.invoiceId, payload.before]);
-      const { before: _b, waived: _w, ...rest } = payload;
-      return rest;
-    }
+    const named = !!payload.invoiceId && payload.amount !== undefined;
     if (decision === 'approve') {
-      const pct = Number(payload.percent ?? 0);
-      const inv = await client.query(
-        `select i.id, i.amount from fee_invoices i where i.student_id = $1 and i.head in (select key from fee_heads where concession) and i.amount > coalesce((select sum(amount - refunded) from payments where invoice_id = i.id),0) order by i.due_on limit 1`, [r.subject_ref]);
-      const target = inv.rows[0] as { id: string; amount: number } | undefined;
+      const target = named ? String(payload.invoiceId) : ((await client.query(
+        `select i.id from fee_invoices i where i.student_id = $1 and i.head in (select key from fee_heads where concession)
+           and i.amount - i.waived_amount > coalesce((select sum(amount - refunded) from payments where invoice_id = i.id),0) order by i.due_on limit 1`, [r.subject_ref])).rows[0] as { id: string } | undefined)?.id;
       if (!target) throw new ApiError('conflict', 'This student has no unpaid fee that takes concessions to reduce.');
-      const waived = roundToCurrency((target.amount * pct) / 100);
-      await client.query('update fee_invoices set waived_amount = $2 where id = $1', [target.id, waived]);
-      return { ...payload, invoiceId: target.id, waived };
+      const inv = (await client.query('select amount, waived_amount from fee_invoices where id = $1 for update', [target])).rows[0] as { amount: number; waived_amount: number } | undefined;
+      if (!inv) throw new ApiError('conflict', 'That invoice no longer exists.');
+      const paid = Number(((await client.query('select coalesce(sum(amount - refunded),0) p from payments where invoice_id = $1', [target])).rows[0] as { p: string }).p);
+      const add = named ? Number(payload.amount) : roundToCurrency((inv.amount * Number(payload.percent ?? 0)) / 100);
+      const waived = Math.min(inv.amount - paid, inv.waived_amount + add);
+      if (waived <= inv.waived_amount) throw new ApiError('conflict', 'Nothing is left to waive on this invoice.');
+      await client.query('update fee_invoices set waived_amount = $2 where id = $1', [target, waived]);
+      return { ...payload, invoiceId: target, before: inv.waived_amount, waived };
     }
-    if (decision === 'undo' || decision === 'reject') {
-      if (payload.invoiceId) await client.query('update fee_invoices set waived_amount = 0 where id = $1', [payload.invoiceId]);
-      const { invoiceId: _i, waived: _w, ...rest } = payload;
-      return rest;
+    if (decision === 'undo' && payload.invoiceId && payload.waived !== undefined) {
+      const added = Number(payload.waived) - Number(payload.before ?? 0);
+      await client.query('update fee_invoices set waived_amount = greatest(0, waived_amount - $2) where id = $1', [payload.invoiceId, added]);
+      const { before: _b, waived: _w, invoiceId, ...rest } = payload;
+      return named ? { ...rest, invoiceId } : rest;
     }
     return payload;
   }

@@ -72,7 +72,7 @@ export class NoticesService implements OnModuleInit {
     if (whole && !user.permissions.includes('notices.publish')) throw forbidden('Only someone allowed to publish notices can write to the whole school. Choose one of your classes.');
     if (b.pinned && !user.permissions.includes('notices.pin')) throw forbidden('Your role cannot pin notices.');
     if (!whole && !user.permissions.includes('notices.publish')) {
-      const teaches = await t.pool.query('select 1 from classes c where c.id = $1 and (c.class_teacher_id = $2 or exists (select 1 from timetable_slots s where s.class_id = c.id and s.teacher_id = $2))', [b.classId, user.id]);
+      const teaches = await t.pool.query('select 1 from classes c where c.id = $1 and (c.class_teacher_id = $2 or exists (select 1 from live_slots s where s.class_id = c.id and s.teacher_id = $2))', [b.classId, user.id]);
       if (!teaches.rowCount) throw forbidden('You can write to the classes you teach.');
     }
     // Targets narrow who it reaches; only someone who publishes to the school uses them, and each must be one the school has.
@@ -138,13 +138,29 @@ export class NoticesService implements OnModuleInit {
   async update(t: TenantCtx, user: User, id: string, b: NoticeCreate & { tellAgain?: boolean }): Promise<NoticeRow> {
     const n = await this.own(t, user, id);
     await this.check(t, user, { ...b, publishAt: n.status === 'published' ? null : b.publishAt });
+    // Where the school asks for approval, a change by someone who cannot publish goes back for it, published or scheduled alike:
+    // what reaches families is always what a second person saw. The notice leaves the apps until it is approved again.
+    const needsApproval = !user.permissions.includes('notices.publish') && (await this.settings.value<string>(t, 'approvals.notice', 'required')) === 'required'
+      && (n.status === 'published' || n.status === 'pending' || !!b.publishAt || !!b.publish);
+    const status = needsApproval ? 'pending' : n.status;
     await t.pool.query(
-      'update notices set title = $2, body = $3, audience = $4, class_id = $5, category = $6, pinned = $7, needs_ack = $8, publish_at = $9, edited_at = case when status = $10 then now() else edited_at end, targets = $11 where id = $1',
-      [id, b.title, b.body, b.audience, b.audience === 'class' ? b.classId : null, b.category, b.pinned, b.needsAck, n.status === 'published' ? null : b.publishAt ?? null, 'published', JSON.stringify(b.targets ?? {})]);
+      `update notices set title = $2, body = $3, audience = $4, class_id = $5, category = $6, pinned = $7, needs_ack = $8, publish_at = $9, edited_at = case when status = 'published' then now() else edited_at end,
+         targets = $10, status = $11, published_at = case when $11 = 'pending' then null else published_at end where id = $1`,
+      [id, b.title, b.body, b.audience, b.audience === 'class' ? b.classId : null, b.category, b.pinned, b.needsAck, n.status === 'published' ? null : b.publishAt ?? null, JSON.stringify(b.targets ?? {}), status]);
     await this.attach(t, id, b.fileIds);
-    if (n.status !== 'published' && b.publishAt) await enqueue(this.hubs.hub.o.pool as never, 'notices.publish', t.info.id, { noticeId: id }, new Date(b.publishAt));
-    await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'notice.edited', entity: 'notice', entityId: id, detail: { title: b.title } });
-    if (n.status === 'published' && b.tellAgain) await this.announce(t, id);
+    if (needsApproval) {
+      const when = n.status !== 'published' && b.publishAt ? `, to go out ${fmtDate(b.publishAt, 'stamp')}` : '';
+      // One request per notice: an open one takes the new words; else a new one, which says whether families hear of it again.
+      const open = await t.pool.query("update approvals set title = $2, subtitle = $3, payload = payload || $4 where kind = 'notice' and subject_ref = $1 and status = 'pending'",
+        [id, b.title, `${n.status === 'published' ? 'Changed' : 'Written'} by ${user.name}${when}`, JSON.stringify({ tell: n.status !== 'published' || !!b.tellAgain })]);
+      if (!open.rowCount) {
+        await t.pool.query("insert into approvals (id, kind, title, subtitle, requester_name, requested_by, subject_ref, payload) values ($1,'notice',$2,$3,$4,$5,$6,$7)",
+          [newId('apr'), b.title, `${n.status === 'published' ? 'Changed' : 'Written'} by ${user.name}${when}`, user.name, user.id, id, JSON.stringify({ noticeId: id, tell: n.status !== 'published' || !!b.tellAgain })]);
+      }
+      if (n.status === 'published') await this.stream.emit(t, [], { type: 'notification', data: { notice: id } });
+    } else if (n.status !== 'published' && b.publishAt) await enqueue(this.hubs.hub.o.pool as never, 'notices.publish', t.info.id, { noticeId: id }, new Date(b.publishAt));
+    await this.audit.record(t, { actorId: user.id, actorName: user.name, action: needsApproval ? 'notice.edited_for_approval' : 'notice.edited', entity: 'notice', entityId: id, detail: { title: b.title } });
+    if (!needsApproval && n.status === 'published' && b.tellAgain) await this.announce(t, id);
     return (await this.rows(t, 'and n.id = $1', [id]))[0]!;
   }
 
@@ -158,16 +174,18 @@ export class NoticesService implements OnModuleInit {
   }
 
   /** Approved: out now, or at its time if it was scheduled. */
-  async approved(t: TenantCtx, id: string): Promise<void> {
+  async approved(t: TenantCtx, id: string, tell = true): Promise<void> {
     const n = (await t.pool.query<{ publish_at: Date | null }>('select publish_at from notices where id = $1', [id])).rows[0];
     if (n?.publish_at && n.publish_at > new Date()) await enqueue(this.hubs.hub.o.pool as never, 'notices.publish', t.info.id, { noticeId: id }, n.publish_at);
-    else await this.publish(t, id);
+    else await this.publish(t, id, tell);
   }
 
-  /** Publishes a notice now (approved, or its time came) and tells everyone it reaches. */
-  async publish(t: TenantCtx, id: string): Promise<void> {
+  /** Publishes a notice now (approved, or its time came) and tells everyone it reaches (a corrected one only when asked). */
+  async publish(t: TenantCtx, id: string, tell = true): Promise<void> {
     const r = await t.pool.query("update notices set status = 'published', published_at = now(), publish_at = null where id = $1 and status <> 'published' and deleted_at is null", [id]);
-    if (r.rowCount) await this.announce(t, id);
+    if (!r.rowCount) return;
+    if (tell) await this.announce(t, id);
+    else await this.stream.emit(t, [], { type: 'notification', data: { notice: id } });
   }
 
   private async publishDue(job: Job): Promise<string> {
@@ -185,7 +203,12 @@ export class NoticesService implements OnModuleInit {
     const n = (await t.pool.query<{ title: string; audience: string; class_id: string | null; targets: unknown }>("select title, audience, class_id, targets from notices where id = $1 and status = 'published' and deleted_at is null", [id])).rows[0];
     if (!n) return;
     const people = (await t.pool.query<{ id: string; phone: string | null }>(`select * from (${reachSql('$1::text', '$2::text', '$3::jsonb')}) x`, [n.audience, n.class_id, JSON.stringify(n.targets ?? {})])).rows;
-    await this.messenger.notify(t, 'notice.published', people.filter((p) => p.phone).map((p) => ({ to: p.phone!, vars: { title: n.title } })));
+    // Families the school has not yet invited to the app have no account, but they are told as every other message tells them.
+    const waiting = ['everyone', 'parents', 'class'].includes(n.audience) ? (await t.pool.query<{ phone: string }>(
+      `select distinct g.phone from guardians g join student_guardians sg on sg.guardian_id = g.id and sg.gets_messages join students s on s.id = sg.student_id
+       where g.user_id is null and g.phone is not null and s.status = 'active' and ${forStudent('$1::text', '$2::jsonb')}`, [n.class_id, JSON.stringify(n.targets ?? {})])).rows : [];
+    const phones = [...new Set([...people.map((p) => p.phone), ...waiting.map((g) => g.phone)].filter((p): p is string => !!p))];
+    await this.messenger.notify(t, 'notice.published', phones.map((to) => ({ to, vars: { title: n.title } })));
     await this.stream.emit(t, people.map((p) => p.id), { type: 'notification', data: { notice: id } });
   }
 

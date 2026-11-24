@@ -219,11 +219,14 @@ export class Actions {
     if (pol && !user.roles.some((r) => (pol.roles as ConsoleRole[]).includes(r))) throw new ApiError('forbidden', 'Your role cannot approve this action.');
     if (!yes) {
       if (note.trim().length < 5) throw new ApiError('validation', 'Say why, so the person who asked knows what to change.', { fields: { note: 'Say why.' } });
-      await this.db.pool.query("update actions set status = 'rejected', approved_by = $2, decision_note = $3, finished_at = now() where id = $1", [id, user.email, note.trim()]);
+      const declined = await this.db.pool.query("update actions set status = 'rejected', approved_by = $2, decision_note = $3, finished_at = now() where id = $1 and status = 'pending_approval'", [id, user.email, note.trim()]);
+      if (!declined.rowCount) throw new ApiError('conflict', 'This request is not waiting for approval.');
       await this.db.audit(user.email, `action.${a.action}.rejected`, 'school', a.schoolId, { note: note.trim() });
       return this.get(id);
     }
-    await this.db.pool.query("update actions set status = 'running', approved_by = $2 where id = $1", [id, user.email]);
+    // Taken once: two approvers at the same moment cannot both run it.
+    const taken = await this.db.pool.query("update actions set status = 'running', approved_by = $2 where id = $1 and status = 'pending_approval'", [id, user.email]);
+    if (!taken.rowCount) throw new ApiError('conflict', 'This request is not waiting for approval.');
     await this.run(id);
     return this.get(id);
   }
