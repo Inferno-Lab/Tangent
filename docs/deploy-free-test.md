@@ -44,6 +44,7 @@ The service starts with no school. Move the test school in from your computer, t
 
 ```bash
 API=https://<service>.onrender.com BOOTSTRAP_PASSWORD=<from Render> CONSOLE_TOTP_SECRET=<the key your authenticator was given> TEST_PASSWORD=<one you choose> node tools/dataset/load.mjs
+# The test school's principal gets an authenticator as it moves in: its key is in .tangent-data/authenticators.json.
 ```
 
 Anyone with the address and the passwords can open the test school, so keep real data out of this environment.

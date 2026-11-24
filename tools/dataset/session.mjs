@@ -49,18 +49,31 @@ const keys = () => { try { return JSON.parse(readFileSync(KEYS, 'utf8')); } catc
  * sign-in adds one, and the key is kept in .tangent-data for the next. An account already set up in a phone's authenticator
  * takes CONSOLE_TOTP_SECRET (the key shown when it was added) or CONSOLE_CODE (a code from the phone, typed now).
  */
-export function consoleCode(challenge) {
-  const id = `${API}|${CONSOLE_LOGIN.email}`;
-  if (challenge.enroll) {
-    mkdirSync(DATA, { recursive: true });
-    writeFileSync(KEYS, JSON.stringify({ ...keys(), [id]: challenge.enroll.secret }));
-    return totp(challenge.enroll.secret);
-  }
-  if (challenge.channel !== 'app') return CONSOLE_LOGIN.code;
-  const secret = process.env.CONSOLE_TOTP_SECRET ?? keys()[id];
-  if (secret) return totp(secret);
-  if (process.env.CONSOLE_CODE) return process.env.CONSOLE_CODE;
-  throw new Error('The console asks for an authenticator code: set CONSOLE_TOTP_SECRET to the key shown when it was added, or CONSOLE_CODE to a code from the app.');
+export async function consoleCode(challenge) {
+  if (challenge.channel !== 'app' && !challenge.enroll) return CONSOLE_LOGIN.code;
+  if (!challenge.enroll && !process.env.CONSOLE_TOTP_SECRET && !keys()[`${API}|${CONSOLE_LOGIN.email}`] && process.env.CONSOLE_CODE) return process.env.CONSOLE_CODE;
+  return authenticatorCode(`${API}|${CONSOLE_LOGIN.email}`, challenge, process.env.CONSOLE_TOTP_SECRET);
+}
+
+/** A sign-in that asks for an authenticator (staff who run a school, the console): no message comes to the Test inbox for it. */
+export const fromApp = (r) => r?.step === 'otp' && (r.challenge?.channel === 'app' || !!r.challenge?.enroll);
+
+const save = (patch) => { mkdirSync(DATA, { recursive: true }); writeFileSync(KEYS, JSON.stringify({ ...keys(), ...patch })); };
+
+/**
+ * The authenticator's code for `id` (`API|email`, or `API|school|email`): its first sign-in adds the key the server shows and
+ * keeps it in .tangent-data, later ones read it (or `secret`). A code is taken once, so a sign-in waits for the next one when
+ * another sign-in already used this one.
+ */
+export async function authenticatorCode(id, challenge, secret) {
+  if (challenge.enroll) save({ [id]: challenge.enroll.secret });
+  const key = challenge.enroll?.secret ?? secret ?? keys()[id];
+  if (!key) throw new Error(`${id.split('|').pop()} signs in with an authenticator this machine has no key for: sign in once in the browser, or set its key.`);
+  const used = keys()[`${id}|used`] ?? 0;
+  const step = () => Math.floor(Date.now() / 30_000);
+  if (used >= step()) await sleep((used + 1) * 30_000 - Date.now() + 300);
+  save({ [`${id}|used`]: step() });
+  return totp(key);
 }
 
 let consoleSession;
@@ -68,7 +81,7 @@ let consoleSession;
 export async function consoleSignIn() {
   consoleSession ??= remember(`${API}|console|${CONSOLE_LOGIN.email}`, async () => {
     const step = await call('/console/v1/auth/login', { body: { identifier: CONSOLE_LOGIN.email, password: CONSOLE_LOGIN.password } });
-    const done = await call('/console/v1/auth/verify', { body: { challengeId: step.challenge.challengeId, code: consoleCode(step.challenge) } });
+    const done = await call('/console/v1/auth/verify', { body: { challengeId: step.challenge.challengeId, code: await consoleCode(step.challenge) } });
     return { accessToken: done.accessToken, user: done.user };
   }, (c) => call('/console/v1/cells', { token: c.accessToken }));
   return consoleSession;
@@ -76,11 +89,13 @@ export async function consoleSignIn() {
 
 const norm = (x) => x.toLowerCase().replace(/[\s-]/g, '');
 /** Runs `send`, then waits for the new Test inbox message to any of `to` that matches, and returns it. */
-export async function newMessage(slug, to, match, send) {
+export async function newMessage(slug, to, match, send, none = fromApp) {
   const { accessToken } = await consoleSignIn();
   const list = () => call(`/console/v1/sandbox?school=${encodeURIComponent(slug)}`, { token: accessToken });
   const seen = new Set((await list()).map((m) => m.id));
   const result = await send();
+  // An authenticator's code is the person's own: nothing is sent.
+  if (none(result)) return { message: null, result };
   const mine = new Set(to.filter(Boolean).map(norm));
   for (let i = 0; i < 40; i++) {
     const found = (await list()).find((m) => !seen.has(m.id) && mine.has(norm(m.to)) && match.test(m.body));
@@ -97,7 +112,8 @@ export async function staffSignIn(slug, person, { password = STAFF_PASSWORD, cli
     const { message, result } = await newMessage(slug, [person.email, person.phone], /sign-in code/, () =>
       call('/v1/auth/login', { body: { identifier: person.email, password, ...(client ? { client } : {}) }, school: slug }));
     if (result.step === 'done') return { accessToken: result.tokens.accessToken, user: result.tokens.user };
-    const t = await call('/v1/auth/verify', { body: { challengeId: result.challenge.challengeId, code: codeIn(message), ...(client ? { client } : {}) }, school: slug });
+    const code = fromApp(result) ? await authenticatorCode(`${API}|${slug}|${person.email}`, result.challenge) : codeIn(message);
+    const t = await call('/v1/auth/verify', { body: { challengeId: result.challenge.challengeId, code, ...(client ? { client } : {}) }, school: slug });
     return { accessToken: t.accessToken, user: t.user };
   };
   return fresh ? make() : remember(`${API}|${slug}|${person.email}|${client ?? 'web'}`, make, (x) => call('/v1/me', { token: x.accessToken, school: slug }));

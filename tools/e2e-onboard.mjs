@@ -21,7 +21,7 @@ const slug = `brs${String(Date.now()).slice(-6)}`;
 const post = async (path, body) => (await fetch(`${API}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json();
 
 const a = await post('/console/v1/auth/login', { identifier: CONSOLE_LOGIN.email, password: CONSOLE_LOGIN.password });
-const t = await post('/console/v1/auth/verify', { challengeId: a.challenge.challengeId, code: consoleCode(a.challenge) });
+const t = await post('/console/v1/auth/verify', { challengeId: a.challenge.challengeId, code: await consoleCode(a.challenge) });
 const stored = JSON.stringify({ user: t.user });
 
 const browser = await chromium.launch();

@@ -67,8 +67,8 @@ The school's codes are always real and random. On a local or test track they lan
 | Who | Sign in with |
 | --- | --- |
 | Console | `BOOTSTRAP_EMAIL` / `BOOTSTRAP_PASSWORD` from `.env`, then `DEMO_CODE` on your machine, or the authenticator's code on a server |
-| Principal | `principal@sunrisevalley.example` and `TEST_PASSWORD` from `.env`, then the code in the Test inbox |
-| Other staff | the vice principal, office, accountant, the class teacher of 8 A, a maths teacher and a driver: their emails are in `.tangent-data/manifest.json` (`people`), with `TEST_PASSWORD` |
+| Principal | `principal@sunrisevalley.example` and `TEST_PASSWORD` from `.env`, then the code from an authenticator app: the principal runs the school, so a text is not enough. The tools added one when the school moved in; its key is in `.tangent-data/authenticators.json` (add it to your phone's authenticator), or reset it in the console (school → Roles → New authenticator) and add a new one at your next sign-in |
+| Other staff | the vice principal, office, accountant, the class teacher of 8 A, a maths teacher and a driver: their emails are in `.tangent-data/manifest.json` (`people`), with `TEST_PASSWORD`. Those whose role can change settings, staff or refunds use an authenticator too; the others get a code in the Test inbox |
 | Families | the parent's phone (in the manifest: `parentOfTwo`, `parentOfOne`), then the code in the Test inbox; families have no password |
 
 Five codes a person in fifteen minutes is the school's limit. The tools keep a session for ten minutes in

@@ -5,7 +5,7 @@
 import { chromium } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { consolePaths } from './lib/pages.mjs';
-import { CONSOLE_LOGIN, SCHOOL, STAFF_PASSWORD, adminKey, call, codeIn, consoleKey, familySignIn, manifest, newMessage, staffSignIn } from './dataset/session.mjs';
+import { CONSOLE_LOGIN, SCHOOL, STAFF_PASSWORD, adminKey, authenticatorCode, call, codeIn, consoleKey, familySignIn, manifest, newMessage, staffSignIn } from './dataset/session.mjs';
 
 const out = process.argv[2] ?? 'e2e-shots';
 mkdirSync(out, { recursive: true });
@@ -86,7 +86,7 @@ const child = people.parentOfTwo.children[0];
 }
 
 // ── admin ────────────────────────────────────────────────────────────────
-await flow('admin: wrong password shows an error, a wrong code is refused, then the code sent by text signs in', {}, async (p) => {
+await flow('admin: wrong password shows an error, a wrong code is refused, then the principal’s authenticator signs in', {}, async (p) => {
   await p.goto(`${ADMIN}/s/${slug}/login`, { waitUntil: 'networkidle' });
   await p.getByRole('button', { name: /^Sign in/ }).click();
   await expectVisible(p.getByText('Enter your email or phone number to continue').or(p.getByText('Enter your password to continue')), 'an empty-form error');
@@ -95,9 +95,13 @@ await flow('admin: wrong password shows an error, a wrong code is refused, then 
   await p.getByRole('button', { name: /^Sign in/ }).click();
   await expectVisible(p.getByRole('alert'), 'the wrong-password message');
   await p.locator('#lg-pw').fill(STAFF_PASSWORD);
-  const { message } = await newMessage(slug, [people.principal.email, people.principal.phone], /sign-in code/, () => p.getByRole('button', { name: /^Sign in/ }).click());
+  // The principal runs the school: the second step is their authenticator (set up at the first sign-in), not a text.
+  await p.getByRole('button', { name: /^Sign in/ }).click();
   await expectVisible(p.getByText('Verify and sign in'), 'the code step');
-  const code = codeIn(message);
+  await expectVisible(p.getByText('Open your authenticator').or(p.getByText('Set up your authenticator')), 'the authenticator step');
+  const setup = await p.getByText('Set up your authenticator').isVisible();
+  const secret = setup ? (await p.locator('.help b').first().innerText()).trim() : undefined;
+  const code = await authenticatorCode(`${API}|${slug}|${people.principal.email}`, setup ? { enroll: { secret } } : { channel: 'app' });
   await p.getByLabel('6-digit code').fill(code === '111111' ? '222222' : '111111');
   await expectVisible(p.getByRole('alert'), 'the wrong-code message');
   await p.getByLabel('6-digit code').fill(code);
