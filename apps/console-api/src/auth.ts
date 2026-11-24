@@ -125,15 +125,27 @@ export class ConsoleAuth implements OnModuleInit {
     if (!r || r.method !== 'reset' || r.used_at || r.expires_at < new Date()) throw new ApiError('unauthenticated', 'That code has expired. Ask for a new one.', { fields: { code: 'That code has expired.' } });
     if (r.attempts >= 3) throw new ApiError('locked', 'Too many wrong codes. Ask for a new one.');
     await this.codeBudget(r.user_id);
-    if (!constantTimeEqual(sha256(`${challengeId}:${code}`), r.code_hash)) {
-      await this.db.pool.query('update console_otp set attempts = attempts + 1 where id = $1', [r.id]);
-      throw new ApiError('unauthenticated', 'That code isn’t right.', { attemptsLeft: 2 - r.attempts, fields: { code: 'That code isn’t right.' } });
-    }
     if (password.length < 10) throw new ApiError('validation', 'Use at least 10 characters.', { fields: { password: 'Use at least 10 characters.' } });
-    await this.db.pool.query('update console_otp set used_at = now() where id = $1', [r.id]);
+    // A try is taken before the code is checked, in one step: guesses sent at once cannot all slip under the limit.
+    await this.takeTry(r.id);
+    if (!constantTimeEqual(sha256(`${challengeId}:${code}`), r.code_hash)) {
+      throw new ApiError('unauthenticated', 'That code isn’t right.', { attemptsLeft: Math.max(0, 2 - r.attempts), fields: { code: 'That code isn’t right.' } });
+    }
+    await this.spend(r.id);
     // Every session ends: whoever had the old password is signed out.
     await this.db.pool.query('update console_users set password_hash = $2, failed_logins = 0, locked_until = null, token_version = token_version + 1 where id = $1', [r.user_id, await hashPassword(password)]);
     await this.db.audit(r.user_id, 'auth.password_reset', 'user', r.user_id);
+  }
+
+  private async takeTry(id: string): Promise<void> {
+    const took = await this.db.pool.query('update console_otp set attempts = attempts + 1 where id = $1 and used_at is null and attempts < 3', [id]);
+    if (!took.rowCount) throw new ApiError('locked', 'Too many wrong codes. Ask for a new one.');
+  }
+
+  /** Spends a right code once (two requests with it cannot both get in); it is not counted as a wrong try. */
+  private async spend(id: string): Promise<void> {
+    const spent = await this.db.pool.query('update console_otp set used_at = now(), attempts = attempts - 1 where id = $1 and used_at is null', [id]);
+    if (!spent.rowCount) throw new ApiError('unauthenticated', 'That code has expired. Ask for a new one.', { fields: { code: 'That code has expired.' } });
   }
 
   /** Wrong codes one account may type in an hour, across every code and every address. */
@@ -183,16 +195,15 @@ export class ConsoleAuth implements OnModuleInit {
     if (!r || r.used_at || r.expires_at < new Date()) throw new ApiError('unauthenticated', 'That code has expired. Go back and sign in again.', { fields: { code: 'That code has expired.' } });
     if (r.attempts >= 3) throw new ApiError('locked', 'Too many wrong codes. Go back and sign in again.');
     await this.codeBudget(r.user_id);
+    // A try is taken before the code is checked, in one step: guesses sent at once cannot all slip under the limit.
+    await this.takeTry(r.id);
     const secret = r.method === 'enroll' ? r.pending_secret : r.method === 'app' ? r.totp_secret : null;
     // An authenticator code is valid for about 90 seconds; one already used in that time is refused, so it cannot be replayed.
     const [lastCode, lastAt] = (r.totp_last ?? '').split('@');
     const replay = r.method === 'app' && lastCode === body.code.trim() && Date.now() / 1000 - Number(lastAt) < 120;
     const good = !replay && (secret ? verifyTotp(unseal(secret, this.env.SECRETS_KEY), body.code) : constantTimeEqual(sha256(`${body.challengeId}:${body.code}`), r.code_hash));
-    if (!good) {
-      await this.db.pool.query('update console_otp set attempts = attempts + 1 where id = $1', [r.id]);
-      throw new ApiError('unauthenticated', 'That code isn’t right.', { attemptsLeft: 2 - r.attempts, fields: { code: 'That code isn’t right.' } });
-    }
-    await this.db.pool.query('update console_otp set used_at = now() where id = $1', [r.id]);
+    if (!good) throw new ApiError('unauthenticated', 'That code isn’t right.', { attemptsLeft: Math.max(0, 2 - r.attempts), fields: { code: 'That code isn’t right.' } });
+    await this.spend(r.id);
     if (r.method === 'app' || r.method === 'enroll') await this.db.pool.query('update console_users set totp_last = $2 where id = $1', [r.user_id, `${body.code.trim()}@${Math.floor(Date.now() / 1000)}`]);
     if (r.method === 'enroll') {
       await this.db.pool.query('update console_users set totp_secret = $2 where id = $1', [r.user_id, r.pending_secret]);
