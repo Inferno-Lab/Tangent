@@ -65,3 +65,18 @@ describe('authenticator codes', () => {
     expect(verifyTotp(s, totp(s, now - 90_000), now)).toBe(false);
   });
 });
+
+describe('sealed bytes and purpose keys', () => {
+  it('a backup sealed with one key opens with it, and with no other', async () => {
+    const { sealBytes, unsealBytes, isSealedBytes, deriveKey } = await import('./index.js');
+    const key = deriveKey('a-long-secret-for-the-tests-only-123', 'backups');
+    const plain = Buffer.from('the whole school, gzipped');
+    const sealed = sealBytes(plain, key);
+    expect(isSealedBytes(sealed)).toBe(true);
+    expect(isSealedBytes(plain)).toBe(false);
+    expect(unsealBytes(sealed, key).equals(plain)).toBe(true);
+    expect(() => unsealBytes(sealed, deriveKey('a-long-secret-for-the-tests-only-123', 'links'))).toThrow();
+    sealed[sealed.length - 1] ^= 1;
+    expect(() => unsealBytes(sealed, key)).toThrow();
+  });
+});
