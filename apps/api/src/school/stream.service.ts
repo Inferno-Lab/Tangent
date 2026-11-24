@@ -8,7 +8,7 @@ export interface LiveEvent {
   data: Record<string, unknown>;
 }
 
-type Sub = { userId: string; send: (e: LiveEvent) => void };
+type Sub = { userId: string; send: (e: LiveEvent) => void; end: () => void };
 const CHANNEL = 'tangent_live';
 
 /**
@@ -29,7 +29,8 @@ export class StreamService implements OnModuleDestroy {
     await t.pool.query('select pg_notify($1, $2)', [CHANNEL, payload.length < 7900 ? payload : JSON.stringify({ users, type: e.type, data: {} })]).catch(() => undefined);
   }
 
-  subscribe(t: TenantCtx, userId: string, send: (e: LiveEvent) => void): () => void {
+  /** `end` closes the person's stream when this server stops listening for the school, so the app reconnects instead of waiting on a dead line. */
+  subscribe(t: TenantCtx, userId: string, send: (e: LiveEvent) => void, end: () => void): () => void {
     let s = this.schools.get(t.info.slug);
     if (!s) {
       const client = new pg.Client({ connectionString: t.info.dbUrl });
@@ -47,7 +48,7 @@ export class StreamService implements OnModuleDestroy {
       this.schools.set(t.info.slug, entry);
     }
     if (s.idle) { clearTimeout(s.idle); s.idle = undefined; }
-    const sub: Sub = { userId, send };
+    const sub: Sub = { userId, send, end };
     s.subs.add(sub);
     return () => {
       const cur = this.schools.get(t.info.slug);
@@ -62,6 +63,7 @@ export class StreamService implements OnModuleDestroy {
     if (!s) return;
     this.schools.delete(slug);
     if (s.idle) clearTimeout(s.idle);
+    for (const sub of s.subs) { try { sub.end(); } catch { /* already closed */ } }
     void s.client?.end().catch(() => undefined);
   }
 

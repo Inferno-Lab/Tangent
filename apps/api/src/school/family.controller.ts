@@ -61,12 +61,12 @@ export class FamilyController {
     total++;
     reply.raw.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache, no-transform', connection: 'keep-alive', 'x-accel-buffering': 'no' });
     reply.raw.write(': open\n\n');
-    const off = this.stream.subscribe(t, u.id, (e) => reply.raw.write(`event: ${e.type}\ndata: ${JSON.stringify(e.data)}\n\n`));
+    // A stream lasts as long as the token that opened it, and ends at once when the session does (signed out, switched off)
+    // or this server loses the school's live line: the app opens a new one with its fresh token.
+    const end = () => reply.raw.end();
+    const off = this.stream.subscribe(t, u.id, (e) => reply.raw.write(`event: ${e.type}\ndata: ${JSON.stringify(e.data)}\n\n`), end);
     // A comment every 25 seconds keeps proxies from closing an idle stream.
     const ping = setInterval(() => reply.raw.write(': ping\n\n'), 25_000);
-    // A stream lasts as long as the token that opened it, and ends at once when the session does (signed out, switched off):
-    // the app opens a new one with its fresh token.
-    const end = () => reply.raw.end();
     const expiry = setTimeout(end, Math.max(1, (u.exp ?? Date.now() / 1000 + 900) * 1000 - Date.now()));
     const check = setInterval(() => {
       void t.pool.query<{ ok: boolean }>("select s.revoked_at is null and s.expires_at > now() and u.status = 'active' ok from sessions s join users u on u.id = s.user_id where s.id = $1", [u.sid])
@@ -92,8 +92,8 @@ export class FamilyController {
   @Post('students/:id/photo') @HttpCode(200) photo(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(Photo)) b: z.infer<typeof Photo>) { return this.f.proposePhoto(t, u, id, b.fileId); }
   @Get('classes/:id') schoolClass(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string) { return this.f.schoolClass(t, u, id); }
   @Get('classes/:id/students') studentsIn(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string) { return this.f.studentsIn(t, u, id); }
-  @Get('teachers') teachers(@Tenant() t: TenantCtx) { return this.f.teachers(t); }
-  @Get('teachers/:id') teacher(@Tenant() t: TenantCtx, @Param('id') id: string) { return this.f.teacher(t, id); }
+  @Get('teachers') teachers(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser) { return this.f.teachers(t, u); }
+  @Get('teachers/:id') teacher(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string) { return this.f.teacher(t, u, id); }
   @Get('teachers/:id/classes') classesForTeacher(@Tenant() t: TenantCtx, @Param('id') id: string) { return this.f.classesForTeacher(t, id); }
 
   @Get('students/:id/attendance') @RequireModule('attendance') attendance(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string) { return this.f.attendanceOf(t, u, id); }

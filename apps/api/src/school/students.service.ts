@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { nextNumber, commitImport, newId, previewImport, toCsv } from '@tangent/db';
-import { schoolInstant, addDays, dayLabel, initials, schoolToday, latestSchoolDay, schoolDaysEnding, type AssignFee, type AttendanceStatus, type ContactReveal, type FeeStatus, type ImportResult, type MessageRequest, type GuardianRow, type GuardiansPut, type Paged, type StudentCreate, type StudentDetail, type StudentPatch, type StudentQuery, type StudentRow, type StudentSummary, type StudentViews, type ListItem, listKey, tx, addressProblems, joinAddress, type AddressFormat, composeName, type ContactChannel, type LeavingKind, type StudentLeaveInput } from '@tangent/contracts';
+import { schoolInstant, addDays, dayLabel, initials, schoolToday, type AssignFee, type AttendanceStatus, type ContactReveal, type FeeStatus, type ImportResult, type MessageRequest, type GuardianRow, type GuardiansPut, type Paged, type StudentCreate, type StudentDetail, type StudentPatch, type StudentQuery, type StudentRow, type StudentSummary, type StudentViews, type ListItem, listKey, tx, addressProblems, joinAddress, type AddressFormat, composeName, type ContactChannel, type LeavingKind, type StudentLeaveInput } from '@tangent/contracts';
 import { maskPhone } from '@tangent/security';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
@@ -24,9 +24,8 @@ export class StudentsService {
   ) {}
 
   /** The latest school day and the ten before it, for the tick marks. */
-  private days(OFF_DAYS: readonly number[], n = 10): { last: string; days: string[]; today: string } {
-    const today = schoolToday();
-    return { today, last: latestSchoolDay(today, OFF_DAYS), days: schoolDaysEnding(today, n, OFF_DAYS) };
+  private async days(t: TenantCtx, n = 10): Promise<{ last: string; days: string[]; today: string }> {
+    return { today: schoolToday(), ...(await this.settings.openDays(t, n)) };
   }
 
   private baseSql(): string {
@@ -68,7 +67,7 @@ export class StudentsService {
       ...query, feeStatus: has.fees ? query.feeStatus : undefined, attendance: has.attendance ? query.attendance : undefined,
       sort: (!has.fees && query.sort === 'due') || (!has.attendance && query.sort === 'attendance') ? 'name' : query.sort,
     };
-    const { today, days } = this.days(await this.settings.offDays(t));
+    const { today, days } = await this.days(t);
     const where: string[] = [];
     const params: unknown[] = [today, addDays(today, FEE_HORIZON_DAYS)];
     const add = (v: unknown) => { params.push(v); return `$${params.length}`; };
@@ -124,7 +123,7 @@ export class StudentsService {
   }
 
   async summary(t: TenantCtx, q: Pick<StudentQuery, 'classId' | 'house'>): Promise<StudentSummary> {
-    const { today, last } = this.days(await this.settings.offDays(t));
+    const { today, last } = await this.days(t);
     const params: unknown[] = [today, last];
     const where: string[] = [];
     if (q.classId) { params.push(q.classId); where.push(`s.class_id = $${params.length}`); }
@@ -171,7 +170,7 @@ export class StudentsService {
 
   /** The page's starting views. The pinned class is the person's own (remembered when they pick one), else the class they teach. */
   async views(t: TenantCtx, userId: string): Promise<StudentViews> {
-    const { today } = this.days(await this.settings.offDays(t));
+    const { today } = await this.days(t);
     const own = await t.pool.query<{ value: string }>("select value #>> '{}' as value from user_prefs where user_id = $1 and key = 'students.class'", [userId]);
     const taught = own.rows[0] ? null : await t.pool.query<{ id: string }>('select id from classes where class_teacher_id = $1 order by grade, section limit 1', [userId]).catch(() => ({ rows: [] as { id: string }[] }));
     const pinnedId = own.rows[0]?.value ?? taught?.rows[0]?.id ?? null;
@@ -183,7 +182,7 @@ export class StudentsService {
            (select count(*) from students where status = 'active' and admitted_on >= (select starts_on from academic_years where current limit 1)) fresh,
            (select count(*) from students where status = 'left' and erased_at is null) "left"`, [today]),
       t.pool.query<{ id: string; name: string; n: string }>(
-        `select c.id, c.name, (select count(*) from students s where s.class_id = c.id) n from classes c
+        `select c.id, c.name, (select count(*) from students s where s.class_id = c.id and s.status = 'active') n from classes c
          where ($1::text is null or c.id = $1) order by c.grade, c.section limit 1`, [pinnedId]),
     ]);
     const c = counts.rows[0]!;
@@ -192,17 +191,16 @@ export class StudentsService {
   }
 
   async detail(t: TenantCtx, id: string): Promise<StudentDetail> {
-    const OFF_DAYS = await this.settings.offDays(t);
-    const { today, last, days } = this.days(await this.settings.offDays(t));
+    const { today, days } = await this.days(t);
     const params = [today, addDays(today, FEE_HORIZON_DAYS)];
     const { rows } = await t.pool.query<ListRow & { dob: string; blood_group: string | null; house: string | null; address: string | null; admitted_on: string | null; g_phone: string | null; g_email: string | null }>(
       `${this.baseSql().replace('s.status, g.name guardian_name,', "s.status, to_char(s.dob,'YYYY-MM-DD') dob, s.blood_group, s.address, to_char(s.admitted_on,'YYYY-MM-DD') admitted_on, g.phone g_phone, g.email g_email, g.name guardian_name,")} where s.id = $3`, [...params, id]);
     const r = rows[0];
     if (!r) throw notFound('That student');
-    const roll24 = await this.rollWindow(t, id, schoolDaysEnding(last, 24, OFF_DAYS));
+    const roll24 = await this.rollWindow(t, id, (await this.settings.openDays(t, 24)).days);
     const ticks = await this.ticks(t, [id], days);
     const [exam, hw, lib, route, acts, account] = await Promise.all([
-      t.pool.query<{ exam: string; grade: string; pct: number }>('select exam, grade, pct from exam_results where student_id = $1 order by exam desc limit 1', [id]),
+      t.pool.query<{ exam: string; grade: string; pct: number }>('select coalesce(exam_name, exam) exam, grade, pct from exam_results where student_id = $1 order by taken_on desc nulls last limit 1', [id]),
       t.pool.query<{ on_time: string; total: string }>('select count(*) filter (where on_time) on_time, count(*) total from homework_submissions where student_id = $1', [id]),
       t.pool.query<{ n: string }>('select count(*) n from library_loans where student_id = $1 and returned_on is null', [id]),
       t.pool.query<{ route: string }>('select route from transport_assignments where student_id = $1', [id]),
@@ -308,7 +306,7 @@ export class StudentsService {
     const cls = await t.pool.query<{ id: string; grade: number }>('select id, grade from classes where id = $1', [body.classId]);
     if (!cls.rows[0]) throw new ApiError('validation', 'Choose a class from the list.', { fields: { classId: 'Choose a class from the list.' } });
     const limit = t.info.entitlement.limits.students;
-    const count = Number((await t.pool.query<{ n: string }>('select count(*) n from students')).rows[0]!.n);
+    const count = Number((await t.pool.query<{ n: string }>("select count(*) n from students where status = 'active'")).rows[0]!.n);
     if (count >= limit) throw new ApiError('locked', tx('Your plan allows {limit} students. Ask Tangent to raise the limit.', { limit }));
     // The school's own admission numbers (People → Settings) when the office does not type one.
     const pattern = await this.settings.value<string>(t, 'people.admissionNumber', '{yyyy}/{seq:4}');
@@ -436,6 +434,12 @@ export class StudentsService {
           let uid = (await client.query<{ id: string }>(`select id from users where ${byPhone} limit 1`, [d])).rows[0]?.id;
           if (!uid) { uid = newId('usr'); await client.query("insert into users (id, kind, name, phone) values ($1,'guardian',$2,$3)", [uid, g.name, phone]); }
           await client.query('update guardians set user_id = $2 where id = $1', [id, uid]);
+        } else if (known && phone && phone !== known.phone) {
+          // A family's new number is how it signs in to the app from now on (a staff account keeps its own sign-in).
+          if ((await client.query('select 1 from users where phone = $1 and id <> $2', [phone, has])).rowCount) {
+            throw new ApiError('conflict', 'Another account at the school signs in with that phone number.', { fields: { [`guardians.${b.guardians.indexOf(g)}.phone`]: 'Already in use.' } });
+          }
+          await client.query("update users set phone = $2 where id = $1 and kind = 'guardian'", [has, phone]);
         }
         // Left out (an older app or sheet), only the guardian contacted first gets the messages and the bills.
         await client.query(`insert into student_guardians (student_id, guardian_id, is_primary, can_collect, gets_messages, gets_bills) values ($1,$2,$3,$4,$5,$6)
@@ -480,7 +484,7 @@ export class StudentsService {
     const p = await previewImport(t.pool, input);
     if (p.missing.length) throw new ApiError('validation', tx('The first row must name the columns. Nothing is matched to {p0}.', { p0: p.missing.join(', ') }));
     const limit = t.info.entitlement.limits.students;
-    const count = Number((await t.pool.query<{ n: string }>('select count(*) n from students')).rows[0]!.n);
+    const count = Number((await t.pool.query<{ n: string }>("select count(*) n from students where status = 'active'")).rows[0]!.n);
     if (count + p.counts.create > limit) throw new ApiError('locked', tx('Your plan allows {limit} students and this sheet would make {p1}. Ask Tangent to raise the limit.', { limit, p1: count + p.counts.create }));
     const errors = p.rows.filter((r) => r.errors.length).map((r) => ({ line: r.line, message: r.errors.join(' ') }));
     if (p.counts.create + p.counts.update === 0) return { created: 0, updated: 0, skipped: p.counts.skip, errors };

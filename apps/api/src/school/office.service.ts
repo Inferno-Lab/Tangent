@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { newId, toCsv, zip } from '@tangent/db';
-import { bestOf, roundPct, tx, fmtNumber, fmtMoney, fmtDate, addDays, dayMonth, schoolToday, latestSchoolDay, type DataRequestCreate, type DataRequestDecision, type DataRequestRow, type EventReply, type EventRow, type EventSave, type FeeStatus, type InvoiceListQuery, type InvoiceListRow, type InvoiceListSummary, type Paged, type ReceiptRow, type ReportData, type ReportInfo, type ReportQuery, type ThreadCreate, type ThreadDetail, type ThreadPatch, type ThreadReply, type ThreadRow } from '@tangent/contracts';
+import { bestOf, roundPct, tx, fmtNumber, fmtMoney, fmtDate, addDays, dayMonth, schoolToday, type DataRequestCreate, type DataRequestDecision, type DataRequestRow, type EventReply, type EventRow, type EventSave, type FeeStatus, type InvoiceListQuery, type InvoiceListRow, type InvoiceListSummary, type Paged, type ReceiptRow, type ReportData, type ReportInfo, type ReportQuery, type ThreadCreate, type ThreadDetail, type ThreadPatch, type ThreadReply, type ThreadRow } from '@tangent/contracts';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
@@ -101,7 +101,7 @@ export class OfficeService {
     const info = (await this.reportList(t)).find((r) => r.id === id);
     if (!info) throw notFound('That report');
     const today = schoolToday();
-    const last = latestSchoolDay(today, await this.settings.offDays(t));
+    const { last } = await this.settings.openDays(t);
     const cls = q.classId ? (await t.pool.query<{ name: string }>('select name from classes where id = $1', [q.classId])).rows[0]?.name ?? null : null;
     if (q.classId && !cls) throw notFound('That class');
     const dated = !!(q.from || q.to);
@@ -187,7 +187,7 @@ export class OfficeService {
       const weighted = Object.keys(weights).length > 0;
       const { rows } = await t.pool.query<{ id: string; name: string; class_name: string; grade: number; kind: string; pct: number }>(
         `select s.id, s.name, c.name class_name, c.grade, e.kind, r.pct from exams e join classes c on c.id = e.class_id
-         join students s on s.class_id = c.id and s.status = 'active' join exam_results r on r.student_id = s.id and r.exam = e.name
+         join students s on s.class_id = c.id and s.status = 'active' join exam_results r on r.student_id = s.id and (r.exam_id = e.id or (r.exam_id is null and r.exam = e.name))
          where e.status = 'published' and e.starts_on >= coalesce((select starts_on from academic_years where current limit 1), '1900-01-01') and ($1::text is null or c.id = $1)`, [q.classId ?? null]);
       const by = new Map<string, { name: string; cls: string; grade: number; sum: number; w: number; n: number; kinds: Map<string, number[]> }>();
       for (const r of rows) {
@@ -217,7 +217,7 @@ export class OfficeService {
       const grading = await this.settings.grading(t);
       const { rows } = await t.pool.query<{ exam: string; class_name: string; avg: string; pass: string; n: string }>(
         `select e.name exam, c.name class_name, round(avg(r.pct)) avg, round(100.0 * count(*) filter (where r.pct >= ${Number(grading.pass)}) / count(*)) pass, count(*) n
-         from exams e join classes c on c.id = e.class_id join students s on s.class_id = c.id join exam_results r on r.student_id = s.id and r.exam = e.name where e.status = 'published' and ($1::text is null or c.id = $1)
+         from exams e join classes c on c.id = e.class_id join students s on s.class_id = c.id join exam_results r on r.student_id = s.id and (r.exam_id = e.id or (r.exam_id is null and r.exam = e.name)) where e.status = 'published' and ($1::text is null or c.id = $1)
          group by e.id, e.name, c.name, c.grade, c.section order by c.grade, c.section`, [q.classId ?? null]);
       return { ...base, scope: scope(), summary: [{ label: 'Published exams', value: String(rows.length) }],
         columns: [{ key: 'exam', label: 'Exam' }, { key: 'class', label: 'Class' }, { key: 'students', label: 'Students', align: 'right' }, { key: 'average', label: 'Average', align: 'right' }, { key: 'grade', label: 'Grade', align: 'right' }, { key: 'pass', label: 'Passed', align: 'right' }],
@@ -254,10 +254,11 @@ export class OfficeService {
     return rows.map((r) => this.threadRow(r));
   }
 
-  async thread(t: TenantCtx, id: string): Promise<ThreadDetail> {
+  /** A conversation; opening it marks the family's messages read, unless Tangent's read-only support is the one looking. */
+  async thread(t: TenantCtx, id: string, markRead = true): Promise<ThreadDetail> {
     const head = (await t.pool.query(this.threadSql('where th.id = $1'), [id])).rows[0];
     if (!head) throw notFound('That conversation');
-    await t.pool.query("update thread_messages set read_at = now() where thread_id = $1 and from_kind = 'guardian' and read_at is null", [id]);
+    if (markRead) await t.pool.query("update thread_messages set read_at = now() where thread_id = $1 and from_kind = 'guardian' and read_at is null", [id]);
     const msgs = await t.pool.query<{ id: string; from_kind: 'staff' | 'guardian'; sender_name: string; body: string; created_at: Date; deleted_at: Date | null; file_ids: string[] | null }>(
       'select id, from_kind, sender_name, body, created_at, deleted_at, file_ids from thread_messages where thread_id = $1 order by created_at, id', [id]);
     const ids = msgs.rows.flatMap((m) => m.file_ids ?? []);
@@ -299,12 +300,12 @@ export class OfficeService {
 
   // Events
 
-  async events(t: TenantCtx): Promise<EventRow[]> {
+  async events(t: TenantCtx, id?: string): Promise<EventRow[]> {
     const { rows } = await t.pool.query<{ id: string; title: string; starts_at: Date; ends_at: Date | null; kind: EventRow['kind']; venue: string; note: string; audience: string; category: string; needs_rsvp: boolean; lat: number | null; lng: number | null; going: string; maybe: string; cant: string; adults: string; class_id: string | null; class_name: string | null; rsvp_by: string | null; max_adults: number | null; capacity: number | null }>(
       `select e.id, e.title, e.starts_at, e.ends_at, e.kind, e.venue, e.note, e.audience, e.category, e.needs_rsvp, e.lat, e.lng, e.class_id, (select name from classes c where c.id = e.class_id) class_name, e.rsvp_by::text, e.max_adults, e.capacity,
          count(r.*) filter (where r.status = 'going') going, count(r.*) filter (where r.status = 'maybe') maybe, count(r.*) filter (where r.status = 'cant') cant,
          coalesce(sum(r.adults) filter (where r.status = 'going'), 0) adults
-       from events e left join event_rsvps r on r.event_id = e.id where e.kind not in ('routine','cover') group by e.id order by e.starts_at desc limit 200`);
+       from events e left join event_rsvps r on r.event_id = e.id where e.kind not in ('routine','cover') and ($1::text is null or e.id = $1) group by e.id order by e.starts_at desc limit 200`, [id ?? null]);
     return rows.map((r) => ({
       id: r.id, title: r.title, startsAt: r.starts_at.toISOString(), endsAt: r.ends_at?.toISOString() ?? null, kind: r.kind, venue: r.venue, note: r.note, audience: r.audience,
       category: r.category, needsRsvp: r.needs_rsvp, lat: r.lat, lng: r.lng, going: Number(r.going), maybe: Number(r.maybe), cant: Number(r.cant), adults: Number(r.adults),
@@ -348,7 +349,7 @@ export class OfficeService {
       }
     }
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'event.saved', entity: 'event', entityId: id, detail: { title: body.title } });
-    return (await this.events(t)).find((e) => e.id === id)!;
+    return (await this.events(t, id))[0]!;
   }
 
   async deleteEvent(t: TenantCtx, user: User, id: string): Promise<void> {
@@ -401,8 +402,8 @@ export class OfficeService {
     return { name: `${r.subject_name || 'data'} - ${schoolToday()}.zip`.replace(/[^\w ,.-]+/g, ' '), zip: zip(files.length ? files : [{ name: 'nothing.txt', content: tx('The school keeps nothing else about this person.') }]) };
   }
 
-  async dataRequests(t: TenantCtx): Promise<DataRequestRow[]> {
-    const { rows } = await t.pool.query('select id, kind, subject_name, requested_by, status, note, answer, user_id, created_at, resolved_at from data_requests order by (status = \'open\') desc, created_at desc limit 100');
+  async dataRequests(t: TenantCtx, id?: string): Promise<DataRequestRow[]> {
+    const { rows } = await t.pool.query('select id, kind, subject_name, requested_by, status, note, answer, user_id, created_at, resolved_at from data_requests where $1::text is null or id = $1 order by (status = \'open\') desc, created_at desc limit 100', [id ?? null]);
     return rows.map((r) => this.dsr(r));
   }
 
@@ -410,7 +411,7 @@ export class OfficeService {
     const id = newId('dsr');
     await t.pool.query('insert into data_requests (id, kind, subject_name, requested_by, note) values ($1,$2,$3,$4,$5)', [id, body.kind, body.subjectName, body.requestedBy, body.note]);
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'privacy.request', entity: 'data_request', entityId: id, detail: { kind: body.kind, subject: body.subjectName } });
-    return (await this.dataRequests(t)).find((r) => r.id === id)!;
+    return (await this.dataRequests(t, id))[0]!;
   }
 
   async decideDataRequest(t: TenantCtx, user: User, id: string, body: DataRequestDecision): Promise<DataRequestRow> {
@@ -420,6 +421,6 @@ export class OfficeService {
     if (r.rowCount && who?.phone) await this.messenger.notify(t, 'privacy.answered', [{ to: who.phone, vars: { request: who.kind === 'access' ? 'copy of your data' : who.kind, status: body.status === 'done' ? 'done' : 'declined', note: body.note } }]);
     if (!r.rowCount) throw new ApiError('conflict', 'That request is not open any more.');
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: `privacy.${body.status}`, entity: 'data_request', entityId: id });
-    return (await this.dataRequests(t)).find((x) => x.id === id)!;
+    return (await this.dataRequests(t, id))[0]!;
   }
 }

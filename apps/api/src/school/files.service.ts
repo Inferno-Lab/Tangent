@@ -132,6 +132,8 @@ export class FilesService implements OnModuleInit {
       };
       const p = need[f.kind];
       if (!p || user.permissions.includes(p)) return;
+      // A teacher reads the files in their own conversations without the office's inbox permission.
+      if (f.kind === 'chat' && (await t.pool.query('select 1 from threads where id = $1 and assigned_to = $2', [f.owner_id, user.id])).rowCount) return;
       throw forbidden('You do not have access to this file.');
     }
     const kids = await this.children(t, user.id);
