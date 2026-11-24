@@ -12,7 +12,7 @@ export interface Write { table: string; pk: string[]; cols: string[]; rows: Rec[
 type Total = { label: string; value: string };
 /** One kind of data: what it looks up first, how it checks a row, and what it writes. */
 export interface Impl<L> {
-  load(db: Q, rows: Row[]): Promise<L>;
+  load(db: Q, rows: Row[], by: { grants?: readonly string[] }): Promise<L>;
   check(r: Row, l: L): { key: string; errors: string[]; exists: boolean };
   writes(rows: Row[], l: L): Write[];
   totals(rows: Row[], l: L): Total[];
@@ -262,13 +262,18 @@ const periods = kind<Set<number>>({
 });
 
 type UserRow = { id: string; kind: string; name: string; phone: string | null; email: string | null };
-type StaffLookups = { byEmail: Map<string, UserRow>; byPhone: Map<string, string>; roles: Map<string, string>; subjects: Map<string, SubjectRow>; staff: Map<string, Rec> };
+type StaffLookups = { byEmail: Map<string, UserRow>; byPhone: Map<string, string>; roles: Map<string, string>; subjects: Map<string, SubjectRow>; staff: Map<string, Rec>; tooHigh: Set<string>; above: Set<string> };
 const staff = kind<StaffLookups>({
-  async load(db) {
+  async load(db, _rows, by) {
     const users = (await db.query<UserRow>('select id, kind, name, phone, email from users')).rows;
-    const roles = (await db.query<{ id: string; key: string; name: string }>('select id, key, name from roles')).rows;
+    const roles = (await db.query<{ id: string; key: string; name: string; permissions: string[] }>('select id, key, name, permissions from roles')).rows;
     const st = (await db.query<Rec & { user_id: string }>('select user_id, designation, department, joined_on::text from staff')).rows;
+    // A school's own staff import gives no role with more access than the person importing has, and changes no one who has more.
+    const beyond = (perms: string[]) => !!by.grants && perms.some((p) => !by.grants!.includes(p));
+    const held = by.grants ? (await db.query<{ user_id: string; perms: string[] }>(
+      'select ur.user_id, jsonb_agg(distinct p) perms from user_roles ur join roles r on r.id = ur.role_id, jsonb_array_elements_text(r.permissions) p group by ur.user_id')).rows : [];
     return {
+      tooHigh: new Set(roles.filter((r) => beyond(r.permissions)).map((r) => r.id)), above: new Set(held.filter((h) => beyond(h.perms)).map((h) => h.user_id)),
       byEmail: new Map(users.filter((u) => u.email).map((u) => [lc(u.email!), u])), byPhone: new Map(users.filter((u) => u.phone).map((u) => [digits(u.phone!), u.id])),
       roles: new Map(roles.flatMap((r) => [[lc(r.name), r.id], [lc(r.key), r.id]] as [string, string][])), subjects: await subjectMap(db), staff: new Map(st.map((s) => [s.user_id, s])),
     };
@@ -283,6 +288,8 @@ const staff = kind<StaffLookups>({
       ...(r.phone && !digits(r.phone) ? [badPhone(r.phone)] : []),
       ...(phoneOwner && phoneOwner !== was?.id ? ['Someone else already has this phone number.'] : []),
       ...(r.role && !l.roles.has(lc(r.role)) ? [`There is no role “${r.role}”: Tangent makes roles in the console.`] : []),
+      ...(r.role && l.tooHigh.has(l.roles.get(lc(r.role))!) ? [`The role “${r.role}” has more access than yours: someone with at least as much gives it.`] : []),
+      ...(was && l.above.has(was.id) ? ['This person has more access than you: someone with at least as much changes them.'] : []),
       ...(unknown.length ? [`Subjects not set up yet: ${unknown.join(', ')}. Import subjects first.`] : []),
       ...(r.joined_on && !isoDay(r.joined_on) ? ['Write the joining date as 2019-06-10 or 10/06/2019.'] : []),
     ];

@@ -5,6 +5,7 @@ import { createApp, loadEnv as loadApiEnv } from '@tangent/api';
 import { ensureDatabase, startDevPostgres, type DevPostgres } from '@tangent/db/dev';
 import { pg } from '@tangent/db';
 import { PoolManager, Registry } from '@tangent/tenancy';
+import { totp } from '@tangent/security';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createConsoleApp } from '../src/app.js';
 import { loadEnv } from '../src/env.js';
@@ -21,6 +22,11 @@ export interface Harness {
   invite: (token: string, body: { name: string; email: string; roles: string[] }, password: string) => Promise<{ status: number; json: any }>;
   /** A school's first admin signs in as they would: the temporary password from the welcome email, then the code, both from the Test inbox. */
   schoolSignIn: (slug: string) => Promise<string>;
+  /**
+   * A school sign-in's second step: a new school's principal runs it, so it is their authenticator (set up at the first sign-in,
+   * its key kept here); anyone else gets the texted code `texted` reads.
+   */
+  secondStep: (who: string, challenge: { channel: string; enroll?: { secret: string } }, texted: () => Promise<string>) => Promise<string>;
   close: () => Promise<void>;
 }
 
@@ -63,13 +69,25 @@ export async function startHarness(extra: Record<string, string> = {}): Promise<
   };
   const inbox = async (slug: string, to: string, re: RegExp) => re.exec((await pool.query(
     'select body from sandbox_messages where school_slug = $1 and to_addr = $2 order by created_at desc limit 1', [slug, to])).rows[0]?.body ?? '')?.[1];
+  // A code is taken once: a second sign-in answers with the next one, which the server takes for a clock running ahead.
+  const keys = new Map<string, string>();
+  const used = new Map<string, string>();
+  const secondStep: Harness['secondStep'] = async (who, challenge, texted) => {
+    if (challenge.channel !== 'app' && !challenge.enroll) return texted();
+    if (challenge.enroll) keys.set(who, challenge.enroll.secret);
+    const key = keys.get(who)!;
+    const code = [0, 30_000].map((d) => totp(key, Date.now() + d)).find((c) => c !== used.get(who))!;
+    used.set(who, code);
+    return code;
+  };
   const schoolSignIn: Harness['schoolSignIn'] = async (slug) => {
     const password = await inbox(slug, `asha@${slug}.test`, /temporary password (\S+)\./);
     const a = await s('POST', '/v1/auth/login', { school: slug, body: { identifier: `asha@${slug}.test`, password } });
-    const code = await inbox(slug, '+919000022222', /(\d{6})/);
+    const code = await secondStep(`${slug}|asha`, a.json.challenge, async () => (await inbox(slug, '+919000022222', /(\d{6})/))!);
     return (await s('POST', '/v1/auth/verify', { school: slug, body: { challengeId: a.json.challenge.challengeId, code } })).json.accessToken as string;
   };
   return {
+    secondStep,
     console: console_, api, server, registry: pool, c, s, signIn, invite, schoolSignIn,
     close: async () => { await pool.end(); await console_.close(); await api.close(); await registry.close(); await pools.closeAll(); await server.stop(); },
   };

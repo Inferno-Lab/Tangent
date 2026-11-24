@@ -17,6 +17,14 @@ const WEB_DAYS = 7;
 const MOBILE_DAYS = 14;
 let dummy: Promise<string> | undefined;
 const limiter = new Limiter(process.env.NODE_ENV === 'test' ? 10_000 : 30, 60_000);
+// Wrong passwords hold back one address after a few, the account only after many from everywhere: knowing a super admin's email
+// is not enough to keep them out.
+const deviceFails = new Limiter(5, 15 * 60_000);
+const ACCOUNT_LOCK_AFTER = 30;
+// Codes: wrong ones per account in an hour, and "Forgot it?" codes per account in an hour, whoever asks and from wherever.
+const CODE_FAILS_PER_HOUR = 10;
+const RESETS_PER_HOUR = 5;
+const made = "expires_at > now() - interval '50 minutes'"; // a code lasts 10 minutes: made in the last hour
 // Refreshing is not a guess (the token is 32 random bytes) and happens on every page load: its own cap only stops a flood.
 const refreshLimit = new Limiter(process.env.NODE_ENV === 'test' ? 10_000 : 600, 60_000);
 
@@ -44,24 +52,29 @@ export class ConsoleAuth implements OnModuleInit {
     scheduleJob(this.db.pool, 'console-sweep', 24 * 60 * 60 * 1000, () => this.sweep(), () => undefined);
   }
 
-  async login(body: LoginRequest): Promise<ConsoleLoginResponse> {
+  /** The fixed demo code stands in for an authenticator only on a developer's machine and in tests, never on a server people use. */
+  private get demo(): string | undefined {
+    return this.env.NODE_ENV === 'production' ? undefined : this.env.DEMO_CODE;
+  }
+
+  async login(body: LoginRequest, ip = ''): Promise<ConsoleLoginResponse> {
     const { rows } = await this.db.pool.query<{ id: string; name: string; email: string; password_hash: string | null; status: string; roles: ConsoleRole[]; totp_secret: string | null; failed_logins: number; locked_until: Date | null }>(
       'select id, name, email, password_hash, status, roles, totp_secret, failed_logins, locked_until from console_users where lower(email) = $1', [body.identifier.trim().toLowerCase()]);
     const u = rows[0];
-    if (u?.locked_until && u.locked_until > new Date()) {
-      throw new ApiError('locked', tx('Too many wrong passwords. Try again in {p0} minutes.', { p0: Math.ceil((u.locked_until.getTime() - Date.now()) / 60_000) }));
-    }
+    const device = `${u?.id ?? body.identifier.trim().toLowerCase()}|${ip}`;
+    const lockedFor = u?.locked_until && u.locked_until > new Date() ? Math.ceil((u.locked_until.getTime() - Date.now()) / 1000) : 0;
+    const wait = Math.max(deviceFails.wait(device), lockedFor);
+    if (wait) throw new ApiError('locked', tx('Too many wrong passwords. Try again in {p0} minutes.', { p0: Math.ceil(wait / 60) }), { retryAfter: wait });
     dummy ??= hashPassword('not-a-real-password');
     const ok = await verifyPassword(body.password, u?.password_hash ?? (await dummy));
     if (!u || !ok || u.status !== 'active') {
+      deviceFails.hit(device);
       if (u) {
-        const lock = u.failed_logins + 1 >= 5;
+        const lock = u.failed_logins + 1 >= ACCOUNT_LOCK_AFTER;
         await this.db.pool.query('update console_users set failed_logins = $2, locked_until = $3 where id = $1', [u.id, lock ? 0 : u.failed_logins + 1, lock ? new Date(Date.now() + 15 * 60_000) : null]);
-        if (lock) throw new ApiError('locked', 'Too many wrong passwords. Try again in 15 minutes.');
       }
-      throw new ApiError('unauthenticated', u ? 'That password isn’t right. Check it, or ask a super admin to reset it.' : 'We couldn’t find a console account with that email.', {
-        fields: u ? { password: 'That password isn’t right.' } : { identifier: 'We couldn’t find a console account with that email.' },
-      });
+      // One answer whether or not the account exists: the sign-in page does not say who has one.
+      throw new ApiError('unauthenticated', 'That email or password isn’t right.', { fields: { password: 'Check your email and password.' } });
     }
     await this.db.pool.query('update console_users set failed_logins = 0, locked_until = null where id = $1', [u.id]);
     if (passwordNeedsRehash(u.password_hash)) {
@@ -74,9 +87,9 @@ export class ConsoleAuth implements OnModuleInit {
       await this.db.pool.query("insert into console_otp (id, user_id, code_hash, method, expires_at) values ($1,$2,'',$3,$4)", [id, u.id, 'app', expires]);
       return { step: 'otp', challenge: { challengeId: id, channel: 'app', maskedTo: 'your authenticator app', expiresInSeconds: 600 } };
     }
-    // The test track has no email service either: its fixed DEMO_CODE stands in for the emailed code.
-    if (this.env.DEMO_CODE) {
-      const code = this.env.DEMO_CODE;
+    // A developer's machine has no authenticator to hand: its fixed DEMO_CODE stands in for one.
+    if (this.demo) {
+      const code = this.demo;
       await this.db.pool.query('insert into console_otp (id, user_id, code_hash, expires_at) values ($1,$2,$3,$4)', [id, u.id, sha256(`${id}:${code}`), expires]);
       await this.sandbox.put({ schoolSlug: 'console', channel: 'email', to: u.email, subject: 'Your Tangent console code', body: `Your sign-in code is ${code}. It expires in 10 minutes.` });
       return { step: 'otp', challenge: { challengeId: id, channel: 'email', maskedTo: maskEmail(u.email), expiresInSeconds: 600 } };
@@ -94,20 +107,24 @@ export class ConsoleAuth implements OnModuleInit {
   async resetStart(email: string): Promise<{ challengeId: string; channel: 'email'; maskedTo: string; expiresInSeconds: number }> {
     const u = (await this.db.pool.query<{ id: string; email: string }>("select id, email from console_users where lower(email) = $1 and status = 'active'", [email.trim().toLowerCase()])).rows[0];
     const id = newId('cot');
-    // An unknown address gets the same answer, so the form does not say who has an account.
-    if (!u) return { challengeId: id, channel: 'email', maskedTo: maskEmail(email.trim()), expiresInSeconds: 600 };
-    const code = this.env.DEMO_CODE ?? String(randomInt(0, 1_000_000)).padStart(6, '0');
+    const answer = { challengeId: id, channel: 'email' as const, maskedTo: maskEmail(u?.email ?? email.trim()), expiresInSeconds: 600 };
+    // An unknown address, or one asked for too often, gets the same answer and no code, so the form neither says who has an
+    // account nor lets anyone draw code after code to guess at.
+    if (!u) return answer;
+    const recent = Number((await this.db.pool.query<{ n: string }>(`select count(*) n from console_otp where user_id = $1 and method = 'reset' and ${made}`, [u.id])).rows[0]!.n);
+    if (recent >= RESETS_PER_HOUR) return answer;
+    // Always a fresh random code, never the demo one: a reset is where a guessed fixed code would hand over the console.
+    const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
     await this.db.pool.query("insert into console_otp (id, user_id, code_hash, method, expires_at) values ($1,$2,$3,'reset',$4)", [id, u.id, sha256(`${id}:${code}`), new Date(Date.now() + 10 * 60_000)]);
-    if (!this.env.DEMO_CODE) {
-      await this.platform.hub.send({ schoolId: null, schoolSlug: 'console', channel: 'email', to: u.email, subject: 'Your Tangent console code', body: `Your code to choose a new console password is ${code}. It expires in 10 minutes. If you did not ask for it, ignore this email.`, now: true });
-    }
-    return { challengeId: id, channel: 'email', maskedTo: maskEmail(u.email), expiresInSeconds: 600 };
+    await this.platform.hub.send({ schoolId: null, schoolSlug: 'console', channel: 'email', to: u.email, subject: 'Your Tangent console code', body: `Your code to choose a new console password is ${code}. It expires in 10 minutes. If you did not ask for it, ignore this email.`, now: true });
+    return answer;
   }
 
   async resetFinish(challengeId: string, code: string, password: string): Promise<void> {
     const r = (await this.db.pool.query<{ id: string; user_id: string; code_hash: string; method: string; attempts: number; expires_at: Date; used_at: Date | null }>('select * from console_otp where id = $1', [challengeId])).rows[0];
     if (!r || r.method !== 'reset' || r.used_at || r.expires_at < new Date()) throw new ApiError('unauthenticated', 'That code has expired. Ask for a new one.', { fields: { code: 'That code has expired.' } });
     if (r.attempts >= 3) throw new ApiError('locked', 'Too many wrong codes. Ask for a new one.');
+    await this.codeBudget(r.user_id);
     if (!constantTimeEqual(sha256(`${challengeId}:${code}`), r.code_hash)) {
       await this.db.pool.query('update console_otp set attempts = attempts + 1 where id = $1', [r.id]);
       throw new ApiError('unauthenticated', 'That code isn’t right.', { attemptsLeft: 2 - r.attempts, fields: { code: 'That code isn’t right.' } });
@@ -117,6 +134,12 @@ export class ConsoleAuth implements OnModuleInit {
     // Every session ends: whoever had the old password is signed out.
     await this.db.pool.query('update console_users set password_hash = $2, failed_logins = 0, locked_until = null, token_version = token_version + 1 where id = $1', [r.user_id, await hashPassword(password)]);
     await this.db.audit(r.user_id, 'auth.password_reset', 'user', r.user_id);
+  }
+
+  /** Wrong codes one account may type in an hour, across every code and every address. */
+  private async codeBudget(userId: string): Promise<void> {
+    const n = Number((await this.db.pool.query<{ n: string }>(`select coalesce(sum(attempts), 0) n from console_otp where user_id = $1 and ${made}`, [userId])).rows[0]!.n);
+    if (n >= CODE_FAILS_PER_HOUR) throw new ApiError('locked', 'Too many wrong codes for this account. Try again in an hour.', { retryAfter: 3600 });
   }
 
   /** Which console this is, said by the server: a guess from the address could call production "Test". */
@@ -159,6 +182,7 @@ export class ConsoleAuth implements OnModuleInit {
     const r = rows[0];
     if (!r || r.used_at || r.expires_at < new Date()) throw new ApiError('unauthenticated', 'That code has expired. Go back and sign in again.', { fields: { code: 'That code has expired.' } });
     if (r.attempts >= 3) throw new ApiError('locked', 'Too many wrong codes. Go back and sign in again.');
+    await this.codeBudget(r.user_id);
     const secret = r.method === 'enroll' ? r.pending_secret : r.method === 'app' ? r.totp_secret : null;
     // An authenticator code is valid for about 90 seconds; one already used in that time is refused, so it cannot be replayed.
     const [lastCode, lastAt] = (r.totp_last ?? '').split('@');
@@ -274,7 +298,7 @@ export class AuthController {
   @Public() @Post('login') @HttpCode(200)
   login(@Body(new ZodPipe(LoginRequest)) body: LoginRequest, @Req() req: FastifyRequest): Promise<ConsoleLoginResponse> {
     limiter.check(`l|${req.ip}`);
-    return this.auth.login(body);
+    return this.auth.login(body, req.ip);
   }
 
   @Public() @Post('reset/start') @HttpCode(200)

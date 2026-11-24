@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, Injectable, Param, Post, Put, 
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { createHash, randomBytes } from 'node:crypto';
 import { FormAnswer, FormInput, checkAnswers, schoolToday, tx, type FormResponseRow, type FormRow } from '@tangent/contracts';
-import { newId } from '@tangent/db';
+import { newId, toCsv } from '@tangent/db';
 import { ApiError, ZodPipe, forbidden, notFound } from '@tangent/nest-kit';
 import { Core, CurrentUser, Public, Require } from '../auth/guards.js';
 import { Tenant, type AuthedUser, type TenantCtx } from '../tenancy/tenant.js';
@@ -73,10 +73,10 @@ export class FormsService {
   /** The answers as a spreadsheet: who, for which child, when, then a column a question. */
   async csv(t: TenantCtx, id: string): Promise<{ name: string; text: string }> {
     const { form, rows } = await this.responses(t, id);
-    const q = (v: unknown) => `"${(Array.isArray(v) ? v.join('; ') : v === null || v === undefined ? '' : typeof v === 'boolean' ? (v ? tx('Yes') : tx('No')) : String(v)).replace(/"/g, '""')}"`;
-    const head = [tx('From'), tx('Child'), tx('When'), ...form.fields.map((f) => f.label)].map(q).join(',');
-    const lines = rows.map((r) => [r.by, r.studentName ?? '', r.createdAt.slice(0, 16).replace('T', ' '), ...form.fields.map((f) => r.answers[f.key])].map(q).join(','));
-    return { name: `${form.title} - ${schoolToday()}.csv`.replace(/[^\w ,.-]+/g, ' '), text: [head, ...lines].join('\r\n') };
+    const q = (v: unknown) => (Array.isArray(v) ? v.join('; ') : v === null || v === undefined ? '' : typeof v === 'boolean' ? (v ? tx('Yes') : tx('No')) : String(v));
+    const head = [tx('From'), tx('Child'), tx('When'), ...form.fields.map((f) => f.label)];
+    const lines = rows.map((r) => [r.by, r.studentName ?? '', r.createdAt.slice(0, 16).replace('T', ' '), ...form.fields.map((f) => q(r.answers[f.key]))]);
+    return { name: `${form.title} - ${schoolToday()}.csv`.replace(/[^\w ,.-]+/g, ' '), text: toCsv([head, ...lines]) };
   }
 
   // ── Answering ───────────────────────────────────────────────────────────────
@@ -162,7 +162,7 @@ export class FormsController {
   async csv(@Tenant() t: TenantCtx, @Param('id') id: string, @Res({ passthrough: true }) reply: FastifyReply): Promise<string> {
     const c = await this.forms.csv(t, id);
     reply.header('content-type', 'text/csv; charset=utf-8').header('content-disposition', `attachment; filename="${c.name}"`);
-    return `﻿${c.text}`;
+    return c.text;
   }
 
   // Forms anyone with the link may fill, before anyone signs in.

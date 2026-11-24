@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { AppModule, loadEnv as loadApiEnv } from '@tangent/api';
 import { ConsoleModule, loadEnv as loadConsoleEnv, prepareRegistry } from '@tangent/console-api';
-import { ApiExceptionFilter, registerHttp } from '@tangent/nest-kit';
+import { ApiExceptionFilter, fastifyOptions, registerHttp } from '@tangent/nest-kit';
 import { poolManagerFromEnv, Registry } from '@tangent/tenancy';
 import { ConsoleLogger, Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
@@ -17,10 +17,13 @@ const consoleEnv = loadConsoleEnv();
 await prepareRegistry(consoleEnv);
 const shared = { registry: new Registry({ url: apiEnv.REGISTRY_DATABASE_URL, secret: apiEnv.SECRETS_KEY }), pools: poolManagerFromEnv() };
 
-@Module({ imports: [AppModule.register(apiEnv, shared), ConsoleModule.register(consoleEnv, shared)] })
+// The school API can use a registry login of its own that cannot open the console's tables (tools/registry-api-role.sql).
+const apiShared = process.env.API_REGISTRY_DATABASE_URL ? { ...shared, registry: new Registry({ url: process.env.API_REGISTRY_DATABASE_URL, secret: apiEnv.SECRETS_KEY }) } : shared;
+
+@Module({ imports: [AppModule.register(apiEnv, apiShared), ConsoleModule.register(consoleEnv, shared)] })
 class ServerModule {}
 
-const app = await NestFactory.create<NestFastifyApplication>(ServerModule, new FastifyAdapter({ trustProxy: true, bodyLimit: 256_000, routerOptions: { maxParamLength: 2048 } }), {
+const app = await NestFactory.create<NestFastifyApplication>(ServerModule, new FastifyAdapter(fastifyOptions()), {
   // JSON lines in production, so the host's log search can filter by school and request; readable text locally.
   logger: new ConsoleLogger({ json: apiEnv.NODE_ENV === 'production', logLevels: ['error', 'warn', 'log'] }),
   // Provider webhooks are checked against the exact bytes they signed.

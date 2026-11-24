@@ -177,6 +177,8 @@ export const StaffPatch = z.object({
   status: z.enum(['active', 'inactive']).optional(),
   managerId: z.string().min(1).nullable().optional(),
   custom: CustomValues.optional(),
+  /** Their phone was lost: the authenticator is dropped and they add a new one at their next sign-in. */
+  resetAuthenticator: z.literal(true).optional(),
 });
 export type StaffPatch = z.infer<typeof StaffPatch>;
 

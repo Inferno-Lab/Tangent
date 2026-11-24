@@ -79,7 +79,10 @@ async function each<T, U>(list: T[], fn: (x: T, i: number) => U): Promise<U[]> {
   return out;
 }
 
-async function check(db: Q, input: ImportInput): Promise<Checked> {
+/** Who runs an import, when it is a school's own staff: the permissions they hold, so a sheet cannot give more than they have. */
+export interface ImportBy { grants?: readonly string[] }
+
+async function check(db: Q, input: ImportInput, by: ImportBy = {}): Promise<Checked> {
   const kind = await ownKind(db, input.kind);
   const impl = KINDS[input.kind] as Impl<unknown> | undefined;
   if (!kind || !impl) throw new ImportError(tx('There is no import for “{kind}”.', { kind: input.kind }));
@@ -110,7 +113,7 @@ async function check(db: Q, input: ImportInput): Promise<Checked> {
       if (odd.length) unmatched[c.key] = odd;
     }
   }
-  const lookups = await impl.load(db, rows);
+  const lookups = await impl.load(db, rows, by);
   const seen = new Map<string, number>();
   const checks: ImportRowCheck[] = await each(rows, (r, i): ImportRowCheck => {
     const line = input.rows ? i + 1 : i + 2;
@@ -134,8 +137,8 @@ async function check(db: Q, input: ImportInput): Promise<Checked> {
 }
 
 /** Reads, matches and checks a file without changing anything: what would be added, changed and left out, and the totals. */
-export async function previewImport(db: Q, input: ImportInput): Promise<ImportPreview> {
-  const p = (await check(db, input)).preview;
+export async function previewImport(db: Q, input: ImportInput, by: ImportBy = {}): Promise<ImportPreview> {
+  const p = (await check(db, input, by)).preview;
   if (p.rows.length <= PREVIEW_ROWS) return p;
   const bad = p.rows.filter((r) => r.errors.length).slice(0, PREVIEW_ROWS);
   const good = p.rows.filter((r) => !r.errors.length).slice(0, PREVIEW_ROWS - bad.length);
@@ -213,13 +216,13 @@ export async function freshStats(pool: pg.Pool, tables: string[]): Promise<void>
 }
 
 /** Imports the rows that passed the checks as one batch, in one transaction, and records how to undo it. Rows with problems are left out. */
-export async function commitImport(pool: pg.Pool, input: ImportInput, byName: string): Promise<ImportBatchRow> {
+export async function commitImport(pool: pg.Pool, input: ImportInput, byName: string, by: ImportBy = {}): Promise<ImportBatchRow> {
   const client = await pool.connect();
   try {
     await client.query('begin');
     await client.query('set local statement_timeout = 0');
     await client.query(LOCK);
-    const { preview, valid, impl, lookups, own } = await check(client, input);
+    const { preview, valid, impl, lookups, own } = await check(client, input, by);
     if (preview.missing.length) throw new ImportError(tx('Match a column to {p0} first.', { p0: preview.missing.join(', ') }));
     if (!valid.length) throw new ImportError('Nothing to import: every row has a problem. Fix them in the grid and check again.');
     const changes: Change[] = [];

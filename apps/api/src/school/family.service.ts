@@ -12,7 +12,7 @@ import { LearningService } from './learning.service.js';
 import { LibraryService } from './library.service.js';
 import { ChatService, type ChatSender } from './chat.service.js';
 import { NoticesService } from './notices.service.js';
-import { AuditService, Messenger, SettingsService, checkLeaveClash } from './support.js';
+import { AuditService, Messenger, SettingsService, checkLeaveClash, mayTeach } from './support.js';
 import { BUS_CREW_SQL, TransportService } from './transport.service.js';
 
 const key = (subjectId: string) => subjectId.replace(/^sub_/, '');
@@ -356,6 +356,7 @@ export class FamilyService {
   /** A class's roll call for one day, as the teacher marks it in the app (approved leave already filled in). */
   async rollCall(t: TenantCtx, user: AuthedUser, classId: string, date: string) {
     if (!user.permissions.includes('attendance.mark')) throw forbidden('You are not allowed to mark attendance.');
+    await mayTeach(t, user, classId);
     return this.attendance.day(t, classId, date);
   }
 
@@ -521,9 +522,10 @@ export class FamilyService {
   }
 
   /** The teacher's own subject for a class, from the timetable (a teacher may teach several). */
-  private async subjectFor(t: TenantCtx, teacherId: string, classId: string, wanted?: string): Promise<string> {
-    const { rows } = await t.pool.query<{ subject_id: string }>('select distinct subject_id from timetable_slots where class_id = $1 and teacher_id = $2', [classId, teacherId]);
-    if (wanted && (rows.some((r) => r.subject_id === wanted) || !rows.length)) return wanted;
+  private async subjectFor(t: TenantCtx, user: AuthedUser, classId: string, wanted?: string): Promise<string> {
+    const { rows } = await t.pool.query<{ subject_id: string }>('select distinct subject_id from timetable_slots where class_id = $1 and teacher_id = $2', [classId, user.id]);
+    // Someone who teaches nothing in the class names its subject only if they act on every class (an office or a principal).
+    if (wanted && (rows.some((r) => r.subject_id === wanted) || (!rows.length && user.permissions.includes('classes.all')))) return wanted;
     if (rows.length === 1) return rows[0]!.subject_id;
     if (wanted) throw new ApiError('validation', 'You do not teach that subject to this class.');
     throw new ApiError('validation', 'Choose the subject.', { fields: { subject: 'Choose the subject.' } });
@@ -531,7 +533,7 @@ export class FamilyService {
 
   async assignHomework(t: TenantCtx, user: AuthedUser, b: HomeworkInput) {
     if (!user.permissions.includes('homework.write')) throw forbidden('You are not allowed to set homework.');
-    const subjectId = await this.subjectFor(t, user.id, b.classId, b.subject ? (b.subject.startsWith('sub_') ? b.subject : `sub_${b.subject}`) : undefined);
+    const subjectId = await this.subjectFor(t, user, b.classId, b.subject ? (b.subject.startsWith('sub_') ? b.subject : `sub_${b.subject}`) : undefined);
     const d = await this.learning.createHomework(t, user, { classId: b.classId, subjectId, title: b.title, description: b.description ?? '', dueOn: b.dueOn.slice(0, 10), maxMarks: b.maxMarks ?? 20, graded: b.graded ?? true, draft: b.draft ?? false, fileIds: b.fileIds ?? [] });
     return { id: d.id };
   }
@@ -541,7 +543,7 @@ export class FamilyService {
     const own = (await t.pool.query<{ created_by: string | null }>('select created_by from homework where id = $1', [id])).rows[0];
     if (!own) throw notFound('That homework');
     if (own.created_by !== user.id && !user.permissions.includes('homework.read')) throw forbidden('You can change only the homework you set.');
-    const subjectId = await this.subjectFor(t, user.id, b.classId, b.subject ? (b.subject.startsWith('sub_') ? b.subject : `sub_${b.subject}`) : undefined);
+    const subjectId = await this.subjectFor(t, user, b.classId, b.subject ? (b.subject.startsWith('sub_') ? b.subject : `sub_${b.subject}`) : undefined);
     await this.learning.updateHomework(t, user, id, { classId: b.classId, subjectId, title: b.title, description: b.description ?? '', dueOn: b.dueOn.slice(0, 10), maxMarks: b.maxMarks ?? 20, graded: b.graded ?? true, draft: b.draft ?? false, fileIds: b.fileIds ?? [] });
     return { id };
   }
@@ -621,6 +623,7 @@ export class FamilyService {
 
   async saveMarks(t: TenantCtx, user: AuthedUser, classId: string, b: { subject: string; values: Record<string, number>; grades?: Record<string, string> }) {
     if (!user.permissions.includes('exams.write')) throw forbidden('You are not allowed to enter marks.');
+    await mayTeach(t, user, classId);
     const e = await this.openExam(t, classId, b.subject);
     if (!e) throw new ApiError('conflict', 'No exam is open for marks in this subject. Add one under Exams in the admin.');
     const subjectId = `sub_${b.subject}`;

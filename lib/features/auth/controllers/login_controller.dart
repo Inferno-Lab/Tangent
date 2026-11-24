@@ -19,6 +19,11 @@ class LoginController extends GetxController {
 
   /// Seconds before another code may be asked for (the school's answer).
   final resendIn = 30.obs;
+
+  /// The code comes from the person's authenticator app; with a key to add first when it is their first sign-in with one.
+  final fromApp = false.obs;
+  final setupKey = RxnString();
+  String? setupUri;
   /// True when the person asked for a code instead of typing a password (families have no password).
   var _codeOnly = false;
 
@@ -66,6 +71,9 @@ class LoginController extends GetxController {
       // The password was right. The school sent a code; the code screen takes over.
       otp.clear();
       useOtp.value = true;
+      fromApp.value = sent.fromApp;
+      setupKey.value = sent.setupKey;
+      setupUri = sent.setupUri;
       resendIn.value = sent.resendIn;
       resendIn.refresh();
       ToastHelper.show(sent.message, body: sent.sentTo);

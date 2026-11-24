@@ -4,6 +4,19 @@ import { ApiError } from './errors.js';
 export class Limiter {
   private readonly hits = new Map<string, number[]>();
   constructor(private readonly limit: number, private readonly windowMs: number) {}
+  /** Seconds until `key` may try again, without counting a try (0: it may). */
+  wait(key: string): number {
+    const now = Date.now();
+    const recent = (this.hits.get(key) ?? []).filter((t) => now - t < this.windowMs);
+    return recent.length >= this.limit ? Math.ceil((this.windowMs - (now - recent[0]!)) / 1000) : 0;
+  }
+
+  /** Counts one try for `key` (a wrong password, say) without refusing it. */
+  hit(key: string): void {
+    const now = Date.now();
+    this.hits.set(key, [...(this.hits.get(key) ?? []).filter((t) => now - t < this.windowMs), now]);
+  }
+
   check(key: string): void {
     const now = Date.now();
     const recent = (this.hits.get(key) ?? []).filter((t) => now - t < this.windowMs);

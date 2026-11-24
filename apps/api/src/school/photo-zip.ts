@@ -66,7 +66,7 @@ export class PhotoZipService implements OnModuleInit {
     await s.pool.query("update photo_imports set status = 'running' where id = $1", [imp.id]);
     const r = await this.hubs.hub.resolve('storage', s.id, s.slug);
     let entries: ReturnType<typeof zipEntries>;
-    try { entries = zipEntries(await r.adapter.storage!.get(r.ctx, f.storage_key)); } catch { return fail(tx('This is not a zip Tangent can read.')); }
+    try { entries = zipEntries(await r.adapter.storage!.get(r.ctx, f.storage_key), { entry: 15 * MB }); } catch { return fail(tx('This is not a zip Tangent can read.')); }
     // Photos and PDFs: folders, hidden files and the Mac's copies are left out. Each is inflated only when its turn comes.
     const photos = entries.filter((e) => e.size && !/(^|\/)(__MACOSX|\.)/.test(e.name) && /\.(jpe?g|png|webp|pdf)$/i.test(e.name));
     const students = new Map((await s.pool.query<{ id: string; admission_no: string }>("select id, admission_no from students where admission_no <> ''")).rows.map((x) => [norm(x.admission_no), x.id]));
@@ -79,7 +79,7 @@ export class PhotoZipService implements OnModuleInit {
       const name = entry.name;
       const base = name.split('/').pop()!.replace(/\.[^.]+$/, '');
       let data: Buffer;
-      try { data = entry.read(); } catch { unmatched.push(`${base} (${tx('not a photo')})`); if (++done % 20 === 0) await s.pool.query('update photo_imports set done = $2, matched = $3 where id = $1', [imp.id, done, matched]); continue; }
+      try { data = entry.read(); } catch { unmatched.push(`${base} (${entry.size > 15 * MB ? tx('over 15 MB') : tx('not a photo')})`); if (++done % 20 === 0) await s.pool.query('update photo_imports set done = $2, matched = $3 where id = $1', [imp.id, done, matched]); continue; }
       if (/\.pdf$/i.test(name)) {
         // The admission number is the name's first words; what follows names the document.
         const words = base.split(/[\s_]+/).filter(Boolean);

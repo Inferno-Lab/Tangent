@@ -5,9 +5,9 @@ import {
   type ExamCreate, type ExamMarksPut, type ExamMarksView, type ExamResults, type ExamRow, type HomeworkCreate, type HomeworkDetail, type HomeworkMarks, type HomeworkRow, tx } from '@tangent/contracts';
 import { ApiError, notFound } from '@tangent/nest-kit';
 import type { TenantCtx } from '../tenancy/tenant.js';
-import { AuditService, Messenger, SettingsService } from './support.js';
+import { AuditService, Messenger, SettingsService, mayTeach } from './support.js';
 
-type User = { id: string; name: string };
+type User = { id: string; name: string; permissions: readonly string[] };
 
 
 /** Homework and exams: setting them, recording hand-ins and marks, and turning marks into results. */
@@ -81,6 +81,7 @@ export class LearningService {
   }
 
   private async writeHomework(t: TenantCtx, user: User, id: string, body: HomeworkCreate, isNew: boolean, was = 'draft'): Promise<void> {
+    await mayTeach(t, user, body.classId);
     const [cls, sub] = await Promise.all([
       t.pool.query<{ name: string }>('select name from classes where id = $1', [body.classId]),
       t.pool.query<{ name: string }>('select name from subjects where id = $1', [body.subjectId]),
@@ -120,6 +121,7 @@ export class LearningService {
 
   /** Sends handed-in work back for a redo, saying why: the family hands it in again. */
   async returnHomework(t: TenantCtx, user: User, id: string, studentId: string, note: string): Promise<void> {
+    await this.mayTeachHomework(t, user, id);
     const r = await t.pool.query('update homework_submissions set returned_at = now(), return_note = $3, score = null, graded_at = null where homework_id = $1 and student_id = $2 and handed_at is not null', [id, studentId, note]);
     if (!r.rowCount) throw new ApiError('conflict', 'Only work that was handed in can be sent back.');
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'homework.returned', entity: 'homework', entityId: id, detail: { studentId, note } });
@@ -128,6 +130,7 @@ export class LearningService {
   async markHomework(t: TenantCtx, user: User, id: string, body: HomeworkMarks): Promise<HomeworkDetail> {
     const hw = (await t.pool.query<{ due_on: string; max_marks: number; class_id: string }>('select due_on::text, max_marks, class_id from homework where id = $1', [id])).rows[0];
     if (!hw) throw notFound('That homework');
+    await mayTeach(t, user, hw.class_id);
     for (const m of body.marks) {
       if (m.score != null && m.score > hw.max_marks) throw new ApiError('validation', tx('Marks cannot be more than {max_marks}.', { max_marks: hw.max_marks }), { fields: { score: tx('The most is {max_marks}.', { max_marks: hw.max_marks }) } });
     }
@@ -157,7 +160,15 @@ export class LearningService {
     return this.homeworkDetail(t, id);
   }
 
+  /** Homework is changed, graded or sent back only by someone who teaches its class (or acts on every class). */
+  private async mayTeachHomework(t: TenantCtx, user: User, id: string): Promise<void> {
+    const h = (await t.pool.query<{ class_id: string }>('select class_id from homework where id = $1', [id])).rows[0];
+    if (!h) throw notFound('That homework');
+    await mayTeach(t, user, h.class_id);
+  }
+
   async deleteHomework(t: TenantCtx, user: User, id: string): Promise<void> {
+    await this.mayTeachHomework(t, user, id);
     const r = await t.pool.query('delete from homework where id = $1', [id]);
     if (!r.rowCount) throw notFound('That homework');
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'homework.removed', entity: 'homework', entityId: id });
@@ -327,6 +338,7 @@ export class LearningService {
 
   async putMarks(t: TenantCtx, user: User, id: string, body: ExamMarksPut): Promise<ExamMarksView> {
     const exam = await this.exam(t, id);
+    await mayTeach(t, user, exam.classId);
     if (exam.status === 'published') throw new ApiError('locked', 'The results are out, so the marks are locked. Someone allowed to publish results can reopen them, saying why.');
     const max = new Map(exam.subjects.map((s) => [s.subjectId, s.maxMarks]));
     const students = new Set((await t.pool.query<{ id: string }>('select id from students where class_id = $1', [exam.classId])).rows.map((r) => r.id));
@@ -442,6 +454,7 @@ export class LearningService {
   /** Remarks on students' reports for this exam, written or picked from the school's (exams.remarks); empty removes one. */
   async putRemarks(t: TenantCtx, user: User, id: string, body: ExamRemarksPut): Promise<ExamMarksView> {
     const exam = await this.exam(t, id);
+    await mayTeach(t, user, exam.classId);
     if (exam.status === 'published') throw new ApiError('locked', tx('The results are out, so the remarks are locked. Reopen the results to change them.'));
     const students = new Set((await t.pool.query<{ id: string }>('select id from students where class_id = $1', [exam.classId])).rows.map((r) => r.id));
     if (body.remarks.some((r) => !students.has(r.studentId))) throw new ApiError('validation', 'One of those students is not in this class.');

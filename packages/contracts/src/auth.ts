@@ -14,11 +14,14 @@ export type LoginRequest = z.infer<typeof LoginRequest>;
 /** Step one succeeds with a challenge; the code goes to the user's phone or email (or the sandbox inbox on test). */
 export const LoginChallenge = z.object({
   challengeId: z.string(),
-  channel: z.enum(['sms', 'email']),
+  /** sms or email: a code was sent there; app: the code is in the person's authenticator app. */
+  channel: z.enum(['sms', 'email', 'app']),
   maskedTo: z.string(),
   expiresInSeconds: z.number().int(),
   /** When another code may be asked for: a short wait, longer once several were sent. */
   resendInSeconds: z.number().int().optional(),
+  /** Staff who run the school, at their first sign-in with an authenticator: add this key to the app, then type its code. */
+  enroll: z.object({ secret: z.string(), uri: z.string() }).optional(),
 });
 export type LoginChallenge = z.infer<typeof LoginChallenge>;
 

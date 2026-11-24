@@ -15,6 +15,13 @@ import { AuditService, Messenger, SettingsService } from './support.js';
 export const tempPassword = () => `${randomToken(6).replace(/[^a-zA-Z0-9]/g, 'k').slice(0, 8)}-${Math.floor(1000 + Math.random() * 9000)}`;
 
 type User = { id: string; name: string };
+/** The person acting, with what their role lets them do. */
+type Actor = User & { permissions: readonly string[] };
+
+/** Permissions in `perms` the actor does not hold: a person gives no more access than they have, and changes no one who has more. */
+const beyond = (actor: Actor, perms: readonly string[]) => perms.some((p) => !actor.permissions.includes(p));
+/** A permission that exists: an unknown name is refused by the role check with its own words, not counted as access. */
+const real = (p: string) => (PERMISSIONS as readonly string[]).includes(p);
 
 interface StaffSql {
   id: string; name: string; email: string | null; phone: string | null; status: string; designation: string; department: string | null; joined_on: string | null; max_periods: number; periods: string;
@@ -80,11 +87,12 @@ export class PeopleService {
     }));
   }
 
-  async createStaff(t: TenantCtx, user: User, body: StaffCreate): Promise<StaffRow> {
+  async createStaff(t: TenantCtx, user: Actor, body: StaffCreate): Promise<StaffRow> {
     // When only Tangent assigns roles, a new person starts with none (and sees nothing) until Tangent gives them one.
     const assigns = await this.schoolAssignsRoles(t);
-    const role = assigns ? (await t.pool.query<{ id: string; name: string }>('select id, name from roles where id = $1', [body.roleId])).rows[0] : { id: '', name: 'none yet' };
+    const role = assigns ? (await t.pool.query<{ id: string; name: string; permissions: string[] }>('select id, name, permissions from roles where id = $1', [body.roleId])).rows[0] : { id: '', name: 'none yet', permissions: [] };
     if (!role) throw new ApiError('validation', 'Choose a role from the list.', { fields: { roleId: 'Choose a role from the list.' } });
+    if (await this.above(t, user, role.permissions)) throw forbidden(tx('This role has more access than yours. Someone with at least as much access gives it.'));
     const staffLimit = t.info.entitlement.limits.staff;
     if (staffLimit && Number((await t.pool.query<{ n: string }>("select count(*) n from users where kind = 'staff' and status = 'active'")).rows[0]!.n) >= staffLimit) {
       throw new ApiError('locked', tx('Your plan allows {staffLimit} staff accounts. Ask Tangent to raise the limit.', { staffLimit }));
@@ -116,12 +124,22 @@ export class PeopleService {
     return (await this.staff(t, { id }))[0]!;
   }
 
-  async patchStaff(t: TenantCtx, user: User, id: string, body: StaffPatch): Promise<StaffRow> {
+  async patchStaff(t: TenantCtx, user: Actor, id: string, body: StaffPatch): Promise<StaffRow> {
     const me = id === user.id;
-    if (me && (body.roleId || body.status === 'inactive')) throw forbidden('You cannot change your own role or switch yourself off. Ask another administrator.');
-    const cur = (await t.pool.query<{ designation: string }>('select designation from staff where user_id = $1', [id])).rows[0];
+    if (me && (body.roleId || body.status === 'inactive' || body.resetAuthenticator)) throw forbidden('You cannot change your own role, authenticator or switch yourself off. Ask another administrator.');
+    const cur = (await t.pool.query<{ designation: string; email: string | null; phone: string | null; name: string }>(
+      'select s.designation, u.email, u.phone, u.name from staff s join users u on u.id = s.user_id where s.user_id = $1', [id])).rows[0];
     if (!cur) throw notFound('That person');
+    if (!me && (await this.above(t, user, await this.permsOf(t, id)))) throw forbidden(tx('This person has more access than you. Someone with at least as much access changes them.'));
     if (body.roleId && !(await this.schoolAssignsRoles(t))) throw forbidden('Tangent assigns roles at your school. Ask Tangent to change this person’s role.');
+    if (body.roleId) {
+      const r = (await t.pool.query<{ permissions: string[] }>('select permissions from roles where id = $1', [body.roleId])).rows[0];
+      if (!r) throw new ApiError('validation', 'Choose a role from the list.');
+      if (await this.above(t, user, r.permissions)) throw forbidden(tx('This role has more access than yours. Someone with at least as much access gives it.'));
+    }
+    // A new email or phone is how this person signs in from now on: they are signed out everywhere and told at the old one.
+    const email = body.email && body.email !== cur.email?.toLowerCase() ? body.email : null;
+    const phone = body.phone && this.settings.phone(t, body.phone) !== cur.phone ? this.settings.phone(t, body.phone) : null;
     const custom = body.custom ? await this.settings.custom(t, 'staff', body.custom, false) : null;
     await this.checkManager(t, id, body.managerId);
     const client = await t.pool.connect();
@@ -137,17 +155,15 @@ export class PeopleService {
           [id, body.designation ?? null, body.department !== undefined, body.department ?? null]);
       }
       if (custom) await client.query('update staff set custom = custom || $2::jsonb where user_id = $1', [id, JSON.stringify(custom)]);
-      if (body.status) {
-        await client.query('update users set status = $2 where id = $1', [id, body.status]);
-        if (body.status === 'inactive') await client.query('update sessions set revoked_at = now() where user_id = $1 and revoked_at is null', [id]);
-      }
+      if (body.status) await client.query('update users set status = $2 where id = $1', [id, body.status]);
+      // A lost phone: the person adds a new authenticator at their next sign-in.
+      if (body.resetAuthenticator) await client.query('update users set totp_secret = null, totp_last = null where id = $1', [id]);
+      if (body.status === 'inactive' || body.resetAuthenticator || (!me && (email || phone))) await client.query('update sessions set revoked_at = now() where user_id = $1 and revoked_at is null', [id]);
       if (body.subjectIds) {
         await client.query('delete from staff_subjects where user_id = $1', [id]);
         for (const s of body.subjectIds) await client.query('insert into staff_subjects (user_id, subject_id) select $1, id from subjects where id = $2', [id, s]);
       }
       if (body.roleId) {
-        const r = await client.query('select 1 from roles where id = $1', [body.roleId]);
-        if (!r.rowCount) throw new ApiError('validation', 'Choose a role from the list.');
         await client.query('delete from user_roles where user_id = $1', [id]);
         await client.query('insert into user_roles (user_id, role_id) values ($1,$2)', [id, body.roleId]);
       }
@@ -159,7 +175,12 @@ export class PeopleService {
     } finally {
       client.release();
     }
-    if (body.roleId || body.status === 'inactive') await this.auth.bumpVersion(t, id);
+    if (body.roleId || body.status === 'inactive' || body.resetAuthenticator || (!me && (email || phone))) await this.auth.bumpVersion(t, id);
+    if (!me && (email || phone)) {
+      const said = tx('The sign-in {what} of your Tangent account at {school} was changed by {by}. If you did not expect this, tell your school office.', { what: email ? 'email' : 'phone number', school: t.info.shortName, by: user.name });
+      if (email && cur.email) await this.messenger.send(t, { channel: 'email', to: cur.email, subject: tx('Your sign-in email was changed'), body: said }).catch(() => undefined);
+      if (phone && cur.phone) await this.messenger.send(t, { channel: 'sms', to: cur.phone, body: said }).catch(() => undefined);
+    }
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'staff.changed', entity: 'staff', entityId: id, detail: Object.fromEntries(Object.entries(body).map(([k, v]) => [k, Array.isArray(v) ? v.join(',') : String(v)])) });
     return (await this.staff(t, { id }))[0]!;
   }
@@ -180,16 +201,19 @@ export class PeopleService {
   }
 
   /** Staff from a sheet, through the one import engine; they are invited from the Staff page once they are in. */
-  async importStaff(t: TenantCtx, csv: string, user: User): Promise<ImportResult> {
+  async importStaff(t: TenantCtx, csv: string, user: Actor): Promise<ImportResult> {
     const input = { kind: 'staff', csv, fileName: 'Staff page' };
-    const p = await previewImport(t.pool, input);
+    // What the plan does not include sleeps in roles unseen: it is counted as held, so it neither blocks nor grants anything.
+    const cfg = await this.settings.effective(t);
+    const by = { grants: [...user.permissions, ...PERMISSIONS.filter((p) => !permissionAvailable(p, cfg))] };
+    const p = await previewImport(t.pool, input, by);
     if (p.missing.length) throw new ApiError('validation', tx('The first row must name the columns. Nothing is matched to {p0}.', { p0: p.missing.join(', ') }));
     const limit = t.info.entitlement.limits.staff;
     const count = Number((await t.pool.query<{ n: string }>("select count(*) n from users where kind = 'staff' and status = 'active'")).rows[0]!.n);
     if (limit && count + p.counts.create > limit) throw new ApiError('locked', tx('Your plan allows {limit} staff accounts and this sheet would make {p1}. Ask Tangent to raise the limit.', { limit, p1: count + p.counts.create }));
     const errors = p.rows.filter((r) => r.errors.length).map((r) => ({ line: r.line, message: r.errors.join(' ') }));
     if (p.counts.create + p.counts.update === 0) return { created: 0, updated: 0, skipped: p.counts.skip, errors };
-    const batch = await commitImport(t.pool, input, user.name);
+    const batch = await commitImport(t.pool, input, user.name, by);
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'staff.imported', entity: 'staff', detail: { created: batch.created, updated: batch.updated, skipped: batch.skipped } });
     return { created: batch.created, updated: batch.updated, skipped: p.counts.skip, errors };
   }
@@ -338,16 +362,38 @@ export class PeopleService {
     if ((await this.settings.value<boolean>(t, 'roles.schoolEdits', true)) === false) throw forbidden('Tangent holds the school’s roles. Ask Tangent to change them.');
   }
 
+  /** Whether `perms` reach past what the actor holds, counting only what the school's plan includes (the rest sleeps unseen). */
+  private async above(t: TenantCtx, user: Actor, perms: readonly string[]): Promise<boolean> {
+    const cfg = await this.settings.effective(t);
+    return beyond(user, perms.filter((p) => real(p) && permissionAvailable(p, cfg)));
+  }
+
+  /** Everything a person's roles let them do. */
+  private async permsOf(t: TenantCtx, userId: string): Promise<string[]> {
+    return (await t.pool.query<{ p: string }>('select distinct jsonb_array_elements_text(r.permissions) p from user_roles ur join roles r on r.id = ur.role_id where ur.user_id = $1', [userId])).rows.map((r) => r.p);
+  }
+
+  /** A role is made, changed or removed only by someone holding everything it has, before and after. */
+  private async mayChangeRole(t: TenantCtx, user: Actor, id: string | null, next: readonly string[], inPlan: (p: string) => boolean = () => true): Promise<void> {
+    const now = id ? (await t.pool.query<{ permissions: string[] }>('select permissions from roles where id = $1', [id])).rows[0]?.permissions ?? [] : [];
+    // What the school's plan does not include sleeps in a role unseen; it is neither given nor taken here.
+    if (beyond(user, [...now, ...next].filter(inPlan))) throw forbidden(tx('This role has more access than yours. Someone with at least as much access changes it.'));
+  }
+
   /** A role the school makes or changes: only permissions its plan includes (a module or feature it has). */
-  async saveRole(t: TenantCtx, user: User, id: string | null, body: RoleDefSave): Promise<RoleRow[]> {
+  async saveRole(t: TenantCtx, user: Actor, id: string | null, body: RoleDefSave): Promise<RoleRow[]> {
     await this.mayEditRoles(t);
     const cfg = await this.settings.effective(t);
+    // Permissions outside the plan are refused by the role check below, with its own words.
+    await this.mayChangeRole(t, user, id, body.permissions, (p) => real(p) && permissionAvailable(p, cfg));
     await roleCall(() => saveRole(t.pool, { id: user.id, name: user.name }, id, body, (p) => permissionAvailable(p, cfg)));
     return this.roles(t);
   }
 
-  async deleteRole(t: TenantCtx, user: User, id: string): Promise<RoleRow[]> {
+  async deleteRole(t: TenantCtx, user: Actor, id: string): Promise<RoleRow[]> {
     await this.mayEditRoles(t);
+    const cfg = await this.settings.effective(t);
+    await this.mayChangeRole(t, user, id, [], (p) => real(p) && permissionAvailable(p, cfg));
     await roleCall(() => deleteRole(t.pool, { id: user.id, name: user.name }, id));
     return this.roles(t);
   }

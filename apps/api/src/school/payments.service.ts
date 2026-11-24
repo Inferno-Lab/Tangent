@@ -139,26 +139,45 @@ export class PaymentsService implements OnModuleInit {
 
   /** Asks for a refund on an online payment. Above the school's limit it waits for a second person with the same permission. */
   async requestRefund(t: TenantCtx, user: AuthedUser, paymentId: string, amount: number, reason: string): Promise<RefundRow> {
-    const p = (await t.pool.query<{ amount: number; refunded: number; provider_payment_id: string | null }>('select amount, refunded, provider_payment_id from payments where id = $1', [paymentId])).rows[0];
-    if (!p) throw notFound('That payment');
-    if (!p.provider_payment_id) throw new ApiError('validation', 'Only payments made online can be refunded here. Cash and cheques are returned at the desk.');
-    const pending = Number((await t.pool.query<{ n: string }>("select coalesce(sum(amount), 0) n from refunds where payment_id = $1 and status in ('requested','sent')", [paymentId])).rows[0]!.n);
-    if (amount > p.amount - p.refunded - pending) throw new ApiError('validation', tx('At most {p0} can be refunded on this payment.', { p0: fmtMoney(p.amount - p.refunded - pending) }), { fields: { amount: 'That is more than can be refunded.' } });
     const id = newId('rfd');
-    await t.pool.query('insert into refunds (id, payment_id, amount, reason, requested_by) values ($1,$2,$3,$4,$5)', [id, paymentId, amount, reason, user.id]);
+    const client = await t.pool.connect();
+    try {
+      await client.query('begin');
+      // The payment is locked while what is left on it is counted, so two refunds asked for at once cannot both take the same money.
+      const p = (await client.query<{ amount: number; refunded: number; provider_payment_id: string | null }>('select amount, refunded, provider_payment_id from payments where id = $1 for update', [paymentId])).rows[0];
+      if (!p) throw notFound('That payment');
+      if (!p.provider_payment_id) throw new ApiError('validation', 'Only payments made online can be refunded here. Cash and cheques are returned at the desk.');
+      // Waiting for approval: a refund sent is already in `refunded`.
+      const pending = Number((await client.query<{ n: string }>("select coalesce(sum(amount), 0) n from refunds where payment_id = $1 and status = 'requested'", [paymentId])).rows[0]!.n);
+      const left = p.amount - p.refunded - pending;
+      if (amount > left) throw new ApiError('validation', tx('At most {p0} can be refunded on this payment.', { p0: fmtMoney(Math.max(0, left)) }), { fields: { amount: 'That is more than can be refunded.' } });
+      await client.query('insert into refunds (id, payment_id, amount, reason, requested_by) values ($1,$2,$3,$4,$5)', [id, paymentId, amount, reason, user.id]);
+      await client.query('commit');
+    } catch (err) {
+      await client.query('rollback').catch(() => undefined);
+      throw err;
+    } finally {
+      client.release();
+    }
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'refund.requested', entity: 'payment', entityId: paymentId, detail: { amount } });
     const limit = await this.settings.value<number>(t, 'fees.refundApprovalAbove', 5000);
-    if (amount <= limit) await this.send(t, user, id);
+    if (amount <= limit && (await this.claim(t, user, id))) await this.send(t, user, id);
     return (await this.refunds(t)).find((r) => r.id === id)!;
+  }
+
+  /** Takes a waiting refund for one decision, once: two approvals at once (two people, or a double click) send it once. */
+  // ponytail: a server that dies between the claim and the provider leaves the refund claimed; it is then handled by hand.
+  private async claim(t: TenantCtx, user: AuthedUser, id: string): Promise<boolean> {
+    return !!(await t.pool.query("update refunds set approved_by = $2 where id = $1 and status = 'requested' and approved_by is null", [id, user.id])).rowCount;
   }
 
   async decideRefund(t: TenantCtx, user: AuthedUser, id: string, yes: boolean, note = ''): Promise<RefundRow> {
     const r = (await t.pool.query<{ status: string; requested_by: string | null }>('select status, requested_by from refunds where id = $1', [id])).rows[0];
     if (!r) throw notFound('That refund');
-    if (r.status !== 'requested') throw new ApiError('conflict', 'This refund is not waiting for approval.');
     if (r.requested_by === user.id) throw forbidden('A second person has to approve this refund.');
+    if (r.status !== 'requested' || !(await this.claim(t, user, id))) throw new ApiError('conflict', 'This refund is not waiting for approval.');
     if (!yes) {
-      await t.pool.query("update refunds set status = 'rejected', approved_by = $2, done_at = now(), decision_note = $3 where id = $1", [id, user.id, note]);
+      await t.pool.query("update refunds set status = 'rejected', done_at = now(), decision_note = $2 where id = $1", [id, note]);
       await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'refund.rejected', entity: 'refund', entityId: id });
     } else {
       await this.send(t, user, id);

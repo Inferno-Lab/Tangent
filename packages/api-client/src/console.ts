@@ -59,6 +59,7 @@ export function consoleApi(h: Http) {
       saveRole: (schoolId: string, roleId: string, b: RoleDefSave) => h.put<RoleDef[]>(`${base}/schools/${schoolId}/roles/${roleId}`, b),
       deleteRole: (schoolId: string, roleId: string) => h.del<RoleDef[]>(`${base}/schools/${schoolId}/roles/${roleId}`),
       setStaffRole: (schoolId: string, userId: string, roleId: string) => h.put<void>(`${base}/schools/${schoolId}/staff/${userId}/role`, { roleId }),
+      resetStaffAuthenticator: (schoolId: string, userId: string) => h.post<void>(`${base}/schools/${schoolId}/staff/${userId}/authenticator/reset`, {}),
       templates: () => h.get<ConfigTemplateRow[]>(`${base}/config-templates`),
       saveTemplate: (schoolId: string, name: string) => h.post<ConfigTemplateRow[]>(`${base}/config-templates`, { schoolId, name }),
       applyTemplate: (templateId: string, schoolIds: string[]) => h.post<{ applied: number }>(`${base}/config-templates/${templateId}/apply`, { schoolIds }),

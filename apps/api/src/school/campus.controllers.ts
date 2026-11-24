@@ -301,10 +301,15 @@ export class FamilyCampusController {
     @Inject(ENV) private readonly env: Env,
   ) {}
 
-  /** The children a parent may see; null for staff (who see what their permissions allow). */
-  private async kids(t: TenantCtx, u: AuthedUser): Promise<string[] | null> {
+  /**
+   * The children a parent may see; null for staff, who see every child's only with the permission the admin asks for the same
+   * thing (`need`): a teacher without fees.read gets no family's receipts here either.
+   */
+  private async kids(t: TenantCtx, u: AuthedUser, need?: string): Promise<string[] | null> {
     const w = await this.f.who(t, u);
-    return w.kind === 'staff' ? null : w.children;
+    if (w.kind !== 'staff') return w.children;
+    if (need && !u.permissions.includes(need)) throw forbidden('You do not have access to this. Ask your principal to change your role.');
+    return null;
   }
 
   private async mine(t: TenantCtx, u: AuthedUser, studentId: string): Promise<void> {
@@ -332,7 +337,7 @@ export class FamilyCampusController {
 
   @Get('orders/:id') @RequireModule('fees.onlinePayment')
   async orderStatus(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string) {
-    return this.payments.orderStatus(t, id, await this.kids(t, u));
+    return this.payments.orderStatus(t, id, await this.kids(t, u, 'fees.read'));
   }
 
   /**
@@ -340,7 +345,7 @@ export class FamilyCampusController {
    * person may read here: checked now as reading it in the app would be, for the same children, in the reader's language.
    */
   private async link(t: TenantCtx, u: AuthedUser, lang: string | string[] | undefined, d: { kind: 'receipt' | 'report'; id: string; exam?: string }): Promise<{ url: string }> {
-    const kids = await this.kids(t, u);
+    const kids = await this.kids(t, u, d.kind === 'receipt' ? 'fees.read' : 'exams.read');
     if (d.kind === 'receipt') await this.docs.receipt(t, d.id, kids);
     else await this.docs.reportCard(t, d.exam!, d.id, kids ?? [d.id]);
     const token = signLink(this.env.SECRETS_KEY, { p: 'doc', slug: t.info.slug, ...d, kids, lang: requestLanguage(lang) } satisfies DocLink, 600);
@@ -378,12 +383,12 @@ export class FamilyCampusController {
 
   @Get('receipts/:id/pdf') @RequireModule('fees')
   async receipt(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Res() reply: FastifyReply): Promise<void> {
-    sendPdf(reply, await this.docs.receipt(t, id, await this.kids(t, u)));
+    sendPdf(reply, await this.docs.receipt(t, id, await this.kids(t, u, 'fees.read')));
   }
 
   @Get('results/:examId/:studentId/pdf') @RequireModule('exams.resultsInApp')
   async reportCard(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('examId') e: string, @Param('studentId') s: string, @Res() reply: FastifyReply): Promise<void> {
-    sendPdf(reply, await this.docs.reportCard(t, e, s, (await this.kids(t, u)) ?? [s]));
+    sendPdf(reply, await this.docs.reportCard(t, e, s, (await this.kids(t, u, 'exams.read')) ?? [s]));
   }
 
   @Get('library/catalogue') @RequireModule('library')
@@ -408,7 +413,7 @@ export class FamilyCampusController {
 
   @Delete('library/reservations/:id') @RequireModule('library.reservations') @HttpCode(204)
   async unreserve(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string): Promise<void> {
-    return this.lib.cancelReservation(t, id, await this.kids(t, u));
+    return this.lib.cancelReservation(t, id, await this.kids(t, u, 'library.write'));
   }
 
   @Get('students/:id/bus') @RequireModule('transport')
@@ -439,8 +444,11 @@ export class FamilyCampusController {
   @Get('albums') @RequireModule('gallery')
   async albums(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser): Promise<AlbumRow[]> {
     const k = await this.kids(t, u);
-    if (k === null) return this.g.albums(t);
-    const classes = (await t.pool.query<{ class_id: string }>('select distinct class_id from students where id = any($1)', [k])).rows.map((r) => r.class_id);
+    if (k === null && u.permissions.includes('gallery.read')) return this.g.albums(t);
+    // A family sees its children's classes' published albums; staff who do not manage the gallery, the classes they teach.
+    const classes = k === null
+      ? (await t.pool.query<{ id: string }>('select id from classes where class_teacher_id = $1 union select class_id from timetable_slots where teacher_id = $1 or cover_teacher_id = $1', [u.id])).rows.map((r) => r.id)
+      : (await t.pool.query<{ class_id: string }>('select distinct class_id from students where id = any($1)', [k])).rows.map((r) => r.class_id);
     return this.g.albums(t, classes);
   }
 
@@ -454,7 +462,7 @@ export class FamilyCampusController {
   async photos(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string): Promise<PhotoRow[]> {
     const albums = await this.albums(t, u);
     if (!albums.some((a) => a.id === id)) throw forbidden('That album is not shared with you.');
-    return this.g.photos(t, id, (await this.kids(t, u)) !== null);
+    return this.g.photos(t, id, (await this.kids(t, u)) !== null || !u.permissions.includes('gallery.read'));
   }
 }
 

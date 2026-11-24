@@ -165,7 +165,7 @@ export const MODULES: ModuleManifest[] = localized([
     ],
     app: [A('dock', 'academics', 'Academics', FAMILY), A('dock', 'classes', 'My classes', ['teacher'])],
     settings: ['vocab.words', 'people.nameOrder', 'people.admissionNumber', 'people.admissionStart', 'people.houses', 'students.required', 'lists.genders', 'lists.relationships', 'lists.bloodGroups', 'fields.custom', 'people.addressFormat', 'letters.family', 'letters.student', 'admissions.sources', 'admissions.stages', 'admissions.onlineForm'],
-    permissions: ['students.read', 'students.write', 'staff.read', 'staff.write', 'admissions.read', 'admissions.write'],
+    permissions: ['students.read', 'students.write', 'staff.read', 'staff.write', 'classes.all', 'admissions.read', 'admissions.write'],
     messages: ['admissions.offer', 'admissions.stage', 'admissions.received', 'family.invite', 'student.invite', 'staff.invite', 'office.message'],
     imports: ['staff', 'students', 'contacts', 'admissions'],
     approvals: ['admission', 'photo'],

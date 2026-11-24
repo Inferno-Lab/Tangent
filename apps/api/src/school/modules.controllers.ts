@@ -8,7 +8,7 @@ import {
 } from '@tangent/contracts';
 import { z } from 'zod';
 import { ZodPipe } from '@tangent/nest-kit';
-import { ownKind, templateXlsx } from '@tangent/db';
+import { ownKind, templateXlsx, toCsv } from '@tangent/db';
 import { Core, CurrentUser, Public, Require, RequireModule } from '../auth/guards.js';
 import { Tenant, type AuthedUser, type TenantCtx } from '../tenancy/tenant.js';
 import { LearningService } from './learning.service.js';
@@ -223,8 +223,8 @@ export class OfficeController {
       rows.push(...r.items);
       if (rows.length >= r.total || !r.items.length) break;
     }
-    const c = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
-    return ['student,class,head,fee,amount,waived,paid,outstanding,due_on,status', ...rows.map((r) => [r.studentName, r.className, r.head, r.title, r.amount, r.waived, r.paid, r.outstanding, r.dueOn, r.status].map(c).join(','))].join('\n');
+    return toCsv([['student', 'class', 'head', 'fee', 'amount', 'waived', 'paid', 'outstanding', 'due_on', 'status'],
+      ...rows.map((r) => [r.studentName, r.className, r.head, r.title, r.amount, r.waived, r.paid, r.outstanding, r.dueOn, r.status].map(String))]);
   }
 
   @Get('fees/receipts') @RequireModule('fees') @Require('fees.read')

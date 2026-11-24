@@ -53,7 +53,9 @@ export class AuthGuard implements CanActivate {
     if (!claims.support && req.tenant) {
       await this.auth.assertSession(req.tenant, claims.sid, claims.ver, claims.sub);
     }
-    req.user = { id: claims.sub, sid: claims.sid, name: claims.name, permissions: claims.perms };
+    // A support session ends when Tangent ends it in the console, not only when its token runs out.
+    if (claims.support) await this.auth.assertSupport(claims.sid);
+    req.user = { id: claims.sub, sid: claims.sid, name: claims.name, permissions: claims.perms, exp: claims.exp };
     return true;
   }
 }

@@ -29,7 +29,8 @@ describe('console sign-in', () => {
     expect(bad.status).toBe(401);
     const nobody = await h.c('POST', '/console/v1/auth/login', { body: { identifier: 'nobody@tangent.app', password: 'x' } });
     expect(nobody.status).toBe(401);
-    expect(nobody.json.fields.identifier).toBeDefined();
+    expect(nobody.json.message).toBe(bad.json.message);
+    expect(nobody.json.fields).toEqual(bad.json.fields);
   });
   it('needs a token, and only super admins can reach the team', async () => {
     expect((await h.c('GET', '/console/v1/fleet')).status).toBe(401);
@@ -110,8 +111,10 @@ describe('the new-school wizard', () => {
     const login = await h.s('POST', '/v1/auth/login', { school: 'freshschool', body: { identifier: 'asha@freshschool.test', password } });
     expect(login.status).toBe(200);
     expect(login.json.challenge.demoCode).toBeUndefined();
-    const code = (await h.c('GET', '/console/v1/sandbox?school=freshschool', { token: t })).json.find((m: any) => m.channel === 'sms' && /sign-in code/.test(m.body));
-    const verified = await h.s('POST', '/v1/auth/verify', { school: 'freshschool', body: { challengeId: login.json.challenge.challengeId, code: /code for \S+ is (\d{6})/.exec(code.body)![1] } });
+    // The new school's principal runs it, so the second step is an authenticator they add now.
+    expect(login.json.challenge).toMatchObject({ channel: 'app', enroll: { secret: expect.any(String) } });
+    const code = await h.secondStep('freshschool|asha', login.json.challenge, async () => '');
+    const verified = await h.s('POST', '/v1/auth/verify', { school: 'freshschool', body: { challengeId: login.json.challenge.challengeId, code } });
     expect(verified.status).toBe(200);
     const dash = await h.s('GET', '/v1/dashboard', { school: 'freshschool', token: verified.json.accessToken });
     expect(dash.status).toBe(200);

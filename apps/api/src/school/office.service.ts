@@ -233,8 +233,7 @@ export class OfficeService {
   }
 
   csv(r: ReportData): string {
-    const cell = (v: string | number) => (/[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
-    return [r.columns.map((c) => cell(c.label)).join(','), ...r.rows.map((row) => r.columns.map((c) => cell(row[c.key] ?? '')).join(','))].join('\n');
+    return toCsv([r.columns.map((c) => c.label), ...r.rows.map((row) => r.columns.map((c) => String(row[c.key] ?? '')))]);
   }
 
   // Messages
@@ -396,7 +395,7 @@ export class OfficeService {
       if (!res.rows.length) continue;
       const cols = Object.keys(res.rows[0]);
       const cell = (v: unknown) => (v === null || v === undefined ? '' : v instanceof Date ? v.toISOString() : typeof v === 'object' ? JSON.stringify(v) : String(v));
-      files.push({ name: `${name}.csv`, content: `\uFEFF${toCsv([cols, ...res.rows.map((row) => cols.map((c) => cell(row[c])))])}` });
+      files.push({ name: `${name}.csv`, content: `${toCsv([cols, ...res.rows.map((row) => cols.map((c) => cell(row[c])))])}` });
     }
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'privacy.exported', entity: 'data_request', entityId: id, detail: { files: files.length } });
     return { name: `${r.subject_name || 'data'} - ${schoolToday()}.zip`.replace(/[^\w ,.-]+/g, ' '), zip: zip(files.length ? files : [{ name: 'nothing.txt', content: tx('The school keeps nothing else about this person.') }]) };

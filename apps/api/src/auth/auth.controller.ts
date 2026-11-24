@@ -27,7 +27,7 @@ export class AuthController {
     @Res({ passthrough: true }) reply: FastifyReply,
   ): Promise<LoginResponse> {
     loginLimit.check(`${t.info.slug}|${req.ip}`);
-    return this.auth.login(t, body, req.headers['user-agent'], reply);
+    return this.auth.login(t, body, req.headers['user-agent'], reply, req.ip);
   }
 
   @Public() @Post('verify') @HttpCode(200)

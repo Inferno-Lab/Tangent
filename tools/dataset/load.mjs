@@ -7,7 +7,7 @@
 // Usage: node tools/dataset/load.mjs [--today 2026-11-20]   (API, BOOTSTRAP_EMAIL, BOOTSTRAP_PASSWORD, DEMO_CODE, TEST_PASSWORD from the env)
 import { generateSchool } from './school.mjs';
 import { asUpload } from './build.mjs';
-import { API, STAFF_PASSWORD, call, codeIn, consoleSignIn, newMessage, saveManifest, setPassword } from './session.mjs';
+import { API, STAFF_PASSWORD, authenticatorCode, call, codeIn, consoleSignIn, fromApp, newMessage, saveManifest, setPassword } from './session.mjs';
 
 const arg = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : fallback; };
 const today = arg('today', undefined);
@@ -71,7 +71,9 @@ for (const f of files.filter((x) => x.kind)) {
 const temporary = /temporary password (\S+?)\.?\s/.exec(`${welcome.body} `)[1];
 const { message: codeMsg, result: challenge } = await newMessage(s.slug, [principal.email, principal.phone], /sign-in code/, () =>
   call('/v1/auth/login', { body: { identifier: principal.email, password: temporary }, school: s.slug }));
-const { accessToken: pt } = await call('/v1/auth/verify', { body: { challengeId: challenge.challenge.challengeId, code: codeIn(codeMsg) }, school: s.slug });
+// The principal runs the school, so their first sign-in adds an authenticator (its key is kept in .tangent-data).
+const principalCode = fromApp(challenge) ? await authenticatorCode(`${API}|${s.slug}|${principal.email}`, challenge.challenge) : codeIn(codeMsg);
+const { accessToken: pt } = await call('/v1/auth/verify', { body: { challengeId: challenge.challenge.challengeId, code: principalCode }, school: s.slug });
 for (const f of files.filter((x) => x.upload)) {
   const bytes = Buffer.from(f.content);
   const { fileId, upload } = await call('/v1/files', { body: { kind: 'photo_zip', ownerId: 'school', name: f.name, mime: 'application/zip', bytes: bytes.length }, token: pt, school: s.slug });

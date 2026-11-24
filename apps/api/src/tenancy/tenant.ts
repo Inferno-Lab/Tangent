@@ -16,6 +16,8 @@ export interface AuthedUser {
   sid: string;
   name: string;
   permissions: string[];
+  /** When the access token ends (seconds since 1970): a live stream opened with it ends then too. */
+  exp?: number;
 }
 
 declare module 'fastify' {

@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, createHmac, hkdfSync, randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 
 const scrypt = promisify(scryptCb) as (pw: string, salt: Buffer, len: number, opts: { N: number; r: number; p: number; maxmem: number }) => Promise<Buffer>;
@@ -79,6 +79,33 @@ export function unseal(sealed: string, secret: string): string {
   const d = createDecipheriv('aes-256-gcm', keyFrom(secret), Buffer.from(iv, 'base64url'));
   d.setAuthTag(Buffer.from(tag, 'base64url'));
   return Buffer.concat([d.update(Buffer.from(data, 'base64url')), d.final()]).toString('utf8');
+}
+
+/** A key of its own for one purpose, from a secret kept for another (HKDF): signing links never uses the key that seals secrets. */
+export function deriveKey(secret: string, purpose: string): Buffer {
+  return Buffer.from(hkdfSync('sha256', secret, '', `tangent:${purpose}`, 32));
+}
+
+const SEALED = Buffer.from('TGS1');
+
+/** AES-256-GCM over bytes too large for a string (a school's backup): `TGS1`, the nonce, the tag, then the data. */
+export function sealBytes(plain: Buffer, key: Buffer): Buffer {
+  const iv = randomBytes(12);
+  const c = createCipheriv('aes-256-gcm', key, iv);
+  const data = Buffer.concat([c.update(plain), c.final()]);
+  return Buffer.concat([SEALED, iv, c.getAuthTag(), data]);
+}
+
+/** Whether bytes were sealed by `sealBytes` (older backups were kept as they were). */
+export function isSealedBytes(b: Buffer): boolean {
+  return b.length > 32 && b.subarray(0, 4).equals(SEALED);
+}
+
+/** Opens bytes sealed by `sealBytes`; throws if they were changed or the key is not the one they were sealed with. */
+export function unsealBytes(b: Buffer, key: Buffer): Buffer {
+  const d = createDecipheriv('aes-256-gcm', key, b.subarray(4, 16));
+  d.setAuthTag(b.subarray(16, 32));
+  return Buffer.concat([d.update(b.subarray(32)), d.final()]);
 }
 
 const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');

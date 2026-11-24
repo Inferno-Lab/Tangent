@@ -12,9 +12,11 @@ import 'package:tangent/core/theme/tokens.dart';
 import 'package:tangent/core/utils/extensions.dart';
 import 'package:tangent/core/utils/validators.dart';
 import 'package:tangent/core/widgets/glass.dart';
+import 'package:tangent/core/widgets/toast.dart';
 import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/features/auth/controllers/login_controller.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LoginView extends GetView<LoginController> {
   const LoginView({super.key});
@@ -294,6 +296,8 @@ class _OtpScreenState extends State<_OtpScreen> {
     final c = context.app;
     final inset = MediaQuery.paddingOf(context);
     final code = widget.controller.otp.text;
+    final app = widget.controller.fromApp.value;
+    final setup = widget.controller.setupKey.value;
     void back() => widget.controller.useOtp.value = false;
     return PopScope(
       canPop: false,
@@ -325,9 +329,13 @@ class _OtpScreenState extends State<_OtpScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('auth.enter_code'.tr, style: context.type.h1),
+                      Text((app ? 'auth.app_code_title' : 'auth.enter_code').tr, style: context.type.h1),
                       const SizedBox(height: 8),
-                      Text('auth.code_sent'.tr, style: context.type.b.copyWith(color: c.ink2)),
+                      Text((setup != null ? 'auth.app_setup_body' : app ? 'auth.app_code_body' : 'auth.code_sent').tr, style: context.type.b.copyWith(color: c.ink2)),
+                      if (setup != null) ...[
+                        const SizedBox(height: 16),
+                        _SetupKey(secret: setup, uri: widget.controller.setupUri),
+                      ],
                       const SizedBox(height: 24),
                       Pressable(
                         onTap: _focus.requestFocus,
@@ -367,7 +375,8 @@ class _OtpScreenState extends State<_OtpScreen> {
                       const SizedBox(height: 16),
                       Row(
                         children: [
-                          Expanded(
+                          // An authenticator makes its own codes: there is nothing to send again.
+                          if (app) const Spacer() else Expanded(
                             child: _left > 0
                                 ? Text.rich(
                                     TextSpan(
@@ -481,4 +490,45 @@ class _CaretState extends State<_Caret> with SingleTickerProviderStateMixin {
       child: Container(width: 2, height: 28, color: context.app.ink),
     ),
   );
+}
+
+/// The key a first sign-in adds to the authenticator app: copied to type in, or added in one tap on this phone.
+class _SetupKey extends StatelessWidget {
+  const _SetupKey({required this.secret, required this.uri});
+
+  final String secret;
+  final String? uri;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.app;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: c.paper2, borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('auth.app_setup_key'.tr, style: AppText.capB(color: c.ink2)),
+          const SizedBox(height: 4),
+          SelectableText(secret, style: context.type.mono),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              Btn('auth.app_setup_copy', small: true, kind: BtnKind.quiet, onPressed: () {
+                unawaited(Clipboard.setData(ClipboardData(text: secret)));
+                ToastHelper.show('auth.app_setup_copied');
+              }),
+              if (uri != null)
+                Btn('auth.app_setup_open', small: true, onPressed: () async {
+                  final ok = await launchUrl(Uri.parse(uri!), mode: LaunchMode.externalApplication).catchError((Object _) => false);
+                  if (!ok) ToastHelper.show('auth.app_setup_no_app', kind: ToastKind.error);
+                }),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }

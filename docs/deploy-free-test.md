@@ -25,7 +25,7 @@ The repository already exists at `Inferno-Lab/Tangent`. Render builds from `main
 2. **New +** → **Blueprint** → pick `Tangent` → branch `main` → **Connect**.
 3. Render reads `render.yaml` and shows one service, `tangent`. It asks for three values:
    - `REGISTRY_DATABASE_URL`: paste the Neon string.
-   - `DEMO_CODE`: six digits you choose, for example `482915`. The console asks for it after your password.
+   - Nothing for the console's second step: at your first sign-in it shows a key to add to an authenticator app (Google or Microsoft Authenticator), and asks for the app's code from then on.
 4. Press **Apply**. The first build takes 6 to 10 minutes.
 5. When the service says **Live**, open `https://<your-service>.onrender.com`.
 
@@ -35,7 +35,7 @@ If `tangent` is already taken as a name, Render proposes another one. That is fi
 
 | Where | Address | Sign in with |
 | --- | --- | --- |
-| Console | `https://<service>.onrender.com/console/` | `kaushal@tangent.app`, the password from Render → your service → **Environment** → `BOOTSTRAP_PASSWORD`, then your `DEMO_CODE` |
+| Console | `https://<service>.onrender.com/console/` | `kaushal@tangent.app`, the password from Render → your service → **Environment** → `BOOTSTRAP_PASSWORD`, then the code from your authenticator app |
 | Test school admin | `https://<service>.onrender.com/s/sunrise-valley` | `principal@sunrisevalley.example` and your `TEST_PASSWORD`, then the code from the console's Test inbox |
 | Phone app (a build for `sunrise-valley`) | the app | a parent's phone (in `.tangent-data/manifest.json` after the load), then the code from the Test inbox |
 
@@ -43,7 +43,8 @@ The service starts with no school. Move the test school in from your computer, t
 (`docs/test-school.md`); it takes a few minutes:
 
 ```bash
-API=https://<service>.onrender.com BOOTSTRAP_PASSWORD=<from Render> DEMO_CODE=<yours> TEST_PASSWORD=<one you choose> node tools/dataset/load.mjs
+API=https://<service>.onrender.com BOOTSTRAP_PASSWORD=<from Render> CONSOLE_TOTP_SECRET=<the key your authenticator was given> TEST_PASSWORD=<one you choose> node tools/dataset/load.mjs
+# The test school's principal gets an authenticator as it moves in: its key is in .tangent-data/authenticators.json.
 ```
 
 Anyone with the address and the passwords can open the test school, so keep real data out of this environment.

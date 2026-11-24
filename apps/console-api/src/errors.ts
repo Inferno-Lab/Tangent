@@ -6,6 +6,8 @@ import type { FastifyRequest } from 'fastify';
 import { Db, Me, Needs, Public, type ConsoleUser } from './core.js';
 
 const limit = new Limiter(process.env.NODE_ENV === 'test' ? 10_000 : 60, 60_000);
+// However many addresses send them: a flood of made-up reports stops here.
+const everyone = new Limiter(process.env.NODE_ENV === 'test' ? 10_000 : 300, 60_000);
 
 @Injectable()
 export class ErrorBook implements OnModuleInit {
@@ -46,6 +48,7 @@ export class ErrorsController {
   @Public() @Post() @HttpCode(204)
   async report(@Body(new ZodPipe(ClientError)) body: ClientError, @Req() req: FastifyRequest): Promise<void> {
     limit.check(req.ip);
+    everyone.check('all');
     await recordError(this.db.pool, body);
   }
 }

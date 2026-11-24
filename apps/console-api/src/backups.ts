@@ -2,6 +2,7 @@ import { Controller, Get, HttpCode, Inject, Injectable, Param, Post, type OnModu
 import type { BackupRow, RestoreDrillRow } from '@tangent/contracts';
 import { backupDatabase, backupMigrations, bringForward, loadMigrations, migrate, newId, pg, restoreDatabase, scheduleJob } from '@tangent/db';
 import { ApiError, alert, notFound } from '@tangent/nest-kit';
+import { deriveKey, isSealedBytes, sealBytes, unsealBytes } from '@tangent/security';
 import { Db, Me, Needs, type ConsoleUser } from './core.js';
 import { ENV, type Env } from './env.js';
 import { withSchoolDb } from './school-db.js';
@@ -28,11 +29,20 @@ export class Backups implements OnModuleInit {
     return { storage: r.adapter.storage, ctx: r.ctx };
   }
 
-  /** A backup's data: from storage, or (for backups taken before storage held them) from its row. */
+  /**
+   * Backups are sealed before they leave the server: a school's whole database (children, contacts) is never readable by whoever
+   * holds the storage. The key is BACKUP_KEY, or one of its own derived from SECRETS_KEY.
+   */
+  private get key(): Buffer {
+    return this.env.BACKUP_KEY ? deriveKey(this.env.BACKUP_KEY, 'backups') : deriveKey(this.env.SECRETS_KEY, 'backups');
+  }
+
+  /** A backup's data: from storage, or (for backups taken before storage held them) from its row; opened if it was sealed. */
   private async read(b: { data: Buffer | null; storage_key: string | null }): Promise<Buffer> {
-    if (!b.storage_key) return b.data!;
-    const f = await this.files();
-    return f.storage.get(f.ctx, b.storage_key);
+    let raw: Buffer;
+    if (!b.storage_key) raw = b.data!;
+    else { const f = await this.files(); raw = await f.storage.get(f.ctx, b.storage_key); }
+    return isSealedBytes(raw) ? unsealBytes(raw, this.key) : raw;
   }
 
   async onModuleInit(): Promise<void> {
@@ -110,9 +120,9 @@ export class Backups implements OnModuleInit {
   async take(schoolId: string, kind: 'daily' | 'manual', by: string): Promise<BackupRow> {
     const data = await this.withPool(schoolId, backupDatabase);
     const id = newId('bak');
-    const key = `backups/${schoolId}/${id}.jsonl.gz`;
+    const key = `backups/${schoolId}/${id}.jsonl.gz.sealed`;
     const f = await this.files();
-    await f.storage.put(f.ctx, key, data, 'application/gzip');
+    await f.storage.put(f.ctx, key, sealBytes(data, this.key), 'application/octet-stream');
     await this.db.pool.query('insert into school_backups (id, school_id, kind, taken_by, bytes, data, storage_key) values ($1,$2,$3,$4,$5,null,$6)', [id, schoolId, kind, by, data.length, key]);
     const old = await this.db.pool.query<{ id: string; storage_key: string | null }>(
       'delete from school_backups where school_id = $1 and id not in (select id from school_backups where school_id = $1 order by taken_at desc limit $2) returning id, storage_key', [schoolId, KEEP]);

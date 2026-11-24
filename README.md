@@ -49,12 +49,12 @@ systems wrote ([`docs/test-school.md`](docs/test-school.md): what is in it, wher
 
 | Where | Address | Credentials |
 | --- | --- | --- |
-| Console | `http://localhost:5174` | `BOOTSTRAP_EMAIL` / `BOOTSTRAP_PASSWORD` from `.env`, then the console's test-track code `DEMO_CODE` |
+| Console | `http://localhost:5174` | `BOOTSTRAP_EMAIL` / `BOOTSTRAP_PASSWORD` from `.env`, then `DEMO_CODE` (local only) |
 | School admin | `http://localhost:5173/s/sunrise-valley` | `principal@sunrisevalley.example` and `TEST_PASSWORD` from `.env`, then the code from the console's Test inbox |
 | Phone app | a build with `SCHOOL=sunrise-valley API_BASE_URL=http://10.0.2.2:4000` | a parent's phone (in `.tangent-data/manifest.json`), then the code from the Test inbox |
 
 Every school code is real and random. On a local or test track it lands in the console's **Test inbox** (Integrations → Test inbox).
-On the hosted test track (`https://tangent.onrender.com`) the console uses `BOOTSTRAP_PASSWORD` and `DEMO_CODE` from Render's Environment page.
+On the hosted test track (`https://tangent.onrender.com`) the console uses `BOOTSTRAP_PASSWORD` from Render's Environment page and an authenticator app (added at the first sign-in).
 
 In sandbox mode texts and emails land in the console's **Test inbox**, except to the addresses on its allow-list. Email goes out for real through a Brevo (or SES, SMTP, Resend…) connection, phone notifications through Firebase Cloud Messaging, both set in the console's Integrations with no change to the code ([`docs/integrations.md`](docs/integrations.md) has the steps). A real SMS provider (with DLT registration) is the step that lets families without email sign in from anywhere.
 

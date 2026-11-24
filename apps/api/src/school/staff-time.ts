@@ -448,7 +448,7 @@ export class StaffTimeController {
   async monthCsv(@Tenant() t: TenantCtx, @Query('month') month: string, @Res({ passthrough: true }) reply: FastifyReply): Promise<string> {
     const c = await this.s.monthCsv(t, month ?? schoolToday().slice(0, 7));
     reply.header('content-type', 'text/csv; charset=utf-8').header('content-disposition', `attachment; filename="${c.name}"`);
-    return `﻿${c.text}`;
+    return c.text;
   }
 
   @Get('staff-leave') @Require('staffAttendance.read')

@@ -9,6 +9,8 @@ import { Core, CurrentUser, Public, Require } from '../auth/guards.js';
 import { HubService } from './hub.service.js';
 
 const limit = new Limiter(process.env.NODE_ENV === 'test' ? 10_000 : 60, 60_000);
+// However many addresses send them: a flood of made-up reports stops here.
+const everyone = new Limiter(process.env.NODE_ENV === 'test' ? 10_000 : 300, 60_000);
 
 /** Errors are kept in the registry, where the console's Health page lists them. */
 @Injectable()
@@ -29,6 +31,7 @@ export class ErrorsController {
   @Public() @NoTenant() @Post() @HttpCode(204)
   async report(@Body(new ZodPipe(ClientError)) body: ClientError, @Req() req: FastifyRequest): Promise<void> {
     limit.check(req.ip);
+    everyone.check('all');
     const school = req.headers['x-school'];
     await recordError(this.registry.pool, { ...body, schoolSlug: typeof school === 'string' ? school.slice(0, 40) : null });
   }

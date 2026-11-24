@@ -135,8 +135,8 @@ describe('public status and kill switches', () => {
     const invite = inbox.find((m: any) => m.channel === 'email' && /temporary password/.test(m.body));
     const password = /temporary password (\S+)\./.exec(invite.body)![1]!.replace(/\.$/, '');
     const login = await h.s('POST', '/v1/auth/login', { school: 'moveme', body: { identifier: 'asha@moveme.test', password } });
-    const code = (await h.c('GET', '/console/v1/sandbox?school=moveme', { token: t })).json.find((m: any) => m.channel === 'sms' && /sign-in code/.test(m.body));
-    const tok = (await h.s('POST', '/v1/auth/verify', { school: 'moveme', body: { challengeId: login.json.challenge.challengeId, code: /code for \S+ is (\d{6})/.exec(code.body)![1] } })).json.accessToken;
+    const code = await h.secondStep('moveme|asha', login.json.challenge, async () => /code for \S+ is (\d{6})/.exec((await h.c('GET', '/console/v1/sandbox?school=moveme', { token: t })).json.find((m: any) => m.channel === 'sms' && /sign-in code/.test(m.body)).body)![1]!);
+    const tok = (await h.s('POST', '/v1/auth/verify', { school: 'moveme', body: { challengeId: login.json.challenge.challengeId, code } })).json.accessToken;
     expect((await h.s('GET', '/v1/fees/summary', { school: 'moveme', token: tok })).status).toBe(200);
     await h.c('PUT', '/console/v1/flags/kill.fees', { token: t, body: { enabled: true, schoolId: school.id, label: 'Fees paused' } });
     // A flag change drops the cached school, so the pause holds at once.
