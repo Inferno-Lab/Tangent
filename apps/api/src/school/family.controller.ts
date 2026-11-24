@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query, Req, Res } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { ZodPipe } from '@tangent/nest-kit';
+import { ApiError, ZodPipe } from '@tangent/nest-kit';
 import { NoticeCreate, PeriodMarksPut } from '@tangent/contracts';
 import { CurrentUser, Core, RequireModule } from '../auth/guards.js';
 import { Tenant, type AuthedUser, type TenantCtx } from '../tenancy/tenant.js';
@@ -33,6 +33,12 @@ const Leave = z.object({ studentId: z.string().min(1), from: z.string().min(10),
   halfDay: z.enum(['am', 'pm']).nullable().optional(), note: z.string().trim().max(500).optional(), fileIds: z.array(z.string()).max(3).optional() });
 const Review = z.object({ status: z.string().min(1), note: z.string().max(300).optional() });
 
+// Live streams open now, per person and on this server.
+const STREAMS_PER_PERSON = 5;
+const STREAMS_PER_SERVER = 2000;
+const open = new Map<string, number>();
+let total = 0;
+
 /**
  * What the mobile app reads and writes, in the shapes its models already parse. Every route is scoped to the signed-in person:
  * a parent sees their children, a student sees themselves, a teacher sees what their permissions allow.
@@ -48,12 +54,30 @@ export class FamilyController {
    */
   @Get('stream')
   live(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Req() req: FastifyRequest, @Res() reply: FastifyReply): void {
+    // A few streams a person (a phone and a tablet, a reconnect overlapping the old one), and a ceiling for the whole server.
+    const key = `${t.info.slug}|${u.id}`;
+    if ((open.get(key) ?? 0) >= STREAMS_PER_PERSON || total >= STREAMS_PER_SERVER) throw new ApiError('rate_limited', 'Too many live connections. Close the app on another device and try again.', { retryAfter: 30 });
+    open.set(key, (open.get(key) ?? 0) + 1);
+    total++;
     reply.raw.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache, no-transform', connection: 'keep-alive', 'x-accel-buffering': 'no' });
     reply.raw.write(': open\n\n');
     const off = this.stream.subscribe(t, u.id, (e) => reply.raw.write(`event: ${e.type}\ndata: ${JSON.stringify(e.data)}\n\n`));
     // A comment every 25 seconds keeps proxies from closing an idle stream.
     const ping = setInterval(() => reply.raw.write(': ping\n\n'), 25_000);
-    req.raw.on('close', () => { clearInterval(ping); off(); });
+    // A stream lasts as long as the token that opened it, and ends at once when the session does (signed out, switched off):
+    // the app opens a new one with its fresh token.
+    const end = () => reply.raw.end();
+    const expiry = setTimeout(end, Math.max(1, (u.exp ?? Date.now() / 1000 + 900) * 1000 - Date.now()));
+    const check = setInterval(() => {
+      void t.pool.query<{ ok: boolean }>("select s.revoked_at is null and s.expires_at > now() and u.status = 'active' ok from sessions s join users u on u.id = s.user_id where s.id = $1", [u.sid])
+        .then((r) => { if (!r.rows[0]?.ok) end(); }, () => undefined);
+    }, 60_000);
+    req.raw.on('close', () => {
+      clearInterval(ping); clearInterval(check); clearTimeout(expiry); off();
+      total--;
+      const n = (open.get(key) ?? 1) - 1;
+      if (n > 0) open.set(key, n); else open.delete(key);
+    });
   }
 
   @Get('me') me(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser) { return this.f.me(t, u); }
