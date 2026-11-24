@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { nextNumber, commitImport, newId, previewImport } from '@tangent/db';
+import { nextNumber, commitImport, newId, previewImport, toCsv } from '@tangent/db';
 import { schoolInstant, addDays, dayLabel, initials, schoolToday, latestSchoolDay, schoolDaysEnding, type AssignFee, type AttendanceStatus, type ContactReveal, type FeeStatus, type ImportResult, type MessageRequest, type GuardianRow, type GuardiansPut, type Paged, type StudentCreate, type StudentDetail, type StudentPatch, type StudentQuery, type StudentRow, type StudentSummary, type StudentViews, type ListItem, listKey, tx, addressProblems, joinAddress, type AddressFormat, composeName, type ContactChannel, type LeavingKind, type StudentLeaveInput } from '@tangent/contracts';
 import { maskPhone } from '@tangent/security';
 import { ApiError, notFound } from '@tangent/nest-kit';
@@ -494,8 +494,7 @@ export class StudentsService {
       `select s.admission_no, s.name, c.name class_name, s.roll_no, to_char(s.dob,'YYYY-MM-DD') dob, g.name guardian, g.phone
        from students s join classes c on c.id = s.class_id left join student_guardians sg on sg.student_id = s.id and sg.is_primary left join guardians g on g.id = sg.guardian_id
        ${ids ? 'where s.id = any($1)' : ''} order by c.grade, c.section, s.roll_no`, ids ? [ids] : []);
-    const q = (v: string | null) => `"${(v ?? '').replace(/"/g, '""')}"`;
-    return ['admission_no,name,class,roll,dob,guardian,phone', ...rows.map((r) => [r.admission_no, r.name, r.class_name, r.roll_no, r.dob, r.guardian, r.phone].map(q).join(','))].join('\n');
+    return toCsv([['admission_no', 'name', 'class', 'roll', 'dob', 'guardian', 'phone'], ...rows.map((r) => [r.admission_no, r.name, r.class_name, r.roll_no, r.dob, r.guardian ?? '', r.phone ?? ''])]);
   }
 
   async message(t: TenantCtx, body: MessageRequest, user: { id: string; name: string }): Promise<{ sent: number }> {

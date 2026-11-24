@@ -36,7 +36,10 @@ export function parseCsv(text: string): string[][] {
 
 /** Writes CSV that Excel opens correctly (BOM for UTF-8, quotes where needed, CRLF). */
 export function toCsv(rows: string[][]): string {
-  const q = (v: string) => (/[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  // A cell starting with = + - @ (or a tab or return) is a formula to Excel and Sheets: what a family typed in a form could run
+  // on the office's computer. A leading apostrophe keeps it as the text it is; a plain negative number stays a number.
+  const safe = (v: string) => (/^[=+\-@\t\r]/.test(v) && !/^-\d+([.,]\d+)?$/.test(v) ? `'${v}` : v);
+  const q = (raw: string) => { const v = safe(raw); return /[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; };
   return `﻿${rows.map((r) => r.map(q).join(',')).join('\r\n')}\r\n`;
 }
 
@@ -108,16 +111,26 @@ export function zip(files: { name: string; content: string | Buffer }[]): Buffer
   return Buffer.concat([...parts, dir, end]);
 }
 
+const MB = 1024 * 1024;
+/** How much a ZIP may unpack to: a few kilobytes can be made to unpack to gigabytes, and the server would stop for every school. */
+export interface ZipLimits { entry?: number; total?: number; entries?: number }
+const tooBig = () => new ImportError('This file is too large once unpacked. Split it, or save it again from Excel or Sheets.');
+
 /** The files inside a ZIP (an .xlsx is one), by name. Stored and deflated entries, which is all Excel and Sheets write. */
-export function unzip(buf: Buffer): Map<string, Buffer> {
-  return new Map(zipEntries(buf).map((e) => [e.name, e.read()]));
+export function unzip(buf: Buffer, limits: ZipLimits = {}): Map<string, Buffer> {
+  const entries = zipEntries(buf, limits);
+  // Everything is unpacked here, so the whole has a ceiling too, counted on what each entry really unpacked to.
+  let total = 0;
+  return new Map(entries.map((e) => { const data = e.read(); total += data.length; if (total > (limits.total ?? 200 * MB)) throw tooBig(); return [e.name, data]; }));
 }
 
 /**
  * The entries of a ZIP, each read only when asked: a photo zip may be 300 MB, and inflating every photo at once held it twice
- * over in memory. `size` is the entry's size once read.
+ * over in memory. `size` is the entry's size once read. An entry says how large it unpacks to, and is never let past that or
+ * `limits.entry`: reading one that would is refused (ImportError) before or while it unpacks.
  */
-export function zipEntries(buf: Buffer): { name: string; size: number; read: () => Buffer }[] {
+export function zipEntries(buf: Buffer, limits: ZipLimits = {}): { name: string; size: number; read: () => Buffer }[] {
+  const entry = limits.entry ?? 100 * MB;
   const out: { name: string; size: number; read: () => Buffer }[] = [];
   const eocd = buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
   if (eocd < 0) throw new ImportError('This file is not a spreadsheet Tangent can read. Save it as .xlsx or .csv.');
@@ -127,7 +140,13 @@ export function zipEntries(buf: Buffer): { name: string; size: number; read: () 
     const name = buf.toString('utf8', p + 46, p + 46 + n);
     const start = off + 30 + buf.readUInt16LE(off + 26) + buf.readUInt16LE(off + 28);
     const data = buf.subarray(start, start + size);
-    out.push({ name, size: full, read: () => (method === 8 ? inflateRawSync(data) : data) });
+    if (out.length >= (limits.entries ?? 20_000)) throw tooBig();
+    out.push({ name, size: full, read: () => {
+      if (full > entry || data.length > entry) throw tooBig();
+      // A stored entry is exactly its declared size; one that is not lies about it.
+      if (method !== 8) { if (data.length !== full) throw tooBig(); return data; }
+      try { return inflateRawSync(data, { maxOutputLength: Math.max(1, full) }); } catch { throw tooBig(); }
+    } });
     p += 46 + n + buf.readUInt16LE(p + 30) + buf.readUInt16LE(p + 32);
   }
   return out;

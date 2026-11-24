@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Header, HttpCode, Inject, Injectable, Lo
 import { POOLS, REGISTRY } from './tokens.js';
 import { MODULES, PRICE_CURRENCY, activeModules, closeModules, moduleByKey } from '@tangent/config-engine';
 import { fmtMoney, roundToCurrency, type SchoolContract, CellCreate, CellPatch, DEPLOY_TARGET_LABELS, InvoicePaid, auditLabel, CONSOLE_ROLES, type AuditRow, type ConsoleRole, type FleetSummary, type ConsoleUserRow, type FlagRow, type EntitlementDoc, type EntitlementRow, type InvoiceRowC, type SupportSessionRow, type SupportToken, tx } from '@tangent/contracts';
-import { migrate, newId, pg, scheduleJob } from '@tangent/db';
+import { migrate, newId, pg, scheduleJob, toCsv } from '@tangent/db';
 import { ApiError, ZodPipe, alert, notFound } from '@tangent/nest-kit';
 import { hashPassword, randomToken, sha256, signJwt, unseal } from '@tangent/security';
 import type { PoolManager, Registry } from '@tangent/tenancy';
@@ -559,8 +559,7 @@ export class OpsController {
   @Get('audit/export') @Needs('audit.read') @Header('content-type', 'text/csv; charset=utf-8')
   async auditCsv(@Query('school') school?: string, @Query('actor') actor?: string, @Query('action') action?: string, @Query('from') from?: string, @Query('to') to?: string): Promise<string> {
     const rows = await this.admin.audit(500, school, { actor, action, from, to });
-    const q = (v: string) => `"${v.replace(/"/g, '""')}"`;
-    return ['when,who,what,details', ...rows.map((r) => [r.at, r.actor, auditLabel(r.action), r.detail].map(q).join(','))].join('\n');
+    return toCsv([['when', 'who', 'what', 'details'], ...rows.map((r) => [r.at, r.actor, auditLabel(r.action), r.detail])]);
   }
 
   @Get('catalog') @Needs('schools.read')
