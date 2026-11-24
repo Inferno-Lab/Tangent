@@ -7,6 +7,7 @@ import { FilesService } from './files.service.js';
 import { HubService } from './hub.service.js';
 import { StreamService } from './stream.service.js';
 import { AuditService, Messenger, SettingsService } from './support.js';
+import { forStaff, forStudent, reachSql } from './notice-reach.js';
 import { fmtDate, tx } from '@tangent/contracts';
 
 type User = { id: string; name: string; permissions: readonly string[] };
@@ -14,28 +15,6 @@ type Row = {
   id: string; title: string; body: string; audience: string; class_id: string | null; class_name: string | null; category: string; pinned: boolean; needs_ack: boolean; targets: NoticeTargets | null;
   status: 'draft' | 'pending' | 'published'; author: string | null; author_id: string | null; published_at: Date | null; publish_at: Date | null; edited_at: Date | null; created_at: Date;
 };
-
-/**
- * Whether student `s` is one a notice is for: its one class, and any of its targets (classes, year groups, houses; none of a
- * kind: every one). `c` and `g` are the notice's class and targets, as columns or parameters.
- */
-const forStudent = (c: string, g: string) => `(${c} is null or s.class_id = ${c})
-  and (coalesce(jsonb_array_length(${g}->'classes'), 0) = 0 or s.class_id in (select jsonb_array_elements_text(${g}->'classes')))
-  and (coalesce(jsonb_array_length(${g}->'grades'), 0) = 0 or (select cl.grade::text from classes cl where cl.id = s.class_id) in (select jsonb_array_elements_text(${g}->'grades')))
-  and (coalesce(jsonb_array_length(${g}->'houses'), 0) = 0 or lower(coalesce(s.house, '')) in (select lower(jsonb_array_elements_text(${g}->'houses'))))`;
-/** A notice aimed at some students' classes, years or houses does not go to staff; staff can be narrowed to some roles. */
-const forStaff = (c: string, g: string) => `${c} is null and coalesce(jsonb_array_length(${g}->'classes'), 0) = 0 and coalesce(jsonb_array_length(${g}->'grades'), 0) = 0
-  and coalesce(jsonb_array_length(${g}->'houses'), 0) = 0
-  and (coalesce(jsonb_array_length(${g}->'roles'), 0) = 0 or exists (select 1 from user_roles ur join roles ro on ro.id = ur.role_id where ur.user_id = u.id and ro.key in (select jsonb_array_elements_text(${g}->'roles'))))`;
-
-/** The people a notice reaches, as SQL over users (parents, students, staff), for counts and messages alike. */
-const reachSql = (a = 'n.audience', c = 'n.class_id', g = 'n.targets') => `
-  select distinct u.id, u.phone from users u
-  where u.status = 'active' and (
-    (${a} in ('everyone','parents','class') and u.id in (select g.user_id from guardians g join student_guardians sg on sg.guardian_id = g.id join students s on s.id = sg.student_id
-      where s.status = 'active' and ${forStudent(c, g)}))
-    or (${a} in ('everyone','students','class') and u.id in (select s.user_id from students s where s.status = 'active' and ${forStudent(c, g)}))
-    or (${a} in ('everyone','staff') and u.kind = 'staff' and ${forStaff(c, g)}))`;
 
 /**
  * Notices from the office and from teachers: written, scheduled, approved where the school asks, published, corrected and taken

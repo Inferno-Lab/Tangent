@@ -6,6 +6,7 @@ import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import type { AuthedUser, TenantCtx } from '../tenancy/tenant.js';
 import { HubService } from './hub.service.js';
 import { SettingsService } from './support.js';
+import { reachSql } from './notice-reach.js';
 import { tx } from '@tangent/contracts';
 
 const IMAGES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -127,7 +128,7 @@ export class FilesService implements OnModuleInit {
     if (await this.isStaff(t, user.id)) {
       const need: Partial<Record<FileKind, string>> = {
         student_photo: 'students.read', student_document: 'students.read', homework_submission: 'homework.read', gallery: 'gallery.read', chat: 'messages.read',
-        visitor_photo: 'visitors.read', pickup_photo: 'visitors.read',
+        visitor_photo: 'visitors.read', pickup_photo: 'visitors.read', receipt: 'fees.read', report_card: 'exams.read', staff_photo: 'staff.read',
       };
       const p = need[f.kind];
       if (!p || user.permissions.includes(p)) return;
@@ -141,7 +142,8 @@ export class FilesService implements OnModuleInit {
         case 'diary_attachment': return (await t.pool.query('select 1 from diary_entries e join students s on s.class_id = e.class_id where e.file_ids ? $1 and s.id = any($2)', [f.id, kids])).rowCount! > 0;
         case 'student_photo': case 'student_document': return kids.includes(owner);
         case 'homework_attachment': return (await t.pool.query('select 1 from homework h join students s on s.class_id = h.class_id where h.id = $1 and s.id = any($2)', [owner, kids])).rowCount! > 0;
-        case 'notice_attachment': return (await t.pool.query("select 1 from notices where id = $1 and status = 'published'", [owner])).rowCount! > 0;
+        // Only a notice that reaches this person: one for another class's families is not theirs to open.
+        case 'notice_attachment': return (await t.pool.query(`select 1 from notices n where n.id = $1 and n.status = 'published' and exists (select 1 from (${reachSql('n.audience', 'n.class_id', 'n.targets')}) r where r.id = $2)`, [owner, user.id])).rowCount! > 0;
         case 'chat': return (await t.pool.query('select 1 from threads th left join guardians g on g.id = th.guardian_id where th.id = $1 and (g.user_id = $2 or th.student_user_id = $2)', [owner, user.id])).rowCount! > 0;
         case 'gallery': return (await t.pool.query('select 1 from gallery_albums where id = $1 and published', [owner])).rowCount! > 0;
         case 'logo': return true;
