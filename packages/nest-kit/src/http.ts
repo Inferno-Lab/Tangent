@@ -28,6 +28,25 @@ const CSP = {
   formAction: ["'self'"],
 };
 
+/**
+ * Which proxies in front of the server may say who the client is (TRUST_PROXY): how many sit in front (1 for one load balancer, the
+ * default), their addresses or ranges ("10.0.0.0/8,127.0.0.1"), or "false" when clients connect straight to the server. Never every
+ * proxy: a client writes the left-most X-Forwarded-For itself, and every per-device limit would take its word for its address.
+ */
+export function trustProxy(value = process.env.TRUST_PROXY): string | false | ((addr: string, hop: number) => boolean) {
+  const v = (value ?? '1').trim();
+  if (v === 'true') throw new Error('TRUST_PROXY=true lets any client choose its own address. Set the number of proxies in front of the server, or their addresses.');
+  if (v === 'false' || v === '0' || v === '') return false;
+  if (!/^\d+$/.test(v)) return v;
+  // Fastify takes a bare hop count as "trust no one"; this trusts exactly that many hops back from the server, so the client is the
+  // address the nearest of them saw, whatever the client wrote further left.
+  const hops = Number(v);
+  return (_addr: string, hop: number) => hop < hops;
+}
+
+/** The Fastify options every server here starts with. */
+export const fastifyOptions = () => ({ trustProxy: trustProxy(), bodyLimit: 256_000, routerOptions: { maxParamLength: 2048 } });
+
 /** Cookies, security headers, CORS, and a process-wide rate limit. Call once per Fastify instance. */
 export async function registerHttp(app: NestFastifyApplication, env: HttpEnv): Promise<void> {
   const fastify = app.getHttpAdapter().getInstance();

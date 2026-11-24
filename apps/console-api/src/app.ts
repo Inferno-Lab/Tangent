@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
-import { registerHttp } from '@tangent/nest-kit';
+import { fastifyOptions, registerHttp } from '@tangent/nest-kit';
 import { migrate, pg } from '@tangent/db';
 import type { PoolManager, Registry } from '@tangent/tenancy';
 import { ConsoleModule } from './console.module.js';
@@ -19,7 +19,7 @@ export async function prepareRegistry(env: Env): Promise<number> {
 
 export async function createConsoleApp(env: Env = loadEnv(), shared?: { registry: Registry; pools: PoolManager }): Promise<NestFastifyApplication> {
   await prepareRegistry(env);
-  const app = await NestFactory.create<NestFastifyApplication>(ConsoleModule.register(env, shared), new FastifyAdapter({ trustProxy: true, bodyLimit: 256_000, routerOptions: { maxParamLength: 2048 } }), {
+  const app = await NestFactory.create<NestFastifyApplication>(ConsoleModule.register(env, shared), new FastifyAdapter(fastifyOptions()), {
     logger: env.NODE_ENV === 'test' ? ['error'] : ['error', 'warn', 'log'],
   });
   await registerHttp(app, env);
