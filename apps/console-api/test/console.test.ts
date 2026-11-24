@@ -29,7 +29,8 @@ describe('console sign-in', () => {
     expect(bad.status).toBe(401);
     const nobody = await h.c('POST', '/console/v1/auth/login', { body: { identifier: 'nobody@tangent.app', password: 'x' } });
     expect(nobody.status).toBe(401);
-    expect(nobody.json.fields.identifier).toBeDefined();
+    expect(nobody.json.message).toBe(bad.json.message);
+    expect(nobody.json.fields).toEqual(bad.json.fields);
   });
   it('needs a token, and only super admins can reach the team', async () => {
     expect((await h.c('GET', '/console/v1/fleet')).status).toBe(401);

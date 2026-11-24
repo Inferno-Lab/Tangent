@@ -8,6 +8,8 @@ const Env = z.object({
   SECRETS_KEY: z.string().min(16),
   JWT_SECRET: z.string().min(16),
   JWT_SECRET_PREVIOUS: z.string().min(16).optional(),
+  /** Seals school backups (optional): without it, a key of its own is derived from SECRETS_KEY. Changing it leaves earlier backups unreadable. */
+  BACKUP_KEY: z.string().min(32).optional(),
   CORS_ORIGINS: z.string().default('*'),
   APP_VERSION: z.string().default('0.1.0'),
   /** Where school admin sites are served from. */
@@ -50,7 +52,6 @@ export function loadEnv(source: Record<string, string | undefined> = process.env
     if (env.SECRETS_KEY.length < 32) problems.push('SECRETS_KEY must be at least 32 characters.');
     if (env.JWT_SECRET === env.SECRETS_KEY) problems.push('JWT_SECRET and SECRETS_KEY must be different.');
     if (env.CORS_ORIGINS === '*') problems.push('CORS_ORIGINS must list the admin and console origins, not *.');
-    if (env.DEMO_CODE && env.ALLOW_DEMO !== 'true') problems.push('DEMO_CODE is not allowed in production unless ALLOW_DEMO=true.');
     if (problems.length) throw new Error(`The console is not configured correctly:\n${problems.map((p) => `  ${p}`).join('\n')}`);
   }
   return env;

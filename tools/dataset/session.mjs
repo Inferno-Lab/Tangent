@@ -1,9 +1,11 @@
-// Signs people of a running Tangent in the way they really do: the console with its password and its fixed test-track code,
+// Signs people of a running Tangent in the way they really do: the console with its password and its authenticator (on a
+// developer's machine its fixed DEMO_CODE),
 // staff with a password and the code that lands in the Test inbox, families with a code alone. Sessions are kept for a few
 // minutes in .tangent-data/sessions.json, so the tools that run one after another (page checks, flows) stay under the
 // school's limit of five codes a person in fifteen minutes.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { totp } from '../../packages/security/dist/index.js';
 
 export const API = (process.env.API ?? 'http://localhost:4000').replace(/\/$/, '');
 /** The password the dataset's staff are given once the school has moved in (tools/dataset/load.mjs). */
@@ -39,12 +41,34 @@ async function remember(key, make, still) {
   return session;
 }
 
+const KEYS = `${DATA}authenticators.json`;
+const keys = () => { try { return JSON.parse(readFileSync(KEYS, 'utf8')); } catch { return {}; } };
+
+/**
+ * The second step the console asks for. On a developer's machine, the fixed DEMO_CODE. On a server: the authenticator. Its first
+ * sign-in adds one, and the key is kept in .tangent-data for the next. An account already set up in a phone's authenticator
+ * takes CONSOLE_TOTP_SECRET (the key shown when it was added) or CONSOLE_CODE (a code from the phone, typed now).
+ */
+export function consoleCode(challenge) {
+  const id = `${API}|${CONSOLE_LOGIN.email}`;
+  if (challenge.enroll) {
+    mkdirSync(DATA, { recursive: true });
+    writeFileSync(KEYS, JSON.stringify({ ...keys(), [id]: challenge.enroll.secret }));
+    return totp(challenge.enroll.secret);
+  }
+  if (challenge.channel !== 'app') return CONSOLE_LOGIN.code;
+  const secret = process.env.CONSOLE_TOTP_SECRET ?? keys()[id];
+  if (secret) return totp(secret);
+  if (process.env.CONSOLE_CODE) return process.env.CONSOLE_CODE;
+  throw new Error('The console asks for an authenticator code: set CONSOLE_TOTP_SECRET to the key shown when it was added, or CONSOLE_CODE to a code from the app.');
+}
+
 let consoleSession;
 /** The console's session: `{ accessToken, user }`. */
 export async function consoleSignIn() {
   consoleSession ??= remember(`${API}|console|${CONSOLE_LOGIN.email}`, async () => {
     const step = await call('/console/v1/auth/login', { body: { identifier: CONSOLE_LOGIN.email, password: CONSOLE_LOGIN.password } });
-    const done = await call('/console/v1/auth/verify', { body: { challengeId: step.challenge.challengeId, code: CONSOLE_LOGIN.code } });
+    const done = await call('/console/v1/auth/verify', { body: { challengeId: step.challenge.challengeId, code: consoleCode(step.challenge) } });
     return { accessToken: done.accessToken, user: done.user };
   }, (c) => call('/console/v1/cells', { token: c.accessToken }));
   return consoleSession;

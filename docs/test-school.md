@@ -66,7 +66,7 @@ The school's codes are always real and random. On a local or test track they lan
 
 | Who | Sign in with |
 | --- | --- |
-| Console | `BOOTSTRAP_EMAIL` / `BOOTSTRAP_PASSWORD` from `.env`, then the console's own test-track code `DEMO_CODE` |
+| Console | `BOOTSTRAP_EMAIL` / `BOOTSTRAP_PASSWORD` from `.env`, then `DEMO_CODE` on your machine, or the authenticator's code on a server |
 | Principal | `principal@sunrisevalley.example` and `TEST_PASSWORD` from `.env`, then the code in the Test inbox |
 | Other staff | the vice principal, office, accountant, the class teacher of 8 A, a maths teacher and a driver: their emails are in `.tangent-data/manifest.json` (`people`), with `TEST_PASSWORD` |
 | Families | the parent's phone (in the manifest: `parentOfTwo`, `parentOfOne`), then the code in the Test inbox; families have no password |

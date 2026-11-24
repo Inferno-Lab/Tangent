@@ -53,7 +53,7 @@ What "the entire plan" means in practice: the plan's build order (section 24) ha
 ### 2.3 How the pieces behave (the parts that are not obvious)
 
 - **Tenant selection.** School API calls carry `X-School: <slug>`. The admin gets the slug from the URL: `/s/<slug>/...` (router basepath), or `<slug>.<VITE_BASE_DOMAIN>` if that build variable is set, or `VITE_DEFAULT_SCHOOL`. A bare host name is **not** treated as a school (that was a deployed bug, section 8.4).
-- **Sign-in.** `POST /v1/auth/login` returns either `{step:'otp', challenge}` or tokens (when the school turned two-step off). The code goes to the **sandbox inbox** (console → Test inbox). The console never returns the code in production (`NODE_ENV=production`), so on a hosted test track the code is the owner's `DEMO_CODE` environment value.
+- **Sign-in.** `POST /v1/auth/login` returns either `{step:'otp', challenge}` or tokens (when the school turned two-step off). The code goes to the **sandbox inbox** (console → Test inbox). The console never returns the code in production (`NODE_ENV=production`). Staff who can change settings, staff or refunds confirm with an authenticator app instead (`security.staffAuthenticator`, on by default; Sunrise Valley has it off so the tools can sign its principal in).
 - **Settings.** Versioned: a save sends `expectedVersion`; a stale one gets a conflict. Locked keys (set by the platform per school) are read-only in the UI and refused by the API. The admin never writes `modules.enabled` outside the plan (`closeModules` + entitlement check).
 - **Roles.** Permissions are strings (`students.read`, `settings.write`...). A role template bundles them; users get roles. The UI hides or disables what a permission does not allow and the API enforces it.
 - **Support sessions.** The console issues a JWT with `support: true`, the school as audience, read permissions only and 30 minutes (display says one hour max). The admin reads it from `#support=<token>`, shows a red frame and "End session", and the API refuses non-GET requests from it.
@@ -133,8 +133,12 @@ One Render web service `tangent` (free, Singapore, auto-deploys from `main`; wor
 | `SECRETS_KEY` | Seals school connection strings. **Never change it**: every school becomes unreadable. |
 | `JWT_SECRET` | Signs tokens. Changing it signs everyone out. |
 | `BOOTSTRAP_EMAIL`, `BOOTSTRAP_PASSWORD` | The first console super admin (created only when no console user exists). Changing the password later does nothing; use the console's Team page. |
-| `DEMO_CODE` | The six-digit second step for console sign-in. |
-| `ALLOW_DEMO=true` | Marks the console as the test track: the free test hosting target and the console's fixed `DEMO_CODE`. Production refuses `DEMO_CODE` unless it is set, which only the test track does. Schools have no demo code. |
+| `DEMO_CODE` | The six-digit second step for console sign-in on a developer's machine and in tests. A production server ignores it: every console account uses an authenticator app. |
+| `ALLOW_DEMO=true` | Marks the console as the test track: the free test hosting target. Schools have no demo code. |
+| `TRUST_PROXY` | How many proxies sit in front of the server (default 1), or their addresses, or `false`. Never `true`: the client would choose its own address for every sign-in limit. |
+| `BACKUP_KEY` | Seals school backups; without it a key is derived from `SECRETS_KEY`. |
+| `API_REGISTRY_DATABASE_URL` | Optional registry login for the school API without the console's tables (`tools/registry-api-role.sql`). |
+| `ALLOW_PRIVATE_HOSTS` | Private hosts a typed-in integration address may reach. |
 | `TENANT_MAX_POOLS`, `TENANT_PER_POOL` | Connection pools: schools held open × connections each (defaults 20 × 3). |
 
 Everything else outside Tangent is a connection in the console's **Integrations** (n8n-style: pick a provider, fill its template, Test, go live): team alerts (Slack, Discord, e-mail), file scanning (ClamAV), app builds (GitHub), the app stores (Google Play, App Store Connect), school databases (Postgres server, Neon), hosting (Render), file storage, messaging and payments. The messaging mode (test inbox or real delivery) is a console switch under Integrations, not a variable.
@@ -191,7 +195,7 @@ Done: access JWT (15 min, HS256, `iss`/`aud`/`alg`/`typ` checked, key derived pe
 
 Still open: passkeys; SSO (the sign-in buttons are disabled placeholders); CSP nonces, Trusted Types and SRI; penetration test. *(now done: TOTP for console staff, password reset by code, a cap of five codes per account in fifteen minutes, consent in the app, data requests including erasure, full export.)*
 
-Keep `DEMO_CODE` off in any environment with real data (production refuses it unless `ALLOW_DEMO=true`); schools never had a fixed code.
+A production server ignores `DEMO_CODE`; schools never had a fixed code.
 
 ### 9.6 Console gaps
 
@@ -260,7 +264,7 @@ Traps from these sessions: Vite on this machine binds `localhost` (IPv6) unless 
 The plan at the time was the production plan, since replaced (today: `docs/one-shot-plan.md`). The rules that now hold:
 
 - **Schools configure nothing** *(replaced on 2026-11-12, §23: the school edits its own settings with `PATCH /v1/settings`, except `TANGENT_SETTINGS`; AGENTS.md has the rule as it holds)*. At the time the school API had no settings or role writes; `settings.write` and `roles.manage` are gone (migration `0006_roles_config_to_console`). The console API owns configuration (`apps/console-api/src/config.ts`): `GET/PATCH /console/v1/schools/:id/config` (stale version → 409; keys marked `risky` go through Approvals as `config.apply`), rollback, roles, staff roles, templates, preview and the requests schools send. **A new setting** goes into `SchoolSettingsSchema` and `SETTINGS_META` (`packages/contracts/src/settings-meta.ts`); the console's Configuration tab renders it with no new screen. Mark it `notUsedYet` until something acts on it.
-- **Accounts.** Family logins are made when a student is added, imported or enrolled (`students.service.ts` `create`); families sign in with `POST /v1/auth/code`; `POST /v1/auth/reset/start|finish` resets a password (codes carry a purpose, migration `0005`). Tokens carry `kind`; family tokens only reach `/v1/f`, `/v1/auth`, `/v1/me`, `/v1/config`, `/v1/brand`, `/v1/errors` (`guards.ts`). Console staff use an authenticator app unless `DEMO_CODE` is set (test track).
+- **Accounts.** Family logins are made when a student is added, imported or enrolled (`students.service.ts` `create`); families sign in with `POST /v1/auth/code`; `POST /v1/auth/reset/start|finish` resets a password (codes carry a purpose, migration `0005`). Tokens carry `kind`; family tokens only reach `/v1/f`, `/v1/auth`, `/v1/me`, `/v1/config`, `/v1/brand`, `/v1/errors` (`guards.ts`). Console staff use an authenticator app (`DEMO_CODE` stands in only on a developer's machine).
 - **Operations.** Errors: `error_reports` in the registry, fed by the exception filter and `POST /v1/errors` / `POST /console/v1/errors`; listed on the console's Health page. Backups: `packages/db/src/backup.ts` (gzipped JSON of every table, any PostgreSQL), daily per live school, kept 14, restore needs a second approver. Receipt numbers are taken under an advisory lock.
 - **Browser tools** send their token as a request header (`setExtraHTTPHeaders`); the admin and console keep tokens in memory only and come back from the refresh cookie.
 - **App.** `SchoolConfig` (`lib/core/services/school_config.dart`) loads `/v1/config` when the shell opens; family tabs come from `app.dock` and `ShellController.showTab('chat')` takes a tab key. A release build needs `SCHOOL` and `API_BASE_URL`.
