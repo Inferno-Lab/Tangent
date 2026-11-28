@@ -33,11 +33,11 @@ html:has(.nest.dark){color-scheme:dark}
   .nest .app>.sb .sbc{display:none}
 }
 
-/* Names and labels that were cut mid-word now wrap or ellipsise with the full text in a tooltip (set in the markup). */
-.nest .ws>div{min-width:0}
-.nest .ws b,.nest .ws small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.nest .wsw>div{min-width:0}
-.nest .wsw b,.nest .wsw small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The school's and the workspace's names at the top of the menu wrap onto a second line instead of being cut. */
+.nest .ws{height:auto;min-height:52px}
+.nest .ws>div,.nest .wsw>div{min-width:0}
+.nest .ws b,.nest .ws small{display:block;white-space:normal;overflow-wrap:anywhere}
+.nest .wsw b,.nest .wsw small{white-space:normal;overflow-wrap:anywhere}
 .nest .grd .nm{min-width:0}
 .nest .ll{white-space:pre-wrap;overflow-wrap:anywhere}
 .nest .kv b{min-width:0}

@@ -138,7 +138,7 @@ export function StudentsView({ v }: { v: any }) {
                     <span className="cls">
                       {r.cls} · {r.roll}
                     </span>
-                    <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--ink2)" } as CSSProperties}>{r.g}</span>
+                    <span style={{ overflowWrap: "anywhere", minWidth: 0, color: "var(--ink2)" } as CSSProperties}>{r.g}</span>
                     {v.has.attendance && <span className="tk" aria-label={tr('admin.students.view.percent_present', { p0: r.att ?? "" })}>
                       {r.tk.map((t: any, $i: number) => (
                         <Fragment key={$i}>

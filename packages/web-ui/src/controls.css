@@ -2,22 +2,21 @@
 
 /* Dropdown button */
 /* The height of every field (.inp, .btn: 42px), so a select lines up with the text boxes beside it. */
-.nest .sx{display:flex;align-items:center;gap:10px;width:100%;height:42px;padding-block:0 0;padding-inline:16px 10px;border-radius:14px;border:1.5px solid var(--field);background:var(--s1);color:var(--ink);font:600 15px var(--fb);text-align:start;cursor:pointer;transition:border-color var(--t1),background var(--t1)}
+.nest .sx{display:flex;align-items:center;gap:10px;width:100%;min-height:42px;padding-block:4px;padding-inline:16px 10px;border-radius:14px;border:1.5px solid var(--field);background:var(--s1);color:var(--ink);font:600 15px var(--fb);text-align:start;cursor:pointer;transition:border-color var(--t1),background var(--t1)}
 .nest .sx:hover:not(:disabled){border-color:var(--ink3)}
 .nest .sx:focus-visible,.nest .sx.open{outline:0;border-color:var(--brand)}
 .nest .sx.err{border-color:var(--bad)}
 .nest .sx:disabled{opacity:.5;cursor:not-allowed}
-/* A long choice wraps to a second line inside the field instead of being cut with an ellipsis. */
-.nest .sxv{flex:1;min-width:0;overflow:hidden;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-height:1.2}
-/* In a form a long choice (a fee with its amount and date) takes a second line instead of being cut; toolbars keep one. */
-.nest .fld .sx:not(.sm){height:auto;min-height:42px;padding-block:4px}
-.nest .fld .sx:not(.sm) .sxv{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.3}
+/* A long choice wraps onto more lines inside the field (the field grows) instead of being cut with an ellipsis or a clamp. */
+.nest .sxv{flex:1;min-width:0;overflow-wrap:anywhere;white-space:normal;line-height:1.2}
+/* In a form a long choice (a fee with its amount and date) reads a little looser on its second line. */
+.nest .fld .sx:not(.sm) .sxv{line-height:1.3}
 .nest .sxc{width:28px;height:28px;border-radius:50%;background:var(--s2);color:var(--ink2);display:grid;place-items:center;flex:none;transition:background var(--t1),color var(--t1)}
 .nest .sxc svg{width:16px;height:16px;transition:transform var(--t2) var(--e)}
 .nest .sx:hover:not(:disabled) .sxc{color:var(--ink)}
 .nest .sx.open .sxc{background:var(--brand-soft);color:var(--brand-ink)}
 .nest .sx.open .sxc svg{transform:rotate(180deg)}
-.nest .sx.sm{width:auto;min-width:150px;height:40px;border-radius:999px;padding-block:0 0;padding-inline:16px 6px;font:700 14px var(--fb)}
+.nest .sx.sm{width:auto;min-width:150px;min-height:40px;border-radius:999px;padding-block:2px;padding-inline:16px 6px;font:700 14px var(--fb)}
 .nest .sx.sm .sxc{width:26px;height:26px}
 /* A dropdown inside a field box takes the box's place */
 .nest .inp>.sx{border:0;height:100%;background:none;padding:0}

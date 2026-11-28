@@ -54,6 +54,10 @@ describe('the design system', { timeout: 30_000 }, () => {
     expect(hits(tsx, /<[a-z][a-z0-9]*\b(?:[^<>]|=>)*?\stitle=/), 'use data-tip="…" (the shared tooltip)').toEqual([]);
   });
 
+  it('cuts no text with an ellipsis or a line clamp', () => {
+    expect(hits([...css, ...allTsx], /text-overflow\s*:\s*ellipsis|textOverflow\s*:\s*["']ellipsis|line-clamp|lineClamp/i, (l) => !comment(l)), 'let the text wrap (overflow-wrap:anywhere)').toEqual([]);
+  });
+
   it('has one shell per app, mounted by its signed-in layout', () => {
     expect(hits(tsx, /<Shell\b|useChrome\(/, (_, f) => !/app[\\/](Layout|useChrome)\.tsx$/.test(f)), 'render pages in PageScope; read the shell with useShellChrome()').toEqual([]);
   });

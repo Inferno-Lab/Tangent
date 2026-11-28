@@ -52,7 +52,7 @@
 
 /* List view and small screens. */
 .pg-timetable .lst{display:flex;flex-direction:column;gap:6px}
-.pg-timetable .lrow{display:grid;grid-template-columns:70px minmax(0,1.2fr) minmax(0,1fr) 120px;gap:12px;align-items:center;height:52px;padding:0 16px;border:0;border-radius:14px;font:600 14px var(--fb);text-align:start;cursor:pointer;color:var(--ink);transition:transform var(--t3) var(--e),filter var(--t2)}
+.pg-timetable .lrow{display:grid;grid-template-columns:70px minmax(0,1.2fr) minmax(0,1fr) 120px;gap:12px;align-items:center;min-height:52px;padding:6px 16px;border:0;border-radius:14px;font:600 14px var(--fb);text-align:start;cursor:pointer;color:var(--ink);transition:transform var(--t3) var(--e),filter var(--t2)}
 .pg-timetable .lrow:hover{transform:translateX(calc(4px * var(--dir,1)));filter:brightness(1.03)}
 .pg-timetable .lrow .d{font:700 12px var(--fb);opacity:.7}
 .pg-timetable .lrow.v{background:var(--brand-soft);color:var(--brand-ink)}.pg-timetable .lrow.g{background:var(--ok-s);color:var(--ok-i)}.pg-timetable .lrow.c{background:var(--bad-s);color:var(--bad-i)}.pg-timetable .lrow.a{background:var(--warn-s);color:var(--warn-i)}.pg-timetable .lrow.b{background:var(--brand-soft);color:var(--brand)}.pg-timetable .lrow.n{background:var(--s2)}.pg-timetable .lrow.bad{background:var(--bad-s);color:var(--bad)}
