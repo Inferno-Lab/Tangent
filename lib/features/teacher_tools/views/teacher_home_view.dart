@@ -674,7 +674,7 @@ class _ClassCard extends StatelessWidget {
                       Text(
                         [
                           if (count > 0) 'teacher.n_students'.trn(count),
-                          room,
+                          if (room.isNotEmpty) roomLabel(room),
                           when,
                         ].join(' · '),
                         style: context.type.cap,

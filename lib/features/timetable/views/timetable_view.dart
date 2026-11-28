@@ -214,7 +214,7 @@ class _Block extends StatelessWidget {
                         ),
                         if (teacher != null)
                           Text(
-                            period.room.isEmpty ? teacher : '$teacher · ${period.room}',
+                            period.room.isEmpty ? teacher : '$teacher · ${roomLabel(period.room)}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: AppText.cap(color: pigment.on.withValues(alpha: .88), height: 1.2),

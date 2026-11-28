@@ -20,6 +20,7 @@ import 'package:tangent/core/widgets/empty_kit.dart';
 import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/data/models/user.dart';
 import 'package:tangent/features/dashboard/controllers/around_school_controller.dart';
+import 'package:tangent/features/events/controllers/events_controller.dart';
 import 'package:tangent/features/dashboard/widgets/home_cards.dart' show QuickRow;
 
 /// Opens "Around school": the school's other pages as tiles, each showing a line of its own content.
@@ -526,7 +527,7 @@ class _EventsTile extends StatelessWidget {
           ),
           if (e != null) ...[
             const SizedBox(height: 6),
-            Text([day(e.date), e.time].where((x) => x.isNotEmpty).join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: context.type.capB),
+            Text('${day(e.date)} · ${eventTime(e)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: context.type.capB),
           ],
         ],
       ),

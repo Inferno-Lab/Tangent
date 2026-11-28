@@ -153,7 +153,7 @@ class _SubjectCard extends StatelessWidget {
     final pigment = AppColors.subject(item.subject).fill;
     final next = item.nextToday;
     final line = next != null
-        ? 'academics.next_today'.trp({'time': clockOf(minutesOf(next.start)), 'room': next.room})
+        ? 'academics.next_today'.trp({'time': clockOf(minutesOf(next.start)), 'room': roomLabel(next.room)})
         : item.nextDay != null
         ? 'academics.next_on'.trp({'day': 'day.${item.nextDay}'.tr})
         : 'academics.no_class'.tr;

@@ -15,6 +15,7 @@ import 'package:tangent/data/repositories/academic_repository.dart';
 import 'package:tangent/data/repositories/campus_repository.dart';
 import 'package:tangent/data/repositories/directory_repository.dart';
 import 'package:tangent/data/repositories/school_life_repository.dart';
+import 'package:tangent/features/events/controllers/events_controller.dart';
 import 'package:tangent/core/utils/clock.dart';
 
 enum DueKind { fee, homework, event }
@@ -223,7 +224,7 @@ class DashboardController extends GetxController with Loadable {
           dates.add(UpcomingItem(
             date: e.date,
             title: e.title,
-            sub: [e.time, e.venue].where((x) => x.isNotEmpty).join(' · '),
+            sub: eventWhenWhere(e),
             subject: eventSubject(e.category),
             route: AppRoutes.eventDetail.replaceFirst(':id', e.id),
             action: e.needsRsvp && !replied ? 'home.reply' : null,

@@ -626,7 +626,7 @@ class NowCard extends StatelessWidget {
     if (isNow && now < start) {
       when = 'home.starts_at'.trp({'time': clockOf(start)});
       title = '${subjectName(p.subject)} · $who';
-      meta = 'home.room_line'.trp({'room': p.room, 'start': clockOf(a), 'end': clockOf(b)});
+      meta = 'home.room_line'.trp({'room': roomLabel(p.room), 'start': clockOf(a), 'end': clockOf(b)});
       pct = 0;
     } else if (isNow && now > end) {
       when = 'home.done_today'.tr;
@@ -640,7 +640,7 @@ class NowCard extends StatelessWidget {
         title = '${subjectName(p.subject)} · $who';
         final left = (b - minute).clamp(0, 999);
         meta =
-            'home.room_line'.trp({'room': p.room, 'start': clockOf(a), 'end': clockOf(b)}) +
+            'home.room_line'.trp({'room': roomLabel(p.room), 'start': clockOf(a), 'end': clockOf(b)}) +
             (isNow ? ' · ${'home.min_left'.trp({'n': '$left'})}' : '');
       } else {
         final next = nextClassAfter(periods, p);

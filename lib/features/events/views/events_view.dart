@@ -30,19 +30,6 @@ SubjectColor _pigment(String category) => AppColors.subject(switch (category) {
   _ => 'social',
 });
 
-String _time(String hhmm) {
-  final p = hhmm.split(':');
-  final t = DateTime(2000, 1, 1, int.parse(p[0]), int.parse(p[1]));
-  return DateFormat(t.minute == 0 ? 'h a' : 'h:mm a').format(t).toLowerCase();
-}
-
-/// When and where, as one line: its time ("All day" for one starting at midnight, a holiday's), then its place when it has
-/// one; never a time nobody set or a separator with nothing after it.
-String _whenWhere(SchoolEvent e, {bool lower = false}) => [
-  if (e.time == '00:00' || e.time.isEmpty) 'events.all_day'.tr else _time(e.time),
-  if (e.venue.trim().isNotEmpty) lower ? e.venue.trim().toLowerCase() : e.venue.trim(),
-].join(' · ');
-
 void _openEvent(SchoolEvent e) => unawaited(Get.toNamed<void>('/events/${e.id}'));
 
 class EventsView extends GetView<EventsController> {
@@ -146,7 +133,7 @@ class _Featured extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Overline(
-                      '${DateFormat('EEE d MMM').format(event.date)} · ${_whenWhere(event, lower: true)}',
+                      '${DateFormat('EEE d MMM').format(event.date)} · ${eventWhenWhere(event, lower: true)}',
                       color: pigment.on.withValues(alpha: .8),
                     ),
                     const SizedBox(height: 10),
@@ -241,7 +228,7 @@ class _Row extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(event.title, style: context.type.t),
-                  Text(_whenWhere(event, lower: true), style: context.type.cap),
+                  Text(eventWhenWhere(event, lower: true), style: context.type.cap),
                 ],
               ),
             ),
@@ -413,14 +400,8 @@ class EventDetailView extends GetView<EventsController> {
       final pigment = _pigment(event.category);
       final answer = controller.mine(event);
       final going = controller.going(event);
-      final start = event.time.split(':');
-      final gates = DateTime(
-        2000,
-        1,
-        1,
-        int.parse(start[0]),
-        int.parse(start[1]),
-      ).subtract(const Duration(minutes: 15));
+      // An event with no time of its own (a holiday) has no gates to open; reading one as a time crashed the page.
+      final gates = eventGates(event);
       final droplet = switch (answer) {
         RsvpStatus.going => AppColors.ok,
         RsvpStatus.maybe => AppColors.late,
@@ -439,7 +420,7 @@ class EventDetailView extends GetView<EventsController> {
               addToCalendar(
                 title: event.title,
                 first: event.date,
-                details: '${_whenWhere(event)}\n${event.description}',
+                details: '${eventWhenWhere(event)}\n${event.description}',
               ),
             ),
           ),
@@ -526,8 +507,8 @@ class EventDetailView extends GetView<EventsController> {
                         // An all-day event (a holiday) has no time and no gates; one with no place has no place row.
                         _Fact(
                           icon: PhosphorIconsRegular.clock,
-                          title: event.time == '00:00' || event.time.isEmpty ? 'events.all_day'.tr : _time(event.time),
-                          sub: event.time == '00:00' || event.time.isEmpty ? null : 'events.gates'.trp({'time': DateFormat('h:mm').format(gates)}),
+                          title: eventTime(event),
+                          sub: gates == null ? null : 'events.gates'.trp({'time': DateFormat('h:mm').format(gates)}),
                         ),
                         if (event.venue.trim().isNotEmpty) ...[
                           const Hr(indent: 46),

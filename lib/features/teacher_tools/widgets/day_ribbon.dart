@@ -143,7 +143,7 @@ class _DayRibbonState extends State<DayRibbon> with SingleTickerProviderStateMix
     final ground = pigment.fill;
     final ink = pigment.on;
     return Semantics(
-      label: tidySeparators('${widget.label(p)} · ${p.room} · ${clockOf(a)} – ${clockOf(b)}'),
+      label: tidySeparators('${widget.label(p)} · ${roomLabel(p.room)} · ${clockOf(a)} – ${clockOf(b)}'),
       child: DecoratedBox(
         decoration: BoxDecoration(color: ground, borderRadius: const BorderRadius.vertical(bottom: Radius.circular(AppRadius.panel))),
         child: Stack(

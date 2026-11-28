@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/services/school_config.dart';
 import 'package:tangent/core/utils/app_exception.dart';
@@ -9,6 +10,36 @@ import 'package:tangent/data/models/campus.dart';
 import 'package:tangent/data/repositories/campus_repository.dart';
 import 'package:tangent/data/repositories/directory_repository.dart';
 import 'package:tangent/core/utils/clock.dart';
+
+/// The event's start as hours and minutes, or null when it has none of its own: no time, or midnight (a holiday, all day).
+({int h, int m})? _start(SchoolEvent e) {
+  final p = e.time.split(':');
+  final h = int.tryParse(p.first);
+  final m = p.length > 1 ? int.tryParse(p[1]) : null;
+  return h == null || m == null || (h == 0 && m == 0) ? null : (h: h, m: m);
+}
+
+/// Whether the event runs all day (it has no start time of its own).
+bool eventAllDay(SchoolEvent e) => _start(e) == null;
+
+/// The event's start as people read it ("4 pm", "9:30 am"), or "All day"; never "12 am" or a bare "00:00".
+String eventTime(SchoolEvent e) {
+  final s = _start(e);
+  if (s == null) return 'events.all_day'.tr;
+  return DateFormat(s.m == 0 ? 'h a' : 'h:mm a').format(DateTime(2000, 1, 1, s.h, s.m)).toLowerCase();
+}
+
+/// When and where as one line: its time, then its place when it has one; never a separator with nothing after it.
+String eventWhenWhere(SchoolEvent e, {bool lower = false}) => [
+  eventTime(e),
+  if (e.venue.trim().isNotEmpty) lower ? e.venue.trim().toLowerCase() : e.venue.trim(),
+].join(' · ');
+
+/// When the gates open, a quarter of an hour before it starts; null for an event that runs all day.
+DateTime? eventGates(SchoolEvent e) {
+  final s = _start(e);
+  return s == null ? null : DateTime(2000, 1, 1, s.h, s.m).subtract(const Duration(minutes: 15));
+}
 
 class EventsController extends GetxController with Loadable {
   List<SchoolEvent> items = [];

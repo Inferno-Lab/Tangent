@@ -221,7 +221,7 @@ class _LiveStripState extends State<LiveStrip> with SingleTickerProviderStateMix
     );
   }
 
-  String _who(PeriodSlot p) => [widget.teacherNames[p.teacherId] ?? '', p.room].where((x) => x.isNotEmpty).join(' · ');
+  String _who(PeriodSlot p) => [widget.teacherNames[p.teacherId] ?? '', roomLabel(p.room)].where((x) => x.isNotEmpty).join(' · ');
 }
 
 /// The day's lessons as one thin line, each in its subject's colour: done ones faded, the one on now thicker, now marked.

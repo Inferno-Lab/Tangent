@@ -77,7 +77,7 @@ class _Paper extends StatelessWidget {
     final when = [
       if (paper.date != null) DateFormat.MMMEd(lang).format(paper.date!) else 'exams.day_not_set'.tr,
       if (paper.startsAt.isNotEmpty) paper.endsAt.isEmpty ? paper.startsAt : '${paper.startsAt}–${paper.endsAt}',
-      if (paper.room.isNotEmpty) paper.room,
+      if (paper.room.isNotEmpty) roomLabel(paper.room),
     ].join(' · ');
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
