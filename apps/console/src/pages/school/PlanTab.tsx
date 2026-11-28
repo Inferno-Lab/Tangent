@@ -90,15 +90,15 @@ export function PlanTab({ d, say }: { d: SchoolDetail; say: Say }) {
                 <span style={{ flex: '1 1 200px', minWidth: 0 }}><b style={{ font: '700 14px var(--fb)' }}>{m.name}</b>{m.core && <span className="chip" style={{ marginInlineStart: 8 }}>{t('console.plan_tab.always_on')}</span>}<div className="help" style={{ margin: 0 }}>{m.blurb}</div></span>
                 {on && !m.core && (
                   <span style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                    <span style={{ width: 160 }}><DateField label={t('console.plan_tab.from')} value={dates[m.key]?.from ?? ''} onChange={(v) => setDate(m.key, 'from', v)} disabled={!can} /></span>
-                    <span style={{ width: 160 }}><DateField label={t('console.plan_tab.until')} value={dates[m.key]?.until ?? ''} onChange={(v) => setDate(m.key, 'until', v)} disabled={!can} /></span>
+                    <span style={{ width: 180 }}><DateField label={t('console.plan_tab.from')} value={dates[m.key]?.from ?? ''} onChange={(v) => setDate(m.key, 'from', v)} disabled={!can} /></span>
+                    <span style={{ width: 180 }}><DateField label={t('console.plan_tab.until')} value={dates[m.key]?.until ?? ''} onChange={(v) => setDate(m.key, 'until', v)} disabled={!can} /></span>
                   </span>
                 )}
               </div>
               {on && m.features.length > 0 && (
                 <div className="tgrow" style={{ marginTop: 10, paddingInlineStart: 56 }}>
                   {m.features.map((f) => f.state === 'planned'
-                    ? <span key={f.key} className="chip" style={{ maxWidth: '100%' }} data-tip={t('console.plan_tab.planned_not_built_yet', { name: f.name })}><span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name} {t('console.plan_tab.planned')}</span></span>
+                    ? <span key={f.key} className="chip" style={{ maxWidth: '100%' }} data-tip={t('console.plan_tab.planned_not_built_yet', { name: f.name })}><span style={{ overflowWrap: 'anywhere' }}>{f.name} {t('console.plan_tab.planned')}</span></span>
                     : (
                       <Fragment key={f.key}>
                         <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', font: '600 13px var(--fb)' }}>

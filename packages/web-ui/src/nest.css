@@ -143,7 +143,7 @@ font-family:var(--fb);color:var(--ink);background:var(--bd);-webkit-font-smoothi
 /* tables */
 .nest .grd{display:grid;grid-template-columns:var(--cols);align-items:center;column-gap:12px;padding:0 24px}
 .nest .th{height:46px;font:700 12px var(--fb);color:var(--ink3);border-bottom:1px solid var(--line)}
-.nest .rw{position:relative;height:64px;border-bottom:1px solid var(--line);font:600 14px var(--fb);cursor:pointer;transition:background var(--t2)}
+.nest .rw{position:relative;min-height:64px;border-bottom:1px solid var(--line);font:600 14px var(--fb);cursor:pointer;transition:background var(--t2)}
 .nest .rw:last-child{border-bottom:0}
 .nest .rw:hover{background:color-mix(in srgb,var(--brand) 5%,transparent)}
 .nest .rw.sel{background:color-mix(in srgb,var(--brand-soft) 55%,var(--s1))}

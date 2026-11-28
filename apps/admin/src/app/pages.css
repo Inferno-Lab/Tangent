@@ -60,8 +60,8 @@
 .nest .admk:hover{transform:translateY(-2px);box-shadow:var(--sh2)}
 .nest .admo{display:flex;align-items:center;gap:10px;border:0;background:none;color:inherit;font:inherit;text-align:start;cursor:pointer;padding:0;min-width:0}
 .nest .admo>span{min-width:0}
-.nest .admo b{display:block;font:700 14px var(--fb);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.nest .admo small{display:block;font:600 12px var(--fb);color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nest .admo b{display:block;font:700 14px var(--fb);overflow-wrap:anywhere}
+.nest .admo small{display:block;font:600 12px var(--fb);color:var(--ink3);overflow-wrap:anywhere}
 
 .nest .rpg{display:grid;grid-template-columns:minmax(240px,320px) minmax(0,1fr);gap:16px;align-items:start}
 /* The report index keeps its own height whichever report is open, and stays in view while a long one scrolls. */
@@ -76,10 +76,10 @@
 .nest .mti::before{content:'';position:absolute;inset:4px 8px;border-radius:16px;z-index:-1;transition:background var(--t1)}
 .nest .mti:hover::before{background:var(--s2)}
 .nest .mti.on::before{background:var(--brand-soft)}
-.nest .mti b{font:700 14px var(--fb);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nest .mti b{font:700 14px var(--fb);overflow-wrap:anywhere}
 .nest .mti small{font:600 11px var(--fb);color:var(--ink3);flex:none}
-.nest .mts{display:block;font:700 13px var(--fb);color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.nest .mtp{display:block;font:500 12px var(--fb);color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nest .mts{display:block;font:700 13px var(--fb);color:var(--ink2);overflow-wrap:anywhere}
+.nest .mtp{display:block;font:500 12px var(--fb);color:var(--ink3);overflow-wrap:anywhere}
 .nest .mcv{display:flex;flex-direction:column;min-height:min(70dvh,640px)}
 .nest .mch{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .nest .mback{display:none}
@@ -121,12 +121,14 @@
 .nest .evi:first-child{border-top:0}
 .nest .evi:hover{background:var(--s2)}
 .nest .evk{width:10px;height:10px;margin-top:6px;flex:none}
-.nest .evi b{display:block;font:700 15px var(--fb);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nest .evi b{display:block;font:700 15px var(--fb);overflow-wrap:anywhere}
 .nest .evi small{display:block;font:600 12px var(--fb);color:var(--ink3)}
-.nest .evi .evn{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nest .evi .evn{font-weight:500;overflow-wrap:anywhere}
 .nest .lgd{display:inline-flex;align-items:center;font:700 12px var(--fb);color:var(--ink3)}
 @media (max-width:1000px){.nest .evg{grid-template-columns:minmax(0,1fr)}}
 
 
 /* Names and notes wrap instead of being cut. Only one-line previews in lists keep an ellipsis. */
 .nest .admo b,.nest .admo small,.nest .evi b,.nest .evi .evn{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+/* A written answer handed in from the app, kept as the student wrote it (line breaks and all). */
+.nest .hwans{flex:1 1 100%;margin:0;padding:10px 14px;border-radius:14px;background:var(--s2);font:500 14px/1.5 var(--fb);color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}

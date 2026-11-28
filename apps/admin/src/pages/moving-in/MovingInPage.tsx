@@ -60,7 +60,7 @@ export function MovingInPage() { const app = useApp();
           <div className="stack">
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <FilePick multiple onPickAll={(f) => { setPicked(f); setErr(''); }}>{picked.length ? tr('admin.moving_in_page.choose_other_files') : tr('admin.moving_in_page.choose_files')}</FilePick>
-              {picked.length > 0 && <b style={{ font: '700 14px var(--fb)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} data-tip={picked.map((f) => f.name).join(', ')}>{picked.length === 1 ? picked[0]!.name : tr('admin.moving_in_page.files', { length: picked.length, p1: picked.map((f) => f.name).join(', ') })}</b>}
+              {picked.length > 0 && <b style={{ font: '700 14px var(--fb)', minWidth: 0, overflowWrap: 'anywhere' }} data-tip={picked.map((f) => f.name).join(', ')}>{picked.length === 1 ? picked[0]!.name : tr('admin.moving_in_page.files', { length: picked.length, p1: picked.map((f) => f.name).join(', ') })}</b>}
             </div>
             <Field label={tr('admin.moving_in_page.what_is_in_it_optional')} value={note} onChange={setNote} maxLength={500} placeholder={tr('admin.moving_in_page.for_example_fees_paid_this')} />
             {err && <div className="emsg" role="alert">{err}</div>}
@@ -70,7 +70,7 @@ export function MovingInPage() { const app = useApp();
             <div style={{ marginTop: 16 }}>
               {uploads.data!.map((u) => (
                 <div key={u.id} className="rw" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 16, rowGap: 6, height: 'auto', padding: '10px 0', cursor: 'default' }}>
-                  <span style={{ minWidth: 0, flex: '1 1 220px' }}><b style={{ font: '700 14px var(--fb)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} data-tip={u.fileName}>{u.fileName}</b><small style={{ color: 'var(--ink3)', font: '600 12px var(--fb)' }}>{u.note || (u.rows ? tr('admin.moving_in_page.rows', { rows: u.rows }) : tr('admin.moving_in_page.a_file_to_read'))}</small>{u.status === 'set_aside' && u.setAsideReason && <small style={{ display: 'block', color: 'var(--warn)', font: '600 12px var(--fb)', marginTop: 4 }}>{tr('admin.moving_in_page.set_aside_2')}{' '}{u.setAsideReason}</small>}</span>
+                  <span style={{ minWidth: 0, flex: '1 1 220px' }}><b style={{ font: '700 14px var(--fb)', display: 'block', overflowWrap: 'anywhere' }} data-tip={u.fileName}>{u.fileName}</b><small style={{ color: 'var(--ink3)', font: '600 12px var(--fb)' }}>{u.note || (u.rows ? tr('admin.moving_in_page.rows', { rows: u.rows }) : tr('admin.moving_in_page.a_file_to_read'))}</small>{u.status === 'set_aside' && u.setAsideReason && <small style={{ display: 'block', color: 'var(--warn)', font: '600 12px var(--fb)', marginTop: 4 }}>{tr('admin.moving_in_page.set_aside_2')}{' '}{u.setAsideReason}</small>}</span>
                   <span style={{ color: 'var(--ink2)', font: '600 13px var(--fb)' }}>{u.uploadedBy} · {stamp(u.at)}</span>
                   <span className={`st ${STATUS[u.status].tone}`}><i></i>{STATUS[u.status].label}</span>
                 </div>

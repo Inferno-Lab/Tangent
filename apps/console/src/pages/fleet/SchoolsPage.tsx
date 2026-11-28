@@ -72,7 +72,7 @@ export function SchoolsPage() {
                       style={{ '--cols': COLS, height: 58, color: 'inherit', textDecoration: 'none' } as React.CSSProperties}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                         <span className="av" style={{ width: 34, height: 34, fontSize: 11, background: t.bg, color: t.fg, boxShadow: 'none' }}>{initials(s.name)}</span>
-                        <span style={{ minWidth: 0 }}><b data-tip={s.name} style={{ font: '700 14px/1.25 var(--fb)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</b><small style={{ color: 'var(--ink3)', font: '600 12px var(--fb)' }}>{s.slug}</small></span>
+                        <span style={{ minWidth: 0 }}><b data-tip={s.name} style={{ font: '700 14px/1.25 var(--fb)', display: 'block', overflowWrap: 'anywhere' }}>{s.name}</b><small style={{ color: 'var(--ink3)', font: '600 12px var(--fb)' }}>{s.slug}</small></span>
                       </span>
                       <span>{plans.data?.find((p) => p.key === s.plan)?.name ?? s.plan}</span>
                       <span className="chip">{s.cell}</span>

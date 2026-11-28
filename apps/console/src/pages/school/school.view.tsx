@@ -77,7 +77,8 @@ export function SchoolView({ v }: { v: any }) {
         {v.tab === "overview" && (
           <section className="grid" data-even="">
             {v.golive}
-            <div className="card s7 rise" style={{ "--d": ".15s" } as CSSProperties} aria-labelledby="prov">
+            <div className="s7" style={{ display: "flex", flexDirection: "column", gap: "16px", minWidth: "0" } as CSSProperties}>
+            <div className="card rise" style={{ "--d": ".15s" } as CSSProperties} aria-labelledby="prov">
               <div className="ch">
                 <h2 id="prov">{v.provTitle}</h2>
                 {v.folded && (
@@ -136,6 +137,35 @@ export function SchoolView({ v }: { v: any }) {
               </div>
               </>
               )}
+            </div>
+              <div className="card rise" style={{ "--d": ".3s" } as CSSProperties} aria-labelledby="stores">
+                <div className="ch">
+                  <h2 id="stores">{tr('console.school.view.app_stores')}</h2>
+                  <span className={`chip ${v.checkDone === v.checkTotal && v.checkTotal > 0 ? "g" : "a"}`}>
+                    {v.checkDone} {tr('console.school.view.of')}{' '}{v.checkTotal}
+                  </span>
+                </div>
+                <div style={{ marginTop: "8px" } as CSSProperties}>
+                  {v.checks.length === 0 && <EmptyNote icon="checkCircle" title={tr('console.school.view.no_checklist_yet')} body={tr('console.school.view.the_store_checklist_is_created')} />}
+                  {v.checks.map((c: any) => (
+                    <div key={c.key} className="ck" style={{ cursor: "default", alignItems: "center", flexWrap: "wrap" } as CSSProperties}>
+                      <i className={c.cls}>
+                        {c.cls === "d" && (
+                          <Icon name="check" />
+                        )}
+                        {c.cls === "w" && (
+                          <Icon name="time" />
+                        )}
+                      </i>
+                      <span style={{ flex: "1 1 160px", minWidth: 0 } as CSSProperties}>
+                        {c.n}
+                        {c.who && <small style={{ display: "block", color: "var(--ink3)", font: "600 12px var(--fb)" } as CSSProperties}>{c.who}</small>}
+                      </span>
+                      <Select compact aria-label={c.n} value={c.state} onChange={c.set} disabled={!v.canWrite} options={v.checkOptions} />
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
             <div className="s5" style={{ display: "flex", flexDirection: "column", gap: "16px", minWidth: "0" } as CSSProperties}>
               <div className="tkt rise" style={{ "--d": ".2s" } as CSSProperties}>
@@ -200,34 +230,6 @@ export function SchoolView({ v }: { v: any }) {
                       ))}
                     </div>
                   </div>
-                </div>
-              </div>
-              <div className="card rise" style={{ "--d": ".3s" } as CSSProperties} aria-labelledby="stores">
-                <div className="ch">
-                  <h2 id="stores">{tr('console.school.view.app_stores')}</h2>
-                  <span className={`chip ${v.checkDone === v.checkTotal && v.checkTotal > 0 ? "g" : "a"}`}>
-                    {v.checkDone} {tr('console.school.view.of')}{' '}{v.checkTotal}
-                  </span>
-                </div>
-                <div style={{ marginTop: "8px" } as CSSProperties}>
-                  {v.checks.length === 0 && <EmptyNote icon="checkCircle" title={tr('console.school.view.no_checklist_yet')} body={tr('console.school.view.the_store_checklist_is_created')} />}
-                  {v.checks.map((c: any) => (
-                    <div key={c.key} className="ck" style={{ cursor: "default", alignItems: "center", flexWrap: "wrap" } as CSSProperties}>
-                      <i className={c.cls}>
-                        {c.cls === "d" && (
-                          <Icon name="check" />
-                        )}
-                        {c.cls === "w" && (
-                          <Icon name="time" />
-                        )}
-                      </i>
-                      <span style={{ flex: "1 1 160px", minWidth: 0 } as CSSProperties}>
-                        {c.n}
-                        {c.who && <small style={{ display: "block", color: "var(--ink3)", font: "600 12px var(--fb)" } as CSSProperties}>{c.who}</small>}
-                      </span>
-                      <Select compact aria-label={c.n} value={c.state} onChange={c.set} disabled={!v.canWrite} options={v.checkOptions} />
-                    </div>
-                  ))}
                 </div>
               </div>
             </div>

@@ -38,7 +38,7 @@ export function GalleryPage() { const app = useApp();
           {list.map((a, i) => (
             <button key={a.id} className="card s4 rise" onClick={() => setOpen(a)} style={{ '--d': `${Math.min(i, 8) * 0.04}s`, textAlign: 'start', cursor: 'pointer', border: 0, font: 'inherit', color: 'inherit' } as React.CSSProperties} aria-label={t('admin.gallery_page.open', { title: a.title })}>
               {a.coverFileId ? <Photo id={a.coverFileId} alt={a.title} /> : <div style={{ width: '100%', aspectRatio: '4 / 3', borderRadius: 12, background: 'var(--s2)', display: 'grid', placeItems: 'center', alignContent: 'center', gap: 6, color: 'var(--ink3)', font: '600 13px var(--fb)' }}><Icon name="image" size={28} />{t('admin.gallery_page.no_photos_yet')}</div>}
-              <div className="ch" style={{ marginTop: 12 }}><h2 style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.title}</h2><span className={`chip ${a.published ? 'g' : ''}`}>{a.published ? t('admin.gallery_page.shared') : t('admin.gallery_page.draft')}</span></div>
+              <div className="ch" style={{ marginTop: 12 }}><h2 style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{a.title}</h2><span className={`chip ${a.published ? 'g' : ''}`}>{a.published ? t('admin.gallery_page.shared') : t('admin.gallery_page.draft')}</span></div>
               <div className="help" style={{ marginTop: 4 }}>{a.className ?? t('admin.gallery_page.whole_school')} · {t('admin.gallery_page.n_photos', { n: a.photos })} · {stamp(a.createdAt)}</div>
             </button>
           ))}

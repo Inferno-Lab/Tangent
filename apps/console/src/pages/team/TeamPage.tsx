@@ -48,11 +48,11 @@ export function TeamPage() {
       {rows.length === 0 ? <div><EmptyState scene="team" onAction={canWrite ? () => setAdding(true) : undefined} /></div> : (
         <Card style={{ padding: 0 }}>
           <div className="tbl scroll-x"><div style={{ minWidth: 620 }}>
-            <div className="grd th" style={{ '--cols': 'minmax(0,2fr) minmax(0,2fr) 120px 170px' } as React.CSSProperties}><span>{tr('console.team_page.person')}</span><span>{tr('console.team_page.roles')}</span><span>{tr('console.team_page.last_seen')}</span><span></span></div>
+            <div className="grd th" style={{ '--cols': 'minmax(0,2fr) minmax(0,2fr) 120px 220px' } as React.CSSProperties}><span>{tr('console.team_page.person')}</span><span>{tr('console.team_page.roles')}</span><span>{tr('console.team_page.last_seen')}</span><span></span></div>
             {rows.map((r) => {
               const t = tintFor(r.name);
               return (
-                <div key={r.id} className="grd rw" style={{ '--cols': 'minmax(0,2fr) minmax(0,2fr) 120px 170px' } as React.CSSProperties}>
+                <div key={r.id} className="grd rw" style={{ '--cols': 'minmax(0,2fr) minmax(0,2fr) 120px 220px' } as React.CSSProperties}>
                   <span style={{ display: 'flex', gap: 12, alignItems: 'center', minWidth: 0 }}>
                     <span className="av" style={{ width: 34, height: 34, fontSize: 11, background: t.bg, color: t.fg, boxShadow: 'none' }}>{initials(r.name)}</span>
                     <span style={{ minWidth: 0 }}><b style={{ display: 'block', font: '700 14px var(--fb)' }}>{r.name}</b><small style={{ color: 'var(--ink3)' }}>{r.email}</small></span>

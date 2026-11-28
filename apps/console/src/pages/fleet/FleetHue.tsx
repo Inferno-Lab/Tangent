@@ -50,8 +50,8 @@ export function FleetHue({ v, f, schools, actions }: { v: V; f: FleetSummary; sc
               </div>
             </section>
 
-            <div className="g" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(280px,320px)' }}>
-              <section className="card flush">
+            {/* The schools across the page (a short list leaves no blank beside it), then what waits and the release side by side. */}
+            <section className="card flush">
                 <div className="ch" style={{ padding: '20px 20px 8px' }}><h2>{tr('console.fleet_hue.schools')}</h2><small>{tr('console.fleet_hue.by_health_then_name')}</small><a href="#" onClick={(e) => { e.preventDefault(); v.openSchools(); }}>{tr('console.fleet_hue.all')}{' '}{schools.length}<Icon name="next" size={14} className="i" /></a></div>
                 <div className="scroll-x">
                   <div style={{ minWidth: 640 }}>
@@ -71,8 +71,8 @@ export function FleetHue({ v, f, schools, actions }: { v: V; f: FleetSummary; sc
                   </div>
                 </div>
                 <div className="t2" style={{ fontSize: 13, padding: '14px 20px' }}>{tr('console.fleet_hue.showing')}{' '}{rows.length} {tr('console.fleet_hue.of')}{' '}{schools.length}</div>
-              </section>
-              <div className="vc" style={{ gap: 20 }}>
+            </section>
+            <div className="g" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(min(320px,100%),1fr))', gap: 20 }}>
                 <section className="card">
                   <div className="ch"><h2>{tr('console.fleet_hue.approvals')}</h2>{waiting.length > 0 && <span className="tag warn">{waiting.length} {tr('console.fleet_hue.waiting')}</span>}</div>
                   {waiting.length ? waiting.slice(0, 3).map((a) => (
@@ -95,7 +95,6 @@ export function FleetHue({ v, f, schools, actions }: { v: V; f: FleetSummary; sc
                     </>
                   ) : <><p className="t2" style={{ fontSize: 14 }}>{v.relLine}</p><button className="btn ton" onClick={v.openReleases}>{v.relCta}</button></>}
                 </section>
-              </div>
             </div>
           </>
         )}

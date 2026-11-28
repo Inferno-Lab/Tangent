@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
 import { HttpError } from '@tangent/api-client';
-import { CURRICULA, SchoolDetailsPatch, STEP_LABELS, auditLabel, type ActionKey, type ProvisionRunRow, type SchoolDetail } from '@tangent/contracts';
+import { CURRICULA, SchoolDetailsPatch, STEP_LABELS, auditLabel, initials, type ActionKey, type ProvisionRunRow, type SchoolDetail } from '@tangent/contracts';
 import { DateField, Dialog, EmptyCard, Field, NumberField, PageScope, PhoneField, Select, SelectField, useShake, useToast, EmptyNote, t as tr, busyFor, Skeleton } from '@tangent/web-ui';
 import { PRICE_CURRENCY } from '@tangent/config-engine';
 import { useApp } from '../../app/context';
@@ -290,7 +290,7 @@ function Audit({ id }: { id: string }) {
       </div>
       {q.isLoading ? <Skeleton kind="rows" rows={4} style={{ margin: 20 }} />
         : !rows.length ? <div style={{ padding: '0 20px 20px' }}><EmptyNote icon={pages.length || Object.values(f).some(Boolean) ? 'search' : 'audit'} title={pages.length || Object.values(f).some(Boolean) ? tr('console.school_page.nothing_matches') : tr('console.school_page.nothing_has_happened_yet')} body={pages.length || Object.values(f).some(Boolean) ? tr('console.school_page.clear_a_filter_to_see') : tr('console.school_page.every_change_made_from_the')} /></div>
-          : <div className="lscroll" style={{ padding: '0 20px' }}>{rows.map((r) => <div key={r.id} className="kv"><span>{auditLabel(r.action)}<br /><small style={{ color: 'var(--ink3)' }}>{r.actor}{r.detail ? ` · ${r.detail}` : ''}</small></span><b>{when(r.at)}</b></div>)}</div>}
+          : <div className="lscroll" style={{ padding: '0 20px' }}>{rows.map((r) => <div key={r.id} className="audr"><span className="av" aria-hidden="true">{initials(r.actor)}</span><span style={{ minWidth: 0 }}><b>{auditLabel(r.action)}</b><small>{r.actor}{r.detail ? ` · ${r.detail}` : ''}</small></span><time dateTime={r.at}>{when(r.at)}</time></div>)}</div>}
       <div className="tgrow" style={{ padding: '12px 20px 20px' }}>
         <button className="btn sm" disabled={!pages.length} onClick={() => setPages(pages.slice(0, -1))}>{tr('console.school_page.newer')}</button>
         <button className="btn sm" disabled={rows.length < 50} onClick={() => setPages([...pages, rows.at(-1)!.at])}>{tr('console.school_page.older')}</button>

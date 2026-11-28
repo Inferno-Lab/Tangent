@@ -81,8 +81,8 @@ export function LanguagesPage() {
         </div>
         {rows.data && !rows.data.length
           ? <EmptyNote icon="check" title={t('console.languages_page.nothing_here')} body={filter === 'missing' ? t('console.languages_page.every_text_of_this_part') : t('console.languages_page.no_text_matches')} />
-          : shown.map((r) => <TextRow key={r.key} lang={lang} surface={surface} row={r} canWrite={canWrite} onSaved={refresh} onError={(m) => say(m, 'bad')} />)}
-        {more}
+          /* Each text is a tall row (English, the translation, its state): the list scrolls inside the card, a page at a time. */
+          : <div className="lscroll" style={{ marginTop: 12 }}>{shown.map((r) => <TextRow key={r.key} lang={lang} surface={surface} row={r} canWrite={canWrite} onSaved={refresh} onError={(m) => say(m, 'bad')} />)}{more}</div>}
         {!more && (rows.data?.length ?? 0) >= 500 && <div className="help">{t('console.languages_page.the_first_500_are_shown')}</div>}
       </Card>
     </Page>

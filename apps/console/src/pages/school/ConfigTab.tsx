@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
 import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, MODULES } from '@tangent/config-engine';
 import { COUNTRY_PACKS, curriculaFor, tx, DEFAULT_BRAND, SETTING_GROUPS, SETTINGS_META, SchoolSettingsSchema, TIGHTEN, settingOwner, type SchoolConfig, type SettingKey, hueContrast, hueOf, hueTokens } from '@tangent/contracts';
-import { Checkbox, Dialog, EmptyCard, ErrorLine, Field, SelectField, SettingRow, useShake, Icon, EmptyNote, t as tr, useUnsaved, Skeleton } from '@tangent/web-ui';
+import { Checkbox, Dialog, EmptyCard, ErrorLine, Field, Select, SelectField, SettingChanges, SettingRow, useShake, Icon, EmptyNote, t as tr, useUnsaved, Skeleton } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { ago } from '../../app/format';
 
@@ -88,38 +88,46 @@ export function ConfigTab({ schoolId, say }: { schoolId: string; say: Say }) { c
         )}
       </div>
 
-      <nav className="card s3 rise" aria-label={tr('console.config_tab.setting_groups')} style={{ padding: 12, alignSelf: 'start' }}>
-        {groups.map((g) => { const n = changed.filter((k) => SETTINGS_META[k as SettingKey]?.group === g).length;
-          return (
-            <button key={g} className={`rpb ${!needle && g === group ? 'on' : ''}`} aria-current={!needle && g === group} onClick={() => setGroup(g)} style={{ width: '100%' }}>
-              <b>{groupLabel(g)}{n ? tr('console.config_tab.changed', { n }) : ''}</b><small>{KEYS.filter((k) => SETTINGS_META[k].group === g && shown(k)).length} {tr('console.config_tab.settings')}</small>
-            </button>
-          );
-        })}
-        {hiddenCount > 0 && <div style={{ padding: '10px 8px 0' }}><Checkbox checked={unused} onChange={setUnused} label={tr('console.config_tab.show_not_in_use_yet', { hiddenCount })} /></div>}
-      </nav>
-
-      <div className={`card s9 rise ${shake.cls}`}>
-        <div className="ch"><h2>{needle ? tr('console.config_tab.settings_matching', { p0: find.trim() }) : groupLabel(group)}</h2></div>
-        {keys.length === 0 && <div style={{ marginTop: 12 }}><EmptyNote icon={needle ? 'search' : 'setup'} title={needle ? tr('console.config_tab.no_setting_matches', { p0: find.trim() }) : tr('console.config_tab.no_settings_here')} body={needle ? tr('console.config_tab.search_by_what_the_setting') : tr('console.config_tab.this_group_has_nothing_to')} /></div>}
-        {keys.map((k) => (
-          <div key={k}>
-            {needle && <div className="lbl" style={{ marginTop: 12 }}>{groupLabel(SETTINGS_META[k].group)}</div>}
-            <LockLine k={k} cfg={cfg} schoolId={schoolId} can={can} current={value(k)} say={say} />
-            <SettingRow meta={SETTINGS_META[k]} value={value(k)} error={err[k]} disabled={!can} ctx={cfg} logo={logo} onLogo={setLogo} after={k === 'brand.color' ? <HueSwatches colour={String(value(k) || DEFAULT_BRAND)} /> : undefined}
-              onChange={(v) => { setEdits((x) => ({ ...x, [k]: v })); setErr({}); }} />
-          </div>
-        ))}
-        {can && (
-          <div style={{ marginTop: 16 }}>
-            {err._ && <ErrorLine>{err._}</ErrorLine>}
-            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: 220 }}><Field label={tr('console.config_tab.why_kept_in_the_history')} value={note} onChange={setNote} maxLength={200} placeholder={tr('console.config_tab.for_example_the_principal_asked')} /></div>
-              <button className="btn" disabled={!total || save.isPending} onClick={() => { setEdits({}); setLogo(null); setErr({}); }}>{tr('console.config_tab.discard_all')}</button>
-              <button className="btn pri" disabled={!total || save.isPending} onClick={() => save.mutate()}>{save.isPending ? tr('console.config_tab.saving') : total ? tr('console.config_tab.save', { total }) : tr('console.config_tab.save_2')}</button>
+      <div className="s12 sidesplit rise">
+        <nav className="card" aria-label={tr('console.config_tab.setting_groups')} style={{ padding: 12 }}>
+          {[['wide', groups.filter((g) => !MODULES.some((m) => m.key === g))], ['mods', groups.filter((g) => MODULES.some((m) => m.key === g))]].map(([part, list]) => (
+            <div key={part as string} style={{ display: 'contents' }}>
+              <div className="lbl" style={{ padding: part === 'wide' ? '4px 12px 6px' : '14px 12px 6px' }}>{part === 'wide' ? tr('console.config_tab.whole_school') : tr('console.config_tab.modules')}</div>
+              {(list as string[]).map((g) => { const n = changed.filter((k) => SETTINGS_META[k as SettingKey]?.group === g).length;
+                return (
+                  <button key={g} className={`rpb ${!needle && g === group ? 'on' : ''}`} aria-current={!needle && g === group} onClick={() => setGroup(g)} style={{ width: '100%' }}>
+                    <b>{groupLabel(g)}{n ? tr('console.config_tab.changed', { n }) : ''}</b><small>{tr('console.config_tab.n_settings', { n: KEYS.filter((k) => SETTINGS_META[k].group === g && shown(k)).length })}</small>
+                  </button>
+                );
+              })}
             </div>
+          ))}
+          {hiddenCount > 0 && <div style={{ padding: '10px 8px 0' }}><Checkbox checked={unused} onChange={setUnused} label={tr('console.config_tab.show_not_in_use_yet', { hiddenCount })} /></div>}
+        </nav>
+
+        <div className={`card pane ${shake.cls}`}>
+          <div className="ch"><h2>{needle ? tr('console.config_tab.settings_matching', { p0: find.trim() }) : groupLabel(group)}</h2><span className="chip">{keys.length}</span></div>
+          <div className="pane-body" style={{ marginTop: 8 }}>
+            {keys.length === 0 && <div style={{ marginTop: 12 }}><EmptyNote icon={needle ? 'search' : 'setup'} title={needle ? tr('console.config_tab.no_setting_matches', { p0: find.trim() }) : tr('console.config_tab.no_settings_here')} body={needle ? tr('console.config_tab.search_by_what_the_setting') : tr('console.config_tab.this_group_has_nothing_to')} /></div>}
+            {keys.map((k) => (
+              <div key={k} className="setr">
+                <LockLine k={k} cfg={cfg} schoolId={schoolId} can={can} current={value(k)} say={say} group={needle ? groupLabel(SETTINGS_META[k].group) : ''} />
+                <SettingRow meta={SETTINGS_META[k]} value={value(k)} error={err[k]} disabled={!can} ctx={cfg} logo={logo} onLogo={setLogo} after={k === 'brand.color' ? <HueSwatches colour={String(value(k) || DEFAULT_BRAND)} /> : undefined}
+                  onChange={(v) => { setEdits((x) => ({ ...x, [k]: v })); setErr({}); }} />
+              </div>
+            ))}
           </div>
-        )}
+          {can && (
+            <div className="pane-foot">
+              {err._ && <ErrorLine>{err._}</ErrorLine>}
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 220 }}><Field label={tr('console.config_tab.why_kept_in_the_history')} value={note} onChange={setNote} maxLength={200} placeholder={tr('console.config_tab.for_example_the_principal_asked')} /></div>
+                <button className="btn" disabled={!total || save.isPending} onClick={() => { setEdits({}); setLogo(null); setErr({}); }}>{tr('console.config_tab.discard_all')}</button>
+                <button className="btn pri" disabled={!total || save.isPending} onClick={() => save.mutate()}>{save.isPending ? tr('console.config_tab.saving') : total ? tr('console.config_tab.save', { total }) : tr('console.config_tab.save_2')}</button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <History cfg={cfg} schoolId={schoolId} can={can} say={say} />
@@ -156,9 +164,6 @@ function History({ cfg, schoolId, can, say }: { cfg: SchoolConfig; schoolId: str
   );
 }
 
-/** A value as one short line: words as they are, anything else as its JSON, cut short. */
-const brief = (v: unknown) => { const s = typeof v === 'string' ? v : JSON.stringify(v); return s.length > 80 ? `${s.slice(0, 77)}…` : s; };
-
 /**
  * Re-applies part of a starter pack to a live school (one-shot plan 3.2): what each part would change is shown first, and a
  * second person approves before anything changes. Only what differs is written, worked out again when it is approved.
@@ -186,7 +191,7 @@ function Packs({ cfg, schoolId, can, say }: { cfg: SchoolConfig; schoolId: strin
         : (parts.data ?? []).map((p) => (
           <div key={p.group} style={{ marginTop: 12 }}>
             <Checkbox label={`${groupLabel(p.group)} (${p.changes.length})`} checked={groups.includes(p.group)} disabled={!can} onChange={(on) => setGroups(on ? [...groups, p.group] : groups.filter((g) => g !== p.group))} />
-            {p.changes.map((c) => <div key={c.key} className="kv" style={{ alignItems: 'flex-start' }}><span>{c.label}</span><b style={{ minWidth: 0, textAlign: 'end' }}><s style={{ color: 'var(--ink3)' }}>{brief(c.before)}</s> → {brief(c.after)}</b></div>)}
+            <div style={{ paddingInlineStart: 32 }}><SettingChanges changes={p.changes} /></div>
           </div>
         ))}
       {can && groups.length > 0 && (
@@ -261,19 +266,44 @@ function Preview({ cfg, schoolId }: { cfg: SchoolConfig; schoolId: string }) { c
   const [roleId, setRoleId] = useState(cfg.roles[0]?.id ?? '');
   const p = useQuery({ queryKey: ['config-preview', schoolId, roleId, cfg.version], queryFn: () => app.api.config.preview(schoolId, roleId), enabled: !!roleId });
   const label = useMemo(() => Object.fromEntries([...APP_CATALOG.dock, ...APP_CATALOG.home, ...APP_CATALOG.quick].map((c) => [c.key, c.label])), []);
+  const tiles = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(240px,100%),1fr))', gap: 12 } as const;
+  const tile = { padding: 14, borderRadius: 18, background: 'var(--s2)', minWidth: 0 } as const;
+  const chips = (keys: string[], tone = '') => <div className="tgrow" style={{ gap: 6, marginTop: 6 }}>{keys.map((k) => <span key={k} className={`chip ${tone}`}>{label[k] ?? k}</span>)}</div>;
   return (
     <div className="card s12 rise">
-      <div className="ch"><h2>{tr('console.config_tab.preview')}</h2></div>
+      <div className="ch">
+        <h2>{tr('console.config_tab.preview')}</h2><span className="grow"></span>
+        <Select compact aria-label={tr('console.config_tab.as_this_role_sees_it')} value={roleId} onChange={setRoleId} options={cfg.roles.map((r) => ({ value: r.id, label: r.name }))} />
+      </div>
       <div className="help">{tr('console.config_tab.the_admin_menu_this_role')}</div>
-      <div style={{ maxWidth: 320 }}><SelectField label={tr('console.config_tab.as_this_role_sees_it')} value={roleId} onChange={setRoleId} options={cfg.roles.map((r) => ({ value: r.id, label: r.name }))} /></div>
+      {p.isLoading && <Skeleton kind="grid" style={{ marginTop: 12 }} />}
       {p.data && (
         <>
-          {p.data.menu.map((g) => <div key={g.group} className="kv">{g.group}<b className="tgrow">{g.pages.map((n) => <span key={n.id} className="chip">{n.label}</span>)}</b></div>)}
-          {APP_ROLES.map((r) => (
-            <div key={r} className="kv">{tr('console.config_tab.app')}{' '}{APP_ROLE_LABELS[r]}<b className="tgrow">{p.data!.app.roles.includes(r)
-              ? [...p.data!.app.layout[r].dock.map((k) => <span key={`d${k}`} className="chip v">{label[k] ?? k}</span>), ...p.data!.app.layout[r].home.map((k) => <span key={`h${k}`} className="chip">{label[k] ?? k}</span>)]
-              : tr('console.config_tab.does_not_use_the_app')}</b></div>
-          ))}
+          <div className="lbl" style={{ margin: '16px 0 8px' }}>{tr('console.config_tab.admin_menu_for', { role: cfg.roles.find((r) => r.id === roleId)?.name ?? '' })}</div>
+          {!p.data.menu.length ? <EmptyNote icon="lock" title={tr('console.config_tab.no_pages')} body={tr('console.config_tab.no_pages_body')} /> : (
+            <div style={tiles}>
+              {p.data.menu.map((g) => (
+                <div key={g.group} style={tile}><b style={{ font: '700 14px var(--fb)' }}>{g.group}</b>
+                  <div className="tgrow" style={{ gap: 6, marginTop: 6 }}>{g.pages.map((n) => <span key={n.id} className="chip">{n.label}</span>)}</div></div>
+              ))}
+            </div>
+          )}
+          <div className="lbl" style={{ margin: '20px 0 8px' }}>{tr('console.config_tab.the_app_for_each_role')}</div>
+          <div style={tiles}>
+            {APP_ROLES.map((r) => {
+              const on = p.data!.app.roles.includes(r);
+              const l = p.data!.app.layout[r];
+              return (
+                <div key={r} style={tile}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}><b style={{ font: '700 14px var(--fb)' }}>{APP_ROLE_LABELS[r]}</b>{!on && <span className="chip">{tr('console.config_tab.off')}</span>}</div>
+                  {on ? <>
+                    <small className="help" style={{ display: 'block', marginTop: 8 }}>{tr('console.config_tab.bottom_tabs')}</small>{chips(l.dock, 'v')}
+                    {l.home.length > 0 && <><small className="help" style={{ display: 'block', marginTop: 8 }}>{tr('console.config_tab.home_cards')}</small>{chips(l.home)}</>}
+                  </> : <small className="help" style={{ display: 'block', marginTop: 6 }}>{tr('console.config_tab.does_not_use_the_app')}</small>}
+                </div>
+              );
+            })}
+          </div>
         </>
       )}
     </div>
@@ -306,7 +336,7 @@ function HueSwatches({ colour }: { colour: string }) { const h = hueOf(/^#[0-9a-
  * Whose setting it is, and Tangent's lock for this school: a locked setting keeps Tangent's value whatever the school chooses
  * (on a security or privacy setting the value is a floor the school may tighten). The reason is shown to the school.
  */
-function LockLine({ k, cfg, schoolId, can, current, say }: { k: SettingKey; cfg: SchoolConfig; schoolId: string; can: boolean; current: unknown; say: Say }) { const app = useApp();
+function LockLine({ k, cfg, schoolId, can, current, say, group }: { k: SettingKey; cfg: SchoolConfig; schoolId: string; can: boolean; current: unknown; say: Say; group: string }) { const app = useApp();
   const qc = useQueryClient();
   const [asking, setAsking] = useState(false);
   const [note, setNote] = useState('');
@@ -317,7 +347,8 @@ function LockLine({ k, cfg, schoolId, can, current, say }: { k: SettingKey; cfg:
     onError: (e) => say((e as Error).message, 'bad') });
   const owner = settingOwner(k);
   return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 14 }}>
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      {group && <span className="lbl">{group}</span>}
       <span className={`chip ${owner === 'tangent' ? 'v' : ''}`}>{owner === 'tangent' ? tr('console.config_tab.tangent_s') : tr('console.config_tab.the_school_s')}</span>
       {lock && <span className="chip a" data-tip={lock.note || undefined}>{floor ? tr('console.config_tab.minimum_set_by_tangent') : tr('console.config_tab.locked_by_tangent')}</span>}
       {can && owner === 'school' && (lock

@@ -115,7 +115,7 @@ function Conversation({ id, canWrite, onBack, onChanged }: { id: string; canWrit
       <header className="mch">
         <button className="btn sm mback" onClick={onBack} aria-label={tr('admin.messages_page.back_to_the_list')}><Ico d={BACK} /></button>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <b className="fd" data-tip={t.subject} style={{ display: 'block', fontSize: 17, letterSpacing: '-.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.subject}</b>
+          <b className="fd" data-tip={t.subject} style={{ display: 'block', fontSize: 17, letterSpacing: '-.02em', overflowWrap: 'anywhere' }}>{t.subject}</b>
           <small style={{ color: 'var(--ink3)', font: '600 12px var(--fb)' }}>{t.guardianName}{t.studentName ? tr('admin.messages_page.class', { studentName: t.studentName, className: t.className }) : ''}{t.assignedToName ? tr('admin.messages_page.with', { assignedToName: t.assignedToName }) : ''}</small>
         </div>
         {canWrite && <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>

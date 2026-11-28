@@ -82,7 +82,7 @@ export function LibraryPage() { const app = useApp();
                 <div className="grd th" style={{ '--cols': 'minmax(0,2.4fr) minmax(0,1fr) 90px 110px 170px' } as React.CSSProperties}><span>{tr('admin.library_page.book')}</span><span>{tr('admin.library_page.category')}</span><span>{tr('admin.library_page.shelf')}</span><span>{tr('admin.library_page.on_the_shelf')}</span><span></span></div>
                 {books.slice((page - 1) * 50, page * 50).map((b) => (
                   <div key={b.id} className="grd rw" style={{ '--cols': 'minmax(0,2.4fr) minmax(0,1fr) 90px 110px 170px', height: 'auto', minHeight: 56, padding: '8px 20px' } as React.CSSProperties}>
-                    <span style={{ minWidth: 0 }}><b style={{ font: '700 14px/1.3 var(--fb)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} data-tip={b.title}>{b.title}</b><small className="help">{types.length > 1 && b.itemType !== 'book' ? `${listLabel(types, b.itemType, currentLanguage())} · ` : ''}{b.author || tr('admin.library_page.author_not_given')}{b.isbn ? ` · ${b.isbn}` : ''}{b.barcode ? ` · ${b.barcode}` : ''}</small></span>
+                    <span style={{ minWidth: 0 }}><b style={{ font: '700 14px/1.3 var(--fb)', overflowWrap: 'anywhere' }} data-tip={b.title}>{b.title}</b><small className="help">{types.length > 1 && b.itemType !== 'book' ? `${listLabel(types, b.itemType, currentLanguage())} · ` : ''}{b.author || tr('admin.library_page.author_not_given')}{b.isbn ? ` · ${b.isbn}` : ''}{b.barcode ? ` · ${b.barcode}` : ''}</small></span>
                     <span className="help" style={{ margin: 0 }}>{b.category}</span>
                     <span className="help" style={{ margin: 0 }}>{b.shelf || '–'}</span>
                     <span><span className={`chip ${b.copies - b.out > 0 ? 'g' : 'a'}`}>{b.copies - b.out} {tr('admin.library_page.of')}{' '}{b.copies}</span>{b.waiting > 0 && <span className="chip v" style={{ marginInlineStart: 4 }} data-tip={tr('admin.library_page.families_waiting')}>{b.waiting} {tr('admin.library_page.waiting')}</span>}</span>
@@ -110,7 +110,7 @@ export function LibraryPage() { const app = useApp();
                 {!loans.length && <div style={{ padding: '4px 20px 20px' }}><EmptyNote icon="search" title={tr('admin.library_page.no_loan_matches', { p0: lq.trim() })} body={tr('admin.library_page.search_by_the_book_or')} /></div>}
                 {loans.map((l) => (
                   <div key={l.id} className="grd rw" style={{ '--cols': 'minmax(0,2fr) minmax(0,1.4fr) 110px 150px 190px', height: 'auto', minHeight: 56, padding: '8px 20px' } as React.CSSProperties}>
-                    <b style={{ font: '700 14px/1.3 var(--fb)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} data-tip={l.title}>{l.title}</b>
+                    <b style={{ font: '700 14px/1.3 var(--fb)', minWidth: 0, overflowWrap: 'anywhere' }} data-tip={l.title}>{l.title}</b>
                     <span style={{ minWidth: 0 }}><b style={{ font: '600 13px var(--fb)' }}>{l.student}</b><small className="help" style={{ display: 'block' }}>{l.className}</small></span>
                     <span className="num">{dateLabel(l.dueOn)}</span>
                     <span>{l.overdueDays > 0 ? <span className="chip c" data-tip={tr('admin.library_page.days_late', { overdueDays: l.overdueDays })}>{tr('admin.library_page.late')}{' '}{fmtMoney(l.fine)}</span> : <span className="chip g">{tr('admin.library_page.on_time')}</span>}</span>

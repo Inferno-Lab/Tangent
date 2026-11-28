@@ -247,7 +247,7 @@ function ExamSheet({ id, onClose, onChange, onChanged, onRemoved }: { id: string
                 {m.students.map((s) => (
                   <div className="mkr" key={s.studentId} style={{ '--n': ex.subjects.length } as React.CSSProperties}>
                     <span className="rn num">{s.rollNo || '–'}</span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}><Avatar name={s.name} size={26} /><b data-tip={s.name} style={{ font: '700 13px var(--fb)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{s.name}</b></span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}><Avatar name={s.name} size={26} /><b data-tip={s.name} style={{ font: '700 13px var(--fb)', overflowWrap: 'anywhere' }}>{s.name}</b></span>
                     {ex.subjects.map((sub) => { const c = cell(s.studentId, sub.subjectId);
                       const over = c.score !== '' && Number(c.score) > sub.maxMarks;
                       return (
@@ -293,7 +293,7 @@ function ExamSheet({ id, onClose, onChange, onChanged, onRemoved }: { id: string
                     {results.data.rows.map((r) => (
                       <div className="grd rw" key={r.studentId} style={{ '--cols': '44px minmax(0,1.6fr) 90px 70px 60px' } as React.CSSProperties}>
                         <b className="num" style={{ font: '700 14px var(--fb)', color: r.rank <= 3 ? 'var(--brand)' : 'var(--ink3)' }}>#{r.rank}</b>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}><Avatar name={r.name} size={28} /><b data-tip={r.name} style={{ font: '700 14px var(--fb)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.name}</b></span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}><Avatar name={r.name} size={28} /><b data-tip={r.name} style={{ font: '700 14px var(--fb)', overflowWrap: 'anywhere' }}>{r.name}</b></span>
                         <span className="num" style={{ font: '600 13px var(--fb)' }}>{r.total} / {r.max}</span>
                         <b className="num" style={{ font: '700 14px var(--fb)' }}>{r.pct}%</b>
                         <span className={`chip ${r.pct >= pass ? 'g' : 'c'}`}>{r.grade}</span>

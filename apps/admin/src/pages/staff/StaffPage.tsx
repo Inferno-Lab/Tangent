@@ -94,7 +94,7 @@ export function StaffPage() { const app = useApp();
                         <div className="grd rw stf" style={{ '--cols': cols } as React.CSSProperties}>
                           <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                             <Avatar name={r.name} />
-                            <span style={{ minWidth: 0 }}><b data-tip={r.name} style={{ font: '700 14px var(--fb)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.name}</b><small style={{ color: 'var(--ink3)', font: '600 12px var(--fb)' }}>{r.designation}{r.department ? ` · ${r.department}` : ''}</small></span>
+                            <span style={{ minWidth: 0 }}><b data-tip={r.name} style={{ font: '700 14px var(--fb)', overflowWrap: 'anywhere' }}>{r.name}</b><small style={{ color: 'var(--ink3)', font: '600 12px var(--fb)' }}>{r.designation}{r.department ? ` · ${r.department}` : ''}</small></span>
                           </span>
                           <span className="tgrow hs" style={{ gap: 6 }}>{r.subjects.length ? r.subjects.map((s) => <span className="chip" key={s.id}>{s.name}</span>) : <span style={{ color: 'var(--ink3)', font: '600 13px var(--fb)' }}>–</span>}</span>
                           <span className="tgrow" style={{ gap: 6 }}>{r.roles.length ? r.roles.map((x) => <span className="chip v" key={x.id}>{x.name}</span>) : <span className="chip">{tr('admin.staff_page.no_role')}</span>}</span>

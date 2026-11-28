@@ -63,8 +63,8 @@ export function OnlinePaymentsPage({ tabs }: { tabs?: React.ReactNode }) {
             {list.map((p) => (
               <div key={p.id} className="grd rw" style={{ '--cols': '140px minmax(0,1.4fr) minmax(0,1.4fr) 110px 100px 190px', height: 'auto', minHeight: 52, padding: '8px 20px' } as React.CSSProperties}>
                 <b className="num" style={{ font: '700 13px var(--fb)' }} data-tip={p.providerPaymentId}>{p.receiptNo}</b>
-                <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.student}</span>
-                <span className="help" style={{ margin: 0, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} data-tip={p.title}>{p.title}</span>
+                <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{p.student}</span>
+                <span className="help" style={{ margin: 0, minWidth: 0, overflowWrap: 'anywhere' }} data-tip={p.title}>{p.title}</span>
                 <span className="num">{fmtMoney(p.amount)}{p.refunded ? <small className="help" style={{ display: 'block' }}>−{fmtMoney(p.refunded)}</small> : null}</span>
                 <span className="num">{dateLabel(p.paidOn)}</span>
                 <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>

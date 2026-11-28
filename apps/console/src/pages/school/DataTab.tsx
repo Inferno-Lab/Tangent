@@ -125,7 +125,7 @@ export function DataTab({ d, say, danger }: { d: SchoolDetail; say: Say; danger:
         <div className="help">{tr('console.data_tab.what_the_school_sent_from')}</div>
         {v.uploads.length === 0 ? <div style={{ marginTop: 10 }}><EmptyNote icon="file" title={tr('console.data_tab.no_files_yet')} body={tr('console.data_tab.spreadsheets_the_school_sends_for')} /></div> : v.uploads.map((u) => (
           <div key={u.id} className="rw" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 16, rowGap: 8, height: 'auto', padding: '10px 0', cursor: 'default' }}>
-            <span style={{ minWidth: 0, flex: '1 1 220px' }}><b style={{ font: '700 14px var(--fb)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} data-tip={u.fileName}>{u.fileName}</b><small style={{ color: 'var(--ink3)', font: '600 12px var(--fb)' }}>{u.note || (u.rows ? tr('console.data_tab.rows_2', { rows: u.rows }) : tr('console.data_tab.read_by_eye'))}</small></span>
+            <span style={{ minWidth: 0, flex: '1 1 220px' }}><b style={{ font: '700 14px var(--fb)', display: 'block', overflowWrap: 'anywhere' }} data-tip={u.fileName}>{u.fileName}</b><small style={{ color: 'var(--ink3)', font: '600 12px var(--fb)' }}>{u.note || (u.rows ? tr('console.data_tab.rows_2', { rows: u.rows }) : tr('console.data_tab.read_by_eye'))}</small></span>
             <span style={{ color: 'var(--ink2)', font: '600 13px var(--fb)' }}>{u.uploadedBy} · {when(u.at)}{u.status === 'set_aside' && u.setAsideReason ? tr('console.data_tab.set_aside', { setAsideReason: u.setAsideReason }) : ''}</span>
             {asideFor === u.id && (
               <span style={{ flex: '1 1 100%', display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
@@ -170,7 +170,7 @@ function BatchRow({ b, kinds, canUndo, busy, onUndo }: { b: ImportBatchRow; kind
     <div className="rw" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', columnGap: 16, rowGap: 8, height: 'auto', padding: '12px 0', cursor: 'default' }}>
       <span style={{ minWidth: 0, flex: '1 1 260px' }}>
         <b style={{ font: '700 14px var(--fb)' }}>{kinds.find((k) => k.key === b.kind)?.label ?? b.kind}</b>
-        <small style={{ display: 'block', color: 'var(--ink3)', font: '600 12px var(--fb)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.fileName || tr('console.data_tab.typed')} · {SOURCES[b.source] ?? b.source} · {b.byName} · {when(b.at)}</small>
+        <small style={{ display: 'block', color: 'var(--ink3)', font: '600 12px var(--fb)', overflowWrap: 'anywhere' }}>{b.fileName || tr('console.data_tab.typed')} · {SOURCES[b.source] ?? b.source} · {b.byName} · {when(b.at)}</small>
         {b.notes.map((n) => <small key={n} style={{ display: 'block', color: 'var(--warn)', font: '600 12px var(--fb)', marginTop: 4 }}>{n}</small>)}
       </span>
       <span className="tgrow" style={{ gap: 6, flex: '1 1 260px' }}>
@@ -213,7 +213,7 @@ function PreviewPanel({ kind: base, src, preview: p, loading, error, onMap, onVa
           <div className="lbl" style={{ marginBottom: 6 }}>{tr('console.data_tab.columns_in_the_file')}</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 10 }}>
             {p.headers.map((h) => (
-              <div className="fld" key={h}><label htmlFor={`map-${h}`} data-tip={h} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h || tr('console.data_tab.no_heading')}</label>
+              <div className="fld" key={h}><label htmlFor={`map-${h}`} data-tip={h} style={{ overflowWrap: 'anywhere' }}>{h || tr('console.data_tab.no_heading')}</label>
                 <Select id={`map-${h}`} compact value={p.mapping[h] ?? ''} onChange={(val) => onMap({ ...p.mapping, [h]: val })} options={options} /></div>
             ))}
           </div>
@@ -287,7 +287,7 @@ function ValueMap({ columns, values, unmatched, onChange }: { columns: ImportCol
         <div className="lbl" style={{ marginBottom: 6 }}>{tr('console.data_tab.values_to_match')}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 10 }}>
           {Object.entries(unmatched).flatMap(([k, odd]) => odd.map((f) => (
-            <div className="fld" key={`${k}|${f}`}><label data-tip={f} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label(k)}: “{f}”</label>
+            <div className="fld" key={`${k}|${f}`}><label data-tip={f} style={{ overflowWrap: 'anywhere' }}>{label(k)}: “{f}”</label>
               <Select compact aria-label={`${label(k)}: ${f}`} value="" onChange={(v) => put(k, f, v)}
                 options={[{ value: '', label: tr('console.data_tab.leave_it_as_it_is') }, ...(columns.find((c) => c.key === k)?.options ?? []).map((o) => ({ value: o, label: o }))]} /></div>
           )))}

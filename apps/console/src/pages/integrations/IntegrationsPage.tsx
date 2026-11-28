@@ -122,12 +122,12 @@ function Connections({ v, write, busy, onEdit, onTest, onDelete, onAct, onAdd }:
             return (
               <Card key={c.id} span="s6" title={c.name} chip={<><span className="chip v">{CAPABILITY_LABELS[g.cap]}</span><span className={`chip ${st.tone}`}>{st.text}</span></>}>
                 <div className="kv">{tr('console.integrations_page.provider')}<b>{def?.name ?? c.provider}</b></div>
-                <div className="kv">{tr('console.integrations_page.serves')}<b style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} data-tip={c.schoolName ?? tr('console.integrations_page.every_school_without_its_own')}>{c.scope === 'platform' ? tr('console.integrations_page.tangent_wide') : c.schoolName}</b></div>
+                <div className="kv">{tr('console.integrations_page.serves')}<b style={{ minWidth: 0, overflowWrap: 'anywhere' }} data-tip={c.schoolName ?? tr('console.integrations_page.every_school_without_its_own')}>{c.scope === 'platform' ? tr('console.integrations_page.tangent_wide') : c.schoolName}</b></div>
                 <div className="kv">{tr('console.integrations_page.health')}<b className={`st ${c.health.ok === null ? '' : c.health.ok ? 'g' : 'c'}`} data-tip={c.health.error ?? undefined} style={{ minWidth: 0 }}>
                   <i></i>{c.health.ok === null ? tr('console.integrations_page.not_tested_yet') : c.health.ok ? tr('console.integrations_page.healthy', { ago: ago(c.health.checkedAt) }) : tr('console.integrations_page.failing', { ago: ago(c.health.checkedAt) })}</b></div>
                 {c.health.ok === false && c.health.error && <div className="help" style={{ padding: '0 0 8px', overflowWrap: 'anywhere' }}>{c.health.error}</div>}
                 <div className="kv">{tr('console.integrations_page.this_month')}<b className="num">{count(c.usage.count)}{c.usage.costPaise ? ` · ${price(c.usage.costPaise / 100)}` : ''}</b></div>
-                <div className="kv">{tr('console.integrations_page.keys')}<b style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.secretsSet.length ? c.secretsSet.map((s) => `${s.key} ••${s.ending}`).join(' · ') : tr('console.integrations_page.none')}</b></div>
+                <div className="kv">{tr('console.integrations_page.keys')}<b style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{c.secretsSet.length ? c.secretsSet.map((s) => `${s.key} ••${s.ending}`).join(' · ') : tr('console.integrations_page.none')}</b></div>
                 {write && (
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
                     <button className="btn sm" onClick={() => onTest(c)}>{tr('console.integrations_page.test')}</button>
@@ -522,7 +522,7 @@ function Activity({ schools, write, say }: { schools: SchoolRow[]; write: boolea
                   <span className={`chip ${DELIVERY[m.status]}`} data-tip={m.error ?? (m.sendAfter ? tr('console.integrations_page.held_until', { when: when(m.sendAfter) }) : undefined)}>{m.status}</span>
                   <span className="help" style={{ margin: 0 }}>{m.schoolSlug}</span>
                   <span style={{ minWidth: 0 }}><b className="num" style={{ font: '700 13px var(--fb)' }}>{m.to}</b><div className="help" style={{ margin: 0 }}>{CAPABILITY_LABELS[m.channel as Capability] ?? m.channel} · {ago(m.createdAt)}</div></span>
-                  <span style={{ minWidth: 0, font: '400 13px/1.4 var(--fb)', color: 'var(--ink2)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} data-tip={m.error ?? m.body}>{m.error ? <span style={{ color: 'var(--bad-i)' }}>{m.error}</span> : m.body}</span>
+                  <span style={{ minWidth: 0, font: '400 13px/1.4 var(--fb)', color: 'var(--ink2)', overflowWrap: 'anywhere' }} data-tip={m.error ?? m.body}>{m.error ? <span style={{ color: 'var(--bad-i)' }}>{m.error}</span> : m.body}</span>
                   <span className="help" style={{ margin: 0 }}>{m.connectionName ?? '–'}{m.costPaise ? ` · ${price(m.costPaise / 100)}` : ''}</span>
                   <span>{write && m.status === 'failed' && <button className="btn sm" disabled={busyFor(retry, m.id)} onClick={() => retry.mutate(m.id)}>{tr('console.integrations_page.retry')}</button>}</span>
                 </div>
@@ -559,7 +559,7 @@ function Webhooks({ v, say }: { v: IntegrationsView; say: (m: string, tone?: 'ba
                 {events.isLoading ? <div className="help">{tr('console.integrations_page.loading')}</div> : !(events.data ?? []).length ? <EmptyNote icon="link" title={tr('console.integrations_page.nothing_received_yet')} body={tr('console.integrations_page.calls_the_provider_makes_to')} />
                   : (events.data ?? []).slice(0, 10).map((e) => (
                     <div key={e.id} className="kv" style={{ alignItems: 'center' }}>
-                      <span style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}><span className={`chip ${e.ok ? 'g' : 'c'}`}>{e.ok ? tr('console.integrations_page.accepted') : tr('console.integrations_page.refused')}</span><span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} data-tip={e.summary}>{e.summary}</span></span>
+                      <span style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}><span className={`chip ${e.ok ? 'g' : 'c'}`}>{e.ok ? tr('console.integrations_page.accepted') : tr('console.integrations_page.refused')}</span><span style={{ minWidth: 0, overflowWrap: 'anywhere' }} data-tip={e.summary}>{e.summary}</span></span>
                       <b style={{ whiteSpace: 'nowrap' }}>{ago(e.at)}</b>
                     </div>
                   ))}

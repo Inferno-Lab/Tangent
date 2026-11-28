@@ -21,7 +21,7 @@
 .pg-students .sortb{display:inline-flex;align-items:center;gap:4px;cursor:pointer}
 .pg-students .sortb svg{width:14px;height:14px;opacity:.6}
 .pg-students .who{display:flex;align-items:center;gap:12px;min-width:0}
-.pg-students .who b{display:block;font:700 14px var(--fb);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pg-students .who b{display:block;font:700 14px var(--fb);overflow-wrap:anywhere}
 .pg-students .who small{font:600 12px var(--fb);color:var(--ink3)}
 .pg-students .cls{display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:999px;background:var(--s2);font:700 12px var(--fb);width:fit-content}
 .pg-students .tk{display:flex;gap:2px}

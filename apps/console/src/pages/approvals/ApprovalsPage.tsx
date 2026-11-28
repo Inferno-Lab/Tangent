@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HttpError } from '@tangent/api-client';
-import { ACTION_LABELS, SETTINGS_META, type ActionRow } from '@tangent/contracts';
-import { AreaField, Dialog, Select, useShake, EmptyState, t, EmptyNote, busyFor } from '@tangent/web-ui';
+import { ACTION_LABELS, type ActionRow } from '@tangent/contracts';
+import { AreaField, Dialog, Select, SettingChanges, useShake, EmptyState, t, EmptyNote, busyFor } from '@tangent/web-ui';
 import { Card, Page, useToast } from '../../app/Page';
 import { useApp } from '../../app/context';
 import { ago, when } from '../../app/format';
@@ -10,8 +10,6 @@ import { ago, when } from '../../app/format';
 const TONE: Record<ActionRow['status'], string> = { pending_approval: 'a', running: 'v', done: 'g', failed: 'c', rejected: 'n' };
 const LABEL: Record<ActionRow['status'], string> = { pending_approval: t('console.approvals_page.waiting_for_approval'), running: t('console.approvals_page.running'), done: t('console.approvals_page.done'), failed: t('console.approvals_page.failed'), rejected: t('console.approvals_page.rejected') };
 const name = (r: ActionRow) => `${ACTION_LABELS[r.action] ?? r.action}${r.schoolName ? ` · ${r.schoolName}` : ''}`;
-/** A setting's value in words: on and off, a list joined, nothing as a dash. */
-const shown = (v: unknown) => (v == null || v === '' ? '–' : typeof v === 'boolean' ? (v ? t('console.approvals_page.on') : t('console.approvals_page.off')) : Array.isArray(v) ? v.join(', ') || '–' : typeof v === 'object' ? JSON.stringify(v) : String(v));
 
 /** The console team's own queue: risky changes wait here for a second person, who sees exactly what would change. */
 export function ApprovalsPage() {
@@ -56,12 +54,7 @@ export function ApprovalsPage() {
                 </div>
                 {r.changes.length > 0 && (
                   <div style={{ marginTop: 10 }}>
-                    {r.changes.map((c) => (
-                      <div key={c.key} className="kv" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                        <span>{SETTINGS_META[c.key as keyof typeof SETTINGS_META]?.label ?? c.key}</span>
-                        <b style={{ textAlign: 'end' }}><span style={{ color: 'var(--ink3)', textDecoration: 'line-through' }}>{shown(c.before)}</span> → {shown(c.after)}</b>
-                      </div>
-                    ))}
+                    <SettingChanges changes={r.changes} />
                   </div>
                 )}
                 {own && <div className="help">{t('console.approvals_page.you_asked_for_this_so')}</div>}

@@ -24,10 +24,10 @@ export function IntegrationsTab({ d }: { d: SchoolDetail }) { const app = useApp
   const own = v.connections.filter((c) => c.schoolId === d.id);
   return (
     <>
-      <section className="grid" data-even="">
-        <div className="card s7 rise">
+      <section className="grid">
+        <div className="card s12 rise">
           <div className="ch"><h2>{t('console.integrations_tab.what_reaches_this_school_s')}</h2><span className={`chip ${v.mode === 'live' ? 'g' : 'a'}`}>{v.mode === 'live' ? t('console.integrations_tab.live_mode') : t('console.integrations_tab.sandbox_mode')}</span></div>
-          <div style={{ marginTop: 8 }}>
+          <div className="kvcols" style={{ marginTop: 8 }}>
             {caps.map((k) => { const mine = v.routes.find((r) => r.capability === k && r.schoolId === d.id);
               const def = v.routes.find((r) => r.capability === k && !r.schoolId);
               const r = mine ?? def;
@@ -44,14 +44,13 @@ export function IntegrationsTab({ d }: { d: SchoolDetail }) { const app = useApp
           </div>
           <div className="help" style={{ marginTop: 10 }}>{t('console.integrations_tab.change_routes_on')}{' '}<a href={url('/integrations/routing')} onClick={(e) => { e.preventDefault(); app.go('/integrations/routing'); }}>{t('console.integrations_tab.integrations_routing')}</a>{t('console.integrations_tab.texts_used_this_month_are')}</div>
         </div>
-        <div className="card s5 rise">
+        <div className="card s6 rise">
           <div className="ch"><h2>{t('console.integrations_tab.its_own_connections')}</h2><span className="chip">{own.length}</span></div>
           {!own.length ? <EmptyNote icon="integrations" title={t('console.integrations_tab.none_of_its_own')} body={t('console.integrations_tab.this_school_sends_through_tangent')} /> : own.map((c) => (
             <div key={c.id} className="kv" style={{ alignItems: 'center' }}><span style={{ minWidth: 0 }}>{c.name}</span><b style={{ display: 'flex', gap: 6, alignItems: 'center' }}><span className="chip">{providerDef(c.provider)?.name}</span><span className={`chip ${c.state === 'live' ? 'g' : c.state === 'paused' ? 'c' : 'a'}`}>{c.state}</span></b></div>
           ))}
         </div>
-      </section>
-      <section className="card rise">
+        <div className="card s6 rise">
         <div className="ch"><h2>{t('console.integrations_tab.recent_failures')}</h2><span className="chip">{fails.data?.rows.length ?? 0}</span></div>
         <div style={{ marginTop: 8 }}>
           {!(fails.data?.rows ?? []).length ? <EmptyNote icon="checkCircle" title={t('console.integrations_tab.nothing_has_failed_lately')} body={t('console.integrations_tab.a_message_to_this_school')} /> : fails.data!.rows.map((m) => (
@@ -60,6 +59,7 @@ export function IntegrationsTab({ d }: { d: SchoolDetail }) { const app = useApp
               <b style={{ whiteSpace: 'nowrap' }}>{ago(m.createdAt)}</b>
             </div>
           ))}
+        </div>
         </div>
       </section>
     </>

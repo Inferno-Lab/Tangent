@@ -60,7 +60,7 @@ export function CellsPage() {
                     const st = statusOf(s);
                     return (
                       <div key={s.id} className="kv" style={{ alignItems: 'center' }}>
-                        <a href={url(`/schools/${s.id}`)} onClick={(e) => { e.preventDefault(); app.go(`/schools/${s.id}`); }} style={{ color: 'inherit', textDecoration: 'none', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</a>
+                        <a href={url(`/schools/${s.id}`)} onClick={(e) => { e.preventDefault(); app.go(`/schools/${s.id}`); }} style={{ color: 'inherit', textDecoration: 'none', minWidth: 0, overflowWrap: 'anywhere' }}>{s.name}</a>
                         <b style={{ display: 'flex', gap: 8, alignItems: 'center' }}><span className={`st ${st.tone}`}><i></i>{st.text}</span>{canMove && list.length > 1 && s.status === 'live' && <button className="btn sm" onClick={() => setDlg({ kind: 'move', school: s })}>{tr('console.cells_page.move')}</button>}</b>
                       </div>
                     );

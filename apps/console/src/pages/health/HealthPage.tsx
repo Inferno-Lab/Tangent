@@ -50,8 +50,8 @@ export function HealthPage() { const app = useApp();
             {rows.map((s) => { const st = statusOf(s); const t = tintFor(s.name);
               return (
                 <a key={s.id} className="grd rw" href={url(`/schools/${s.id}/technical`)} onClick={(e) => { e.preventDefault(); app.go(`/schools/${s.id}/technical`); }} style={{ '--cols': 'minmax(0,2fr) 70px 140px 100px 130px', color: 'inherit', textDecoration: 'none' } as React.CSSProperties}>
-                  <span style={{ display: 'flex', gap: 12, alignItems: 'center', minWidth: 0 }}><span className="av" style={{ width: 34, height: 34, fontSize: 11, background: t.bg, color: t.fg, boxShadow: 'none' }}>{initials(s.name)}</span><b data-tip={s.name} style={{ font: '700 14px/1.25 var(--fb)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{s.name}</b></span>
-                  <span className="chip">{s.cell}</span><span className={`st ${st.tone}`}><i></i>{st.text}</span><span className="num" style={{ font: '700 13px var(--fb)' }}>{s.healthMs != null ? tr('console.health_page.ms', { healthMs: s.healthMs }) : '–'}</span><span style={{ color: 'var(--ink3)', font: '600 13px var(--fb)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} data-tip={s.lastIncident ?? undefined}>{s.lastIncident ?? ''}</span>
+                  <span style={{ display: 'flex', gap: 12, alignItems: 'center', minWidth: 0 }}><span className="av" style={{ width: 34, height: 34, fontSize: 11, background: t.bg, color: t.fg, boxShadow: 'none' }}>{initials(s.name)}</span><b data-tip={s.name} style={{ font: '700 14px/1.25 var(--fb)', overflowWrap: 'anywhere' }}>{s.name}</b></span>
+                  <span className="chip">{s.cell}</span><span className={`st ${st.tone}`}><i></i>{st.text}</span><span className="num" style={{ font: '700 13px var(--fb)' }}>{s.healthMs != null ? tr('console.health_page.ms', { healthMs: s.healthMs }) : '–'}</span><span style={{ color: 'var(--ink3)', font: '600 13px var(--fb)', minWidth: 0, overflowWrap: 'anywhere' }} data-tip={s.lastIncident ?? undefined}>{s.lastIncident ?? ''}</span>
                 </a>
               );
             })}
@@ -66,7 +66,7 @@ export function HealthPage() { const app = useApp();
               <summary style={{ display: 'flex', gap: 10, alignItems: 'center', cursor: 'pointer', listStyle: 'none', minWidth: 0 }}>
                 <span className="chip">{e.source}</span>
                 {e.schoolSlug && <span className="chip v">{e.schoolSlug}</span>}
-                <b style={{ flex: 1, minWidth: 0, font: '700 13px/1.35 var(--fb)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} data-tip={e.message}>{e.message}</b>
+                <b style={{ flex: 1, minWidth: 0, font: '700 13px/1.35 var(--fb)', overflowWrap: 'anywhere' }} data-tip={e.message}>{e.message}</b>
                 {e.handledBy && <span className="chip g" data-tip={tr('console.health_page.by', { handledBy: e.handledBy })}>{tr('console.health_page.handled')}</span>}
                 <span className="num" style={{ font: '700 13px var(--fb)' }}>{e.count}×</span>
                 <span style={{ color: 'var(--ink3)', font: '600 13px var(--fb)', whiteSpace: 'nowrap' }}>{ago(e.lastAt)}</span>
@@ -127,7 +127,7 @@ function Jobs({ say }: { say: (m: string, tone?: 'bad') => void }) { const app =
               <div key={j.id} className="grd rw" style={{ '--cols': '100px minmax(0,1.2fr) minmax(0,1fr) minmax(0,2fr) 90px', height: 'auto', minHeight: 52, padding: '8px 20px' } as React.CSSProperties}>
                 <span className={`chip ${JOB_TONE[j.status]}`}>{JOB_WORDS[j.status]}</span>
                 <span style={{ minWidth: 0 }}><b style={{ font: '700 13px var(--fb)' }}>{JOB_LABELS[j.kind] ?? j.kind}</b><div className="help" style={{ margin: 0 }}>{ago(j.finishedAt ?? j.runAt)}{j.attempts > 1 ? tr('console.health_page.try', { attempts: j.attempts }) : ''}</div></span>
-                <span className="help" style={{ margin: 0, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{j.schoolName ?? tr('console.health_page.every_school')}</span>
+                <span className="help" style={{ margin: 0, minWidth: 0, overflowWrap: 'anywhere' }}>{j.schoolName ?? tr('console.health_page.every_school')}</span>
                 <span style={{ minWidth: 0, font: '400 13px/1.4 var(--fb)', color: j.lastError ? 'var(--bad-i)' : 'var(--ink2)', overflowWrap: 'anywhere' }}>{j.lastError ?? j.result ?? ''}</span>
                 <span>{app.can('schools.write') && j.status === 'failed' && <button className="btn sm" disabled={busyFor(retry, j.id)} onClick={() => retry.mutate(j.id)}>{tr('console.health_page.retry')}</button>}</span>
               </div>

@@ -195,7 +195,7 @@ function Schools({ say }: { say: Say }) { const app = useApp();
                   {can && <Checkbox aria-label={t('console.modules_page.choose_2', { name: r.name })} checked={picked.has(r.id)} onChange={() => { const n = new Set(picked); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); setPicked(n); }} />}
                 </span>
                 <span role="cell" style={{ padding: '12px 8px', borderTop: '1px solid var(--line)', minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <a href={url(`/schools/${r.id}/plan`)} onClick={(e) => { e.preventDefault(); app.go(`/schools/${r.id}/plan`); }} style={{ font: '700 14px var(--fb)', color: 'inherit', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</a>
+                  <a href={url(`/schools/${r.id}/plan`)} onClick={(e) => { e.preventDefault(); app.go(`/schools/${r.id}/plan`); }} style={{ font: '700 14px var(--fb)', color: 'inherit', display: 'block', overflowWrap: 'anywhere' }}>{r.name}</a>
                   <small style={{ color: 'var(--ink3)' }}>{r.plan}{r.trialUntil ? t('console.modules_page.trial_until', { trialUntil: r.trialUntil }) : ''}</small>
                 </span>
                 {cols.map((c) => <span key={c.key} role="cell" style={{ padding: '12px 4px', borderTop: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{dot(has(r, c.key, c.feature), c.feature ? undefined : r.dates[c.key]?.until, paused(c.key, r.id))}</span>)}

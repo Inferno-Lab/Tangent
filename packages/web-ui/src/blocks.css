@@ -157,3 +157,42 @@
 /* The row or card a change was just saved from (markDone): a soft flash of the brand as it settles. */
 .nest [data-done]{animation:nDone var(--t3) var(--e)}
 @keyframes nDone{from{background-color:var(--brand-soft)}}
+/* A side list of choices beside what the chosen one shows (a school's setting groups): both as tall as the window allows and each
+   scrolling on its own, so neither column ever leaves empty space beside the other; the pane's title and its save stay in view. */
+.nest .sidesplit{display:grid;grid-template-columns:minmax(220px,280px) minmax(0,1fr);gap:16px;align-items:stretch;height:min(calc(100dvh - 32px),920px)}
+.nest .sidesplit>*{min-height:0}
+.nest .sidesplit>nav{overflow-y:auto;scrollbar-gutter:stable}
+.nest .sidesplit>.pane{display:flex;flex-direction:column;overflow:hidden}
+.nest .sidesplit .pane-body{flex:1;min-height:0;overflow-y:auto;scrollbar-gutter:stable;margin-inline:-8px;padding-inline:8px}
+.nest .sidesplit .pane-foot{border-top:1px solid var(--line);padding-top:14px;margin-top:8px}
+@media (max-width:900px){
+  .nest .sidesplit{grid-template-columns:minmax(0,1fr);height:auto}
+  .nest .sidesplit>nav{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;scrollbar-gutter:auto}
+  .nest .sidesplit>nav .rpb{flex:none;width:auto!important;white-space:nowrap}
+  .nest .sidesplit>nav .rpb small,.nest .sidesplit>nav .lbl{display:none}
+  .nest .sidesplit>.pane{overflow:visible}
+  .nest .sidesplit .pane-body{max-height:70dvh}
+}
+/* One setting in a list of them: a line between settings, whose they are and its lock on the first line. */
+.nest .setr{padding:14px 0;border-top:1px solid var(--line)}
+.nest .setr:first-child{border-top:0;padding-top:4px}
+/* A list of settings as they are and as a change makes them (SettingChanges): the name, then old → new in words, wrapping. */
+.nest .chg{display:flex;flex-direction:column}
+.nest .chg-r{display:grid;grid-template-columns:minmax(140px,260px) minmax(0,1fr);gap:6px 16px;padding:10px 0;border-top:1px solid var(--line);font:600 14px/1.45 var(--fb);color:var(--ink2)}
+.nest .chg-r:first-child{border-top:0}
+.nest .chg-v{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;min-width:0;overflow-wrap:anywhere}
+.nest .chg-v b{color:var(--ink);font-weight:700}
+.nest .chg-was{color:var(--ink3);text-decoration:line-through}
+.nest .chg-v .ic{color:var(--ink3);flex:none}
+@media (max-width:640px){.nest .chg-r{grid-template-columns:minmax(0,1fr)}}
+/* A row of the audit log: the person's initials, what was done (and its details, wrapping), the time. */
+.nest .audr{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.nest .lbl+.audr{border-top:0}
+.nest .audr .av{background:var(--brand-soft);color:var(--brand-ink);box-shadow:none}
+.nest .audr b{display:block;font:700 14px var(--fb);color:var(--ink)}
+.nest .audr small{display:block;font:500 13px/1.45 var(--fb);color:var(--ink3);overflow-wrap:anywhere;margin-top:2px}
+.nest .audr time{font:600 12px var(--fb);color:var(--ink3);white-space:nowrap}
+/* Key-value rows in two columns on a wide screen, so a long list of short rows does not run down one side of the page. */
+.nest .kvcols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:40px}
+.nest .kvcols>.kv:nth-child(2){border-top:0}
+@media (max-width:900px){.nest .kvcols{grid-template-columns:minmax(0,1fr)}.nest .kvcols>.kv:nth-child(2){border-top:1px solid var(--line)}}

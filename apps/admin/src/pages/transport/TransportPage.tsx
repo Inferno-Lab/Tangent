@@ -67,7 +67,7 @@ export function TransportPage() {
                   {!r.stops.length && <EmptyNote icon="route" title={tr('admin.transport_page.no_stops_yet')} body={tr('admin.transport_page.add_the_stops_in_the')} />}
                   {r.stops.map((s) => (
                     <div key={s.id} className="kv" style={{ alignItems: 'center' }}>
-                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} data-tip={s.lat == null ? tr('admin.transport_page.not_on_the_map_no') : tr('admin.transport_page.on_the_map')}>{s.position}. {s.name}</span>
+                      <span style={{ minWidth: 0, overflowWrap: 'anywhere' }} data-tip={s.lat == null ? tr('admin.transport_page.not_on_the_map_no') : tr('admin.transport_page.on_the_map')}>{s.position}. {s.name}</span>
                       <b className="num">{s.pickup || '–'}{s.dropTime ? ` / ${s.dropTime}` : ''} · {s.riders}</b>
                     </div>
                   ))}
@@ -105,7 +105,7 @@ function Riders({ routes, riders, canWrite, say }: { routes: BusRouteRow[]; ride
           const route = routes.find((x) => x.id === r.routeId);
           return (
             <div key={r.studentId} className="grd rw" style={{ '--cols': 'minmax(0,1.4fr) minmax(0,1.2fr) minmax(0,1.2fr)', height: 'auto', minHeight: 56, padding: '8px 20px' } as React.CSSProperties}>
-              <b style={{ font: '700 13px var(--fb)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.student}{term && <small className="help" style={{ display: 'block', margin: 0 }}>{r.className}</small>}</b>
+              <b style={{ font: '700 13px var(--fb)', minWidth: 0, overflowWrap: 'anywhere' }}>{r.student}{term && <small className="help" style={{ display: 'block', margin: 0 }}>{r.className}</small>}</b>
               <Select compact aria-label={tr('admin.transport_page.route_for', { student: r.student })} disabled={!canWrite || busyFor(set, r.studentId)} value={r.routeId ?? ''} onChange={(x) => set.mutate({ studentId: r.studentId, routeId: x || null, stopId: null })}
                 options={[{ value: '', label: tr('admin.transport_page.does_not_ride') }, ...routes.map((x) => ({ value: x.id, label: x.name }))]} />
               <Select compact aria-label={tr('admin.transport_page.stop_for', { student: r.student })} disabled={!canWrite || !route || busyFor(set, r.studentId)} value={r.stopId ?? ''} onChange={(x) => set.mutate({ studentId: r.studentId, routeId: r.routeId, stopId: x || null })}

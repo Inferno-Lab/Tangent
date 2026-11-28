@@ -56,7 +56,7 @@ export function PeriodGrid({ classId, date, say }: { classId: string; date: stri
             <div className="grd rw" key={s.studentId} style={{ '--cols': '36px minmax(0,1fr) auto' } as React.CSSProperties}>
               <span className="rn num">{s.rollNo || '–'}</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-                <b style={{ font: '700 14px var(--fb)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</b>
+                <b style={{ font: '700 14px var(--fb)', overflowWrap: 'anywhere' }}>{s.name}</b>
                 {s.day && <span className={`chip ${away(s.day) ? 'c' : ''}`} data-tip={t('admin.period_grid.the_day_s_roll_call')}>{dayName(s.day)}</span>}
               </span>
               <span className="mk" role="group" aria-label={t('admin.period_grid.for', { label: p.label, name: s.name })}>

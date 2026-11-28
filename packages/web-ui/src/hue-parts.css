@@ -12,7 +12,7 @@
 .nest .hb .t3{color:var(--ink3)}
 .nest .hb .vc{display:flex;flex-direction:column;min-width:0}
 .nest .hb .fx{display:flex;align-items:center;min-width:0}
-.nest .hb .cut{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nest .hb .cut{overflow-wrap:anywhere}
 .nest .hb .d,.nest .hb .fig,.nest .hb .top h1,.nest .hb .ch h2,.nest .hb .ws b{font-family:var(--fd);font-weight:700;letter-spacing:-0.03em}
 .nest .hb .fig{font-size:64px;line-height:1;letter-spacing:-0.035em}
 .nest .hb .fig small{font:600 15px/22px var(--fb);letter-spacing:0;color:var(--ink2);margin-inline-start:8px}
@@ -280,6 +280,6 @@
 .nest .hb .icz em{font-style:normal;color:var(--ink2);font-size:12px;line-height:16px}
 .nest .hb .icg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px 12px}
 .nest .hb .icc{display:grid;grid-template-columns:auto auto minmax(0,1fr);column-gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
-.nest .hb .icc b{font-weight:600;font-size:13px;line-height:16px;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.nest .hb .icc b{font-weight:600;font-size:13px;line-height:16px;min-width:0;overflow-wrap:anywhere}
 .nest .hb .icc small{grid-column:1/-1;color:var(--ink3);font-size:12px;line-height:16px}
 

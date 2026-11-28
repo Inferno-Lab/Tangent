@@ -102,7 +102,7 @@ export function ReportsPage() {
                         return (
                           <div className="grd rw" key={i} role={sid ? 'button' : undefined} tabIndex={sid ? 0 : undefined} onClick={sid ? () => app.go(`/students?open=${sid}`) : undefined}
                             onKeyDown={sid ? (e) => { if (e.key === 'Enter') app.go(`/students?open=${sid}`); } : undefined} style={{ '--cols': cols, cursor: sid ? 'pointer' : undefined } as React.CSSProperties}>
-                            {d.columns.map((c, j) => <span key={c.key} className={j ? 'num' : ''} style={{ textAlign: c.align, font: j ? '600 13px var(--fb)' : '700 14px var(--fb)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} data-tip={String(r[c.key] ?? '')}>{r[c.key]}</span>)}
+                            {d.columns.map((c, j) => <span key={c.key} className={j ? 'num' : ''} style={{ textAlign: c.align, font: j ? '600 13px var(--fb)' : '700 14px var(--fb)', overflowWrap: 'anywhere' }} data-tip={String(r[c.key] ?? '')}>{r[c.key]}</span>)}
                           </div>
                         );
                       })}

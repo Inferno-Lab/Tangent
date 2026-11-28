@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { APP_CATALOG, APP_ROLES, APP_ROLE_LABELS, hasKey, type AppRole } from '@tangent/config-engine';
-import { AdmissionStages, CERTIFICATE_PLACEHOLDERS, DEFAULT_ADMISSION_STAGES, DEFAULT_CERTIFICATE_TYPES, DEFAULT_LEAVE_TYPES, DEFAULT_TRIP_SESSIONS, TimetableCycle, type CertificateType, type LeaveType, listLabel, readPlace, type LateRule, type LibraryMember, type LibraryTypeRule, type TripSession, type AdmissionStage, rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, ADDRESS_PARTS, ADDRESS_PART_LABELS, SCHEME_KINDS, SCHEME_KIND_LABELS, BLOCK_KINDS, BLOCK_KIND_LABELS, DEFAULT_TEMPLATES, DOC_KINDS, DOC_KIND_LABELS, DOC_PLACEHOLDERS, PAGE_SIZES, type Block, type DocKind, type DocTemplate, type DocTemplates, type GradeBand, type GradingScheme, type AddressFormat, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta } from '@tangent/contracts';
+import { AdmissionStages, CERTIFICATE_PLACEHOLDERS, DEFAULT_ADMISSION_STAGES, DEFAULT_CERTIFICATE_TYPES, DEFAULT_LEAVE_TYPES, DEFAULT_TRIP_SESSIONS, TimetableCycle, type CertificateType, type LeaveType, listLabel, readPlace, type LateRule, type LibraryMember, type LibraryTypeRule, type TripSession, type AdmissionStage, rawOf, tx, VOCAB_CONCEPTS, languageLabel, wordsFor, type VocabConcept, type Vocabulary, type Word, ATTENDANCE_MARKS, CATEGORY_TONES, CATEGORY_TONE_LABELS, DEFAULT_BRAND, MARK_MEANING_LABELS, MESSAGE_EVENTS, PAYMENT_KINDS, PAYMENT_KIND_LABELS, type AppLayout, type AttendanceMarkDef, type Category, type ListItem, ADDRESS_PARTS, ADDRESS_PART_LABELS, SCHEME_KINDS, SCHEME_KIND_LABELS, BLOCK_KINDS, BLOCK_KIND_LABELS, DEFAULT_TEMPLATES, DOC_KINDS, DOC_KIND_LABELS, DOC_PLACEHOLDERS, PAGE_SIZES, type Block, type DocKind, type DocTemplate, type DocTemplates, type GradeBand, type GradingScheme, type AddressFormat, CUSTOM_ENTITIES, FIELD_KINDS, DEFAULT_STEP, PROCESS_LABELS, STEP_ACTORS, STEP_ACTOR_LABELS, STEP_TIMEOUTS, STEP_TIMEOUT_LABELS, WORKFLOW_PROCESSES, type StepDef, type WorkflowProcess, type WorkflowsSetting, type CustomEntity, type CustomFieldsSetting, type FieldDef, type FieldKind, type PaymentMethod, type SettingMeta, SETTINGS_META, fmtNumber } from '@tangent/contracts';
 import { Checkbox, DateField, FilePick, NumberField, TimeField } from './fields';
 import { ColourField } from './ColourPicker';
 import { ErrorLine, Field, SelectField } from './forms';
@@ -501,7 +501,7 @@ function CategoriesEditor({ value, max, disabled, onChange }: { value: Category[
           <div style={{ flex: 1, minWidth: 160 }}><Field label={tr('ui.settings.category')} value={c.name} maxLength={24} disabled={disabled} onChange={(v) => put(i, { name: v })} /></div>
           <div style={{ minWidth: 0, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.colour')} value={c.tone} disabled={disabled} onChange={(t) => put(i, { tone: t as Category['tone'] })} options={CATEGORY_TONES.map((t) => ({ value: t, label: CATEGORY_TONE_LABELS[t] }))} /></div>
           {/* A fixed slot for the preview, so a longer name never pushes the row's fields out of line with the others. */}
-          <span style={{ width: 140, flex: 'none', marginBottom: 10, minWidth: 0 }}><span className={`chip ${c.tone}`} style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name || tr('ui.settings.category')}</span></span>
+          <span style={{ width: 140, flex: 'none', marginBottom: 10, minWidth: 0 }}><span className={`chip ${c.tone}`} style={{ maxWidth: '100%', overflowWrap: 'anywhere' }}>{c.name || tr('ui.settings.category')}</span></span>
           <button type="button" className="btn sm" disabled={disabled || value.length <= 1} onClick={() => onChange(value.filter((_, j) => j !== i))}>{tr('ui.settings.remove')}</button>
         </div>
       ))}
@@ -831,41 +831,64 @@ function DocumentTemplatesEditor({ value, languages, preview, disabled, onChange
       }} /></div>
     ))}</div>
   );
+  const [open, setOpen] = useState<number | null>(null);
+  const [langs, setLangs] = useState(false);
+  const add = () => { setTpl({ ...tpl, blocks: [...blocks, { kind: 'text', text: '' }] }); setOpen(blocks.length); };
+  const drop = (i: number) => { setTpl({ ...tpl, blocks: blocks.filter((_, j) => j !== i) }); setOpen(null); };
+  const shift = (i: number, d: number) => { move(i, d); if (open === i) setOpen(i + d); };
+  // A block in one line: what it is and the words it prints, so the whole layout reads at a glance.
+  const summary = (b: Block) => [b.text, b.kind === 'signatures' ? b.value?.split('\n').filter(Boolean).join(', ') : b.value].filter(Boolean).join(' · ');
   return (
     <div>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-        <div style={{ width: 220 }}><Select value={kind} onChange={(k) => setKind(k as DocKind)} aria-label={tr('ui.settings.document')} options={DOC_KINDS.map((k) => ({ value: k, label: DOC_KIND_LABELS[k] }))} /></div>
-        <div style={{ width: 140 }}><Select value={tpl.size} disabled={disabled} onChange={(s) => setTpl({ ...tpl, size: s as DocTemplate['size'] })} aria-label={tr('ui.settings.page_size')} options={PAGE_SIZES.map((s) => ({ value: s, label: s }))} /></div>
-        {preview && <button type="button" className="btn sm" disabled={busy} onClick={() => void show()}><Icon name="print" />{tr('ui.settings.preview')}</button>}
-        {own && <button type="button" className="btn sm" disabled={disabled} onClick={() => setTpl(undefined)}>{tr('ui.settings.back_to_tangent_s_layout')}</button>}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ minWidth: 0, maxWidth: '100%' }}><Select value={kind} onChange={(k) => { setKind(k as DocKind); setOpen(null); }} aria-label={tr('ui.settings.document')} options={DOC_KINDS.map((k) => ({ value: k, label: DOC_KIND_LABELS[k] }))} /></div>
+        <div style={{ minWidth: 0 }}><Select value={tpl.size} disabled={disabled} onChange={(s) => setTpl({ ...tpl, size: s as DocTemplate['size'] })} aria-label={tr('ui.settings.page_size')} options={PAGE_SIZES.map((s) => ({ value: s, label: s }))} /></div>
+        {preview && <button type="button" className="btn" disabled={busy} onClick={() => void show()}><Icon name="print" />{tr('ui.settings.preview')}</button>}
+        {own && <button type="button" className="btn" disabled={disabled} onClick={() => { setTpl(undefined); setOpen(null); }}>{tr('ui.settings.back_to_tangent_s_layout')}</button>}
+        {languages.length > 0 && <span style={{ marginInlineStart: 'auto' }}><Checkbox checked={langs} onChange={setLangs} label={tr('ui.settings.other_languages_too')} /></span>}
       </div>
       {error && <ErrorLine>{error}</ErrorLine>}
       <div className="help">{tr('ui.settings.fill_in', { names: DOC_PLACEHOLDERS[kind].map((p) => `{${p}}`).join(' ') })}</div>
-      {blocks.map((b, i) => (
-        <div key={i} className="card" style={{ padding: 12, marginTop: 8 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-            <div style={{ width: 320, maxWidth: '100%' }}><SelectField label={tr('ui.settings.block')} value={b.kind} disabled={disabled} onChange={(k) => put(i, { kind: k as Block['kind'] })} options={BLOCK_KINDS.map((k) => ({ value: k, label: BLOCK_KIND_LABELS[k] }))} /></div>
-            {['heading', 'text', 'fact', 'signatures'].includes(b.kind) && <>
-              <div style={{ width: 110 }}><NumberField label={tr('ui.settings.text_size')} min={7} max={28} value={b.size === undefined ? '' : String(b.size)} disabled={disabled} onChange={(v) => put(i, { size: v === '' ? undefined : Number(v) })} /></div>
-              <div style={{ minWidth: 0, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.align')} value={b.align ?? 'start'} disabled={disabled} onChange={(a) => put(i, { align: a === 'start' ? undefined : (a as Block['align']) })}
-                options={[{ value: 'start', label: tr('ui.settings.align_start') }, { value: 'center', label: tr('ui.settings.align_center') }, { value: 'end', label: tr('ui.settings.align_end') }]} /></div>
-              <div style={{ paddingBottom: 10 }}><Checkbox checked={!!b.bold} disabled={disabled} label={tr('ui.settings.bold')} onChange={(on) => put(i, { bold: on || undefined })} /></div>
-            </>}
-            <div style={{ minWidth: 0, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.only_when')} value={b.when ?? ''} disabled={disabled} onChange={(w) => put(i, { when: w || undefined })}
-              options={[{ value: '', label: tr('ui.settings.always') }, ...DOC_PLACEHOLDERS[kind].map((p) => ({ value: p, label: `{${p}}` }))]} /></div>
-            <button type="button" className="btn sm" aria-label={tr('ui.settings.move_up')} disabled={disabled || i === 0} onClick={() => move(i, -1)}><Icon name="caretUp" /></button>
-            <button type="button" className="btn sm" aria-label={tr('ui.settings.move_down')} disabled={disabled || i === blocks.length - 1} onClick={() => move(i, 1)}><Icon name="caretDown" /></button>
-            <button type="button" className="btn sm" disabled={disabled || blocks.length <= 1} onClick={() => setTpl({ ...tpl, blocks: blocks.filter((_, j) => j !== i) })}>{tr('ui.settings.remove')}</button>
+      <div className="dtl">
+        {blocks.map((b, i) => (
+          <div key={i} className={`dtb ${open === i ? 'on' : ''}`}>
+            <div className="dtb-h">
+              <span className="dtb-n">{i + 1}</span>
+              <button type="button" className="rowbtn" aria-expanded={open === i} onClick={() => setOpen(open === i ? null : i)}>
+                <b>{BLOCK_KIND_LABELS[b.kind]}{b.when ? <span className="chip" style={{ marginInlineStart: 8 }}>{tr('ui.settings.only_with', { p: `{${b.when}}` })}</span> : null}</b>
+                {summary(b) && <small>{summary(b)}</small>}
+              </button>
+              <span className="dtb-a">
+                <button type="button" className="btn sm ghost" aria-label={tr('ui.settings.move_up')} data-tip={tr('ui.settings.move_up')} disabled={disabled || i === 0} onClick={() => shift(i, -1)}><Icon name="caretUp" /></button>
+                <button type="button" className="btn sm ghost" aria-label={tr('ui.settings.move_down')} data-tip={tr('ui.settings.move_down')} disabled={disabled || i === blocks.length - 1} onClick={() => shift(i, 1)}><Icon name="caretDown" /></button>
+                <button type="button" className="btn sm ghost" aria-label={tr('ui.settings.remove')} data-tip={tr('ui.settings.remove')} disabled={disabled || blocks.length <= 1} onClick={() => drop(i)}><Icon name="trash" /></button>
+              </span>
+            </div>
+            {open === i && (
+              <div className="dtb-b">
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <div style={{ minWidth: 0, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.block')} value={b.kind} disabled={disabled} onChange={(k) => put(i, { kind: k as Block['kind'] })} options={BLOCK_KINDS.map((k) => ({ value: k, label: BLOCK_KIND_LABELS[k] }))} /></div>
+                  {['heading', 'text', 'fact', 'signatures'].includes(b.kind) && <>
+                    <div style={{ width: 120 }}><NumberField label={tr('ui.settings.text_size')} min={7} max={28} value={b.size === undefined ? '' : String(b.size)} disabled={disabled} onChange={(v) => put(i, { size: v === '' ? undefined : Number(v) })} /></div>
+                    <div style={{ minWidth: 0, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.align')} value={b.align ?? 'start'} disabled={disabled} onChange={(a) => put(i, { align: a === 'start' ? undefined : (a as Block['align']) })}
+                      options={[{ value: 'start', label: tr('ui.settings.align_start') }, { value: 'center', label: tr('ui.settings.align_center') }, { value: 'end', label: tr('ui.settings.align_end') }]} /></div>
+                  </>}
+                  <div style={{ minWidth: 0, maxWidth: '100%' }}><SelectField fit label={tr('ui.settings.only_when')} value={b.when ?? ''} disabled={disabled} onChange={(w) => put(i, { when: w || undefined })}
+                    options={[{ value: '', label: tr('ui.settings.always') }, ...DOC_PLACEHOLDERS[kind].map((p) => ({ value: p, label: `{${p}}` }))]} /></div>
+                  {['heading', 'text', 'fact', 'signatures'].includes(b.kind) && <div style={{ height: 42, display: 'flex', alignItems: 'center' }}><Checkbox checked={!!b.bold} disabled={disabled} label={tr('ui.settings.bold')} onChange={(on) => put(i, { bold: on || undefined })} /></div>}
+                </div>
+                {['heading', 'text', 'fact'].includes(b.kind) && <div style={{ marginTop: 10 }}><Field label={b.kind === 'fact' ? tr('ui.settings.label') : tr('ui.settings.words')} value={b.text ?? ''} maxLength={2000} disabled={disabled} onChange={(v) => put(i, { text: v })} /></div>}
+                {langs && ['heading', 'text', 'fact'].includes(b.kind) && words(b, 'text')}
+                {b.kind === 'fact' && <div style={{ marginTop: 10 }}><Field label={tr('ui.settings.value_at_the_end')} value={b.value ?? ''} maxLength={400} disabled={disabled} onChange={(v) => put(i, { value: v })} /></div>}
+                {b.kind === 'signatures' && <div className="fld" style={{ marginTop: 10 }}><label>{tr('ui.settings.who_signs')}</label>
+                  <div className="inp" style={{ height: 'auto' }}><textarea style={ta} value={b.value ?? ''} disabled={disabled} maxLength={400} onChange={(e) => put(i, { value: e.target.value })} aria-label={tr('ui.settings.who_signs')} /></div></div>}
+                {langs && (b.kind === 'fact' || b.kind === 'signatures') && words(b, 'value')}
+              </div>
+            )}
           </div>
-          {['heading', 'text', 'fact'].includes(b.kind) && <div style={{ marginTop: 6 }}><Field label={b.kind === 'fact' ? tr('ui.settings.label') : tr('ui.settings.words')} value={b.text ?? ''} maxLength={2000} disabled={disabled} onChange={(v) => put(i, { text: v })} /></div>}
-          {['heading', 'text', 'fact'].includes(b.kind) && words(b, 'text')}
-          {b.kind === 'fact' && <div style={{ marginTop: 6 }}><Field label={tr('ui.settings.value_at_the_end')} value={b.value ?? ''} maxLength={400} disabled={disabled} onChange={(v) => put(i, { value: v })} /></div>}
-          {b.kind === 'signatures' && <div style={{ marginTop: 6 }}><div className="fld"><label>{tr('ui.settings.who_signs')}</label>
-            <textarea style={ta} value={b.value ?? ''} disabled={disabled} maxLength={400} onChange={(e) => put(i, { value: e.target.value })} aria-label={tr('ui.settings.who_signs')} /></div></div>}
-          {(b.kind === 'fact' || b.kind === 'signatures') && words(b, 'value')}
-        </div>
-      ))}
-      {blocks.length < 60 && <button type="button" className="btn sm" style={{ marginTop: 8 }} disabled={disabled} onClick={() => setTpl({ ...tpl, blocks: [...blocks, { kind: 'text', text: '' }] })}>{tr('ui.settings.add_a_block')}</button>}
+        ))}
+      </div>
+      {blocks.length < 60 && <button type="button" className="btn sm" style={{ marginTop: 10 }} disabled={disabled} onClick={add}><Icon name="plus" />{tr('ui.settings.add_a_block')}</button>}
     </div>
   );
 }
@@ -964,6 +987,51 @@ function AttendanceMarksEditor({ value, max, disabled, onChange }: { value: Atte
         onChange([...value, { key: `mark-${n}`, name: tr('ui.settings.new_mark'), meaning: 'leave', code: '' }]);
       }}>{tr('ui.settings.add_a_mark')}</button>}
       <div className="help">{tr('ui.settings.a_mark_keeps_its_key')}</div>
+    </div>
+  );
+}
+
+const isEmpty = (v: unknown) => v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length) || (typeof v === 'object' && v !== null && !Array.isArray(v) && !Object.keys(v).length);
+const nameOf = (x: unknown): string => {
+  if (typeof x === 'string' || typeof x === 'number') return String(x);
+  if (!x || typeof x !== 'object') return '';
+  const o = x as Record<string, unknown>;
+  const n = o.name ?? o.label ?? o.grade ?? o.key;
+  return typeof n === 'string' || typeof n === 'number' ? String(n) : '';
+};
+
+/**
+ * A setting's value in words a person reads, never its JSON: on or off, the option's name, a list's names, a number in the
+ * school's way of writing it, or for a whole structure (message wording, steps, layouts) how many parts it has.
+ */
+export function settingText(meta: SettingMeta | undefined, v: unknown): string {
+  if (isEmpty(v)) return tr('ui.settings.not_set');
+  const opt = (x: string) => meta?.options?.find((o) => o[0] === x)?.[1] ?? (meta?.kind === 'language' ? languageLabel(x) : x);
+  if (typeof v === 'boolean') return v ? tr('ui.settings.on') : tr('ui.settings.off');
+  if (typeof v === 'number') return fmtNumber(v);
+  if (typeof v === 'string') return meta?.options || meta?.kind === 'language' ? opt(v) : v;
+  if (Array.isArray(v)) return v.map((x) => (typeof x === 'string' ? opt(x) : nameOf(x))).filter(Boolean).join(', ') || tr('ui.settings.n_items', { n: v.length });
+  const parts = Object.values(v as Record<string, unknown>).reduce<number>((n, x) => n + (Array.isArray(x) ? x.length : 1), 0);
+  return tr('ui.settings.n_items', { n: parts });
+}
+
+/** Settings as they are now and as a change would make them, one under the other in words, for whoever approves it. */
+export function SettingChanges({ changes }: { changes: { key: string; label?: string; before: unknown; after: unknown }[] }) {
+  return (
+    <div className="chg">
+      {changes.map((c) => {
+        const meta = (SETTINGS_META as Record<string, SettingMeta | undefined>)[c.key];
+        return (
+          <div key={c.key} className="chg-r">
+            <span className="chg-l">{c.label ?? meta?.label ?? c.key}</span>
+            <span className="chg-v">
+              <span className="chg-was">{settingText(meta, c.before)}</span>
+              <Icon name="next" size={14} />
+              <b>{settingText(meta, c.after)}</b>
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
