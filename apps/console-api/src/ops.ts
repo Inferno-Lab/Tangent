@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Header, HttpCode, Inject, Injectable, Logger, Param, Post, Put, Query, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
 import { POOLS, REGISTRY } from './tokens.js';
 import { MODULES, PRICE_CURRENCY, activeModules, closeModules, moduleByKey } from '@tangent/config-engine';
-import { fmtMoney, roundToCurrency, type SchoolContract, CellCreate, CellPatch, DEPLOY_TARGET_LABELS, InvoicePaid, auditLabel, CONSOLE_ROLES, type AuditRow, type ConsoleRole, type FleetSummary, type ConsoleUserRow, type FlagRow, type EntitlementDoc, type EntitlementRow, type InvoiceRowC, type SupportSessionRow, type SupportToken, tx } from '@tangent/contracts';
+import { fmtMoney, roundToCurrency, type SchoolContract, CellCreate, CellPatch, DEPLOY_TARGET_LABELS, InvoicePaid, auditLabel, auditDetail, CONSOLE_ROLES, type AuditRow, type ConsoleRole, type FleetSummary, type ConsoleUserRow, type FlagRow, type EntitlementDoc, type EntitlementRow, type InvoiceRowC, type SupportSessionRow, type SupportToken, tx } from '@tangent/contracts';
 import { migrate, newId, pg, scheduleJob, toCsv } from '@tangent/db';
 import { ApiError, ZodPipe, alert, notFound } from '@tangent/nest-kit';
 import { hashPassword, randomToken, sha256, signJwt, unseal } from '@tangent/security';
@@ -103,7 +103,8 @@ export class Support {
     const expires = new Date(Date.now() + 30 * 60_000);
     await this.db.pool.query("insert into support_sessions (id, school_id, school_name, reason, status, expires_at, started_by) values ($1,$2,$3,$4,'active',$5,$6)", [id, school.id, school.name, reason.trim(), expires, user.email]);
     await this.db.audit(user.email, 'support.started', 'school', school.id, { reason: reason.trim() });
-    const perms = ['students.read', 'attendance.read', 'fees.read', 'notices.read', 'approvals.read', 'timetable.read', 'settings.read', 'staff.read', 'reports.read'];
+    // Support looks at the whole school (classes.all widens what it reads; the session can change nothing).
+    const perms = ['students.read', 'attendance.read', 'fees.read', 'notices.read', 'approvals.read', 'timetable.read', 'settings.read', 'staff.read', 'reports.read', 'classes.all'];
     const token = signJwt({ sub: `support:${user.id}`, aud: school.slug, sid: id, name: `${user.name} (Tangent support)`, perms, support: true }, this.env.JWT_SECRET, 30 * 60);
     const row = (await this.db.query<typeof reg.supportSessions.$inferSelect>('select * from support_sessions where id = $1', [id])).rows[0]!;
     return { token, adminUrl: adminUrlFor(this.env, school.slug, school.addressing, school.customDomain), expiresAt: expires.toISOString(), session: this.row(row) };
@@ -286,7 +287,7 @@ export class Admin {
       `select id, at, actor, action, entity, detail from console_audit where ($2::text is null or entity_id = $2) and ($3::text is null or actor = $3) and ($4::text is null or action like $4 || '%')
          and ($5::date is null or at >= $5::date) and ($6::date is null or at < $6::date + 1) and ($7::timestamptz is null or at < $7) order by at desc limit $1`,
       [Math.min(500, limit), entityId ?? null, f.actor || null, f.action || null, f.from || null, f.to || null, f.before || null]);
-    return rows.map((r) => ({ id: r.id, at: r.at.toISOString(), actor: r.actor, action: r.action, entity: r.entity, detail: Object.entries(r.detail).map(([k, v]) => `${k}: ${String(v)}`).join(' · ') }));
+    return rows.map((r) => ({ id: r.id, at: r.at.toISOString(), actor: r.actor, action: r.action, entity: r.entity, detail: auditDetail(r.detail ?? {}) }));
   }
 
   catalog(): CatalogResponse {

@@ -60,7 +60,7 @@ export function TodayView({ v, d }: { v: V; d: DashboardData }) {
                 </div>
               </div>
               <div className="fx" style={{ gap: 10, marginTop: 'auto', flexWrap: 'wrap' }}>
-                {allNot.length > 0 && <button className="btn bri" onClick={v.remind}><Icon name="notifications" className="i" />{tr('admin.today_view.remind', { who: listOf(allNot.length > 2 ? [...allNot.slice(0, 2), tr('admin.today_view.and_more', { n: allNot.length - 2 })] : allNot) })}</button>}
+                {allNot.length > 0 && v.remind && <button className="btn bri" onClick={v.remind}><Icon name="notifications" className="i" />{tr('admin.today_view.remind', { who: listOf(allNot.length > 2 ? [...allNot.slice(0, 2), tr('admin.today_view.and_more', { n: allNot.length - 2 })] : allNot) })}</button>}
                 <button className="btn ond" onClick={() => v.goto('/attendance')}>{tr('admin.today_view.open_attendance')}</button>
               </div>
             </div>

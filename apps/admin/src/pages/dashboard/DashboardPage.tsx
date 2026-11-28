@@ -125,7 +125,8 @@ function DashboardDesktop() { const app = useApp();
     const me = tintFor(app.user.name);
     const t = d.timeline;
     return { ...chrome, goto: app.go, money, allClear,
-      remind: () => void app.api.attendance.remind().then(() => say(tr('admin.dashboard_page.reminders_sent_to_the_class'))).catch((e: Error) => say(e.message, 'bad')),
+      // Reminding every class is the office's (whole-school access); a teacher marks their own.
+      remind: !app.user.permissions.includes('classes.all') ? undefined : () => void app.api.attendance.remind().then(() => say(tr('admin.dashboard_page.reminders_sent_to_the_class'))).catch((e: Error) => say(e.message, 'bad')),
       hidden: [...hidden, ...off], openWidgets: () => setWidgets(true),
       has: { attendance: has('attendance') && may('attendance.read'), fees: has('fees') && may('fees.read'), chat: has('chat') && may('messages.read') }, showChart: tabsOn.length > 0,
       approvalKinds: (() => { const by = new Map<string, number>();

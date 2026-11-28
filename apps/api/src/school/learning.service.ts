@@ -21,7 +21,7 @@ export class LearningService {
 
   // Homework
 
-  async homework(t: TenantCtx, q: { classId?: string; subjectId?: string; draftsOf?: string; id?: string }): Promise<HomeworkRow[]> {
+  async homework(t: TenantCtx, q: { classId?: string; subjectId?: string; draftsOf?: string; id?: string }, scope: string[] | null = null): Promise<HomeworkRow[]> {
     const { rows } = await t.pool.query<{
       id: string; class_id: string; class_name: string; subject_id: string; subject_name: string; title: string; description: string; assigned_on: string; due_on: string; max_marks: number;
       graded: boolean; handed: string; on_time: string; total: string; created_by: string | null; teacher_name: string | null;
@@ -30,7 +30,8 @@ export class LearningService {
          count(*) filter (where sub.handed_at is not null) handed, count(*) filter (where sub.on_time) on_time, count(sub.student_id) total
        from homework h join classes c on c.id = h.class_id join subjects s on s.id = h.subject_id left join users tu on tu.id = h.created_by left join homework_submissions sub on sub.homework_id = h.id
        where ($1::text is null or h.class_id = $1) and ($2::text is null or h.subject_id = $2) and ($4::text is null or h.id = $4) and (h.status = 'set' or h.created_by = $3 or $4::text is not null)
-       group by h.id, c.id, s.id, tu.name order by h.assigned_on desc, c.grade, c.section, h.id limit 120`, [q.classId ?? null, q.subjectId ?? null, q.draftsOf ?? '', q.id ?? null]);
+         and ($5::text[] is null or h.class_id = any($5::text[]))
+       group by h.id, c.id, s.id, tu.name order by h.assigned_on desc, c.grade, c.section, h.id limit 120`, [q.classId ?? null, q.subjectId ?? null, q.draftsOf ?? '', q.id ?? null, scope]);
     return rows.map((r) => ({
       id: r.id, classId: r.class_id, className: r.class_name, subjectId: r.subject_id, subjectName: r.subject_name, title: r.title, description: r.description,
       assignedOn: r.assigned_on, dueOn: r.due_on, maxMarks: r.max_marks, graded: r.graded, handedIn: Number(r.handed), onTime: Number(r.on_time), total: Number(r.total),
@@ -40,8 +41,8 @@ export class LearningService {
 
   async homeworkDetail(t: TenantCtx, id: string): Promise<HomeworkDetail> {
     const row = await this.homeworkRow(t, id);
-    const { rows } = await t.pool.query<{ student_id: string; name: string; roll_no: string; handed_at: Date | null; on_time: boolean; score: number | null; feedback: string }>(
-      `select s.id student_id, s.name, s.roll_no, sub.handed_at, coalesce(sub.on_time, false) on_time, sub.score, coalesce(sub.feedback, '') feedback
+    const { rows } = await t.pool.query<{ student_id: string; name: string; roll_no: string; handed_at: Date | null; on_time: boolean; score: number | null; feedback: string; answer: string }>(
+      `select s.id student_id, s.name, s.roll_no, sub.handed_at, coalesce(sub.on_time, false) on_time, sub.score, coalesce(sub.feedback, '') feedback, coalesce(sub.answer, '') answer
        from students s left join homework_submissions sub on sub.student_id = s.id and sub.homework_id = $1
        where s.class_id = $2 and s.status = 'active' order by s.roll_no, s.name`, [id, row.classId]);
     // What the teacher attached, and what each student handed in from the app (files that passed their check only).
@@ -52,7 +53,7 @@ export class LearningService {
     return {
       ...row, files: files.filter((x) => x.kind === 'homework_attachment').map(f),
       students: rows.map((r) => ({
-        studentId: r.student_id, name: r.name, rollNo: r.roll_no, handedAt: r.handed_at?.toISOString() ?? null, onTime: r.on_time, score: r.score, feedback: r.feedback,
+        studentId: r.student_id, name: r.name, rollNo: r.roll_no, handedAt: r.handed_at?.toISOString() ?? null, onTime: r.on_time, score: r.score, feedback: r.feedback, answer: r.answer,
         files: files.filter((x) => x.kind === 'homework_submission' && x.owner_id === `${id}:${r.student_id}`).map(f),
       })),
     };
@@ -177,13 +178,14 @@ export class LearningService {
 
   // Exams
 
-  async exams(t: TenantCtx, classId?: string, id?: string): Promise<ExamRow[]> {
+  async exams(t: TenantCtx, classId?: string, id?: string, scope: string[] | null = null): Promise<ExamRow[]> {
     // An exam that has begun is being marked, whether or not a mark is in yet (it is never "coming up" once written).
     const today = schoolToday();
     const { rows } = await t.pool.query<{ id: string; name: string; kind: string; class_id: string; class_name: string; grade: number; starts_on: string; ends_on: string; status: ExamRow['status']; students: string; reopened_note: string }>(
       `select e.id, e.name, e.kind, e.class_id, c.name class_name, c.grade, e.starts_on::text, e.ends_on::text, e.status, e.reopened_note,
          (select count(*) from students s where s.class_id = e.class_id and s.status = 'active') students
-       from exams e join classes c on c.id = e.class_id where ($1::text is null or e.class_id = $1) and ($2::text is null or e.id = $2) order by e.starts_on desc, c.grade, c.section limit 100`, [classId ?? null, id ?? null]);
+       from exams e join classes c on c.id = e.class_id where ($1::text is null or e.class_id = $1) and ($2::text is null or e.id = $2) and ($3::text[] is null or e.class_id = any($3::text[]))
+       order by e.starts_on desc, c.grade, c.section limit 100`, [classId ?? null, id ?? null, scope]);
     if (!rows.length) return [];
     const ids = rows.map((r) => r.id);
     const [subs, entered] = await Promise.all([

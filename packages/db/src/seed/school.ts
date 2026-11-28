@@ -1,4 +1,4 @@
-import { toE164, packSettings, PERMISSIONS, ROLE_TEMPLATES, type RoleTemplate, schoolToday } from '@tangent/contracts';
+import { toE164, packSettings, PERMISSIONS, ROLE_TEMPLATES, withWholeSchool, type RoleTemplate, schoolToday } from '@tangent/contracts';
 import type { Pool, PoolClient } from 'pg';
 import { newId } from '../ids.js';
 import { bulkInsert } from './bulk.js';
@@ -90,7 +90,7 @@ async function run(db: PoolClient, input: SeedInput): Promise<void> {
     'yr_current', `${startY}–${String(startY + 1).slice(2)}`, `${startY}-04-01`, `${startY + 1}-03-31`,
   ]);
   await bulkInsert(db, 'roles', ['id', 'key', 'name', 'description', 'permissions', 'locked'],
-    (input.roleTemplates?.length ? input.roleTemplates : ROLE_TEMPLATES).map((t) => [`role_${t.key}`, t.key, t.name, t.description, JSON.stringify(t.key === 'principal' ? [...PERMISSIONS] : t.permissions), t.key === 'principal']));
+    (input.roleTemplates?.length ? input.roleTemplates : ROLE_TEMPLATES).map((t) => [`role_${t.key}`, t.key, t.name, t.description, JSON.stringify(t.key === 'principal' ? [...PERMISSIONS] : withWholeSchool(t.permissions)), t.key === 'principal']));
   if (input.data !== 'import') {
     await bulkInsert(db, 'periods', ['idx', 'label', 'starts_at', 'ends_at', 'kind'], PERIOD_ROWS);
     await bulkInsert(db, 'subjects', ['id', 'name', 'color', 'per_week'], SUBJECTS.map((s) => [s.id, s.name, s.color, s.perWeek]));

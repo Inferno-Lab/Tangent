@@ -190,12 +190,12 @@ export class AttendanceService {
   }
 
   /** Percentage present for each of the last six school days, with the same weekday a week earlier for comparison. */
-  async week(t: TenantCtx, count = 6): Promise<AttendanceWeekPoint[]> {
+  async week(t: TenantCtx, count = 6, scope: string[] | null = null): Promise<AttendanceWeekPoint[]> {
     const { last, days } = await this.settings.openDays(t, count);
     const before = days.map((d) => addDays(d, -7));
     const { rows } = await t.pool.query<{ d: string; present: string; total: string }>(
       `select to_char(s.date,'YYYY-MM-DD') d, count(*) filter (where m.status in ('present','late','half_day')) present, count(*) total
-       from attendance_sessions s join attendance_marks m on m.session_id = s.id where s.date = any($1::date[]) group by s.date`, [[...days, ...before]]);
+       from attendance_sessions s join attendance_marks m on m.session_id = s.id where s.date = any($1::date[]) and ($2::text[] is null or s.class_id = any($2::text[])) group by s.date`, [[...days, ...before], scope]);
     const by = new Map(rows.map((r) => [r.d, { present: Number(r.present), total: Number(r.total) }]));
     const pct = (d: string) => { const x = by.get(d); return x && x.total ? Math.round((x.present / x.total) * 1000) / 10 : null; };
     return days.map((d, i) => {

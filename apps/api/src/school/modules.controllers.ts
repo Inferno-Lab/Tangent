@@ -14,6 +14,10 @@ import { Tenant, type AuthedUser, type TenantCtx } from '../tenancy/tenant.js';
 import { LearningService } from './learning.service.js';
 import { OfficeService } from './office.service.js';
 import { PeopleService } from './people.service.js';
+import { classScope, maySee } from './support.js';
+
+/** Whose family conversations a person sees: everyone's with whole-school access (and Tangent's read-only support), else their own. */
+const mine = (u: AuthedUser): string | null => (u.permissions.includes('classes.all') || u.id.startsWith('support:') ? null : u.id);
 
 const ClassFilter = z.object({ classId: z.string().optional(), subjectId: z.string().optional() });
 const Q = z.object({ query: z.string().trim().max(80).optional() });
@@ -31,8 +35,8 @@ export class LearningController {
   }
 
   @Get('homework') @RequireModule('homework') @Require('homework.read')
-  homework(@Tenant() t: TenantCtx, @Query(new ZodPipe(ClassFilter)) q: z.infer<typeof ClassFilter>): Promise<HomeworkRow[]> {
-    return this.learning.homework(t, q);
+  async homework(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Query(new ZodPipe(ClassFilter)) q: z.infer<typeof ClassFilter>): Promise<HomeworkRow[]> {
+    return this.learning.homework(t, q, await classScope(t, u));
   }
 
   @Post('homework') @RequireModule('homework') @Require('homework.write')
@@ -41,8 +45,10 @@ export class LearningController {
   }
 
   @Get('homework/:id') @RequireModule('homework') @Require('homework.read')
-  homeworkDetail(@Tenant() t: TenantCtx, @Param('id') id: string): Promise<HomeworkDetail> {
-    return this.learning.homeworkDetail(t, id);
+  async homeworkDetail(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string): Promise<HomeworkDetail> {
+    const d = await this.learning.homeworkDetail(t, id);
+    await maySee(t, u, d.classId);
+    return d;
   }
 
   @Put('homework/:id') @RequireModule('homework') @Require('homework.write')
@@ -61,8 +67,8 @@ export class LearningController {
   }
 
   @Get('exams') @RequireModule('exams') @Require('exams.read')
-  exams(@Tenant() t: TenantCtx, @Query(new ZodPipe(ClassFilter)) q: z.infer<typeof ClassFilter>): Promise<ExamRow[]> {
-    return this.learning.exams(t, q.classId);
+  async exams(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Query(new ZodPipe(ClassFilter)) q: z.infer<typeof ClassFilter>): Promise<ExamRow[]> {
+    return this.learning.exams(t, q.classId, undefined, await classScope(t, u));
   }
 
   @Post('exams') @RequireModule('exams') @Require('exams.write')
@@ -81,8 +87,10 @@ export class LearningController {
   }
 
   @Get('exams/:id/marks') @RequireModule('exams') @Require('exams.read')
-  marks(@Tenant() t: TenantCtx, @Param('id') id: string): Promise<ExamMarksView> {
-    return this.learning.marksView(t, id);
+  async marks(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string): Promise<ExamMarksView> {
+    const v = await this.learning.marksView(t, id);
+    await maySee(t, u, v.exam.classId);
+    return v;
   }
 
   @Put('exams/:id/marks') @RequireModule('exams') @Require('exams.write')
@@ -96,7 +104,8 @@ export class LearningController {
   }
 
   @Get('exams/:id/results') @RequireModule('exams') @Require('exams.read')
-  results(@Tenant() t: TenantCtx, @Param('id') id: string): Promise<ExamResults> {
+  async results(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string): Promise<ExamResults> {
+    await maySee(t, u, (await this.learning.exams(t, undefined, id))[0]?.classId);
     return this.learning.results(t, id);
   }
 
@@ -258,8 +267,8 @@ export class OfficeController {
   }
 
   @Get('messages') @RequireModule('chat') @Require('messages.read')
-  threads(@Tenant() t: TenantCtx): Promise<ThreadRow[]> {
-    return this.office.threads(t);
+  threads(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser): Promise<ThreadRow[]> {
+    return this.office.threads(t, mine(u));
   }
 
   @Post('messages') @RequireModule('chat') @Require('messages.write')
@@ -274,17 +283,17 @@ export class OfficeController {
 
   @Get('messages/:id') @RequireModule('chat') @Require('messages.read')
   thread(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string): Promise<ThreadDetail> {
-    return this.office.thread(t, id, !u.id.startsWith('support:'));
+    return this.office.thread(t, id, !u.id.startsWith('support:'), mine(u));
   }
 
   @Post('messages/:id/reply') @HttpCode(200) @RequireModule('chat') @Require('messages.write')
   reply(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(ThreadReply)) b: ThreadReply): Promise<ThreadDetail> {
-    return this.office.reply(t, u, id, b);
+    return this.office.reply(t, u, id, b, mine(u));
   }
 
   @Patch('messages/:id') @RequireModule('chat') @Require('messages.write')
   patchThread(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(ThreadPatch)) b: ThreadPatch): Promise<ThreadDetail> {
-    return this.office.patchThread(t, u, id, b);
+    return this.office.patchThread(t, u, id, b, mine(u));
   }
 
   @Get('events') @RequireModule('events') @Require('events.read')

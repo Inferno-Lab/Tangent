@@ -17,7 +17,7 @@ import { DashboardService } from './dashboard.service.js';
 import { FeesService } from './fees.service.js';
 import { StudentsService } from './students.service.js';
 import { NoticesService } from './notices.service.js';
-import { AuditService, Messenger, SettingsService } from './support.js';
+import { AuditService, Messenger, SettingsService, classScope, maySee } from './support.js';
 import { TimetableService } from './timetable.service.js';
 
 const DayQuery = z.object({ classId: z.string().min(1), date: IsoDate, part: z.enum(REGISTER_PARTS).optional() });
@@ -39,8 +39,9 @@ export class ClassesController {
   constructor(private readonly tt: TimetableService) {}
 
   @Get() @Require('students.read')
-  list(@Tenant() t: TenantCtx): Promise<ClassInfo[]> {
-    return this.tt.classes(t);
+  async list(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser): Promise<ClassInfo[]> {
+    const scope = await classScope(t, u);
+    return (await this.tt.classes(t)).filter((c) => !scope || scope.includes(c.id));
   }
 }
 
@@ -50,23 +51,23 @@ export class StudentsController {
   constructor(private readonly students: StudentsService) {}
 
   @Get() @Require('students.read')
-  list(@Tenant() t: TenantCtx, @Query(new ZodPipe(StudentQuery)) q: StudentQuery): Promise<Paged<StudentRow>> {
-    return this.students.list(t, q);
+  async list(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Query(new ZodPipe(StudentQuery)) q: StudentQuery): Promise<Paged<StudentRow>> {
+    return this.students.list(t, q, await classScope(t, u));
   }
 
   @Get('summary') @Require('students.read')
-  summary(@Tenant() t: TenantCtx, @Query(new ZodPipe(Summ)) q: z.infer<typeof Summ>): Promise<StudentSummary> {
-    return this.students.summary(t, q);
+  async summary(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Query(new ZodPipe(Summ)) q: z.infer<typeof Summ>): Promise<StudentSummary> {
+    return this.students.summary(t, q, await classScope(t, u));
   }
 
   @Get('views') @Require('students.read')
-  views(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser): Promise<StudentViews> {
-    return this.students.views(t, u.id);
+  async views(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser): Promise<StudentViews> {
+    return this.students.views(t, u.id, await classScope(t, u));
   }
 
   @Get('export') @Require('students.read') @Header('content-type', 'text/csv; charset=utf-8') @Header('content-disposition', 'attachment; filename="students.csv"')
-  export(@Tenant() t: TenantCtx, @Query(new ZodPipe(IdsQuery)) q: z.infer<typeof IdsQuery>): Promise<string> {
-    return this.students.exportCsv(t, q.ids ? q.ids.split(',').slice(0, 500) : null);
+  async export(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Query(new ZodPipe(IdsQuery)) q: z.infer<typeof IdsQuery>): Promise<string> {
+    return this.students.exportCsv(t, q.ids ? q.ids.split(',').slice(0, 500) : null, await classScope(t, u));
   }
 
   @Post() @Require('students.write')
@@ -86,8 +87,8 @@ export class StudentsController {
   }
 
   @Post('message') @HttpCode(200) @Require('students.read')
-  message(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(MessageRequest)) body: MessageRequest): Promise<{ sent: number }> {
-    return this.students.message(t, body, u);
+  async message(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(MessageRequest)) body: MessageRequest): Promise<{ sent: number }> {
+    return this.students.message(t, body, u, await classScope(t, u));
   }
 
   @Patch(':id') @Require('students.write')
@@ -122,12 +123,14 @@ export class StudentsController {
   }
 
   @Get(':id') @Require('students.read')
-  detail(@Tenant() t: TenantCtx, @Param('id') id: string): Promise<StudentDetail> {
+  async detail(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string): Promise<StudentDetail> {
+    await this.students.mayOpen(t, await classScope(t, u), id);
     return this.students.detail(t, id);
   }
 
   @Post(':id/reveal') @HttpCode(200) @Require('students.read')
-  reveal(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string): Promise<ContactReveal> {
+  async reveal(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string): Promise<ContactReveal> {
+    await this.students.mayOpen(t, await classScope(t, u), id);
     return this.students.reveal(t, id, u);
   }
 }
@@ -138,7 +141,8 @@ export class AttendanceController {
   constructor(private readonly attendance: AttendanceService) {}
 
   @Get('day') @Require('attendance.read')
-  day(@Tenant() t: TenantCtx, @Query(new ZodPipe(DayQuery)) q: z.infer<typeof DayQuery>): Promise<AttendanceDay> {
+  async day(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Query(new ZodPipe(DayQuery)) q: z.infer<typeof DayQuery>): Promise<AttendanceDay> {
+    await maySee(t, u, q.classId);
     return this.attendance.day(t, q.classId, q.date, q.part);
   }
 
@@ -148,7 +152,8 @@ export class AttendanceController {
   }
 
   @Get('periods') @RequireModule('attendance.periodWise') @Require('attendance.read')
-  periods(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Query(new ZodPipe(DayQuery)) q: z.infer<typeof DayQuery>): Promise<PeriodRoll> {
+  async periods(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Query(new ZodPipe(DayQuery)) q: z.infer<typeof DayQuery>): Promise<PeriodRoll> {
+    await maySee(t, u, q.classId);
     return this.attendance.periods(t, u, q.classId, q.date);
   }
 
@@ -158,11 +163,12 @@ export class AttendanceController {
   }
 
   @Get('week') @Require('attendance.read')
-  week(@Tenant() t: TenantCtx): Promise<AttendanceWeekPoint[]> {
-    return this.attendance.week(t);
+  async week(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser): Promise<AttendanceWeekPoint[]> {
+    return this.attendance.week(t, 6, await classScope(t, u));
   }
 
-  @Post('remind') @HttpCode(200) @Require('attendance.read')
+  // Reminding every class that has not marked is the office's: it is for whoever sees every class.
+  @Post('remind') @HttpCode(200) @Require('attendance.read', 'classes.all')
   remind(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser): Promise<{ sent: number; classes: string[] }> {
     return this.attendance.remind(t, u);
   }
@@ -397,7 +403,7 @@ export class DashboardController {
   @Get('search')
   async search(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Query(new ZodPipe(SearchQuery)) q: z.infer<typeof SearchQuery>): Promise<SearchHit[]> {
     const cfg = await this.settings.effective(t, u.permissions);
-    return this.dash.search(t, q.q, u.permissions, cfg.modules);
+    return this.dash.search(t, q.q, u.permissions, cfg.modules, await classScope(t, u));
   }
 }
 

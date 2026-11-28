@@ -5,7 +5,7 @@ import { ApprovalsService } from './approvals.service.js';
 import { AttendanceService } from './attendance.service.js';
 import { FeesService } from './fees.service.js';
 import { FilesService } from './files.service.js';
-import { SettingsService } from './support.js';
+import { SettingsService, classScope } from './support.js';
 
 /** The run-up to exams that the sidebar card counts down through. */
 const REVISION_WINDOW_DAYS = 17;
@@ -32,7 +32,10 @@ export class DashboardService {
     const v = doc.values;
     // The classes this person chose for the roll-call widget, else the school's choice (People → Academic year), else the first six.
     const mine = (await t.pool.query<{ value: string[] }>("select value from user_prefs where user_id = $1 and key = 'dashboard.rollClasses'", [user.id])).rows[0]?.value;
-    const rollIds = ((mine?.length ? mine : (v['dashboard.rollClasses'] as string[] | undefined)) ?? []).slice(0, 6);
+    // A teacher's dashboard is about their own classes (classScope): the roll-call card, the week's attendance and homework, today's totals.
+    const scope = await classScope(t, user);
+    const chosen = ((mine?.length ? mine : (v['dashboard.rollClasses'] as string[] | undefined)) ?? []).filter((c) => !scope || scope.includes(c));
+    const rollIds = (chosen.length || !scope ? chosen : scope).slice(0, 6);
     // A module the school does not have, or one this person may not read (a teacher without "See fees" gets no fee totals),
     // is not queried at all, so its numbers never leave the server; the admin leaves out the widgets of what is not listed.
     const modules = (await this.settings.effective(t)).modules.filter((m) => !SEE[m] || user.permissions.includes(SEE[m]));
@@ -41,18 +44,18 @@ export class DashboardService {
     const noRows = { rows: [] };
     const [me, week, feeSummary, needs, counts, unmarked, present, prevPresent, hw, rolls, events, classCount, studentTotal] = await Promise.all([
       t.pool.query<{ name: string; role_name: string | null }>("select u.name, (select string_agg(r.name, ', ') from user_roles ur join roles r on r.id = ur.role_id where ur.user_id = u.id) role_name from users u where u.id = $1", [user.id]),
-      on('attendance', () => this.attendance.week(t, count), []),
+      on('attendance', () => this.attendance.week(t, count, scope), []),
       on('fees', () => this.fees.summary(t, count), NO_FEES),
       this.approvals.needsYou(t, user),
       this.approvals.counts(t, user),
-      on('attendance', () => this.attendance.unmarked(t), []),
-      on('attendance', () => t.pool.query<{ present: string }>("select count(*) filter (where d.status in ('present','late','half_day')) present from attendance_days d where d.date = $1", [last]), { rows: [{ present: '0' }] }),
-      on('attendance', () => t.pool.query<{ pct: number | null }>("select avg(case when m.status in ('present','late','half_day') then 1.0 else 0.0 end) pct from attendance_sessions s join attendance_marks m on m.session_id = s.id where s.date = $1", [addDays(last, -7)]), { rows: [{ pct: null }] }),
-      on('homework', () => this.homeworkWeek(t, days), days.map(() => 0)),
-      on('attendance', () => this.classRolls(t, last, rollIds), []),
+      on('attendance', async () => (await this.attendance.unmarked(t)).filter((c) => !scope || scope.includes(c.id)), []),
+      on('attendance', () => t.pool.query<{ present: string }>("select count(*) filter (where d.status in ('present','late','half_day')) present from attendance_days d where d.date = $1 and ($2::text[] is null or d.class_id = any($2::text[]))", [last, scope]), { rows: [{ present: '0' }] }),
+      on('attendance', () => t.pool.query<{ pct: number | null }>("select avg(case when m.status in ('present','late','half_day') then 1.0 else 0.0 end) pct from attendance_sessions s join attendance_marks m on m.session_id = s.id where s.date = $1 and ($2::text[] is null or s.class_id = any($2::text[]))", [addDays(last, -7), scope]), { rows: [{ pct: null }] }),
+      on('homework', () => this.homeworkWeek(t, days, scope), days.map(() => 0)),
+      on('attendance', () => this.classRolls(t, last, rollIds, scope), []),
       on('events', () => t.pool.query<{ id: string; at: Date; title: string; note: string }>("select id, starts_at at, title, note from events where (starts_at at time zone $2)::date = $1 order by starts_at", [last, schoolZone()]), noRows),
-      t.pool.query<{ n: string }>('select count(*) n from classes'),
-      t.pool.query<{ n: string }>("select count(*) n from students where status = 'active'"),
+      t.pool.query<{ n: string }>('select count(*) n from classes where $1::text[] is null or id = any($1::text[])', [scope]),
+      t.pool.query<{ n: string }>("select count(*) n from students where status = 'active' and ($1::text[] is null or class_id = any($1::text[]))", [scope]),
     ]);
     const total = Number(studentTotal.rows[0]!.n);
     const presentNow = Number(present.rows[0]!.present);
@@ -100,20 +103,20 @@ export class DashboardService {
     };
   }
 
-  private async homeworkWeek(t: TenantCtx, days: string[]): Promise<number[]> {
+  private async homeworkWeek(t: TenantCtx, days: string[], scope: string[] | null = null): Promise<number[]> {
     const { rows } = await t.pool.query<{ d: string; pct: number | null }>(
-      `select to_char(h.assigned_on,'YYYY-MM-DD') d, avg(case when hs.on_time then 100.0 else 0.0 end) pct from homework h join homework_submissions hs on hs.homework_id = h.id where h.assigned_on = any($1::date[]) group by 1`, [days]);
+      `select to_char(h.assigned_on,'YYYY-MM-DD') d, avg(case when hs.on_time then 100.0 else 0.0 end) pct from homework h join homework_submissions hs on hs.homework_id = h.id where h.assigned_on = any($1::date[]) and ($2::text[] is null or h.class_id = any($2::text[])) group by 1`, [days, scope]);
     const m = new Map(rows.map((r) => [r.d, Math.round(Number(r.pct ?? 0))]));
     return days.map((d) => m.get(d) ?? 0);
   }
 
-  private async classRolls(t: TenantCtx, last: string, ids: string[]): Promise<DashboardData['classRolls']> {
+  private async classRolls(t: TenantCtx, last: string, ids: string[], scope: string[] | null = null): Promise<DashboardData['classRolls']> {
     const { rows } = await t.pool.query<{ id: string; name: string; size: string; present: string; late: string; absent: string; marked: string }>(
       `select c.id, c.name, (select count(*) from students s where s.class_id = c.id and s.status = 'active') size,
          count(m.status) filter (where m.status in ('present','half_day')) present, count(m.status) filter (where m.status = 'late') late,
          count(m.status) filter (where m.status in ('absent','leave')) absent, count(m.status) marked
        from classes c left join attendance_days m on m.class_id = c.id and m.date = $2
-       where ($1::text[] is null or cardinality($1::text[]) = 0 or c.id = any($1)) group by c.id, c.name, c.grade, c.section order by c.grade, c.section limit 6`, [ids.length ? ids : null, last]);
+       where ($1::text[] is null or cardinality($1::text[]) = 0 or c.id = any($1)) and ($3::text[] is null or c.id = any($3::text[])) group by c.id, c.name, c.grade, c.section order by c.grade, c.section limit 6`, [ids.length ? ids : null, last, scope]);
     return rows.map((r) => {
       const size = Number(r.size);
       const marked = Number(r.marked);
@@ -156,7 +159,7 @@ export class DashboardService {
     };
   }
 
-  async search(t: TenantCtx, q: string, perms: string[], modules: string[]): Promise<SearchHit[]> {
+  async search(t: TenantCtx, q: string, perms: string[], modules: string[], scope: string[] | null = null): Promise<SearchHit[]> {
     const needle = q.trim();
     const all: SearchHit[] = [
       { group: 'Go to', title: 'Dashboard', hint: 'Overview', href: '/', keys: 'G D' },
@@ -165,12 +168,12 @@ export class DashboardService {
       ...(perms.includes('settings.read') ? [{ group: 'Go to' as const, title: 'Settings', hint: 'School', href: '/settings', keys: 'G ,' }] : []),
     ];
     const pages = all.filter((p) => !needle || p.title.toLowerCase().includes(needle.toLowerCase()));
-    if (!needle) return [...pages, ...(perms.includes('students.read') ? [{ group: 'Actions' as const, title: 'Add student', hint: 'People', href: 'action:add-student', keys: 'N S' }] : [])];
+    if (!needle) return [...pages, ...(perms.includes('students.write') ? [{ group: 'Actions' as const, title: 'Add student', hint: 'People', href: 'action:add-student', keys: 'N S' }] : [])];
     const out: SearchHit[] = [];
     if (perms.includes('students.read')) {
       const like = `%${needle.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
       const { rows } = await t.pool.query<{ id: string; name: string; class_name: string; admission_no: string }>(
-        `select s.id, s.name, c.name class_name, s.admission_no from students s join classes c on c.id = s.class_id where s.name ilike $1 or s.admission_no ilike $1 order by lower(s.name) limit 6`, [like]);
+        `select s.id, s.name, c.name class_name, s.admission_no from students s join classes c on c.id = s.class_id where (s.name ilike $1 or s.admission_no ilike $1) and ($2::text[] is null or s.class_id = any($2::text[])) order by lower(s.name) limit 6`, [like, scope]);
       out.push(...rows.map((r) => ({ group: 'People' as const, title: r.name, hint: r.class_name, href: `/students?open=${r.id}`, keys: r.class_name })));
       if (rows[0] && perms.includes('fees.collect') && modules.includes('fees')) out.push({ group: 'Actions', title: `Collect fee for ${rows[0].name}`, hint: 'Fees', href: `/students?open=${rows[0].id}&pay=1`, keys: 'N F' });
     }

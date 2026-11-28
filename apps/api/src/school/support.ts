@@ -3,7 +3,7 @@ import { StaleSettings, newId, recordSettingsVersion, writeSettings } from '@tan
 import { checkSchoolChanges, resolveConfig, validateSettingsChanges } from '@tangent/config-engine';
 import { ApiError, forbidden } from '@tangent/nest-kit';
 import type { Registry } from '@tangent/tenancy';
-import { tx, TimetableCycle, slotDayOf, slotDays, slotKey, schoolToday, addDays, schoolZone, checkCustom, roundToCurrency, type CustomEntity, type CustomFieldsSetting, type CustomValues, rawOf, toE164, phoneProblem, MESSAGE_EVENTS, SETTINGS_META, schoolMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type GradingScheme, gradeIn, schemeFor, type SchoolSettingsPatch, type SchoolSettingsView, type SettingsDoc } from '@tangent/contracts';
+import { tx, TimetableCycle, slotDayOf, slotDays, slotKey, schoolToday, addDays, schoolZone, checkCustom, roundToCurrency, type CustomEntity, type CustomFieldsSetting, type CustomValues, rawOf, toE164, phoneProblem, MESSAGE_EVENTS, SETTINGS_META, auditDetail, schoolMinutes, type AuditRow, type EffectiveConfig, type GradingScale, type GradingScheme, gradeIn, schemeFor, type SchoolSettingsPatch, type SchoolSettingsView, type SettingsDoc } from '@tangent/contracts';
 import { REGISTRY, type TenantCtx } from '../tenancy/tenant.js';
 import { HubService } from './hub.service.js';
 import { serverCatalogue } from '@tangent/tenancy';
@@ -17,11 +17,11 @@ export class AuditService {
     );
   }
 
-  async list(t: TenantCtx, limit = 50): Promise<AuditRow[]> {
+  async list(t: TenantCtx, limit = 300): Promise<AuditRow[]> {
     const { rows } = await t.pool.query<{ id: string; at: Date; actor_name: string; action: string; entity: string; detail: Record<string, unknown> }>(
       // Only what the school's own people did: Tangent's set-up, console changes and its jobs have no user of this school.
-      "select a.id, a.at, a.actor_name, a.action, a.entity, a.detail from audit_log a join users u on u.id = a.actor_id where a.action <> 'school.created' order by a.at desc limit $1", [limit]);
-    return rows.map((r) => ({ id: r.id, at: r.at.toISOString(), actor: r.actor_name, action: r.action, entity: r.entity, detail: Object.entries(r.detail).map(([k, v]) => `${k}: ${String(v)}`).join(' · ') }));
+      "select a.id, a.at, case when a.actor_name = 'self' then u.name else a.actor_name end actor_name, a.action, a.entity, a.detail from audit_log a join users u on u.id = a.actor_id where a.action <> 'school.created' order by a.at desc limit $1", [limit]);
+    return rows.map((r) => ({ id: r.id, at: r.at.toISOString(), actor: r.actor_name, action: r.action, entity: r.entity, detail: auditDetail(r.detail ?? {}) }));
   }
 }
 
@@ -69,6 +69,9 @@ export class SettingsService {
     const changes = { ...checked.values, ...Object.fromEntries(Object.keys(patch.changes).filter((k) => patch.changes[k] === null).map((k) => [k, null])) };
     const risky = Object.keys(changes).filter((k) => SETTINGS_META[k as keyof typeof SETTINGS_META]?.risky);
     if (risky.length) {
+      // The same change asked again while it waits is that request, not a second one in Approvals.
+      const same = (await t.pool.query<{ id: string }>("select id from approvals where kind = 'settings' and status = 'pending' and payload->'changes' = $1::jsonb limit 1", [JSON.stringify(changes)])).rows[0];
+      if (same) return { pending: true, approvalId: same.id };
       const id = newId('apr');
       const labels = risky.map((k) => SETTINGS_META[k as keyof typeof SETTINGS_META].label).join(', ');
       await t.pool.query(
@@ -254,6 +257,25 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
  * A class a person acts on (marks its attendance, enters its marks, sets or grades its homework): any class with `classes.all`,
  * otherwise one they teach, as its class teacher, a teacher in its timetable, or covering a period of it (a day's cover, for two weeks).
  */
+/**
+ * The classes a person sees the students and work of: null (every class) with `classes.all`, else the ones they teach, as above.
+ * A teacher sees their own classes' students, attendance, homework, marks and diary, never another teacher's.
+ */
+export async function classScope(t: TenantCtx, user: { id: string; permissions: readonly string[] }): Promise<string[] | null> {
+  if (user.permissions.includes('classes.all')) return null;
+  const { rows } = await t.pool.query<{ id: string }>(
+    `select id from classes where class_teacher_id = $1 union select class_id from live_slots where teacher_id = $1 or cover_teacher_id = $1
+     union select x.class_id from substitutions s join live_slots x on x.id = s.slot_id where s.teacher_id = $1 and s.date between $2::date - 14 and $2::date`,
+    [user.id, schoolToday()]);
+  return rows.map((r) => r.id);
+}
+
+/** Refuses a class outside the person's scope, as if it were not there (no hint that it exists). */
+export async function maySee(t: TenantCtx, user: { id: string; permissions: readonly string[] }, classId: string | null | undefined): Promise<void> {
+  const scope = await classScope(t, user);
+  if (scope && (!classId || !scope.includes(classId))) throw forbidden(tx('You can see this only for the classes you teach.'));
+}
+
 export async function mayTeach(t: TenantCtx, user: { id: string; permissions: readonly string[] }, classId: string): Promise<void> {
   if (user.permissions.includes('classes.all')) return;
   const ok = await t.pool.query(

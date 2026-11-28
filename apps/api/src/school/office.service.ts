@@ -249,14 +249,15 @@ export class OfficeService {
     return { id: r.id, subject: r.subject, guardianName: r.guardian ?? 'A family', studentName: r.student, className: r.class_name, status: r.status, lastAt: r.last_at.toISOString(), lastBody: r.last_body ?? '', lastFrom: r.last_from ?? 'staff', unread: Number(r.unread), assignedToId: r.assigned_id, assignedToName: r.assigned };
   }
 
-  async threads(t: TenantCtx): Promise<ThreadRow[]> {
-    const { rows } = await t.pool.query(this.threadSql('', 'limit 200'));
+  /** `mine`: only the conversations assigned to this person (staff without whole-school access); null: every one. */
+  async threads(t: TenantCtx, mine: string | null = null): Promise<ThreadRow[]> {
+    const { rows } = await t.pool.query(this.threadSql('where ($1::text is null or th.assigned_to = $1)', 'limit 200'), [mine]);
     return rows.map((r) => this.threadRow(r));
   }
 
   /** A conversation; opening it marks the family's messages read, unless Tangent's read-only support is the one looking. */
-  async thread(t: TenantCtx, id: string, markRead = true): Promise<ThreadDetail> {
-    const head = (await t.pool.query(this.threadSql('where th.id = $1'), [id])).rows[0];
+  async thread(t: TenantCtx, id: string, markRead = true, mine: string | null = null): Promise<ThreadDetail> {
+    const head = (await t.pool.query(this.threadSql('where th.id = $1 and ($2::text is null or th.assigned_to = $2)'), [id, mine])).rows[0];
     if (!head) throw notFound('That conversation');
     if (markRead) await t.pool.query("update thread_messages set read_at = now() where thread_id = $1 and from_kind = 'guardian' and read_at is null", [id]);
     const msgs = await t.pool.query<{ id: string; from_kind: 'staff' | 'guardian'; sender_name: string; body: string; created_at: Date; deleted_at: Date | null; file_ids: string[] | null }>(
@@ -279,14 +280,15 @@ export class OfficeService {
     return this.thread(t, id);
   }
 
-  async reply(t: TenantCtx, user: User, id: string, body: ThreadReply): Promise<ThreadDetail> {
+  async reply(t: TenantCtx, user: User, id: string, body: ThreadReply, mine: string | null = null): Promise<ThreadDetail> {
     const th = (await t.pool.query<{ assigned_to: string | null }>('select assigned_to from threads where id = $1', [id])).rows[0];
-    if (!th) throw notFound('That conversation');
+    if (!th || (mine && th.assigned_to !== mine)) throw notFound('That conversation');
     await this.chat.post(t, { id: user.id, name: user.name, kind: 'staff' }, id, body.body, body.fileIds);
     return this.thread(t, id);
   }
 
-  async patchThread(t: TenantCtx, user: User, id: string, body: ThreadPatch): Promise<ThreadDetail> {
+  async patchThread(t: TenantCtx, user: User, id: string, body: ThreadPatch, mine: string | null = null): Promise<ThreadDetail> {
+    if (mine && !(await t.pool.query('select 1 from threads where id = $1 and assigned_to = $2', [id, mine])).rowCount) throw notFound('That conversation');
     // Handing it on: only to a colleague who may write to families.
     if (body.assignTo && !(await t.pool.query("select 1 from users u join user_roles ur on ur.user_id = u.id join roles r on r.id = ur.role_id where u.id = $1 and u.status = 'active' and r.permissions ? 'messages.write'", [body.assignTo])).rowCount) {
       throw new ApiError('validation', 'Choose a colleague who may write to families.', { fields: { assignTo: 'Cannot reply to families.' } });

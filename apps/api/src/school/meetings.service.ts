@@ -141,9 +141,10 @@ export class MeetingsService implements OnModuleInit {
     for (const s of booked) await this.tellCancelled(t, s);
   }
 
-  async slots(t: TenantCtx, id: string): Promise<MeetingSlotRow[]> {
+  /** A meeting's times: every teacher's for whoever runs meetings, else only the person's own (a teacher never sees a colleague's bookings). */
+  async slots(t: TenantCtx, id: string, onlyTeacher: string | null = null): Promise<MeetingSlotRow[]> {
     await this.one(t, id);
-    return (await t.pool.query<SlotRaw>(`${SLOTS} where s.meeting_id = $1 order by u.name, s.starts_at`, [id])).rows.map((s) => slotRow(s, true));
+    return (await t.pool.query<SlotRaw>(`${SLOTS} where s.meeting_id = $1 and ($2::text is null or s.teacher_id = $2) order by u.name, s.starts_at`, [id, onlyTeacher])).rows.map((s) => slotRow(s, true));
   }
 
   private async slot(t: TenantCtx, id: string): Promise<SlotRaw> {
@@ -314,7 +315,7 @@ export class MeetingsController {
   remove(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string) { return this.m.remove(t, u, id); }
 
   @Get(':id/slots') @Require('meetings.read')
-  slots(@Tenant() t: TenantCtx, @Param('id') id: string) { return this.m.slots(t, id); }
+  slots(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string) { return this.m.slots(t, id, u.permissions.includes('meetings.manage') || u.id.startsWith('support:') ? null : u.id); }
 
   @Post('slots/:id/cancel') @HttpCode(200) @Require('meetings.manage')
   cancel(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string) { return this.m.cancel(t, u, id, 'office'); }

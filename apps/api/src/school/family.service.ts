@@ -83,7 +83,7 @@ export class FamilyService {
   /** Staff see a student when their role reads students, or when they teach the student's class or drive their bus. */
   private async mayStudent(w: Who, studentId: string, t: TenantCtx): Promise<void> {
     if (w.children.includes(studentId)) return;
-    if (w.kind === 'staff' && w.perms.includes('students.read')) return;
+    if (w.kind === 'staff' && w.perms.includes('students.read') && w.perms.includes('classes.all')) return;
     if (w.kind === 'staff' && (await t.pool.query(
       `select 1 from students s where s.id = $1 and (s.class_id = any($3)
          or s.id in (select a.student_id from transport_assignments a join transport_routes r on r.id = a.route_id where r.driver_user_id = $2 or r.attendant_user_id = $2))`, [studentId, w.id, await this.taught(t, w.id)])).rowCount) return;
@@ -99,7 +99,11 @@ export class FamilyService {
   }
 
   private async mayClass(t: TenantCtx, w: Who, classId: string): Promise<void> {
-    if (w.kind === 'staff') return;
+    // Staff see the classes they teach (or every class with classes.all), never another teacher's.
+    if (w.kind === 'staff') {
+      if (w.perms.includes('classes.all') || (await this.taught(t, w.id)).includes(classId)) return;
+      throw forbidden('That class is not yours to look at.');
+    }
     const r = await t.pool.query('select 1 from students where class_id = $1 and id = any($2) limit 1', [classId, w.children]);
     if (!r.rowCount) throw forbidden('That class is not yours to look at.');
   }
@@ -276,7 +280,7 @@ export class FamilyService {
   async studentsIn(t: TenantCtx, user: AuthedUser, classId: string) {
     const w = await this.who(t, user);
     await this.mayClass(t, w, classId);
-    if (w.kind === 'staff' && !w.perms.includes('students.read') && !(await this.taught(t, w.id)).includes(classId)) {
+    if (w.kind === 'staff' && !(w.perms.includes('students.read') && w.perms.includes('classes.all')) && !(await this.taught(t, w.id)).includes(classId)) {
       throw forbidden('That class is not yours to look at.');
     }
     const { rows } = await t.pool.query(`${this.studentSql} where s.class_id = $1 and s.status = 'active' order by s.roll_no, s.name`, [classId]);
@@ -448,8 +452,8 @@ export class FamilyService {
        and (status = 'set' or created_by = $${params.length + 1}) order by assigned_on desc, id limit 80`, [...params, w.id]);
     if (!hw.rowCount) return [];
     const ids = hw.rows.map((h) => h.id);
-    const subs = await t.pool.query<{ homework_id: string; student_id: string; handed_at: Date | null; score: number | null; feedback: string; returned_at: Date | null; return_note: string }>(
-      'select homework_id, student_id, handed_at, score, feedback, returned_at, return_note from homework_submissions where homework_id = any($1)', [ids]);
+    const subs = await t.pool.query<{ homework_id: string; student_id: string; handed_at: Date | null; score: number | null; feedback: string; returned_at: Date | null; return_note: string; answer: string }>(
+      'select homework_id, student_id, handed_at, score, feedback, returned_at, return_note, answer from homework_submissions where homework_id = any($1)', [ids]);
     const mine = (studentId: string) => w.kind === 'staff' || w.children.includes(studentId);
     const visible = subs.rows.filter((x) => mine(x.student_id));
     const attached = await this.files.list(t, 'homework_attachment', ids);
@@ -467,7 +471,7 @@ export class FamilyService {
         submissions: visible.filter((x) => x.homework_id === h.id).map((x) => ({
           studentId: x.student_id, status: x.score != null ? 'graded' : x.returned_at && (!x.handed_at || x.handed_at <= x.returned_at) ? 'returned' : x.handed_at ? 'submitted' : 'pending',
           ...(x.handed_at ? { submittedAt: x.handed_at.toISOString() } : {}), ...(x.returned_at ? { returnedAt: x.returned_at.toISOString(), returnNote: x.return_note } : {}),
-          files: files(handed, `${h.id}:${x.student_id}`),
+          files: files(handed, `${h.id}:${x.student_id}`), ...(x.answer ? { answer: x.answer } : {}),
           ...(x.score != null ? { marks: x.score, grade: grading.grade(Math.round((x.score / h.max_marks) * 100)), feedback: x.feedback } : !h.graded && x.feedback ? { feedback: x.feedback } : {}),
         })),
       };
@@ -496,7 +500,7 @@ export class FamilyService {
   }
 
   /** Hands in work (or hands it in again after a redo, or before it is graded). */
-  async submitHomework(t: TenantCtx, user: AuthedUser, id: string, studentId: string, fileIds: string[] = []) {
+  async submitHomework(t: TenantCtx, user: AuthedUser, id: string, studentId: string, fileIds: string[] = [], answer = '') {
     const w = await this.who(t, user);
     await this.mayStudent(w, studentId, t);
     await this.mayHandIn(t, w);
@@ -505,11 +509,16 @@ export class FamilyService {
     if (!h || h.status !== 'set') throw notFound('That homework');
     const sub = (await t.pool.query<{ score: number | null }>('select score from homework_submissions where homework_id = $1 and student_id = $2', [id, studentId])).rows[0];
     if (sub?.score != null) throw new ApiError('conflict', 'This homework has been graded, so it cannot be handed in again.');
+    // The ways the school takes work (homework.handInWith), and something to hand in.
+    const ways = await this.settings.value<string[]>(t, 'homework.handInWith', ['photo', 'text']);
+    if (fileIds.length && !ways.includes('photo')) throw new ApiError('validation', tx('Your school takes homework as a written answer, not photos.'), { fields: { fileIds: tx('Write the answer instead.') } });
+    if (answer && !ways.includes('text')) throw new ApiError('validation', tx('Your school takes homework as photos of the work, not a written answer.'), { fields: { answer: tx('Add a photo instead.') } });
+    if (!fileIds.length && !answer) throw new ApiError('validation', ways.includes('text') && ways.includes('photo') ? tx('Add a photo of the work or write the answer.') : ways.includes('text') ? tx('Write the answer.') : tx('Add a photo of the work.'), { fields: { answer: tx('Nothing to hand in yet.') } });
     // The handed-in work, uploaded first through /v1/files (kind homework_submission, owner "<homework>:<student>").
     for (const f of fileIds) await this.files.done(t, user.id, f);
     await t.pool.query(
-      `insert into homework_submissions (homework_id, student_id, handed_at, on_time) values ($1,$2,now(),$3)
-       on conflict (homework_id, student_id) do update set handed_at = now(), on_time = homework_submissions.on_time or excluded.on_time`, [id, studentId, schoolToday() <= h.due_on]);
+      `insert into homework_submissions (homework_id, student_id, handed_at, on_time, answer) values ($1,$2,now(),$3,$4)
+       on conflict (homework_id, student_id) do update set handed_at = now(), on_time = homework_submissions.on_time or excluded.on_time, answer = excluded.answer`, [id, studentId, schoolToday() <= h.due_on, answer]);
     return { ok: true };
   }
 
@@ -517,7 +526,7 @@ export class FamilyService {
   async withdrawHomework(t: TenantCtx, user: AuthedUser, id: string, studentId: string) {
     const w = await this.who(t, user);
     await this.mayStudent(w, studentId, t);
-    const r = await t.pool.query('update homework_submissions set handed_at = null, on_time = false where homework_id = $1 and student_id = $2 and score is null and handed_at is not null', [id, studentId]);
+    const r = await t.pool.query("update homework_submissions set handed_at = null, on_time = false, answer = '' where homework_id = $1 and student_id = $2 and score is null and handed_at is not null", [id, studentId]);
     if (!r.rowCount) throw new ApiError('conflict', 'Only work handed in and not yet graded can be taken back.');
     await t.pool.query("update files set deleted_at = now() where kind = 'homework_submission' and owner_id = $1 and deleted_at is null", [`${id}:${studentId}`]);
     return { ok: true };

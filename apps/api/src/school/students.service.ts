@@ -60,7 +60,7 @@ export class StudentsService {
     };
   }
 
-  async list(t: TenantCtx, query: StudentQuery): Promise<Paged<StudentRow>> {
+  async list(t: TenantCtx, query: StudentQuery, scope: string[] | null = null): Promise<Paged<StudentRow>> {
     const has = await this.has(t);
     // Filters and sorts on a module the school does not have are ignored rather than answered.
     const q: StudentQuery = {
@@ -73,6 +73,7 @@ export class StudentsService {
     const add = (v: unknown) => { params.push(v); return `$${params.length}`; };
     if (q.query) where.push(`(s.name ilike ${add(`%${esc(q.query)}%`)} or s.name_local ilike ${add(`%${esc(q.query)}%`)} or s.admission_no ilike ${add(`%${esc(q.query)}%`)})`);
     if (q.classId) where.push(`s.class_id = ${add(q.classId)}`);
+    if (scope) where.push(`s.class_id = any(${add(scope)}::text[])`);
     if (q.house) where.push(`s.house = ${add(q.house)}`);
     if (q.feeStatus === 'overdue') where.push('coalesce(fee.overdue, 0) > 0');
     else if (q.feeStatus === 'due') where.push('coalesce(fee.overdue, 0) = 0 and coalesce(fee.due, 0) > 0');
@@ -122,12 +123,13 @@ export class StudentsService {
     return out;
   }
 
-  async summary(t: TenantCtx, q: Pick<StudentQuery, 'classId' | 'house'>): Promise<StudentSummary> {
+  async summary(t: TenantCtx, q: Pick<StudentQuery, 'classId' | 'house'>, scope: string[] | null = null): Promise<StudentSummary> {
     const { today, last } = await this.days(t);
     const params: unknown[] = [today, last];
     const where: string[] = [];
     if (q.classId) { params.push(q.classId); where.push(`s.class_id = $${params.length}`); }
     if (q.house) { params.push(q.house); where.push(`s.house = $${params.length}`); }
+    if (scope) { params.push(scope); where.push(`s.class_id = any($${params.length}::text[])`); }
     where.push("s.status = 'active'");
     const w = where.length ? `where ${where.join(' and ')}` : '';
     const split = addDays(last, -12);
@@ -149,7 +151,7 @@ export class StudentsService {
        ${w}`, params);
     const r = rows[0]!;
     // The school's roll: students who have left are kept on record but are no longer in the total.
-    const total = Number((await t.pool.query<{ n: string }>("select count(*) n from students where status = 'active'")).rows[0]!.n);
+    const total = Number((await t.pool.query<{ n: string }>("select count(*) n from students where status = 'active' and ($1::text[] is null or class_id = any($1::text[]))", [scope])).rows[0]!.n);
     const now = r.a_now ?? 1;
     const prev = r.a_prev ?? now;
     const out: StudentSummary = {
@@ -169,25 +171,33 @@ export class StudentsService {
   }
 
   /** The page's starting views. The pinned class is the person's own (remembered when they pick one), else the class they teach. */
-  async views(t: TenantCtx, userId: string): Promise<StudentViews> {
+  async views(t: TenantCtx, userId: string, scope: string[] | null = null): Promise<StudentViews> {
     const { today } = await this.days(t);
     const own = await t.pool.query<{ value: string }>("select value #>> '{}' as value from user_prefs where user_id = $1 and key = 'students.class'", [userId]);
     const taught = own.rows[0] ? null : await t.pool.query<{ id: string }>('select id from classes where class_teacher_id = $1 order by grade, section limit 1', [userId]).catch(() => ({ rows: [] as { id: string }[] }));
-    const pinnedId = own.rows[0]?.value ?? taught?.rows[0]?.id ?? null;
+    const pinnedId = [own.rows[0]?.value, taught?.rows[0]?.id, scope?.[0]].find((c) => c && (!scope || scope.includes(c))) ?? null;
     const [counts, pinned] = await Promise.all([
       t.pool.query<{ all: string; overdue: string; fresh: string; left: string }>(
         `with paid as (select invoice_id, sum(amount - refunded) p from payments group by invoice_id),
          od as (select distinct i.student_id from fee_invoices i left join paid on paid.invoice_id=i.id where i.due_on < $1::date and i.amount - i.waived_amount - coalesce(paid.p,0) > 0)
-         select (select count(*) from students where status = 'active') "all", (select count(*) from od join students s on s.id = od.student_id and s.status = 'active') overdue,
-           (select count(*) from students where status = 'active' and admitted_on >= (select starts_on from academic_years where current limit 1)) fresh,
-           (select count(*) from students where status = 'left' and erased_at is null) "left"`, [today]),
+         select (select count(*) from students where status = 'active' and ($2::text[] is null or class_id = any($2::text[]))) "all",
+           (select count(*) from od join students s on s.id = od.student_id and s.status = 'active' and ($2::text[] is null or s.class_id = any($2::text[]))) overdue,
+           (select count(*) from students where status = 'active' and ($2::text[] is null or class_id = any($2::text[])) and admitted_on >= (select starts_on from academic_years where current limit 1)) fresh,
+           (select count(*) from students where status = 'left' and erased_at is null and ($2::text[] is null or class_id = any($2::text[]))) "left"`, [today, scope]),
       t.pool.query<{ id: string; name: string; n: string }>(
         `select c.id, c.name, (select count(*) from students s where s.class_id = c.id and s.status = 'active') n from classes c
-         where ($1::text is null or c.id = $1) order by c.grade, c.section limit 1`, [pinnedId]),
+         where ($1::text is null or c.id = $1) and ($2::text[] is null or c.id = any($2::text[])) order by c.grade, c.section limit 1`, [pinnedId, scope]),
     ]);
     const c = counts.rows[0]!;
     const p = pinned.rows[0];
     return { all: Number(c.all), pinned: p ? { classId: p.id, name: p.name, count: Number(p.n) } : null, overdue: (await this.has(t)).fees ? Number(c.overdue) : 0, newThisYear: Number(c.fresh), left: Number(c.left) };
+  }
+
+  /** Refuses a student outside the person's classes as if they were not there. */
+  async mayOpen(t: TenantCtx, scope: string[] | null, id: string): Promise<void> {
+    if (!scope) return;
+    const c = (await t.pool.query<{ class_id: string }>('select class_id from students where id = $1', [id])).rows[0];
+    if (!c || !scope.includes(c.class_id)) throw notFound('That student');
   }
 
   async detail(t: TenantCtx, id: string): Promise<StudentDetail> {
@@ -493,17 +503,17 @@ export class StudentsService {
     return { created: batch.created, updated: batch.updated, skipped: p.counts.skip, errors };
   }
 
-  async exportCsv(t: TenantCtx, ids: string[] | null): Promise<string> {
+  async exportCsv(t: TenantCtx, ids: string[] | null, scope: string[] | null = null): Promise<string> {
     const { rows } = await t.pool.query<{ admission_no: string; name: string; class_name: string; roll_no: string; dob: string; guardian: string | null; phone: string | null }>(
       `select s.admission_no, s.name, c.name class_name, s.roll_no, to_char(s.dob,'YYYY-MM-DD') dob, g.name guardian, g.phone
        from students s join classes c on c.id = s.class_id left join student_guardians sg on sg.student_id = s.id and sg.is_primary left join guardians g on g.id = sg.guardian_id
-       ${ids ? 'where s.id = any($1)' : ''} order by c.grade, c.section, s.roll_no`, ids ? [ids] : []);
+       where ($1::text[] is null or s.id = any($1::text[])) and ($2::text[] is null or s.class_id = any($2::text[])) order by c.grade, c.section, s.roll_no`, [ids, scope]);
     return toCsv([['admission_no', 'name', 'class', 'roll', 'dob', 'guardian', 'phone'], ...rows.map((r) => [r.admission_no, r.name, r.class_name, r.roll_no, r.dob, r.guardian ?? '', r.phone ?? ''])]);
   }
 
-  async message(t: TenantCtx, body: MessageRequest, user: { id: string; name: string }): Promise<{ sent: number }> {
+  async message(t: TenantCtx, body: MessageRequest, user: { id: string; name: string }, scope: string[] | null = null): Promise<{ sent: number }> {
     const { rows } = await t.pool.query<{ student_id: string; phone: string | null; name: string }>(
-      'select sg.student_id, g.phone, s.name from student_guardians sg join guardians g on g.id = sg.guardian_id join students s on s.id = sg.student_id where sg.student_id = any($1) and sg.gets_messages', [body.ids]);
+      'select sg.student_id, g.phone, s.name from student_guardians sg join guardians g on g.id = sg.guardian_id join students s on s.id = sg.student_id where sg.student_id = any($1) and sg.gets_messages and ($2::text[] is null or s.class_id = any($2::text[]))', [body.ids, scope]);
     const targets = rows.filter((r) => r.phone);
     // How it travels (the app, SMS, WhatsApp, email) is the console's rule for "A message from the office", not the sender's pick.
     const sent = await this.messenger.notify(t, 'office.message', targets.map((r) => ({ to: r.phone!, vars: { text: body.body } })));

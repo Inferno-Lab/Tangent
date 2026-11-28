@@ -14,7 +14,7 @@ const Roll = z.object({ classId: z.string().min(1), date: z.string().regex(/^\d{
 const Subject = z.object({ subject: z.string().min(1).max(40) });
 // -1 is the app's mark for an absent student; `grades` carries a grade for a subject the school grades without marks.
 const Marks = z.object({ subject: z.string().min(1).max(40), values: z.record(z.string(), z.number().min(-1).max(200)), grades: z.record(z.string(), z.string().trim().min(1).max(12)).optional() });
-const Submit = z.object({ studentId: z.string().min(1), fileName: z.string().max(200).optional(), fileIds: z.array(z.string()).max(5).default([]) });
+const Submit = z.object({ studentId: z.string().min(1), fileName: z.string().max(200).optional(), fileIds: z.array(z.string()).max(5).default([]), answer: z.string().trim().max(5000).default('') });
 const Grade = z.object({ studentId: z.string().min(1), marks: z.number().int().min(0).max(100).nullable(), feedback: z.string().max(300).optional() });
 const Return = z.object({ studentId: z.string().min(1), note: z.string().trim().min(3, 'Say what to redo').max(300) });
 const Withdraw = z.object({ studentId: z.string().min(1) });
@@ -108,7 +108,7 @@ export class FamilyController {
   @Get('classes/:id/homework') @RequireModule('homework') homework(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string) { return this.f.homework(t, u, id); }
   @Get('homework/:id') @RequireModule('homework') homeworkOne(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string) { return this.f.homeworkOne(t, u, id); }
   @Post('homework') @RequireModule('homework') @HttpCode(200) assign(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Body(new ZodPipe(Assign)) b: z.infer<typeof Assign>) { return this.f.assignHomework(t, u, b); }
-  @Post('homework/:id/submissions') @RequireModule('homework.onlineSubmission') @HttpCode(200) submit(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(Submit)) b: z.infer<typeof Submit>) { return this.f.submitHomework(t, u, id, b.studentId, b.fileIds); }
+  @Post('homework/:id/submissions') @RequireModule('homework.onlineSubmission') @HttpCode(200) submit(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(Submit)) b: z.infer<typeof Submit>) { return this.f.submitHomework(t, u, id, b.studentId, b.fileIds, b.answer); }
   @Post('homework/:id/grades') @RequireModule('homework.grading') @HttpCode(200) grade(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(Grade)) b: z.infer<typeof Grade>) { return this.f.gradeHomework(t, u, id, b); }
   @Post('homework/:id/return') @RequireModule('homework.grading') @HttpCode(200) returnHw(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(Return)) b: z.infer<typeof Return>) { return this.f.returnHomework(t, u, id, b.studentId, b.note); }
   @Post('homework/:id/withdraw') @RequireModule('homework.onlineSubmission') @HttpCode(200) withdrawHw(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Body(new ZodPipe(Withdraw)) b: z.infer<typeof Withdraw>) { return this.f.withdrawHomework(t, u, id, b.studentId); }
