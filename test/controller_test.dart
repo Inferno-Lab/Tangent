@@ -89,7 +89,17 @@ void main() {
     final homework = await put(tester, () => HomeworkController());
     await real(tester, homework.load);
     final set = homework.items.firstWhere((h) => h.title == title);
-    await real(tester, () => Get.find<HomeworkRepository>().submit(homeworkId: set.id, studentId: child, fileName: 'Homework_scan.jpg'));
+    // Something has to be handed in: a hand-in with no photo and no answer is refused.
+    final refused = await real(tester, () async {
+      try {
+        await Get.find<HomeworkRepository>().submit(homeworkId: set.id, studentId: child, fileName: '');
+        return false;
+      } on AppException {
+        return true;
+      }
+    });
+    expect(refused, isTrue);
+    await real(tester, () => Get.find<HomeworkRepository>().submit(homeworkId: set.id, studentId: child, fileName: '', answer: 'Read it; the summary is in my notebook.'));
     await real(tester, homework.load);
     expect(homework.items.firstWhere((item) => item.id == set.id).forStudent(child)?.status, HomeworkStatus.submitted);
   });
