@@ -74,7 +74,11 @@ describe('the school changes its own settings', () => {
     const sunita = (Array.isArray(staff) ? staff : staff.items).find((s: any) => s.email === h.people.mathsTeacher.email);
     expect((await h.call('PATCH', `/v1/staff/${sunita.id}`, { token: principal, body: { roleId: 'role_principal' } })).status).toBe(200);
     const second = await h.login(h.people.mathsTeacher.email);
-    const ok = await h.call('POST', `/v1/approvals/${r.json.approvalId}/decision`, { token: second, body: { decision: 'approve' } });
+    // The second person sees the setting as it is and as it becomes.
+    const waiting = (await h.call('GET', '/v1/approvals?view=waiting', { token: second })).json as { id: string; changes?: { key: string; before: unknown; after: unknown }[] }[];
+    const before = (await view()).json.values['fees.refundApprovalAbove'];
+    expect(waiting.find((x) => x.id === r.json.approvalId)?.changes).toEqual([{ key: 'fees.refundApprovalAbove', before, after: 48000 }]);
+    const ok =await h.call('POST', `/v1/approvals/${r.json.approvalId}/decision`, { token: second, body: { decision: 'approve' } });
     expect(ok.status).toBe(200);
     expect((await view()).json.values['fees.refundApprovalAbove']).toBe(48000);
   });

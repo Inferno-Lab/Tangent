@@ -83,6 +83,8 @@ export class ApprovalsService implements OnModuleInit {
       id: r.id, kind: r.kind, title: r.title, subtitle: r.subtitle, initials: initials(r.requester_name), tone: TONE[r.kind], action: ACTION[r.kind], doneText,
       status: r.status, createdAt: r.created_at.toISOString(), decidedAt: r.decided_at?.toISOString() ?? null,
       requesterName: r.requester_name, decidedByName: r.decided_by_name ?? null, decisionNote: r.decision_note ?? '',
+      ...(r.kind === 'settings' ? { changes: Object.entries((r.payload as { changes?: Record<string, unknown> }).changes ?? {})
+        .map(([key, after]) => ({ key, before: (r.payload as { before?: Record<string, unknown> }).before?.[key] ?? null, after })) } : {}),
     };
   }
 

@@ -426,6 +426,8 @@ export interface ApprovalRow {
   decisionNote?: string;
   /** Where it is in the school's steps (§3.6.1): the step waiting now, how many there are, and the ones already taken. */
   step?: { name: string; at: number; of: number; done: StepDone[] };
+  /** A settings request: each setting as it was when asked and as it becomes, so the second person sees what they approve. */
+  changes?: { key: string; before: unknown; after: unknown }[];
 }
 export const ApprovalDecision = z.object({ decision: z.enum(['approve', 'reject', 'undo']), note: z.string().trim().max(300).optional() })
   .refine((d) => d.decision !== 'reject' || !!d.note, { message: 'Say why, so the person who asked knows what to do next.', path: ['note'] });

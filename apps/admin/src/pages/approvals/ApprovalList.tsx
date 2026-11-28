@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ApprovalKind, ApprovalRow } from '@tangent/contracts';
-import { Dialog, EmptyCard, useShake, EmptyState, t, busyFor, Skeleton } from '@tangent/web-ui';
+import { Dialog, EmptyCard, SettingChanges, useShake, EmptyState, t, busyFor, Skeleton } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { AreaField, Avatar, problem } from '../../app/kit';
 import { fmtDate } from '@tangent/contracts';
@@ -52,6 +52,7 @@ export function useApprovalList(view: ApprovalView, kind: ApprovalKind | undefin
           <div style={{ flex: 1, minWidth: 0 }}>
             <b style={{ font: '700 15px var(--fb)', display: 'block', overflowWrap: 'anywhere' }}>{r.title}</b>
             <small style={{ display: 'block' }}>{r.subtitle}</small>
+            {r.changes && r.changes.length > 0 && <div style={{ margin: '8px 0' }}><SettingChanges changes={r.changes} /></div>}
             <small style={{ display: 'block' }}>{r.requesterName ? t('admin.approval_list.asked_by', { requesterName: r.requesterName }) : ''}{when(r.createdAt)}</small>
             {r.step && r.step.of > 1 && r.status === 'pending' && <small style={{ display: 'block' }}>{t('admin.approval_list.step_of', { at: r.step.at, of: r.step.of, name: r.step.name })}</small>}
             {r.step && r.step.of > 1 && r.step.done.map((d) => <small key={`${d.key}-${d.at}`} style={{ display: 'block' }}>{t('admin.approval_list.step_done', { name: d.name, by: d.by })} · {when(d.at)}{d.note ? ` · “${d.note}”` : ''}</small>)}

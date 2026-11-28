@@ -74,9 +74,12 @@ export class SettingsService {
       if (same) return { pending: true, approvalId: same.id };
       const id = newId('apr');
       const labels = risky.map((k) => SETTINGS_META[k as keyof typeof SETTINGS_META].label).join(', ');
+      // As each setting is now, so the person who decides sees what changes (the change itself is checked again then).
+      const now = (await this.effective(t)).settings as Record<string, unknown>;
+      const before = Object.fromEntries(Object.keys(changes).map((k) => [k, now[k] ?? null]));
       await t.pool.query(
         "insert into approvals (id, kind, title, subtitle, requester_name, requested_by, payload, status) values ($1,'settings',$2,$3,$4,$5,$6,'pending')",
-        [id, `Change a setting: ${labels}`, patch.note || 'A second person confirms this change before it applies.', user.name, user.id, JSON.stringify({ changes, note: patch.note, expectedVersion: patch.expectedVersion })]);
+        [id, `Change a setting: ${labels}`, patch.note || 'A second person confirms this change before it applies.', user.name, user.id, JSON.stringify({ changes, before, note: patch.note, expectedVersion: patch.expectedVersion })]);
       return { pending: true, approvalId: id };
     }
     return { version: (await this.apply(t, { id: user.id, name: user.name }, changes, patch.note, patch.expectedVersion)).version };
