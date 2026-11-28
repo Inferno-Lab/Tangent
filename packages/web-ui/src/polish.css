@@ -38,6 +38,9 @@ html:has(.nest.dark){color-scheme:dark}
 .nest .ws>div,.nest .wsw>div{min-width:0}
 .nest .ws b,.nest .ws small{display:block;white-space:normal;overflow-wrap:anywhere}
 .nest .wsw b,.nest .wsw small{white-space:normal;overflow-wrap:anywhere}
+/* The signed-in person's name and role under the menu wrap too: a long name ran past the menu's edge and was hidden. */
+.nest .mebtn{min-width:0;width:calc(100% + 12px)}
+.nest .me .fade{min-width:0;white-space:normal;overflow-wrap:anywhere}
 .nest .grd .nm{min-width:0}
 .nest .ll{white-space:pre-wrap;overflow-wrap:anywhere}
 .nest .kv b{min-width:0}
