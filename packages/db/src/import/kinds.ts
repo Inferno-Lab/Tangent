@@ -134,6 +134,8 @@ function sameYear(r: Row, l: Map<string, YearRow>): YearRow | undefined {
   return all.find((y) => dashless(y.label) === dashless(r.label!)) ?? all.find((y) => y.starts_on === s && y.ends_on === e);
 }
 
+// Year-end reads `status`, not `current` (its column defaults to 'current'), so an imported past year must not stay 'current'.
+const yearStatus = (current: boolean, endsOn: string) => current ? 'current' : endsOn < today() ? 'archived' : 'draft';
 const years = kind({
   async load(db) { return new Map((await db.query<YearRow>('select id, label, starts_on::text, ends_on::text, current from academic_years')).rows.map((r) => [lc(r.label), r])); },
   check(r, l) {
@@ -145,11 +147,13 @@ const years = kind({
     const anyCurrent = rows.some((r) => yes(r.current!));
     const out: Rec[] = rows.map((r) => {
       const was = sameYear(r, l);
-      return { id: was?.id ?? newId('yr'), label: r.label, starts_on: isoDay(r.starts_on!), ends_on: isoDay(r.ends_on!), current: yes(r.current!) || (!anyCurrent && !!was?.current) };
+      const current = yes(r.current!) || (!anyCurrent && !!was?.current);
+      const ends = isoDay(r.ends_on!)!; // checked by check()
+      return { id: was?.id ?? newId('yr'), label: r.label, starts_on: isoDay(r.starts_on!), ends_on: ends, current, status: yearStatus(current, ends) };
     });
     // One year is current: marking one in the file unmarks the rest.
-    if (anyCurrent) for (const y of l.values()) if (y.current && !rows.some((r) => sameYear(r, l)?.id === y.id)) out.push({ ...y, current: false });
-    return [{ table: 'academic_years', pk: ['id'], cols: ['label', 'starts_on', 'ends_on', 'current'], rows: out }];
+    if (anyCurrent) for (const y of l.values()) if (y.current && !rows.some((r) => sameYear(r, l)?.id === y.id)) out.push({ ...y, current: false, status: yearStatus(false, y.ends_on) });
+    return [{ table: 'academic_years', pk: ['id'], cols: ['label', 'starts_on', 'ends_on', 'current', 'status'], rows: out }];
   },
   totals: (rows) => [{ label: 'Years', value: String(rows.length) }, { label: 'Current', value: rows.find((r) => yes(r.current!))?.label ?? 'unchanged' }],
   async export(db) { return (await db.query<Row>("select id, label, starts_on::text, ends_on::text, case when current then 'yes' else '' end as current from academic_years order by starts_on")).rows; },
@@ -160,16 +164,16 @@ const terms = kind<TermLookups>({
   async load(db) {
     const y = (await db.query<{ id: string; label: string }>('select id, label from academic_years')).rows;
     const t = (await db.query<{ id: string; year_id: string; name: string }>('select id, year_id, name from terms')).rows;
-    return { years: new Map(y.map((r) => [lc(r.label), r.id])), terms: new Map(t.map((r) => [`${r.year_id}|${lc(r.name)}`, r.id])) };
+    return { years: new Map(y.map((r) => [dashless(r.label), r.id])), terms: new Map(t.map((r) => [`${r.year_id}|${lc(r.name)}`, r.id])) };
   },
   check(r, l) {
-    const year = l.years.get(lc(r.year!));
+    const year = l.years.get(dashless(r.year!));
     const [s, e] = [isoDay(r.starts_on!), isoDay(r.ends_on!)];
     const errors = [...(!year ? [`Year “${r.year}” is not set up: import academic years first.`] : []), ...(!s || !e ? ['Write the dates as 2026-04-01 or 01/04/2026.'] : s > e ? ['The term ends before it starts.'] : [])];
     return ok(`${year}|${lc(r.name!)}`, errors, l.terms.has(`${year}|${lc(r.name!)}`));
   },
   writes: (rows, l) => [{ table: 'terms', pk: ['id'], cols: ['starts_on', 'ends_on'], rows: rows.map((r) => {
-    const year = l.years.get(lc(r.year!))!;
+    const year = l.years.get(dashless(r.year!))!;
     return { id: l.terms.get(`${year}|${lc(r.name!)}`) ?? newId('trm'), year_id: year, name: r.name, starts_on: isoDay(r.starts_on!), ends_on: isoDay(r.ends_on!) };
   }) }],
   totals: (rows) => [{ label: 'Terms', value: String(rows.length) }],
@@ -181,16 +185,16 @@ const reportingPeriods = kind<TermLookups>({
   async load(db) {
     const y = (await db.query<{ id: string; label: string }>('select id, label from academic_years')).rows;
     const t = (await db.query<{ id: string; year_id: string; name: string }>('select id, year_id, name from reporting_periods')).rows;
-    return { years: new Map(y.map((r) => [lc(r.label), r.id])), terms: new Map(t.map((r) => [`${r.year_id}|${lc(r.name)}`, r.id])) };
+    return { years: new Map(y.map((r) => [dashless(r.label), r.id])), terms: new Map(t.map((r) => [`${r.year_id}|${lc(r.name)}`, r.id])) };
   },
   check(r, l) {
-    const year = l.years.get(lc(r.year!));
+    const year = l.years.get(dashless(r.year!));
     const [s, e] = [isoDay(r.starts_on!), isoDay(r.ends_on!)];
     const errors = [...(!year ? [`Year “${r.year}” is not set up: import academic years first.`] : []), ...(!s || !e ? ['Write the dates as 2026-04-01 or 01/04/2026.'] : s > e ? ['The period ends before it starts.'] : [])];
     return ok(`${year}|${lc(r.name!)}`, errors, l.terms.has(`${year}|${lc(r.name!)}`));
   },
   writes: (rows, l) => [{ table: 'reporting_periods', pk: ['id'], cols: ['starts_on', 'ends_on'], rows: rows.map((r) => {
-    const year = l.years.get(lc(r.year!))!;
+    const year = l.years.get(dashless(r.year!))!;
     return { id: l.terms.get(`${year}|${lc(r.name!)}`) ?? newId('rpd'), year_id: year, name: r.name, starts_on: isoDay(r.starts_on!), ends_on: isoDay(r.ends_on!) };
   }) }],
   totals: (rows) => [{ label: 'Reporting periods', value: String(rows.length) }],

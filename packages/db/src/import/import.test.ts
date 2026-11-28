@@ -90,6 +90,8 @@ describe('moving a school in', () => {
     expect(await n("select count(*) n from users where kind = 'staff' and invited_at is not null")).toBe(0);
     // The file's year takes over the starter year the school was set up with: one year, and it is current.
     expect(await n('select count(*) n from academic_years where current')).toBe(1);
+    // Year-end reads the status: only the current year says current.
+    expect(await n("select count(*) n from academic_years where status = 'current'")).toBe(1);
     expect(await n('select count(*) n from academic_years where ends_on >= current_date and starts_on <= current_date')).toBe(1);
   }, 240_000);
 
