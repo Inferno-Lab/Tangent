@@ -196,3 +196,13 @@
 .nest .kvcols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:40px}
 .nest .kvcols>.kv:nth-child(2){border-top:0}
 @media (max-width:900px){.nest .kvcols{grid-template-columns:minmax(0,1fr)}.nest .kvcols>.kv:nth-child(2){border-top:1px solid var(--line)}}
+/* A printed document's blocks, in order: one line each (its number, kind and words), opened one at a time to edit. */
+.nest .dtl{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.nest .dtb{border-radius:16px;background:var(--s2);transition:background var(--t2)}
+.nest .dtb.on{background:color-mix(in srgb,var(--brand-soft) 50%,var(--s2))}
+.nest .dtb-h{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 8px 8px 12px}
+.nest .dtb-n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--s1);font:700 12px var(--fb);color:var(--ink3)}
+.nest .dtb-h .rowbtn b{display:flex;align-items:center;flex-wrap:wrap;font:700 14px var(--fb);color:var(--ink)}
+.nest .dtb-h .rowbtn small{display:block;font:500 13px/1.4 var(--fb);color:var(--ink3);overflow-wrap:anywhere;margin-top:2px}
+.nest .dtb-a{display:flex;gap:2px}
+.nest .dtb-b{padding:4px 14px 14px}

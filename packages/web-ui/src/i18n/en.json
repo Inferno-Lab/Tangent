@@ -377,6 +377,8 @@
  "vocab.term.one": "term",
  "ui.settings.no_kinds_of_exam_yet": "No kinds of exam yet",
  "ui.settings.not_set": "Not set",
+ "ui.settings.only_with": "only with {p}",
+ "ui.settings.other_languages_too": "Words in the other languages too",
  "ui.unsaved.discard_q": "Discard what you typed?",
  "ui.unsaved.keep": "Keep editing",
  "ui.unsaved.discard": "Discard",
