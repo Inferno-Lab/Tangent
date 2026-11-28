@@ -172,6 +172,11 @@ describe('actions', () => {
     expect(wrong.status).toBe(400);
     const asked = await h.c('POST', '/console/v1/actions', { token: t, body: { action: 'school.erase', schoolId: id, confirmCode: 'freshschool' } });
     expect(asked.json.status).toBe('pending_approval');
+    // Asking again while it waits finds the same request: Approvals never shows the same change twice.
+    const again = await h.c('POST', '/console/v1/actions', { token: t, body: { action: 'school.erase', schoolId: id, confirmCode: 'freshschool' } });
+    expect(again.json.id).toBe(asked.json.id);
+    const waiting = (await h.c('GET', '/console/v1/actions', { token: t })).json.filter((a: any) => a.action === 'school.erase' && a.schoolId === id && a.status === 'pending_approval');
+    expect(waiting).toHaveLength(1);
     expect((await h.c('POST', `/console/v1/actions/${asked.json.id}/approve`, { token: t })).status).toBe(403);
     await h.invite(t, { name: 'Second Admin', email: 'second@tangent.app', roles: ['super_admin'] }, 'another-long-pass');
     const second = await h.signIn('second@tangent.app', 'another-long-pass');

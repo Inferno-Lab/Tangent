@@ -196,9 +196,32 @@ export class Actions {
       summary = `${school.name}: ${[c.added.length ? `adds ${c.added.map(catalogueName).join(', ')}` : '', c.removed.length ? `takes away ${c.removed.map(catalogueName).join(', ')}` : ''].filter(Boolean).join('; ') || 'limits, dates or locks only'}`;
     }
     const id = newId('act');
-    await this.db.pool.query(
-      'insert into actions (id, action, school_id, school_name, params, status, requested_by, dry_run, summary, asked) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$9)',
-      [id, body.action, school?.id ?? null, school?.name ?? null, JSON.stringify(body.params), needs ? 'pending_approval' : 'running', user.email, body.dryRun, summary]);
+    const client = await this.db.pool.connect();
+    try {
+      await client.query('begin');
+      // One request for the same change waits at a time: asking again (a second click, a second person) finds the first.
+      // The note and the "as it is now" snapshot do not make a change different.
+      if (needs) {
+        await client.query('select pg_advisory_xact_lock(hashtext($1))', [`action:${body.action}:${school?.id ?? ''}`]);
+        const same = (await client.query<{ id: string }>(
+          `select id from actions where action = $1 and school_id is not distinct from $2 and status = 'pending_approval'
+             and (params - 'note' - 'diff' - 'expectedVersion') = ($3::jsonb - 'note' - 'diff' - 'expectedVersion') limit 1`,
+          [body.action, school?.id ?? null, JSON.stringify(body.params)])).rows[0];
+        if (same) {
+          await client.query('commit');
+          return this.get(same.id);
+        }
+      }
+      await client.query(
+        'insert into actions (id, action, school_id, school_name, params, status, requested_by, dry_run, summary, asked) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$9)',
+        [id, body.action, school?.id ?? null, school?.name ?? null, JSON.stringify(body.params), needs ? 'pending_approval' : 'running', user.email, body.dryRun, summary]);
+      await client.query('commit');
+    } catch (e) {
+      await client.query('rollback').catch(() => undefined);
+      throw e;
+    } finally {
+      client.release();
+    }
     await this.db.audit(user.email, `action.${body.action}.requested`, school ? 'school' : 'integration', school?.id ?? String(body.params.connectionId ?? ''), { dryRun: body.dryRun, needsApproval: !!needs });
     if (!needs) await this.run(id);
     return this.get(id);
