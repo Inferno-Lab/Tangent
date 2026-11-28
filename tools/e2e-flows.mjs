@@ -200,7 +200,7 @@ await flow('admin: fees page lists overdue families and opens a payment', { stor
   await p.keyboard.press('Escape');
 });
 
-await flow('admin: the school edits its own profile, sees what Tangent sets, and asks Tangent for the rest', { storage: adminStore }, async (p) => {
+await flow('admin: the school edits its own profile, sees none of what Tangent sets, and asks Tangent for it', { storage: adminStore }, async (p) => {
   await p.goto(`${ADMIN}/s/${slug}/profile`, { waitUntil: 'networkidle' });
   await expectVisible(p.getByRole('heading', { name: 'School profile' }), 'the School profile page');
   // The school's own setting: changed, saved with a note, and still there after a reload.
@@ -210,8 +210,11 @@ await flow('admin: the school edits its own profile, sees what Tangent sets, and
   await expectVisible(p.getByText(/^Saved\. The admin and the app follow/), 'the saved toast');
   await p.reload({ waitUntil: 'networkidle' });
   if ((await p.getByLabel('Tagline').inputValue()) !== tagline) throw new Error('the tagline was not kept');
-  // What Tangent keeps (the brand colour, the country) is shown with its reason, not as a field to change.
-  await expectVisible(p.getByText('Set by Tangent for your school. Ask Tangent to change it.').first(), 'a Tangent-owned setting');
+  // What Tangent sets (the brand colour, the country, how people sign in) is not shown at all: the school asks Tangent.
+  if (await p.getByLabel('Brand colour').count()) throw new Error('a setting Tangent owns is shown to the school');
+  for (const gone of ['Sign-in and security', 'The app', 'Messages']) {
+    if (await p.getByRole('tab', { name: gone, exact: true }).count()) throw new Error(`the ${gone} tab is still on School profile`);
+  }
   await p.getByRole('button', { name: 'Ask Tangent to change this' }).click();
   await p.getByRole('button', { name: 'Send to Tangent' }).click();
   await expectVisible(p.getByText('Say what you would like changed.'), 'the empty-request error');
@@ -517,13 +520,12 @@ await flow('admin: an event is added, shown on the calendar and removed', { stor
   await expectVisible(p.getByText(/E2E open house was removed/), 'the removed toast');
 });
 
-await flow('admin: the school sets up its roles, app and messages from its profile, and data requests are answered', { storage: adminStore }, async (p) => {
+await flow('admin: the school sets up its roles from its profile, and data requests are answered', { storage: adminStore }, async (p) => {
   await p.goto(A('/profile/roles'), { waitUntil: 'networkidle' });
   await expectVisible(p.getByRole('tab', { name: /Office staff/ }), 'the role list');
-  await p.goto(A('/profile/messages'), { waitUntil: 'networkidle' });
-  await expectVisible(p.getByText('Child marked absent or late').first(), 'the messages');
-  await p.goto(A('/profile/app'), { waitUntil: 'networkidle' });
-  await expectVisible(p.getByText(/Tabs along the bottom|bottom tabs/i).first(), 'the app layout');
+  // The app's layout and the messages are Tangent's now (TANGENT_GROUPS): the profile has no tab for them.
+  await p.goto(A('/profile/plan'), { waitUntil: 'networkidle' });
+  await expectVisible(p.getByText('What your school has'), 'the parts of Tangent the school has');
   await p.goto(A('/privacy'), { waitUntil: 'networkidle' });
   await p.getByRole('button', { name: 'Log a request' }).click();
   await p.getByRole('dialog').getByRole('button', { name: 'Log request' }).click();
