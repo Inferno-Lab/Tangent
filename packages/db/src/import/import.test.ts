@@ -88,6 +88,9 @@ describe('moving a school in', () => {
     expect(await n('select count(*) n from students s where not exists (select 1 from student_guardians sg where sg.student_id = s.id)')).toBe(0);
     // Staff are not invited at import time.
     expect(await n("select count(*) n from users where kind = 'staff' and invited_at is not null")).toBe(0);
+    // The file's year takes over the starter year the school was set up with: one year, and it is current.
+    expect(await n('select count(*) n from academic_years where current')).toBe(1);
+    expect(await n('select count(*) n from academic_years where ends_on >= current_date and starts_on <= current_date')).toBe(1);
   }, 240_000);
 
   it('a second import of the same file updates instead of adding again', async () => {

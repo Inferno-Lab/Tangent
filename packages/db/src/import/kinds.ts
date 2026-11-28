@@ -123,22 +123,33 @@ const needStudent = (m: Map<string, unknown>, adm: string) => (m.has(lc(adm)) ? 
 
 // ── the kinds ──────────────────────────────────────────────────────────────
 type YearRow = { id: string; label: string; starts_on: string; ends_on: string; current: boolean };
+/**
+ * The year a row is: the one with its label (a dash is a dash, however it was typed: 2026-27, 2026–27) or, failing that, the
+ * one with its dates, so a file's year takes over the starter year a new school was given instead of adding a second one.
+ */
+const dashless = (x: string) => lc(x).replace(/[‐-―]/g, '-');
+function sameYear(r: Row, l: Map<string, YearRow>): YearRow | undefined {
+  const s = isoDay(r.starts_on!), e = isoDay(r.ends_on!);
+  const all = [...l.values()];
+  return all.find((y) => dashless(y.label) === dashless(r.label!)) ?? all.find((y) => y.starts_on === s && y.ends_on === e);
+}
+
 const years = kind({
   async load(db) { return new Map((await db.query<YearRow>('select id, label, starts_on::text, ends_on::text, current from academic_years')).rows.map((r) => [lc(r.label), r])); },
   check(r, l) {
     const [s, e] = [isoDay(r.starts_on!), isoDay(r.ends_on!)];
     const errors = !s || !e ? ['Write the dates as 2026-04-01 or 01/04/2026.'] : s >= e ? ['The year ends before it starts.'] : [];
-    return ok(lc(r.label!), errors, l.has(lc(r.label!)));
+    return ok(lc(r.label!), errors, !!sameYear(r, l));
   },
   writes(rows, l) {
     const anyCurrent = rows.some((r) => yes(r.current!));
     const out: Rec[] = rows.map((r) => {
-      const was = l.get(lc(r.label!));
+      const was = sameYear(r, l);
       return { id: was?.id ?? newId('yr'), label: r.label, starts_on: isoDay(r.starts_on!), ends_on: isoDay(r.ends_on!), current: yes(r.current!) || (!anyCurrent && !!was?.current) };
     });
     // One year is current: marking one in the file unmarks the rest.
-    if (anyCurrent) for (const y of l.values()) if (y.current && !rows.some((r) => lc(r.label!) === lc(y.label))) out.push({ ...y, current: false });
-    return [{ table: 'academic_years', pk: ['id'], cols: ['starts_on', 'ends_on', 'current'], rows: out }];
+    if (anyCurrent) for (const y of l.values()) if (y.current && !rows.some((r) => sameYear(r, l)?.id === y.id)) out.push({ ...y, current: false });
+    return [{ table: 'academic_years', pk: ['id'], cols: ['label', 'starts_on', 'ends_on', 'current'], rows: out }];
   },
   totals: (rows) => [{ label: 'Years', value: String(rows.length) }, { label: 'Current', value: rows.find((r) => yes(r.current!))?.label ?? 'unchanged' }],
   async export(db) { return (await db.query<Row>("select id, label, starts_on::text, ends_on::text, case when current then 'yes' else '' end as current from academic_years order by starts_on")).rows; },
