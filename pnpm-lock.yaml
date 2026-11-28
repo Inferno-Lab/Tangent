@@ -525,6 +525,9 @@ importers:
       '@tangent/contracts':
         specifier: workspace:*
         version: link:../contracts
+      qrcode-generator:
+        specifier: 1.4.4
+        version: 1.4.4
       react:
         specifier: ^19.1.0
         version: 19.3.1

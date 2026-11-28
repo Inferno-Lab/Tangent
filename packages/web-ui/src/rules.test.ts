@@ -28,8 +28,8 @@ function hits(files: string[], re: RegExp, keep: (line: string, file: string) =>
   return files.flatMap((f) => read(f).split(/\r?\n/).flatMap((line, i) => (re.test(line) && keep(line, f) ? [`${rel(f)}:${i + 1}  ${line.trim().slice(0, 120)}`] : [])));
 }
 
-// Printed receipts and handouts are black on white paper whatever the theme; the logo keeps its own colours.
-const fixed = (f: string) => /InvoicesPage|MovingInPage|TangentIcon|ColourPicker|\.test\./.test(f);
+// Printed receipts and handouts, and a QR code to scan, are black on white whatever the theme; the logo keeps its own colours.
+const fixed = (f: string) => /InvoicesPage|MovingInPage|TangentIcon|ColourPicker|Qr\.tsx|\.test\./.test(f);
 // The token blocks in nest.css define the colours; the picker paints the colour space itself; masks only use alpha.
 const definesColour = (line: string, f: string) => (/nest\.css$/.test(f) && /^(\.nest(\.dark)?\{)?--/.test(line.trim())) || /\bcpk/.test(line) || /mask/.test(line);
 const comment = (line: string) => /^\s*(\/\/|\/\*|\*)/.test(line);

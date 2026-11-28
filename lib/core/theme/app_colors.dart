@@ -183,6 +183,9 @@ class AppColors extends ThemeExtension<AppColors> {
 
   static const white = Color(0xFFFFFFFF);
 
+  /// A QR code is black on white whatever the theme: an inverted code fails in many scanners.
+  static const qrDark = Color(0xFF000000);
+
   // A subject's spectrum colour, the same as the admin's (packages/contracts subjectColour).
   static const _subjectSpectrum = {
     'maths': 'blue', 'mathematics': 'blue', 'science': 'green', 'english': 'red', 'hindi': 'pink', 'social': 'teal',

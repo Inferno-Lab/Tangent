@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { newId } from '@tangent/db';
 import { toE164, initials, type AppRoleKey, type ClientKind, type LoginChallenge, type LoginRequest, type LoginResponse, type Permission, type SessionUser, type TokenPair, tx, type ContactFinish, type ContactStart, type SessionRow } from '@tangent/contracts';
 import { hashPassword, maskEmail, maskPhone, newTotpSecret, passwordNeedsRehash, randomCode, randomToken, seal, sha256, signJwt, totpUri, unseal, verifyPassword, verifyTotp, constantTimeEqual } from '@tangent/security';
+import qrcode from 'qrcode-generator';
 import { ENV, type Env } from '../env.js';
 import { ApiError, Limiter, alert } from '@tangent/nest-kit';
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -62,6 +63,15 @@ export function deviceOf(ua: string | null): string {
   const os = /Android/i.test(a) ? 'Android' : /iPhone|iPad|iOS/i.test(a) ? 'iPhone or iPad' : /Windows/i.test(a) ? 'Windows' : /Mac OS|Macintosh/i.test(a) ? 'Mac' : /Linux/i.test(a) ? 'Linux' : '';
   const app = /Dart|okhttp|Tangent/i.test(a) ? 'Tangent app' : /Edg\//.test(a) ? 'Edge' : /Chrome\//.test(a) ? 'Chrome' : /Firefox\//.test(a) ? 'Firefox' : /Safari\//.test(a) ? 'Safari' : '';
   return [app, os].filter(Boolean).join(', ') || 'Unknown device';
+}
+
+/** A QR code as rows of 0 and 1 (1 dark), for the app to draw. */
+export function qrRows(text: string): string[] {
+  const q = qrcode(0, 'M');
+  q.addData(text);
+  q.make();
+  const n = q.getModuleCount();
+  return Array.from({ length: n }, (_, r) => Array.from({ length: n }, (__, c) => (q.isDark(r, c) ? '1' : '0')).join(''));
 }
 
 @Injectable()
@@ -142,7 +152,7 @@ export class AuthService {
       [id, userId, enroll ? 'enroll' : 'app', enroll ? seal(enroll.secret, this.env.SECRETS_KEY) : null, new Date(Date.now() + OTP_MINUTES * 60_000)]);
     return {
       challengeId: id, channel: 'app', maskedTo: tx('your authenticator app'), expiresInSeconds: OTP_MINUTES * 60,
-      ...(enroll ? { enroll: { secret: enroll.secret, uri: totpUri(enroll.secret, `${enroll.account} (${t.info.shortName})`) } } : {}),
+      ...(enroll ? { enroll: (() => { const uri = totpUri(enroll.secret, `${enroll.account} (${t.info.shortName})`); return { secret: enroll.secret, uri, qr: qrRows(uri) }; })() } : {}),
     };
   }
 

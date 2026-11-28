@@ -8,14 +8,15 @@ int _resendIn(Map<String, dynamic> c) => (c['resendInSeconds'] as num?)?.toInt()
 /// The school sent a sign-in code (or asks for one from the person's authenticator app); the person has to type it. Thrown by
 /// the first step of a sign-in.
 class OtpRequired extends AppException {
-  const OtpRequired(this.sentTo, {this.resendIn = 30, this.fromApp = false, this.setupKey, this.setupUri})
+  const OtpRequired(this.sentTo, {this.resendIn = 30, this.fromApp = false, this.setupKey, this.setupUri, this.setupQr})
       : super(fromApp ? 'auth.app_code_toast' : 'auth.code_sent');
 
   /// What a challenge from the server says: a texted code, or the authenticator (with a key to add at the first sign-in).
   factory OtpRequired.from(Map<String, dynamic> c) {
     final enroll = c['enroll'] is Map ? Map<String, dynamic>.from(c['enroll'] as Map) : null;
     return OtpRequired(c['maskedTo'] as String? ?? '', resendIn: _resendIn(c), fromApp: c['channel'] == 'app',
-        setupKey: enroll?['secret'] as String?, setupUri: enroll?['uri'] as String?);
+        setupKey: enroll?['secret'] as String?, setupUri: enroll?['uri'] as String?,
+        setupQr: enroll?['qr'] is List ? (enroll!['qr'] as List).whereType<String>().toList() : null);
   }
 
   final String sentTo;
@@ -29,6 +30,9 @@ class OtpRequired extends AppException {
   /// First sign-in with an authenticator: the key to add to it, and the address that adds it in one tap.
   final String? setupKey;
   final String? setupUri;
+
+  /// The key as a QR code, rows of 0 and 1 (1 dark), to scan with an authenticator on another device.
+  final List<String>? setupQr;
 }
 
 class AuthRepository {

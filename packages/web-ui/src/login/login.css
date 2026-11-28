@@ -71,3 +71,12 @@
 .pg-login .foot a{color:var(--ink2);text-decoration:underline;text-underline-offset:3px}
 
 .pg-login .inp{height:50px}
+/* Adding an authenticator: the QR code beside the key to type, stacked on a narrow screen. */
+.pg-login .enr{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-top:16px;padding:14px;border-radius:20px;background:var(--s2)}
+.pg-login .enr .qr{flex:none;border-radius:12px;display:block}
+.pg-login .enr-t{flex:1 1 180px;min-width:0;display:flex;flex-direction:column;gap:6px}
+.pg-login .enr-t b{font:700 14px var(--fb);color:var(--ink)}
+.pg-login .enr-t small{font:500 13px/1.4 var(--fb);color:var(--ink3)}
+.pg-login .enr-k{display:flex;align-items:center;gap:8px;min-width:0}
+.pg-login .enr-k code{flex:1;min-width:0;font:700 14px/1.5 var(--fm,monospace);letter-spacing:.04em;color:var(--ink);overflow-wrap:anywhere;background:var(--s1);border-radius:10px;padding:6px 10px}
+.pg-login .enr-t a{font:700 13px var(--fb);color:var(--brand-ink)}

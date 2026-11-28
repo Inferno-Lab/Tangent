@@ -24,6 +24,7 @@ class LoginController extends GetxController {
   final fromApp = false.obs;
   final setupKey = RxnString();
   String? setupUri;
+  List<String>? setupQr;
   /// True when the person asked for a code instead of typing a password (families have no password).
   var _codeOnly = false;
 
@@ -74,6 +75,7 @@ class LoginController extends GetxController {
       fromApp.value = sent.fromApp;
       setupKey.value = sent.setupKey;
       setupUri = sent.setupUri;
+      setupQr = sent.setupQr;
       resendIn.value = sent.resendIn;
       resendIn.refresh();
       ToastHelper.show(sent.message, body: sent.sentTo);

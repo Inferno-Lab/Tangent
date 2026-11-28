@@ -334,7 +334,7 @@ class _OtpScreenState extends State<_OtpScreen> {
                       Text((setup != null ? 'auth.app_setup_body' : app ? 'auth.app_code_body' : 'auth.code_sent').tr, style: context.type.b.copyWith(color: c.ink2)),
                       if (setup != null) ...[
                         const SizedBox(height: 16),
-                        _SetupKey(secret: setup, uri: widget.controller.setupUri),
+                        _SetupKey(secret: setup, uri: widget.controller.setupUri, qr: widget.controller.setupQr),
                       ],
                       const SizedBox(height: 24),
                       Pressable(
@@ -494,10 +494,11 @@ class _CaretState extends State<_Caret> with SingleTickerProviderStateMixin {
 
 /// The key a first sign-in adds to the authenticator app: copied to type in, or added in one tap on this phone.
 class _SetupKey extends StatelessWidget {
-  const _SetupKey({required this.secret, required this.uri});
+  const _SetupKey({required this.secret, required this.uri, this.qr});
 
   final String secret;
   final String? uri;
+  final List<String>? qr;
 
   @override
   Widget build(BuildContext context) {
@@ -508,6 +509,12 @@ class _SetupKey extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (qr != null && qr!.isNotEmpty) ...[
+            Text('auth.app_setup_scan'.tr, style: AppText.capB(color: c.ink2)),
+            const SizedBox(height: 8),
+            Center(child: _Qr(rows: qr!)),
+            const SizedBox(height: 16),
+          ],
           Text('auth.app_setup_key'.tr, style: AppText.capB(color: c.ink2)),
           const SizedBox(height: 4),
           SelectableText(secret, style: context.type.mono),
@@ -531,4 +538,47 @@ class _SetupKey extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A QR code from rows of 0 and 1 (1 dark), black on white with a quiet border, as authenticator apps scan it.
+class _Qr extends StatelessWidget {
+  const _Qr({required this.rows});
+
+  final List<String> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'auth.app_setup_qr'.tr,
+      image: true,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(12)),
+        child: SizedBox.square(dimension: 168, child: CustomPaint(painter: _QrPainter(rows))),
+      ),
+    );
+  }
+}
+
+class _QrPainter extends CustomPainter {
+  _QrPainter(this.rows);
+
+  final List<String> rows;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final n = rows.length;
+    if (n == 0) return;
+    final cell = size.width / n;
+    final dark = Paint()..color = AppColors.qrDark;
+    for (var r = 0; r < n; r++) {
+      final row = rows[r];
+      for (var c = 0; c < row.length; c++) {
+        if (row.codeUnitAt(c) == 0x31) canvas.drawRect(Rect.fromLTWH(c * cell, r * cell, cell + 0.5, cell + 0.5), dark);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_QrPainter old) => old.rows != rows;
 }
