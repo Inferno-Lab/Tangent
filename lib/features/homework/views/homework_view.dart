@@ -16,6 +16,7 @@ import 'package:tangent/core/widgets/empty_kit.dart';
 import 'package:tangent/core/widgets/glass.dart';
 import 'package:tangent/core/widgets/glass_controls.dart';
 import 'package:tangent/core/widgets/page.dart';
+import 'package:tangent/core/widgets/sheets.dart';
 import 'package:tangent/core/widgets/states.dart';
 import 'package:tangent/core/widgets/ui.dart';
 import 'package:tangent/data/models/academics.dart';
@@ -407,6 +408,10 @@ class _DetailBody extends StatelessWidget {
                     }),
                     style: context.type.t,
                   ),
+                  if ((mine!.answer ?? '').isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(mine!.answer!, style: context.type.b),
+                  ],
                   if ((mine!.feedback ?? '').isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Text('“${mine!.feedback}”', style: context.type.s),
@@ -502,12 +507,30 @@ class _ActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ways = SchoolConfig.handInWith;
+    final photo = ways.contains('photo');
+    final text = ways.contains('text');
     return Glass(
       height: 64,
       radius: 999,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(
         children: [
+          if (text) ...[
+            Expanded(
+              flex: 5,
+              child: Btn(
+                'homework.write',
+                kind: photo ? BtnKind.plain : BtnKind.primary,
+                icon: PhosphorIconsRegular.pencilSimpleLine,
+                expand: true,
+                height: 48,
+                onPressed: () => unawaited(_writeAnswer(item)),
+              ),
+            ),
+            if (photo) const SizedBox(width: 8),
+          ],
+          if (photo) ...[
           Expanded(
             flex: 5,
             child: Btn(
@@ -530,10 +553,51 @@ class _ActionBar extends StatelessWidget {
               onPressed: () => Get.toNamed<void>(AppRoutes.homeworkScan, arguments: item),
             ),
           ),
+          ],
         ],
       ),
     );
   }
+}
+
+/// The written answer: typed in a sheet and handed in, the way the school takes homework when it allows writing.
+Future<void> _writeAnswer(Homework item) async {
+  final answer = TextEditingController();
+  await showSheet<void>(
+    StatefulBuilder(
+      builder: (context, setState) => SheetBody(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+        footer: Btn(
+          'homework.hand_in',
+          expand: true,
+          onPressed: answer.text.trim().isEmpty
+              ? null
+              : () async {
+                  if (await _homework().sendAnswer(item, answer.text)) Get.back<void>();
+                },
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('homework.write_title'.tr, style: context.type.h2),
+            const SizedBox(height: 4),
+            Text(item.title, style: context.type.b.copyWith(color: context.app.ink2)),
+            const SizedBox(height: 16),
+            Field(
+              controller: answer,
+              hint: 'homework.write_hint',
+              keyboard: TextInputType.multiline,
+              minHeight: 160,
+              maxLines: 12,
+              maxLength: 5000,
+              onChanged: (_) => setState(() {}),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+  answer.dispose();
 }
 
 HomeworkController _homework() =>

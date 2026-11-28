@@ -409,9 +409,13 @@ class _GradeSheetViewState extends State<GradeSheetView> {
                         Text(h.title, style: AppText.capB(color: _pen)),
                         const SizedBox(height: 4),
                         Text(
-                          s.fileName ?? 'teacher.no_file'.tr,
+                          (s.answer ?? '').isNotEmpty ? 'teacher.written_answer'.tr : s.fileName ?? 'teacher.no_file'.tr,
                           style: context.type.mono.copyWith(color: _pen),
                         ),
+                        if ((s.answer ?? '').isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Text(s.answer!, style: context.type.b.copyWith(color: _pen)),
+                        ] else
                         for (final w in const [.9, .72, .84, .66, .88, .58])
                           FractionallySizedBox(
                             widthFactor: w,

@@ -113,7 +113,7 @@ class _HomeworkScanViewState extends State<HomeworkScanView> with WidgetsBinding
     final controller = Get.isRegistered<HomeworkController>()
         ? Get.find<HomeworkController>()
         : Get.put(HomeworkController());
-    await controller.sendScan(hw, _pages.length);
+    await controller.sendScan(hw, [for (final p in _pages.take(5)) p.path]);
     Get.back<void>();
   }
 

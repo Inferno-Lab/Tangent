@@ -101,12 +101,36 @@ describe('learning', () => {
     expect(assigned.status).toBe(200);
     const hw = (await f(parent, `/classes/${cls}/homework`)).json.find((x: any) => x.id === assigned.json.id);
     expect(hw.submissions.find((s: any) => s.studentId === aarav).status).toBe('pending');
-    expect((await post(parent, `/homework/${hw.id}/submissions`, { studentId: aarav, fileName: 'work.pdf' })).status).toBe(200);
-    expect((await f(parent, `/homework/${hw.id}`)).json.submissions.find((s: any) => s.studentId === aarav).status).toBe('submitted');
+    // Nothing to hand in is refused: a photo of the work or a written answer.
+    expect((await post(parent, `/homework/${hw.id}/submissions`, { studentId: aarav, fileName: 'work.pdf' })).status).toBe(400);
+    expect((await post(parent, `/homework/${hw.id}/submissions`, { studentId: aarav, answer: 'Photosynthesis makes food from light.' })).status).toBe(200);
+    expect((await f(parent, `/homework/${hw.id}`)).json.submissions.find((s: any) => s.studentId === aarav)).toMatchObject({ status: 'submitted', answer: 'Photosynthesis makes food from light.' });
+    // The teacher reads the written answer in the admin too.
+    expect((await h.call('GET', `/v1/homework/${hw.id}`, { token: teacher })).json.students.find((s: any) => s.studentId === aarav).answer).toBe('Photosynthesis makes food from light.');
     expect((await post(parent, `/homework/${hw.id}/grades`, { studentId: aarav, marks: 15 })).status).toBe(403);
     expect((await post(teacher, `/homework/${hw.id}/grades`, { studentId: aarav, marks: 15, feedback: 'Well done' })).status).toBe(200);
     expect((await f(parent, `/homework/${hw.id}`)).json.submissions.find((s: any) => s.studentId === aarav)).toMatchObject({ status: 'graded', marks: 15, feedback: 'Well done' });
     expect((await post(parent, '/homework', { classId: cls, subject: sci.key, title: 'Not a teacher', dueOn: '2099-01-01' })).status).toBe(403);
+  });
+  it('takes homework only the ways the school chose: photos, a written answer, or both', async () => {
+    const assigned = await post(teacher, '/homework', { classId: cls, subject: sci.key, title: 'Ways to hand in', dueOn: new Date(Date.now() + 3 * 86_400_000).toISOString() });
+    const id = assigned.json.id as string;
+    try {
+      await h.setSettings({ 'homework.handInWith': ['photo'] });
+      const written = await post(parent, `/homework/${id}/submissions`, { studentId: ananya, answer: 'Typed' });
+      expect(written.status).toBe(400);
+      expect(written.json.fields.answer).toBeTruthy();
+      await h.setSettings({ 'homework.handInWith': ['text'] });
+      const photo = await post(parent, `/homework/${id}/submissions`, { studentId: ananya, fileIds: ['fil_not_needed'] });
+      expect(photo.status).toBe(400);
+      expect(photo.json.fields.fileIds).toBeTruthy();
+      expect((await post(parent, `/homework/${id}/submissions`, { studentId: ananya, answer: 'Typed' })).status).toBe(200);
+      // The school cannot switch it itself: Tangent sets it from the console.
+      const v = (await h.call('GET', '/v1/settings/edit', { token: admin })).json;
+      expect((await h.call('PATCH', '/v1/settings', { token: admin, body: { expectedVersion: v.version, changes: { 'homework.handInWith': ['photo'] } } })).status).toBe(400);
+    } finally {
+      await h.setSettings({ 'homework.handInWith': ['photo', 'text'] });
+    }
   });
   it('lets a teacher mark attendance, and the family sees it and is told', async () => {
     const marked = await post(teacher, '/attendance', { [aarav]: 'absent' });

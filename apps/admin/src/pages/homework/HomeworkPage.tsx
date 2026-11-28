@@ -84,7 +84,7 @@ function Row({ r, today, onOpen }: { r: HomeworkRow; today: string; onOpen: () =
     <button className="rowbtn" onClick={onOpen} aria-label={t('admin.homework_page.open_2', { title: r.title, className: r.className })}>
       <div className="grd rw hwl" style={{ '--cols': COLS } as React.CSSProperties}>
         <span style={{ minWidth: 0 }}>
-          <b data-tip={r.title} style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', font: '700 14px/1.25 var(--fb)' }}>{r.title}</b>
+          <b data-tip={r.title} style={{ overflowWrap: 'anywhere', font: '700 14px/1.25 var(--fb)' }}>{r.title}</b>
           <small style={{ color: 'var(--ink3)', font: '600 12px var(--fb)' }}>{r.subjectName} {t('admin.homework_page.set')}{' '}{dateLabel(r.assignedOn)}{r.teacherName ? t('admin.homework_page.by', { teacherName: r.teacherName }) : ''}</small>
         </span>
         <span className="chip">{r.className}</span>
@@ -192,11 +192,12 @@ function HomeworkSheet({ id, canWrite, onChange, onClose, onSaved, onRemoved }: 
               return (
                 <div key={s.studentId} className="hwr">
                   <span className="rn num">{s.rollNo || '–'}</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}><Avatar name={s.name} size={30} /><b style={{ font: '700 14px var(--fb)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} data-tip={s.name}>{s.name}</b></span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}><Avatar name={s.name} size={30} /><b style={{ font: '700 14px var(--fb)', overflowWrap: 'anywhere' }} data-tip={s.name}>{s.name}</b></span>
                   <Checkbox checked={x.handed} disabled={!canWrite} onChange={(handed) => setDraft({ ...draft, [s.studentId]: { ...x, handed } })} label={<span>{x.handed ? (s.onTime || !s.handedAt ? t('admin.homework_page.handed_in') : t('admin.homework_page.late')) : t('admin.homework_page.not_yet')}</span>} />
                   {d.graded ? <input className="hws" inputMode="numeric" aria-label={t('admin.homework_page.marks_for', { name: s.name })} placeholder="–" disabled={!canWrite || !x.handed} value={x.score} onChange={(e) => setDraft({ ...draft, [s.studentId]: { ...x, score: e.target.value.replace(/\D/g, '').slice(0, 3) } })} /> : <span />}
-                  {(x.handed || s.files.length > 0) && (
+                  {(x.handed || s.files.length > 0 || !!s.answer) && (
                     <div style={{ gridColumn: '2 / -1', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', paddingBottom: 6 }}>
+                      {s.answer && <p className="hwans" aria-label={t('admin.homework_page.written_answer_of', { name: s.name })}>{s.answer}</p>}
                       <FileChips files={s.files} />
                       <input className="hws" style={{ flex: '1 1 200px', width: 'auto', minWidth: 0, textAlign: 'start' }} aria-label={t('admin.homework_page.feedback_for', { name: s.name })} placeholder={t('admin.homework_page.a_word_of_feedback_the')} disabled={!canWrite} maxLength={300}
                         value={x.feedback} onChange={(e) => setDraft({ ...draft, [s.studentId]: { ...x, feedback: e.target.value } })} />

@@ -107,6 +107,12 @@ abstract final class SchoolConfig {
       [for (final e in (_settings[key] as List?) ?? const []) Map<String, dynamic>.from(e as Map)];
 
   /// Where the school is and how it writes money and dates (the school's settings; the wizard sets them from its country).
+  /// How homework comes in from the app (console: Homework): 'photo', 'text' or both. Never empty.
+  static List<String> get handInWith {
+    final ways = [for (final w in (_settings['homework.handInWith'] as List?) ?? const ['photo', 'text']) '$w'];
+    return ways.isEmpty ? const ['photo', 'text'] : ways;
+  }
+
   static String get currency => _s<String>('school.currency', 'USD');
   static String get country => _s<String>('school.country', '');
   /// The school's locale in the form intl takes ("en_IN" from "en-IN").

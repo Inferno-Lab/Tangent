@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import 'package:tangent/core/services/auth_service.dart';
 import 'package:tangent/core/services/school_config.dart';
+import 'package:tangent/core/services/session_bus.dart';
 import 'package:tangent/core/utils/app_exception.dart';
 import 'package:tangent/core/utils/extensions.dart';
 import 'package:tangent/core/utils/loadable.dart';
@@ -70,30 +71,37 @@ class HomeworkController extends GetxController with Loadable {
     try {
       final file = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (file == null) return;
-      await send(homework, file.name, path: file.path);
+      await send(homework, file.name, paths: [file.path]);
     } on Exception {
       ToastHelper.show('errors.generic', kind: ToastKind.error);
     }
   }
 
-  // shortcut: scanned pages are counted, not merged into a PDF; add PDF export when the API stores files.
-  Future<void> sendScan(Homework homework, int pages) =>
-      send(homework, 'homework.scan_file'.trn(pages));
+  /// The scanned pages, each a photo of the work (the school keeps up to five a hand-in).
+  Future<bool> sendScan(Homework homework, List<String> pages) =>
+      send(homework, 'homework.scan_file'.trn(pages.length), paths: pages);
 
-  Future<void> send(Homework homework, String fileName, {String? path}) async {
-    if (!SchoolConfig.allows('homework.onlineSubmission')) return;
+  /// A written answer, typed in the app.
+  Future<bool> sendAnswer(Homework homework, String answer) => send(homework, '', answer: answer.trim());
+
+  Future<bool> send(Homework homework, String fileName, {List<String> paths = const [], String answer = ''}) async {
+    if (!SchoolConfig.allows('homework.onlineSubmission')) return false;
     final id = studentId ?? Get.find<AuthService>().activeStudentId.value;
-    if (id == null) return;
+    if (id == null) return false;
     try {
       await Get.find<HomeworkRepository>().submit(
         homeworkId: homework.id,
         studentId: id,
         fileName: fileName,
-        filePath: path,
+        filePaths: paths,
+        answer: answer,
       );
       ToastHelper.show('homework.sent', kind: ToastKind.success);
+      Get.find<SessionBus>().bump();
+      return true;
     } on AppException catch (error) {
       ToastHelper.show(error.message, kind: ToastKind.error);
+      return false;
     }
   }
 }

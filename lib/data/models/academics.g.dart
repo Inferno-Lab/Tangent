@@ -83,6 +83,7 @@ HomeworkSubmission _$HomeworkSubmissionFromJson(Map<String, dynamic> json) =>
       grade: json['grade'] as String?,
       feedback: json['feedback'] as String?,
       returnNote: json['returnNote'] as String?,
+      answer: json['answer'] as String?,
     );
 
 Map<String, dynamic> _$HomeworkSubmissionToJson(HomeworkSubmission instance) =>
@@ -95,6 +96,7 @@ Map<String, dynamic> _$HomeworkSubmissionToJson(HomeworkSubmission instance) =>
       'grade': ?instance.grade,
       'feedback': ?instance.feedback,
       'returnNote': ?instance.returnNote,
+      'answer': ?instance.answer,
     };
 
 const _$HomeworkStatusEnumMap = {

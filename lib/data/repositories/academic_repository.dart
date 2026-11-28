@@ -78,18 +78,22 @@ class HomeworkRepository {
     return Homework.fromJson(Map<String, dynamic>.from(json as Map));
   }
 
+  /// Hands work in: photos of it (each goes to the school's storage first, then the hand-in names them), a written answer, or both.
   Future<void> submit({
     required String homeworkId,
     required String studentId,
     required String fileName,
-    String? filePath,
+    List<String> filePaths = const [],
+    String answer = '',
   }) async {
-    // The work itself goes to the school's storage first; the hand-in then names it.
-    final fileId = filePath == null ? null : await _remote.client.upload(kind: 'homework_submission', ownerId: '$homeworkId:$studentId', path: filePath);
+    final fileIds = [
+      for (final path in filePaths.take(5)) await _remote.client.upload(kind: 'homework_submission', ownerId: '$homeworkId:$studentId', path: path),
+    ];
     await _remote.post('/homework/$homeworkId/submissions', {
       'studentId': studentId,
       'fileName': fileName,
-      'fileIds': [?fileId],
+      'fileIds': fileIds,
+      'answer': answer,
     });
   }
 

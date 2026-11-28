@@ -137,6 +137,7 @@ class HomeworkSubmission {
     this.grade,
     this.feedback,
     this.returnNote,
+    this.answer,
   });
 
   factory HomeworkSubmission.fromJson(Map<String, dynamic> json) =>
@@ -152,6 +153,9 @@ class HomeworkSubmission {
 
   /// Why the teacher sent it back, when the status is returned.
   final String? returnNote;
+
+  /// What was written in the app, when the work was handed in as a written answer.
+  final String? answer;
 
   HomeworkSubmission copyWith({
     HomeworkStatus? status,
@@ -170,6 +174,7 @@ class HomeworkSubmission {
       grade: grade ?? this.grade,
       feedback: feedback ?? this.feedback,
       returnNote: status == HomeworkStatus.submitted ? null : returnNote,
+      answer: answer,
     );
   }
 
