@@ -93,7 +93,7 @@ describe('compliance desk', () => {
     expect(made.status).toBe(200);
     expect(made.json).toMatchObject({ kind: 'dpa', status: 'open', deadlineAt: null });
     expect((await h.c('POST', '/console/v1/compliance', { token: t, body: { schoolId: school.id, kind: 'dpa', title: 'Another agreement' } })).status).toBe(409);
-    const signed = await h.c('PUT', `/console/v1/compliance/${made.json.id}`, { token: t, body: { status: 'signed', signedOn: '2026-01-02', signedBy: 'The principal', file: { name: 'dpa.pdf', data: Buffer.from('%PDF-1.4').toString('base64') } } });
+    const signed = await h.c('PUT', `/console/v1/compliance/${made.json.id}`, { token: t, body: { status: 'signed', signedOn: '2026-01-02', signedBy: 'The principal', file: { name: 'dpa.pdf', data: Buffer.concat([Buffer.from('%PDF-1.4'), Buffer.alloc(1_000_000)]).toString('base64') } } }); // a real scan, past the 256 KB default
     expect(signed.json).toMatchObject({ status: 'signed' });
     expect(signed.json.closedAt).toBeTruthy();
     expect((await h.c('PUT', `/console/v1/compliance/${made.json.id}`, { token: t, body: { status: 'open' } })).status).toBe(409);
