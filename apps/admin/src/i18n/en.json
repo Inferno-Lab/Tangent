@@ -2691,5 +2691,11 @@
  "admin.year_page.yes_promote": "Yes, promote",
  "admin.kit.no_student_found": "No student found",
  "admin.exams_page.no_results_yet": "No results yet",
- "admin.transport_page.no_trips_today": "No trips yet today"
+ "admin.transport_page.no_trips_today": "No trips yet today",
+ "admin.privacy_page.the_privacy_notice": "The privacy notice",
+ "admin.privacy_page.loading": "Loading…",
+ "admin.privacy_page.no_notice_yet": "No notice yet",
+ "admin.privacy_page.no_notice_yet_body": "Tangent writes the school’s privacy notice with you. Ask Tangent from School profile to add it.",
+ "admin.privacy_page.officer": "Grievance officer: {name}",
+ "admin.privacy_page.tangent_sets_the_notice": "Families read this on the sign-in pages and in the app. Tangent sets it: ask Tangent from School profile to change it."
 }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fmtDate, DATA_REQUEST_KINDS, type DataRequestRow } from '@tangent/contracts';
-import { Dialog, Field, SelectField, useShake, useToast, EmptyState, t } from '@tangent/web-ui';
+import { Dialog, EmptyNote, Field, SelectField, useShake, useToast, EmptyState, t } from '@tangent/web-ui';
 import { useApp } from '../../app/context';
 import { AddBtn, AreaField, problem } from '../../app/kit';
 import { Page } from '../../app/Page';
@@ -17,6 +17,7 @@ export function PrivacyPage() {
   const reqs = useQuery({ queryKey: ['privacy', 'requests'], queryFn: app.api.privacy.requests });
   const [adding, setAdding] = useState(false);
   const [deciding, setDeciding] = useState<DataRequestRow | null>(null);
+  const [notice, setNotice] = useState(false);
   const refresh = () => void qc.invalidateQueries({ queryKey: ['privacy'] });
   const rows = reqs.data ?? [];
   const open = rows.filter((r) => r.status === 'open').length;
@@ -38,9 +39,10 @@ export function PrivacyPage() {
       overlays={<>
         {adding && <LogDialog onClose={() => setAdding(false)} onDone={() => { setAdding(false); refresh(); say(t('admin.privacy_page.request_logged')); }} />}
         {deciding && <AnswerDialog r={deciding} onClose={() => setDeciding(null)} onDone={(m) => { setDeciding(null); refresh(); say(m); }} />}
+        {notice && <NoticeDialog onClose={() => setNotice(false)} />}
       </>}>
       {!rows.length ? (
-        <EmptyState scene="privacy" onAction={() => app.go('/profile/privacy')} />
+        <EmptyState scene="privacy" onAction={() => setNotice(true)} />
       ) : (
         <div className="card" style={{ padding: 0 }}>
           {rows.map((r) => (
@@ -112,6 +114,23 @@ function AnswerDialog({ r, onClose, onDone }: { r: DataRequestRow; onClose: () =
           <button className="btn pri" disabled={go.isPending} onClick={() => go.mutate('done')}>{t('admin.privacy_page.mark_done')}</button>
         </div>
       </div>
+    </Dialog>
+  );
+}
+
+/** The school's privacy notice as families read it on the sign-in pages (Tangent sets it; the school asks Tangent to change it). */
+function NoticeDialog({ onClose }: { onClose: () => void }) {
+  const app = useApp();
+  const brand = useQuery({ queryKey: ['brand'], queryFn: app.api.brand, staleTime: 60_000 });
+  const p = brand.data?.privacy;
+  return (
+    <Dialog title={t('admin.privacy_page.the_privacy_notice')} onClose={onClose} width={620}>
+      {brand.isError ? <p className="emsg">{(brand.error as Error).message}</p>
+        : !p ? <p className="help">{t('admin.privacy_page.loading')}</p>
+        : !p.notice ? <EmptyNote icon="privacy" title={t('admin.privacy_page.no_notice_yet')} body={t('admin.privacy_page.no_notice_yet_body')} />
+        : <div style={{ whiteSpace: 'pre-line', overflowWrap: 'anywhere', maxHeight: '60vh', overflow: 'auto' }}>{p.notice}
+          {p.officerName && <p className="help" style={{ marginBottom: 0 }}>{t('admin.privacy_page.officer', { name: [p.officerName, p.officerEmail, p.officerPhone].filter(Boolean).join(' · ') })}</p>}</div>}
+      <p className="help" style={{ marginBottom: 0 }}>{t('admin.privacy_page.tangent_sets_the_notice')}</p>
     </Dialog>
   );
 }
