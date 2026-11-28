@@ -276,8 +276,8 @@ export class NoticesController {
 
   /** Who has not acknowledged a notice that asked for it, to remind them. */
   @Get(':id/not-acknowledged') @Require('notices.read')
-  notAcked(@Tenant() t: TenantCtx, @Param('id') id: string) {
-    return this.notices.notAcked(t, id);
+  async notAcked(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string) {
+    return this.notices.notAcked(t, id, await classScope(t, u));
   }
 }
 

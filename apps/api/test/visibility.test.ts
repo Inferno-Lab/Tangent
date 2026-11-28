@@ -76,6 +76,46 @@ describe('a teacher sees only the classes they teach', () => {
     if (someoneElse) expect((await get(teacher, `/v1/messages/${someoneElse.id}`)).status).toBe(404);
   });
 
+  it('report cards, exam changes, files and the app’s marks and registers stop at their classes', async () => {
+    const day = new Date().toISOString().slice(0, 10);
+    const theirs = (await h.schoolSql<{ id: string }>("select id from students where class_id = $1 and status = 'active' limit 1", [other]))[0]!;
+    const theirExam = (await h.schoolSql<{ id: string }>('select id from exams where class_id = $1 limit 1', [other]))[0];
+    if (theirExam) {
+      expect((await get(teacher, `/v1/exams/${theirExam.id}/report-cards/${theirs.id}`)).status).toBe(403);
+      expect((await h.call('DELETE', `/v1/exams/${theirExam.id}`, { token: teacher })).status).toBe(403);
+    }
+    const subject = (await h.schoolSql<{ id: string }>('select id from subjects limit 1'))[0]!.id;
+    const exam = { name: 'Class test', kind: '', classId: other, alsoClassIds: [], startsOn: day, endsOn: day, subjects: [{ subjectId: subject, maxMarks: 20 }] };
+    expect((await h.call('POST', '/v1/exams', { token: teacher, body: exam })).status).toBe(403);
+    // The app's marks draft, period roll and today's marks hold the same line.
+    expect((await get(teacher, `/v1/f/classes/${other}/marks?subject=${subject.replace(/^sub_/, '')}`)).status).toBe(403);
+    expect([403, 423]).toContain((await get(teacher, `/v1/f/attendance/periods?classId=${other}&date=${day}`)).status);
+    expect(Object.keys((await get(teacher, `/v1/f/attendance/today?students=${theirs.id}`)).json)).toEqual([]);
+    // A child's documents follow their class.
+    const doc = (await h.schoolSql<{ id: string }>("select id from files where kind = 'student_document' and owner_id = $1 limit 1", [theirs.id]))[0];
+    if (doc) expect((await get(teacher, `/v1/files/${doc.id}/url`)).status).toBe(403);
+  });
+
+  it('who has not acknowledged a notice and who replied to an event are their classes’ families only', async () => {
+    const notice = (await h.schoolSql<{ id: string }>("select id from notices where audience = 'all' limit 1"))[0];
+    if (notice) {
+      const families = (await get(teacher, `/v1/notices/${notice.id}/not-acknowledged`)).json as { id: string }[];
+      const everyone = (await get(principal, `/v1/notices/${notice.id}/not-acknowledged`)).json as { id: string }[];
+      expect(families.length).toBeLessThanOrEqual(everyone.length);
+      const outside = await h.schoolSql<{ id: string }>(
+        `select g.user_id id from guardians g join student_guardians sg on sg.guardian_id = g.id join students s on s.id = sg.student_id
+         where g.user_id = any($1) and not exists (select 1 from student_guardians sg2 join students s2 on s2.id = sg2.student_id where sg2.guardian_id = g.id and s2.class_id = any($2))`,
+        [families.map((f) => f.id), mine]);
+      expect(outside).toEqual([]);
+    }
+    const event = (await h.schoolSql<{ event_id: string }>('select event_id from event_rsvps limit 1'))[0];
+    if (event) {
+      const replies = (await get(teacher, `/v1/events/${event.event_id}/replies`)).json as { className: string }[];
+      const names = (await h.schoolSql<{ name: string }>('select name from classes where id = any($1)', [mine])).map((c) => c.name);
+      expect(replies.every((r) => names.includes(r.className))).toBe(true);
+    }
+  });
+
   it('accounts see every class (their work spans the school)', async () => {
     const accounts = await h.login(h.people.accountant.email);
     expect((await get(accounts, '/v1/students?limit=1')).json.total).toBe((await get(principal, '/v1/students?limit=1')).json.total);

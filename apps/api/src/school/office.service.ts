@@ -316,10 +316,11 @@ export class OfficeService {
   }
 
   /** Who answered an event's invitation, family by family. */
-  async eventReplies(t: TenantCtx, id: string): Promise<EventReply[]> {
+  /** `scope`: the classes this person sees (null: every one); another class's families are not listed. */
+  async eventReplies(t: TenantCtx, id: string, scope: string[] | null = null): Promise<EventReply[]> {
     const { rows } = await t.pool.query<{ student: string; class_name: string; guardian: string | null; status: EventReply['status']; adults: number }>(
       `select s.name student, c.name class_name, g.name guardian, r.status, r.adults from event_rsvps r join students s on s.id = r.student_id join classes c on c.id = s.class_id
-       left join student_guardians sg on sg.student_id = s.id and sg.is_primary left join guardians g on g.id = sg.guardian_id where r.event_id = $1 order by r.status, c.grade, c.section, s.name`, [id]);
+       left join student_guardians sg on sg.student_id = s.id and sg.is_primary left join guardians g on g.id = sg.guardian_id where r.event_id = $1 and ($2::text[] is null or s.class_id = any($2::text[])) order by r.status, c.grade, c.section, s.name`, [id, scope]);
     return rows.map((r) => ({ studentName: r.student, className: r.class_name, guardianName: r.guardian ?? '', status: r.status, adults: r.adults }));
   }
 

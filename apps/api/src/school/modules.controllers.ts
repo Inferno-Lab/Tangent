@@ -307,8 +307,8 @@ export class OfficeController {
   }
 
   @Get('events/:id/replies') @RequireModule('events') @Require('events.read')
-  eventReplies(@Tenant() t: TenantCtx, @Param('id') id: string): Promise<EventReply[]> {
-    return this.office.eventReplies(t, id);
+  async eventReplies(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string): Promise<EventReply[]> {
+    return this.office.eventReplies(t, id, await classScope(t, u));
   }
 
   @Put('events/:id') @RequireModule('events') @Require('events.write')

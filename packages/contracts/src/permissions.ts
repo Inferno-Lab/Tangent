@@ -177,7 +177,7 @@ export const RoleTemplatesPut = z.array(z.object({
 /** Work that spans the whole school: a role holding any of these sees every class (classes.all) when a school is set up. */
 export const WHOLE_SCHOOL_PERMISSIONS: readonly Permission[] = ['students.write', 'settings.manage', 'fees.read', 'fees.collect', 'fees.refund', 'admissions.read', 'admissions.write', 'staff.write', 'reports.read',
   'transport.read', 'transport.write', 'library.read', 'library.write', 'visitors.read', 'visitors.manage', 'certificates.read', 'certificates.issue', 'staffAttendance.manage', 'privacy.manage'];
-/** A starting role's permissions with classes.all added where its work spans the whole school (school migration 0073 does the same). */
+/** A starting role's permissions with classes.all added where its work spans the whole school (school migrations 0073 and 0075 do the same for existing schools). */
 export const withWholeSchool = (perms: readonly Permission[]): Permission[] => (perms.some((x) => WHOLE_SCHOOL_PERMISSIONS.includes(x)) && !perms.includes('classes.all') ? [...perms, 'classes.all'] : [...perms]);
 
 export const ROLE_TEMPLATES: RoleTemplate[] = [

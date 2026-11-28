@@ -248,6 +248,7 @@ export class LearningService {
   }
 
   async createExam(t: TenantCtx, user: User, body: ExamCreate): Promise<ExamRow> {
+    for (const c of new Set([body.classId, ...body.alsoClassIds])) await mayTeach(t, user, c);
     if (body.endsOn < body.startsOn) throw new ApiError('validation', 'The last day cannot be before the first day.', { fields: { endsOn: 'Pick a day on or after the first day.' } });
     await this.checkPapers(t, body, []);
     const classIds = [...new Set([body.classId, ...body.alsoClassIds])];
@@ -302,6 +303,7 @@ export class LearningService {
    */
   async updateExam(t: TenantCtx, user: User, id: string, body: ExamCreate): Promise<ExamRow> {
     const e = await this.exam(t, id);
+    await mayTeach(t, user, e.classId);
     if (e.status === 'published') throw new ApiError('conflict', 'The results are out. Reopen them first to change the exam.');
     if (body.endsOn < body.startsOn) throw new ApiError('validation', 'The last day cannot be before the first day.', { fields: { endsOn: 'Pick a day on or after the first day.' } });
     const marked = new Set((await t.pool.query<{ subject_id: string }>('select distinct subject_id from exam_marks where exam_id = $1', [id])).rows.map((r) => r.subject_id));
@@ -334,6 +336,7 @@ export class LearningService {
   /** Published results are locked; reopening them (with why) lets marks be corrected, and families are told why when they go out again. */
   async reopenExam(t: TenantCtx, user: User, id: string, note: string): Promise<ExamRow> {
     const e = await this.exam(t, id);
+    await mayTeach(t, user, e.classId);
     if (e.status !== 'published') throw new ApiError('conflict', 'These results are not out yet, so there is nothing to reopen.');
     await t.pool.query("update exams set status = 'marking', reopened_note = $2 where id = $1", [id, note]);
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'exam.reopened', entity: 'exam', entityId: id, detail: { name: e.name, note } });
@@ -476,6 +479,7 @@ export class LearningService {
 
   async publishExam(t: TenantCtx, user: User, id: string): Promise<{ families: number; exam: ExamRow }> {
     const res = await this.results(t, id);
+    await mayTeach(t, user, res.exam.classId);
     const missing = res.exam.expected - res.exam.entered;
     if (missing > 0) throw new ApiError('conflict', tx('{missing, plural, one {# mark is} other {# marks are}} still missing. Enter every mark, or mark the student absent, before publishing.', { missing }));
     const client = await t.pool.connect();
@@ -505,6 +509,7 @@ export class LearningService {
 
   async deleteExam(t: TenantCtx, user: User, id: string): Promise<void> {
     const e = await this.exam(t, id);
+    await mayTeach(t, user, e.classId);
     if (e.status === 'published') throw new ApiError('conflict', 'Published results cannot be deleted. Ask Tangent if this exam was created by mistake.');
     await t.pool.query('delete from exams where id = $1', [id]);
     await this.audit.record(t, { actorId: user.id, actorName: user.name, action: 'exam.removed', entity: 'exam', entityId: id, detail: { name: e.name } });

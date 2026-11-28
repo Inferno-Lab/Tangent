@@ -5,7 +5,7 @@ import type { FileKind, FileRow, FileStart, FileUpload } from '@tangent/contract
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import type { AuthedUser, TenantCtx } from '../tenancy/tenant.js';
 import { HubService } from './hub.service.js';
-import { SettingsService } from './support.js';
+import { SettingsService, maySee } from './support.js';
 import { reachSql } from './notice-reach.js';
 import { tx } from '@tangent/contracts';
 
@@ -131,10 +131,21 @@ export class FilesService implements OnModuleInit {
         visitor_photo: 'visitors.read', pickup_photo: 'visitors.read', receipt: 'fees.read', report_card: 'exams.read', staff_photo: 'staff.read',
       };
       const p = need[f.kind];
-      if (!p || user.permissions.includes(p)) return;
-      // A teacher reads the files in their own conversations without the office's inbox permission.
-      if (f.kind === 'chat' && (await t.pool.query('select 1 from threads where id = $1 and assigned_to = $2', [f.owner_id, user.id])).rowCount) return;
-      throw forbidden('You do not have access to this file.');
+      const whole = user.permissions.includes('classes.all') || user.id.startsWith('support:');
+      // A teacher reads the files in their own conversations without the office's inbox permission (and, without whole-school
+      // access, only those: the inbox shows them no other conversation either).
+      if (f.kind === 'chat' && (!p || !user.permissions.includes(p) || !whole)) {
+        if ((await t.pool.query('select 1 from threads where id = $1 and assigned_to = $2', [f.owner_id, user.id])).rowCount) return;
+        throw forbidden('You do not have access to this file.');
+      }
+      if (p && !user.permissions.includes(p)) throw forbidden('You do not have access to this file.');
+      // A child's own files follow their class: staff without whole-school access open them only for the classes they teach.
+      const student = f.kind === 'homework_submission' ? f.owner_id?.split(':')[1] : ['student_photo', 'student_document', 'report_card'].includes(f.kind) ? f.owner_id : null;
+      if (student && !whole) {
+        const cls = (await t.pool.query<{ class_id: string | null }>('select class_id from students where id = $1', [student])).rows[0]?.class_id;
+        await maySee(t, user, cls ?? null).catch(() => { throw forbidden('You do not have access to this file.'); });
+      }
+      return;
     }
     const kids = await this.children(t, user.id);
     const owner = f.owner_id ?? '';

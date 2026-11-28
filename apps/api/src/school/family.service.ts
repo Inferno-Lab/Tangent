@@ -367,6 +367,11 @@ export class FamilyService {
   async today(t: TenantCtx, user: AuthedUser, students: string[]) {
     const w = await this.who(t, user);
     if (w.kind !== 'staff') students = students.filter((s) => w.children.includes(s));
+    else if (!w.perms.includes('classes.all')) {
+      // Staff read only the children of the classes they teach.
+      const taught = await this.taught(t, w.id);
+      students = (await t.pool.query<{ id: string }>('select id from students where id = any($1) and class_id = any($2)', [students, taught])).rows.map((r) => r.id);
+    }
     const { rows } = await t.pool.query<{ student_id: string; status: string }>(
       `select d.student_id, d.status from attendance_days d where d.date = $1 and d.student_id = any($2)`, [schoolToday(), students]);
     return Object.fromEntries(rows.map((r) => [r.student_id, r.status === 'leave' ? 'absent' : r.status]));
@@ -382,6 +387,7 @@ export class FamilyService {
   /** A class's periods on a day, for the teacher marking the one they teach. */
   async periods(t: TenantCtx, user: AuthedUser, classId: string, date: string) {
     if (!user.permissions.includes('attendance.mark')) throw forbidden('You are not allowed to mark attendance.');
+    await this.mayClass(t, await this.who(t, user), classId);
     return this.attendance.periods(t, user, classId, date);
   }
 
@@ -638,6 +644,7 @@ export class FamilyService {
 
   async marksDraft(t: TenantCtx, user: AuthedUser, classId: string, subject: string) {
     if (!user.permissions.includes('exams.read')) throw forbidden('You are not allowed to see marks.');
+    await this.mayClass(t, await this.who(t, user), classId);
     // The marks so far, and what the open exam marks this subject out of (the school's default before there is one).
     const e = await this.openExam(t, classId, subject);
     if (!e) return { marks: {}, maxMarks: await this.settings.value<number>(t, 'exams.defaultMaxMarks', 100), grades: [], gradeMarks: {} };

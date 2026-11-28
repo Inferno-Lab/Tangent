@@ -232,10 +232,14 @@ export class NoticesService implements OnModuleInit {
   }
 
   /** For the office: the people a notice that asks for acknowledgement has not been acknowledged by yet. */
-  async notAcked(t: TenantCtx, id: string): Promise<{ id: string; name: string; phone: string | null }[]> {
+  /** `scope`: the classes this person sees (null: every one); families of other classes are left out, as everywhere else. */
+  async notAcked(t: TenantCtx, id: string, scope: string[] | null = null): Promise<{ id: string; name: string; phone: string | null }[]> {
     const n = (await t.pool.query<{ audience: string; class_id: string | null; targets: unknown }>('select audience, class_id, targets from notices where id = $1', [id])).rows[0];
     if (!n) throw notFound('That notice');
-    const sql = `select u.id, u.name, u.phone from users u where u.id in (select x.id from (${reachSql('$1::text', '$2::text', '$4::jsonb')}) x) and u.id not in (select user_id from notice_reads where notice_id = $3 and acked_at is not null) order by u.name`;
-    return (await t.pool.query(sql, [n.audience, n.class_id, id, JSON.stringify(n.targets ?? {})])).rows;
+    const sql = `select u.id, u.name, u.phone from users u where u.id in (select x.id from (${reachSql('$1::text', '$2::text', '$4::jsonb')}) x) and u.id not in (select user_id from notice_reads where notice_id = $3 and acked_at is not null)
+      and ($5::text[] is null or exists (select 1 from staff sf where sf.user_id = u.id) or exists (select 1 from students st where st.user_id = u.id and st.class_id = any($5::text[]))
+        or exists (select 1 from guardians g join student_guardians sg on sg.guardian_id = g.id join students st on st.id = sg.student_id where g.user_id = u.id and st.class_id = any($5::text[])))
+      order by u.name`;
+    return (await t.pool.query(sql, [n.audience, n.class_id, id, JSON.stringify(n.targets ?? {}), scope])).rows;
   }
 }

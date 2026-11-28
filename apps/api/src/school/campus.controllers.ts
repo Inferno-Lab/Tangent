@@ -16,7 +16,7 @@ import { GalleryService } from './gallery.service.js';
 import { HubService } from './hub.service.js';
 import { LibraryService } from './library.service.js';
 import { PaymentsService } from './payments.service.js';
-import { SettingsService } from './support.js';
+import { SettingsService, maySee } from './support.js';
 import { TransportService } from './transport.service.js';
 import { sendPdf } from './pdf.js';
 import { signLink } from '@tangent/integrations';
@@ -144,7 +144,9 @@ export class ReportCardsController {
   constructor(private readonly docs: DocumentsService) {}
 
   @Get(':id/report-cards/:student') @Require('exams.read')
-  async card(@Tenant() t: TenantCtx, @Param('id') id: string, @Param('student') student: string, @Res() reply: FastifyReply): Promise<void> {
+  async card(@Tenant() t: TenantCtx, @CurrentUser() u: AuthedUser, @Param('id') id: string, @Param('student') student: string, @Res() reply: FastifyReply): Promise<void> {
+    // The same classes as the exam's marks and results: a teacher prints their own classes' cards.
+    await maySee(t, u, (await t.pool.query<{ class_id: string }>('select class_id from exams where id = $1', [id])).rows[0]?.class_id);
     sendPdf(reply, await this.docs.reportCard(t, id, student, null));
   }
 }
