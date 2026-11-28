@@ -38,8 +38,15 @@ export interface SettingMeta {
  */
 export const TANGENT_SETTINGS: readonly SettingKey[] = [
   'brand.color', 'school.country', 'school.currency', 'classes.schoolEdits', 'calendar.schoolEdits', 'timetable.schoolEdits', 'feeStructures.schoolEdits', 'roles.schoolEdits',
+  'documents.templates', 'brand.logoFileId', 'homework.handInWith',
 ];
-export const settingOwner = (key: string): 'school' | 'tangent' => ((TANGENT_SETTINGS as readonly string[]).includes(key) ? 'tangent' : 'school');
+/**
+ * Whole areas Tangent sets up for the school (the owner's call, 28 November 2026): how people sign in, what the app shows
+ * each role, how messages travel and are worded, and the privacy notice. The school asks Tangent to change them.
+ */
+export const TANGENT_GROUPS: readonly SchoolWideGroup[] = ['Look', 'The app', 'Sign-in and security', 'Privacy', 'Messaging'];
+export const settingOwner = (key: string): 'school' | 'tangent' =>
+  (TANGENT_SETTINGS as readonly string[]).includes(key) || (TANGENT_GROUPS as readonly string[]).includes(SETTINGS_META[key as SettingKey]?.group ?? '') ? 'tangent' : 'school';
 
 /**
  * Settings where a value Tangent locks is a floor, not a fixed value: the school may only make them stricter (a longer
@@ -153,6 +160,7 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = localized({
   'homework.showClassProgress': { group: 'homework', label: 'Families see how many classmates have handed in', kind: 'bool' },
   'homework.defaultDueDays': { group: 'homework', label: 'New homework is due after', kind: 'number', min: 1, max: 30, help: 'Days after it is set, as the date a teacher starts from.' },
   'homework.defaultMarks': { group: 'homework', label: 'New marked homework is out of', kind: 'number', min: 1, max: 100, help: 'The marks a teacher starts from; they can change it.' },
+  'homework.handInWith': { group: 'homework', label: 'Homework is handed in from the app as', kind: 'multi', options: [['photo', 'Photos of the work'], ['text', 'A written answer']], help: 'Tick one or both. Families and students see only the ways ticked; the teacher sees what was handed in either way.' },
   'homework.handedInBy': { group: 'homework', label: 'Who hands homework in from the app', kind: 'enum', options: [['either', 'The student or a parent'], ['student', 'The student only'], ['parent', 'A parent only']], help: 'Students hand in only when students use the app.' },
 
   // Exams and results
@@ -182,7 +190,7 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = localized({
   'tax.inclusive': { group: 'fees', label: 'Fees include the tax', kind: 'bool', help: 'On: the receipt shows the tax inside each fee. Off: the tax is added on top of the fee when it is billed.' },
   'tax.split': { group: 'fees', label: 'Parts of the tax on a receipt', kind: 'taxSplit', help: 'Where a country shows the tax in parts (central and state GST in India), each part and its share. Empty: one line.' }, // india-pack: an example
   'tax.heads': { group: 'fees', label: 'Fee heads that carry tax', kind: 'multi', help: 'From the school’s own fee heads.' },
-  'fees.refundApprovalAbove': { group: 'fees', label: 'Refunds above this need a second person (in the school’s currency)', kind: 'number', min: 0, max: 10_000_000 },
+  'fees.refundApprovalAbove': { group: 'fees', label: 'Refunds above this need a second person (in the school’s currency)', kind: 'number', min: 0, max: 10_000_000, risky: true, help: 'Raising it lets one person refund more on their own, so a change waits for a second person.' },
   'fees.dailyTarget': { group: 'fees', label: 'Daily fee collection target (in the school’s currency)', kind: 'number', min: 0, max: 100_000_000, help: 'The dashboard measures each day’s collection against it.' },
   'feeStructures.schoolEdits': { group: 'fees', label: 'The school may edit its fee heads and fee structures', kind: 'bool', help: 'Off: only Tangent changes what each grade pays. Who approves a fee waiver is whoever’s role may waive fees (Roles).' },
 
@@ -246,3 +254,18 @@ export const SETTINGS_META: Record<SettingKey, SettingMeta> = localized({
   'certificates.types': { group: 'certificates', label: 'Certificates', kind: 'certificateTypes', help: 'Each with its words and {placeholders}, its own numbering if it has one, its fee, and whether it needs nothing to be owed.' },
   'certificates.number': { group: 'certificates', label: 'Certificate numbers', kind: 'text', help: 'For certificates without their own numbering. A pattern, like CERT-{yyyy}-{seq:4}. Tokens: {yyyy} {yy} {mm} {ay} {seq}.' },
 });
+
+/**
+ * What a change was, in words a person reads: record ids and empty values left out, a list or the settings changed named,
+ * never an object's JSON. The keys are the audit's own words (amount, reason, class).
+ */
+export function auditDetail(d: Record<string, unknown>): string {
+  const label = (k: string) => SETTINGS_META[k as keyof typeof SETTINGS_META]?.label ?? k;
+  return Object.entries(d).flatMap(([k, v]): string[] => {
+    if (v === null || v === undefined || v === '' || k === 'id' || /Ids?$/.test(k)) return [];
+    const name = k.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+    if (Array.isArray(v)) return v.length && v.every((x) => typeof x !== 'object') ? [`${name}: ${v.map((x) => label(String(x))).join(', ')}`] : [];
+    if (typeof v === 'object') return Object.keys(v).length ? [`${name}: ${Object.keys(v).map(label).join(', ')}`] : [];
+    return [`${name}: ${String(v)}`];
+  }).join(' · ');
+}

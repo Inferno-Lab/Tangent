@@ -19,7 +19,8 @@ export function SettingsEditor({ keys: asked, title = t('admin.settings_view.set
   const app = useApp();
   const qc = useQueryClient();
   const shake = useShake();
-  const keys = asked.filter((k): k is SettingKey => k in SETTINGS_META && !SETTINGS_META[k as SettingKey].notUsedYet);
+  // What Tangent sets is not shown at all: a school reads only what it can change (or what Tangent fixed on its own setting).
+  const keys = asked.filter((k): k is SettingKey => k in SETTINGS_META && !SETTINGS_META[k as SettingKey].notUsedYet && settingOwner(k) === 'school');
   const q = useQuery({ queryKey: ['settings-edit'], queryFn: app.api.settings.edit });
   const [edits, setEdits] = useState<Record<string, unknown>>({});
   const [note, setNote] = useState('');
@@ -47,7 +48,6 @@ export function SettingsEditor({ keys: asked, title = t('admin.settings_view.set
   });
   const why = (k: SettingKey) => {
     const lock = locked(k);
-    if (settingOwner(k) === 'tangent') return t('admin.settings_view.set_by_tangent_for_your');
     if (lock) return `${TIGHTEN[k] ? t('admin.settings_view.tangent_sets_the_minimum_here') : t('admin.settings_view.set_by_tangent_for_your_2')}${lock.note ? ` ${lock.note}` : ''}`;
     return SETTINGS_META[k].help;
   };
@@ -61,10 +61,10 @@ export function SettingsEditor({ keys: asked, title = t('admin.settings_view.set
         {!can && keys.length > 0 && <div className="help" style={{ marginTop: 0 }}>{t('admin.settings_view.you_can_see_these_settings')}</div>}
         {keys.map((k) => {
           // A floor (security, privacy) still lets the school be stricter, so it stays editable.
-          const readOnly = !can || settingOwner(k) === 'tangent' || (!!locked(k) && !TIGHTEN[k]);
+          const readOnly = !can || (!!locked(k) && !TIGHTEN[k]);
           return <SettingRow key={k} meta={SETTINGS_META[k]} value={value(k)} error={err[k]} disabled={readOnly} ctx={{ ...v, previewDocument: app.api.settings.previewDocument }} note={why(k)} onChange={(x) => { setEdits((e) => ({ ...e, [k]: x })); setErr({}); }} />;
         })}
-        {can && keys.some((k) => settingOwner(k) === 'school') && (
+        {can && keys.length > 0 && (
           <div style={{ marginTop: 16 }}>
             {err._ && <ErrorLine>{err._}</ErrorLine>}
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>

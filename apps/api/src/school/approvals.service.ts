@@ -2,6 +2,7 @@ import { Injectable, type OnModuleInit } from '@nestjs/common';
 import type { Job } from '@tangent/db';
 import { roundToCurrency, fmtNumber, initials, stepsFor, tx, WORKFLOW_PROCESSES, type ApprovalDecision, type ApprovalKind, type ApprovalRow, type Permission, type StepDef, type StepDone, type WorkflowsSetting } from '@tangent/contracts';
 import { schoolContext } from '@tangent/tenancy';
+import { checkSchoolChanges, settingPermissions } from '@tangent/config-engine';
 import { ApiError, forbidden, notFound } from '@tangent/nest-kit';
 import { TenantService, type TenantCtx } from '../tenancy/tenant.js';
 import { HubService } from './hub.service.js';
@@ -33,7 +34,7 @@ const KIND_NEEDS: Record<ApprovalKind, string | null> = {
 };
 /** What a person needs to be allowed to decide each kind. */
 const NEEDS: Record<ApprovalKind, Permission[]> = {
-  leave: ['approvals.decide'], fee_waiver: ['approvals.decide', 'fees.waive'], notice: ['approvals.decide', 'notices.publish'], admission: ['approvals.decide'], attendance: ['attendance.read'],
+  leave: ['approvals.decide'], fee_waiver: ['approvals.decide', 'fees.waive'], notice: ['approvals.decide', 'notices.publish'], admission: ['approvals.decide'], attendance: ['attendance.read', 'classes.all'],
   photo: ['approvals.decide', 'students.write'], receipt_cancel: ['approvals.decide', 'fees.refund'], settings: ['approvals.decide', 'settings.manage'],
   staff_leave: ['approvals.decide'], gate_pass: ['approvals.decide'], certificate: ['approvals.decide', 'certificates.issue'], visitor: ['approvals.decide'],
 };
@@ -207,7 +208,8 @@ export class ApprovalsService implements OnModuleInit {
     const perms = user.permissions;
     const [cfg, kinds] = await Promise.all([this.settings.effective(t), this.mine(t, perms)]);
     const { rows } = await t.pool.query<{ admissions: string; approvals: string; messages: string }>(
-      "select (select count(*) from enquiries where stage in ('applied','test','offer')) admissions, (select count(*) from approvals where status = 'pending' and kind = any($1)) approvals, (select count(distinct m.thread_id) from thread_messages m join threads x on x.id = m.thread_id where x.status = 'open' and m.from_kind = 'guardian' and m.read_at is null) messages", [kinds]);
+      "select (select count(*) from enquiries where stage in ('applied','test','offer')) admissions, (select count(*) from approvals where status = 'pending' and kind = any($1)) approvals, (select count(distinct m.thread_id) from thread_messages m join threads x on x.id = m.thread_id where x.status = 'open' and m.from_kind = 'guardian' and m.read_at is null and ($2::text is null or x.assigned_to = $2)) messages",
+      [kinds, perms.includes('classes.all') || user.id.startsWith('support:') ? null : user.id]);
     // A badge for a module the school does not have would point at a page it cannot open.
     return {
       admissions: cfg.features.includes('people.admissions') && perms.includes('admissions.read') ? Number(rows[0]!.admissions) : 0,
@@ -255,6 +257,10 @@ export class ApprovalsService implements OnModuleInit {
       // A settings change applies while the request is held: if the settings moved on since it was asked for, nothing is decided.
       if (r.kind === 'settings' && body.decision === 'approve') {
         const p = r.payload as { changes: Record<string, unknown>; note?: string; expectedVersion?: number };
+        // Asked before Tangent took the setting over (or locked it): the school may no longer change it.
+        const ent = t.info.entitlement;
+        const gone = checkSchoolChanges(p.changes, { locks: ent.locks ?? [], overrides: ent.overrides ?? {} }, Object.keys(p.changes).flatMap(settingPermissions));
+        if (gone.length) throw new ApiError('conflict', gone[0]!.message);
         await this.settings.apply(t, { id: r.requested_by ?? user.id, name: `${r.requester_name}, approved by ${user.name}` }, p.changes, p.note ?? '', p.expectedVersion);
       }
       let payload = r.payload;

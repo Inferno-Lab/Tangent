@@ -58,7 +58,7 @@ export interface HomeworkFile { id: string; name: string; mime: string }
 export interface HomeworkDetail extends HomeworkRow {
   /** What the teacher attached. */
   files: HomeworkFile[];
-  students: { studentId: string; name: string; rollNo: string; handedAt: string | null; onTime: boolean; score: number | null; feedback: string; files: HomeworkFile[] }[];
+  students: { studentId: string; name: string; rollNo: string; handedAt: string | null; onTime: boolean; score: number | null; feedback: string; files: HomeworkFile[]; /** What the student wrote in the app, when they handed in a written answer. */ answer: string }[];
 }
 
 // Exams

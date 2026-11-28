@@ -104,7 +104,7 @@ export const PERMISSION_CATALOG: PermissionInfo[] = localized([
   { key: 'students.write', area: 'People', label: 'Add and edit students' },
   { key: 'staff.read', area: 'People', label: 'See staff' },
   { key: 'staff.write', area: 'People', label: 'Add and edit staff', sensitive: true },
-  { key: 'classes.all', area: 'People', label: 'Mark attendance, enter marks and set homework for every class, not only the ones they teach', sensitive: true },
+  { key: 'classes.all', area: 'People', label: 'See and work with every class (students, attendance, homework, marks, diary, family messages), not only the ones they teach', sensitive: true },
   { key: 'attendance.read', area: 'Attendance', label: 'See attendance' },
   { key: 'attendance.mark', area: 'Attendance', label: 'Mark attendance' },
   { key: 'fees.read', area: 'Fees', label: 'See fees and payments' },
@@ -174,6 +174,12 @@ export const RoleTemplatesPut = z.array(z.object({
   permissions: z.array(z.enum(PERMISSIONS)),
 })).min(1).max(30);
 
+/** Work that spans the whole school: a role holding any of these sees every class (classes.all) when a school is set up. */
+export const WHOLE_SCHOOL_PERMISSIONS: readonly Permission[] = ['students.write', 'settings.manage', 'fees.read', 'fees.collect', 'fees.refund', 'admissions.read', 'admissions.write', 'staff.write', 'reports.read',
+  'transport.read', 'transport.write', 'library.read', 'library.write', 'visitors.read', 'visitors.manage', 'certificates.read', 'certificates.issue', 'staffAttendance.manage', 'privacy.manage'];
+/** A starting role's permissions with classes.all added where its work spans the whole school (school migration 0073 does the same). */
+export const withWholeSchool = (perms: readonly Permission[]): Permission[] => (perms.some((x) => WHOLE_SCHOOL_PERMISSIONS.includes(x)) && !perms.includes('classes.all') ? [...perms, 'classes.all'] : [...perms]);
+
 export const ROLE_TEMPLATES: RoleTemplate[] = [
   { key: 'principal', name: 'Principal', description: 'Everything in the school.', permissions: ALL },
   {
@@ -191,7 +197,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
     key: 'accountant',
     name: 'Accountant',
     description: 'Fees, payments and reports.',
-    permissions: ['students.read', 'fees.read', 'fees.collect', 'fees.refund', 'reports.read', 'notices.read', 'events.read'],
+    permissions: ['students.read', 'classes.all', 'fees.read', 'fees.collect', 'fees.refund', 'reports.read', 'notices.read', 'events.read'],
   },
   {
     key: 'teacher',

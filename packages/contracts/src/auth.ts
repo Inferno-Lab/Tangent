@@ -20,8 +20,11 @@ export const LoginChallenge = z.object({
   expiresInSeconds: z.number().int(),
   /** When another code may be asked for: a short wait, longer once several were sent. */
   resendInSeconds: z.number().int().optional(),
-  /** Staff who run the school, at their first sign-in with an authenticator: add this key to the app, then type its code. */
-  enroll: z.object({ secret: z.string(), uri: z.string() }).optional(),
+  /**
+   * Staff who run the school, at their first sign-in with an authenticator: add this key to the app, then type its code. `qr` is
+   * the key's QR code as rows of 0 and 1 (1 dark), for the phone app to draw without a QR library of its own.
+   */
+  enroll: z.object({ secret: z.string(), uri: z.string(), qr: z.array(z.string()).optional() }).optional(),
 });
 export type LoginChallenge = z.infer<typeof LoginChallenge>;
 

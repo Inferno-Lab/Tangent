@@ -63,6 +63,8 @@ export type Category = z.infer<typeof CATEGORY>;
 
 /** The app's roles (config-engine's APP_ROLES is the same list). */
 export const APP_ROLE_KEYS = ['parent', 'student', 'teacher', 'driver'] as const;
+/** How homework comes in from the app: photos of the work, or an answer written in it. */
+export const HAND_IN_WITH = ['photo', 'text'] as const;
 export type AppRoleKey = (typeof APP_ROLE_KEYS)[number];
 const APP_LAYOUT = z.object({ dock: z.array(z.string()).max(4), home: z.array(z.string()).max(12), quick: z.array(z.string()).max(6) });
 export type AppLayout = z.infer<typeof APP_LAYOUT>;
@@ -314,6 +316,8 @@ export const SchoolSettingsSchema = z.object({
   'homework.defaultDueDays': z.number().int().min(1).max(30).default(2),
   'homework.defaultMarks': z.number().int().min(1).max(100).default(20),
   'homework.handedInBy': z.enum(['parent', 'student', 'either']).default('either'),
+  // How work comes in from the app: photos of it, an answer written in the app, or either (at least one).
+  'homework.handInWith': z.array(z.enum(HAND_IN_WITH)).min(1, 'Keep at least one way to hand in').default([...HAND_IN_WITH]),
   // Results: class rank shown to families; the grading scale (highest first) and the pass mark.
   'exams.defaultMaxMarks': z.number().int().min(1).max(200).default(100),
   'exams.leadDays': z.number().int().min(0).max(120).default(7),

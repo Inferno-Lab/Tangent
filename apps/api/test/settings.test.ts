@@ -31,6 +31,12 @@ describe('the school changes its own settings', () => {
 
   it('refuses Tangent’s own settings, bad values and a person without the permission', async () => {
     expect((await change({ 'brand.color': '#123456' })).status).toBe(400);
+    // Sign-in, the app, messages, the privacy notice and printed documents are Tangent's to set (the school asks).
+    for (const k of ['security.passwordMinLength', 'app.layout', 'notify.quietFrom', 'templates.messages', 'privacy.notice', 'documents.templates']) {
+      const r = await change({ [k]: k === 'security.passwordMinLength' ? 12 : k === 'notify.quietFrom' ? '21:00' : k === 'privacy.notice' ? 'x' : {} });
+      expect(r.status, k).toBe(400);
+      expect(r.json.fields[k], k).toContain('Tangent');
+    }
     const bad = await change({ 'library.loanDays': 500 });
     expect(bad.status).toBe(400);
     expect(bad.json.fields['library.loanDays']).toBeTruthy();
@@ -44,25 +50,23 @@ describe('the school changes its own settings', () => {
     expect((await h.call('PATCH', '/v1/settings', { token: principal, body: { expectedVersion: v.json.version, changes: { 'library.maxRenewals': 3 } } })).status).toBe(409);
   });
 
-  it('keeps a locked setting at Tangent’s value, and a floor only lets the school be stricter', async () => {
-    await h.entitle({ locks: ['library.finePerDay', 'security.passwordMinLength'], overrides: { 'library.finePerDay': 2, 'security.passwordMinLength': 12 } });
+  it('keeps a locked setting at Tangent’s value', async () => {
+    await h.entitle({ locks: ['library.finePerDay'], overrides: { 'library.finePerDay': 2 } });
     const v = await view();
     expect(v.json.values['library.finePerDay']).toBe(2);
     expect(v.json.locks.map((l: any) => l.key)).toContain('library.finePerDay');
     expect((await change({ 'library.finePerDay': 5 })).status).toBe(400);
-    const looser = await change({ 'security.passwordMinLength': 10 });
-    expect(looser.status).toBe(400);
-    expect(looser.json.fields['security.passwordMinLength']).toContain('at least 12');
-    expect((await change({ 'security.passwordMinLength': 14 })).status).toBe(200);
-    expect((await view()).json.values['security.passwordMinLength']).toBe(14);
     await h.entitle({ locks: [], overrides: {} });
   });
 
   it('a risky setting waits for a second person in the school', async () => {
-    const r = await change({ 'privacy.retentionMonths': 48 }, principal, 'Board asked for four years');
+    const r = await change({ 'fees.refundApprovalAbove': 48000 }, principal, 'Board raised the limit');
     expect(r.status).toBe(200);
     expect(r.json.pending).toBe(true);
-    expect((await view()).json.values['privacy.retentionMonths']).not.toBe(48);
+    expect((await view()).json.values['fees.refundApprovalAbove']).not.toBe(48000);
+    // The same change asked again while it waits is the same request, not a second one.
+    const again = await change({ 'fees.refundApprovalAbove': 48000 }, principal, 'Board raised the limit');
+    expect(again.json.approvalId).toBe(r.json.approvalId);
     // The one who asked cannot approve it; a second person with the right to change settings can, and it applies then.
     const self = await h.call('POST', `/v1/approvals/${r.json.approvalId}/decision`, { token: principal, body: { decision: 'approve' } });
     expect(self.status).toBe(403);
@@ -72,7 +76,7 @@ describe('the school changes its own settings', () => {
     const second = await h.login(h.people.mathsTeacher.email);
     const ok = await h.call('POST', `/v1/approvals/${r.json.approvalId}/decision`, { token: second, body: { decision: 'approve' } });
     expect(ok.status).toBe(200);
-    expect((await view()).json.values['privacy.retentionMonths']).toBe(48);
+    expect((await view()).json.values['fees.refundApprovalAbove']).toBe(48000);
   });
 
   it('marks attendance with the school’s own marks, named its way and counted by what they mean', async () => {
@@ -234,7 +238,7 @@ describe('grading the school’s way', () => {
 describe('the school’s own printed documents', () => {
   it('prints a receipt and a report card from the school’s own template, and previews one being edited', async () => {
     const receipt = { size: 'A5', blocks: [{ kind: 'school' }, { kind: 'heading', text: 'Official receipt {receiptNo}', align: 'center' }, { kind: 'items' }, { kind: 'signatures', value: 'Bursar\nParent' }] };
-    expect((await change({ 'documents.templates': { receipt } })).status).toBe(200);
+    await h.setSettings({ 'documents.templates': { receipt } });
     const preview = await h.call('POST', '/v1/school/documents/preview', { token: principal, body: { kind: 'reportCard', template: { blocks: [{ kind: 'school' }, { kind: 'items' }, { kind: 'fact', text: 'GPA', value: '{gpa}', when: 'gpa' }] } } });
     expect(preview.status).toBe(200);
     expect(preview.headers['content-type']).toContain('application/pdf');
@@ -245,7 +249,7 @@ describe('the school’s own printed documents', () => {
     const [{ id }] = await h.schoolSql('select id from payments order by receipt_no limit 1');
     const pdf = await h.call('GET', `/v1/fees/payments/${id}/receipt.pdf`, { token: principal });
     expect(pdf.headers['content-type']).toContain('application/pdf');
-    await change({ 'documents.templates': {} });
+    await h.setSettings({ 'documents.templates': {} });
   });
 });
 

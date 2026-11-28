@@ -139,7 +139,8 @@ export const MODULES: ModuleManifest[] = localized([
         tabs: [{ key: 'terms', label: 'Years and terms' }, { key: 'holidays', label: 'Holidays' }, { key: 'classes', label: 'Classes' }, { key: 'subjects', label: 'Subjects' }, { key: 'bells', label: 'Bell times' }, { key: 'year-end', label: 'Year-end', anyOf: ['year.manage'] }],
       }),
       P('profile', 'School profile', 'setup', 'G ,', '/profile', 'School', ['settings.read'], {
-        tabs: [{ key: 'identity', label: 'Identity' }, { key: 'security', label: 'Sign-in' }, { key: 'plan', label: 'Plan and modules' }, { key: 'app', label: 'The app' }, { key: 'roles', label: 'Roles' }, { key: 'messages', label: 'Messages' }, { key: 'privacy', label: 'Privacy notice' }, { key: 'data', label: 'Your data', anyOf: ['privacy.manage'] }],
+        // Sign-in, the app, messages and the privacy notice are Tangent's (TANGENT_GROUPS): the console sets them.
+        tabs: [{ key: 'identity', label: 'Identity' }, { key: 'plan', label: 'Plan and modules' }, { key: 'roles', label: 'Roles' }, { key: 'data', label: 'Your data', anyOf: ['privacy.manage'] }],
       }),
       P('privacy', 'Privacy requests', 'privacy', 'G P', '/privacy', 'School', ['privacy.manage']),
       P('audit', 'Audit log', 'audit', 'G L', '/audit', 'School', ['audit.read']),
@@ -222,7 +223,7 @@ export const MODULES: ModuleManifest[] = localized([
       A('dock', 'homework', 'Homework', FAMILY), A('home', 'homework', 'Homework to do', FAMILY), A('quick', 'homework', 'Homework', FAMILY),
       A('quick', 'assignHomework', 'Set homework', ['teacher']), A('quick', 'grade', 'Grade', ['teacher'], 'homework.grading'),
     ],
-    settings: ['homework.goalPct', 'homework.showClassProgress', 'homework.handedInBy', 'homework.defaultDueDays', 'homework.defaultMarks'],
+    settings: ['homework.goalPct', 'homework.showClassProgress', 'homework.handedInBy', 'homework.handInWith', 'homework.defaultDueDays', 'homework.defaultMarks'],
     permissions: ['homework.read', 'homework.write'],
     messages: ['homework.new', 'homework.graded'],
     imports: [],
