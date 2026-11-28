@@ -7,7 +7,8 @@ import { CSRF_HEADER } from './cookies.js';
 import { requestLanguage, schoolContext } from '@tangent/tenancy';
 
 /** Routes that take a school's files (a whole student list, a year of attendance as CSV): everything else keeps the small limit. */
-const BIG_BODIES = /^\/v1\/(students\/import|moving-in\/uploads)$|^\/console\/v1\/schools\/:id\/(import\/(preview|commit)|logo)$|^\/hooks\/sandbox-storage\/:token$/;
+// The new-school wizard carries the logo (up to 2 MB, base64) in its drafts, review and launch.
+const BIG_BODIES = /^\/v1\/(students\/import|moving-in\/uploads)$|^\/console\/v1\/schools\/:id\/(import\/(preview|commit)|logo)$|^\/console\/v1\/wizard\/(drafts(\/:id)?|review|launch)$|^\/hooks\/sandbox-storage\/:token$/;
 
 export interface HttpEnv {
   NODE_ENV: 'development' | 'test' | 'production';

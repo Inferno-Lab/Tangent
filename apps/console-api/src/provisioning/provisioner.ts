@@ -220,9 +220,17 @@ export class Provisioner implements OnApplicationBootstrap {
         }
       }
       if (!r.dryRun) await this.activate(r.schoolId);
+      // What waits for a set-up school: the wizard's logo goes into its storage, before the run says it is done, so whoever
+      // opens the school next sees it. A failure is written on the run (the school is fine; the logo can be uploaded again).
+      if (!r.dryRun) {
+        for (const fn of this.whenSetUp) {
+          await fn(r.schoolId, payload.wizard).catch((e: Error) => {
+            this.log.warn(`after set-up of ${r.schoolId}: ${e.message}`);
+            steps.at(-1)?.log.push({ at: now(), level: 'warn', text: `The logo could not be stored (${e.message}). Upload it again under the school's Configuration.` });
+          });
+        }
+      }
       await save('succeeded');
-      // What waits for a set-up school: the wizard's logo goes into its storage. A failure here is logged, the school is fine.
-      if (!r.dryRun) for (const fn of this.whenSetUp) await fn(r.schoolId, payload.wizard).catch((e: Error) => this.log.warn(`after set-up of ${r.schoolId}: ${e.message}`));
     } finally {
       this.active.delete(id);
     }
